@@ -6,6 +6,14 @@
 
 **Fresh start, design phase.** This project builds on extensive research from [start-prototype](https://github.com/grantcarthew/start-prototype), which validated the core concepts through a TOML-based implementation. The prototype revealed that TOML's lack of table ordering and limited validation made it unsuitable for this use case. This version is rebuilt from the ground up using CUE.
 
+Avoid references to the prototype in new documentation. This is a new design.
+
+### Active Project
+
+Projects are stored in the docs/projects/ directory. Continue by reading the active project.
+
+Active Project: docs/projects/p-001-cue-foundation-architecture.md
+
 ## Why CUE?
 
 CUE (Configure Unify Execute) provides exactly what this project needs:
