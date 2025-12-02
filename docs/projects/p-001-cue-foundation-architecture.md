@@ -164,6 +164,9 @@ Out of Scope:
 - [x] Documented no-name-field decision (DR-002)
 - [x] Documented index category structure (DR-003)
 - [x] Documented module naming convention (DR-004)
+- [x] Documented UTD pattern with Go templates (DR-005)
+- [x] Documented shell configuration approach (DR-006)
+- [x] Documented UTD error handling strategy (DR-007)
 - [x] Can articulate how CUE replaces the prototype's custom asset system
 - [x] Have working examples that demonstrate key concepts
 
@@ -174,11 +177,15 @@ Design Records:
 - ✓ DR-002: No Name Field in Task Schema
 - ✓ DR-003: Index Category Structure
 - ✓ DR-004: Module Naming Convention
+- ✓ DR-005: Go Templates for UTD Pattern
+- ✓ DR-006: Shell Configuration and Command Execution
+- ✓ DR-007: UTD Error Handling by Context
 
 Documentation:
-- docs/cue/schema-design.md - Schema design documentation
-- docs/cue/module-hierarchy.md - Module organization strategy
-- docs/cue/integration-notes.md - CUE-Go integration notes
+- ✓ docs/design/utd-pattern.md - UTD pattern documentation with Go templates
+- docs/cue/schema-design.md - Schema design documentation (TODO)
+- docs/cue/module-hierarchy.md - Module organization strategy (TODO)
+- docs/cue/integration-notes.md - CUE-Go integration notes (TODO)
 
 Schemas (reference/start-assets/schemas/):
 - ✓ schemas/task.cue - Task schema definition (#Task) - pure constraints, no defaults
@@ -400,12 +407,18 @@ This project sets the foundation for everything else. Take time to understand CU
 27. ✓ Created DR-002: No Name Field
 28. ✓ Created DR-003: Index Category Structure
 29. ✓ Created DR-004: Module Naming Convention
+30. ✓ Created UTD pattern documentation (docs/design/utd-pattern.md)
+31. ✓ Created DR-005: Go Templates for UTD Pattern
+32. ✓ Created DR-006: Shell Configuration and Command Execution
+33. ✓ Created DR-007: UTD Error Handling by Context
+34. ✓ UTD design complete (documentation + 3 design records)
 
 ### In Progress
 - Schema design for remaining concepts (roles, contexts, agents)
   - ✓ Task schema complete
   - ✓ Index schema complete
-  - Next: Role, Context, Agent schemas
+  - ✓ UTD pattern designed and documented
+  - Next: Create #UTD, #Role, #Context, #Agent schemas in CUE
 
 ### Next Steps
 1. Design CUE schemas for remaining core concepts
