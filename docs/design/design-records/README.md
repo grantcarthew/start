@@ -10,6 +10,9 @@ Design Records (DRs) document architectural decisions, algorithms, breaking chan
 | DR-002 | No Name Field in Task Schema | CUE | Accepted | 2025-12-02 |
 | DR-003 | Index Category Structure | Index | Accepted | 2025-12-02 |
 | DR-004 | Module Naming Convention | Module | Accepted | 2025-12-02 |
+| DR-005 | Go Templates for UTD Pattern | UTD | Accepted | 2025-12-02 |
+| DR-006 | Shell Configuration and Command Execution | UTD | Accepted | 2025-12-02 |
+| DR-007 | UTD Error Handling by Context | UTD | Accepted | 2025-12-02 |
 
 ## Process
 
@@ -23,6 +26,7 @@ Design Records (DRs) document architectural decisions, algorithms, breaking chan
 
 Common categories used in DRs:
 - CUE - CUE language and schema decisions
+- UTD - Unified Template Design pattern
 - CLI - Command-line interface design
 - Index - Asset discovery and search
 - Module - Module organization and naming
@@ -30,3 +34,4 @@ Common categories used in DRs:
 - Config - Configuration structure
 - Agent - Agent configuration
 - Role - Role definitions
+- Context - Context document configuration
