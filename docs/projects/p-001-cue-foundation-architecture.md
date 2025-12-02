@@ -1,7 +1,7 @@
 # P-001: CUE Foundation & Architecture
 
-- Status: Proposed
-- Started: -
+- Status: In Progress
+- Started: 2025-12-01
 - Completed: -
 
 ## Overview
@@ -9,6 +9,106 @@
 Research CUE language capabilities and design the foundational architecture for the CUE-based start tool. This project establishes how we'll use CUE for configuration, validation, asset management, and schema definition.
 
 This is the critical first project that determines whether CUE can fulfill the requirements that TOML could not: ordered configuration, built-in validation, type safety, and native package distribution.
+
+## Decisions Made
+
+### Foundation Technology
+- **Pure CUE architecture** - No TOML, all configuration and schemas in CUE
+- **CUE Central Registry** - Use standard OCI registries for module distribution
+- **Git tags for versioning** - Idiomatic CUE approach, format: `<directory-path>/<version>`
+- **Semantic versioning** - Required by CUE (v0.1.0, v0.2.0, etc.)
+
+### Asset Distribution Architecture
+- **Separate repository** - `start-assets` created at `./reference/start-assets`
+- **Each asset = independent CUE module** - Own versioning, independent lifecycle
+- **Lazy loading** - Download assets on first use (e.g., `start task code-review`)
+- **Module path convention** - `github.com/grantcarthew/start-<type>-<name>@v<major>`
+- **Module path prefix** - `github.com/grantcarthew/start` (clean branding, not `start-assets`)
+
+### Repository Structure
+- **Directory organization** - `tasks/category/item/` (e.g., `tasks/golang/code-review/`)
+- **Module names include category** - `start-task-category-item@v0` (e.g., `start-task-golang-code-review@v0`)
+- **Schemas in start-assets** - `start-assets/schemas/` (not separate repo)
+- **Index format** - CUE not CSV (`index.cue`)
+- **Index keys** - Use `category/item` format matching user input and directory structure
+- **Index purpose** - Enable CLI search/discovery (OCI catalog API is disabled)
+
+### Schema Hierarchy
+- **Three layers**:
+  1. Schemas (constraints) - `github.com/grantcarthew/start-schemas@v0`
+  2. Assets (values conforming to schemas)
+  3. User config (values + overrides)
+- **Assets import schemas** - Validate against schemas during development
+- **Publishing workflow** - Schemas published first, assets depend on them
+
+### Context Ordering
+- **Order matters** - ENVIRONMENT.md → INDEX.csv → AGENTS.md
+- **Ordered lists in CUE** - Preserve context injection order
+- **Sequential resolution** - Each config resolved and added in order
+
+### Registry Configuration
+- **Default registry** - Hard-coded to `github.com/grantcarthew/start-assets`
+- **Asset repository** - `github.com/grantcarthew/start-assets` (source code location)
+- **Module prefix** - `start` (module identity, not implementation detail)
+- **User-configurable** - Can override registry location
+
+### Repository Descriptions
+- **start** - "Context-aware AI agent launcher"
+- **start-assets** - "Official asset modules for the start AI agent launcher"
+
+### CLI Commands (From Prototype)
+- `start assets search <query>` - Search catalog
+- `start assets browse` - Open GitHub catalog in browser
+- `start assets add <query>` - Search and install
+- `start assets update [query]` - Update cached assets
+- `start assets info <name>` - Preview asset
+
+### Tag Namespaces
+- **CLI releases** - `v0.1.0` (no prefix, triggers Homebrew/GitHub releases)
+- **Asset modules** - `tasks/golang/code-review/v0.1.0` (directory path prefix)
+- **Schema module** - `schemas/v0.1.0`
+
+### Template Strategy
+- **Pattern constraints** - Use CUE native `[Name=_]: {...}` for schema defaults and field injection
+- **Field name auto-injection** - Pattern alias `[Name=_]: {name: Name}` automatically injects field labels
+- **Placeholder substitution** - Use `text/template.Execute` (Go template syntax) not custom placeholders
+- **UTD pattern implementation** - Template strings with runtime data injection via text/template
+- **Default values** - Use CUE's default operator `|*value` in pattern constraints
+
+### Schema Philosophy: Pure Constraints
+- **No defaults in schemas** - Schemas define "what is valid", not "what is typical"
+- **User-controlled defaults** - Users set global defaults via pattern constraints in their config
+- **Prevents conflicts** - Multiple defaults would conflict and cancel each other out in CUE
+- **Flexibility** - Users can change one line to affect all tasks (e.g., timeout for slow local models)
+- **No name field** - Map keys identify tasks, eliminating redundant name field
+- **Searchable by key** - Task resolution and search use map keys, descriptions, tags, and module paths
+
+### What CUE Eliminates (vs Prototype)
+- ❌ Custom placeholder parser (`{file}`, `{command_output}`) - Replaced by text/template
+- ❌ Custom validation logic - Replaced by CUE native constraints
+- ❌ Custom default value management - Replaced by pattern constraints + `|*`
+- ❌ Custom CSV index parsing - Replaced by native `index.cue`
+- ❌ Manual field name duplication - Replaced by pattern alias auto-injection
+- ❌ Runtime type errors - Replaced by compile-time CUE validation
+- ❌ Custom GitHub asset metadata - Replaced by CUE module metadata
+
+### Minimal Custom Layer (Go)
+- **Runtime data injection** - Execute commands, read files, inject into CUE templates
+- **Module resolution** - Map friendly names to module paths, use CUE's `mod get`
+- **Orchestration** - Load CUE → Execute → Inject → Render → Launch agent
+- **UTD validation** - Validate "at least one of file/command/prompt" at runtime
+
+### Task Schema Design
+- **No name field** - Map key IS the task name (e.g., `tasks["code-review"]`), no duplication needed
+- **Pure schema (no defaults)** - Schema defines constraints only, users set defaults in their config
+- **User-controlled defaults** - `tasks: [_]: #Task & {timeout: *120 | _}` applies global defaults in user config
+- **No alias field** - Users can use shell aliases/history instead
+- **Timeout constraint** - 1-3600 seconds (no default in schema, user provides via pattern)
+- **UTD fields** - file, command, prompt (at least one required, validated by Go)
+- **Template syntax** - Go templates with `{{.placeholder}}` not `{placeholder}`
+- **Placeholders** - `{{.instructions}}`, `{{.file}}`, `{{.file_contents}}`, `{{.command}}`, `{{.command_output}}`, `{{.date}}`
+- **Shell override** - Optional per-task shell configuration
+- **References not inline** - role/agent are string references, not embedded configs
 
 ## Goals
 
@@ -44,34 +144,51 @@ Out of Scope:
 
 ## Success Criteria
 
-- [ ] Can explain CUE's type system and how unification works
-- [ ] Can explain how CUE modules, packages, and hierarchy work (schema vs values vs templates)
-- [ ] Have designed working CUE schemas for roles, tasks, contexts, and agents
-- [ ] Schemas validate correctly using CUE CLI tools
+- [x] Can explain CUE's type system and how unification works
+- [x] Can explain how CUE modules, packages, and hierarchy work (schema vs values vs templates)
+- [x] Understand CUE's order preservation (lists maintain order, evaluation is order-independent)
+- [x] Determined asset distribution strategy (CUE modules via OCI registry)
+- [x] Determined versioning strategy (semver with git tags)
+- [x] Determined repository structure (separate start-assets repo)
+- [x] Have designed working CUE schema for tasks (validates with cue vet)
+- [x] Have designed working CUE schema for index (validates with cue vet)
+- [x] Task schema validates correctly using CUE CLI tools
+- [x] Index schema validates correctly using CUE CLI tools
+- [x] Understand pure constraints design (no defaults in schemas)
+- [x] Understand user-controlled defaults pattern
+- [x] Researched OCI registry capabilities and limitations
+- [ ] Have designed working CUE schemas for roles, contexts, agents
+- [ ] All schemas validate correctly using CUE CLI tools
 - [ ] Understand how to load and validate CUE from Go
-- [ ] Documented why CUE is the right choice (DR-001)
-- [ ] Documented schema design patterns and decisions (DR-002)
-- [ ] Can articulate how CUE replaces the prototype's custom asset system
-- [ ] Have working examples that demonstrate key concepts
+- [x] Documented user-controlled defaults design (DR-001)
+- [x] Documented no-name-field decision (DR-002)
+- [x] Documented index category structure (DR-003)
+- [x] Documented module naming convention (DR-004)
+- [x] Can articulate how CUE replaces the prototype's custom asset system
+- [x] Have working examples that demonstrate key concepts
 
 ## Deliverables
 
 Design Records:
-- DR-001: CUE-First Architecture Decision
-- DR-002: Configuration Schema Design
-- DR-003: Module Hierarchy and Organization (possibly)
+- ✓ DR-001: User-Controlled Defaults in CUE Schemas
+- ✓ DR-002: No Name Field in Task Schema
+- ✓ DR-003: Index Category Structure
+- ✓ DR-004: Module Naming Convention
 
 Documentation:
 - docs/cue/schema-design.md - Schema design documentation
 - docs/cue/module-hierarchy.md - Module organization strategy
 - docs/cue/integration-notes.md - CUE-Go integration notes
 
-Examples (proof of concept):
-- examples/schemas/role.cue - Role schema definition
-- examples/schemas/task.cue - Task schema definition
-- examples/schemas/context.cue - Context schema definition
-- examples/schemas/agent.cue - Agent schema definition
-- examples/test-validation.cue - Validation tests
+Schemas (reference/start-assets/schemas/):
+- ✓ schemas/task.cue - Task schema definition (#Task) - pure constraints, no defaults
+- ✓ schemas/task_example.cue - Working examples demonstrating user config patterns
+- ✓ schemas/index.cue - Index schema definition (#Index) for asset discovery
+- ✓ schemas/index_example.cue - Index examples with resolution flows
+- ✓ schemas/README.md - Schema documentation with design philosophy
+- schemas/role.cue - Role schema definition (TODO)
+- schemas/context.cue - Context schema definition (TODO)
+- schemas/agent.cue - Agent schema definition (TODO)
 
 ## Dependencies
 
@@ -137,19 +254,40 @@ Documentation Phase:
 
 ## Questions & Uncertainties
 
+### Answered ✓
+
 CUE Language:
-- How does unification work in practice for our use case?
-- What's the difference between concrete values and constraints?
-- How do we handle optional vs required fields?
-- Can CUE validate command template syntax (e.g., placeholder patterns)?
-- How do we handle dynamic values that come from runtime?
+- ✓ How does unification work in practice? - Types ARE values, lattice-based constraints
+- ✓ What's the difference between concrete values and constraints? - All exist in value lattice
+- ✓ How do we preserve configuration order? - Use ordered lists in CUE
+- ✓ How do versions and dependencies work? - Semantic versioning + MVS algorithm
+- ✓ What's the package format for CUE Central Registry? - OCI registry with standard manifest
 
 Module System:
-- What's the best way to structure schema vs values vs templates?
-- How do packages compose and extend each other?
-- Can users override or extend our base schemas?
-- What's the package format for CUE Central Registry?
-- How do versions and dependencies work?
+- ✓ What's the best way to structure schema vs values? - Three-layer hierarchy (schemas, assets, user config)
+- ✓ How do packages compose? - Assets import schemas, validate during development
+- ✓ Can users override our base schemas? - Yes, through CUE unification
+- ✓ Package format? - OCI manifest + zip blob + module.cue blob
+
+Architecture:
+- ✓ How much simpler with CUE? - Eliminates custom GitHub asset system, index.csv becomes index.cue
+- ✓ What concepts from prototype still apply? - Core concepts (roles, tasks, contexts, agents), CLI commands
+- ✓ Asset distribution? - CUE modules replace GitHub catalog, lazy loading via registry
+
+### Outstanding Questions
+
+CUE Language:
+- ✓ Can CUE handle placeholder substitution? - Yes, text/template.Execute
+- ✓ Can CUE validate command template syntax? - Yes, via Go template validation in text/template
+- ✓ How do we handle dynamic values from runtime? - Inject via Go, pass to text/template.Execute
+- ✓ Should placeholder substitution happen in CUE or Go? - CUE (text/template.Execute)
+
+Schema Design:
+- ✓ How to model UTD pattern? - Template strings with text/template syntax
+- ✓ How to validate "at least one field must be present" in UTD? - Go validates at runtime (CUE documents requirement)
+- ✓ Should command templates be validated by CUE or Go? - CUE (text/template validates syntax)
+- ✓ How to structure optional file/command/prompt fields? - All optional, Go validates at least one present
+- ✓ Should tasks have alias field? - No, use shell aliases instead
 
 Integration:
 - What's the Go API surface for loading CUE?
@@ -158,16 +296,10 @@ Integration:
 - What's the performance of CUE validation?
 - How do we handle CUE files that don't exist vs invalid CUE?
 
-Architecture:
-- Should we use CUE for everything or mix with Go?
-- How do we preserve configuration order (critical for context injection)?
-- Can CUE handle the placeholder substitution logic?
-- Should command templates be validated by CUE or Go?
-
-Migration from Prototype:
-- What concepts from prototype DRs still apply?
-- What can we delete because CUE handles it?
-- How much simpler is the architecture with CUE?
+User Config:
+- How do users define custom tasks/roles/contexts?
+- How to override published assets?
+- Config file organization in ~/.config/start/?
 
 ## Research Areas
 
@@ -235,3 +367,63 @@ Prototype Learnings to Carry Forward:
 - Many asset management DRs (DR-031-042) likely obsolete with CUE registry
 
 This project sets the foundation for everything else. Take time to understand CUE deeply before moving to P-002.
+
+## Progress & Next Steps
+
+### Completed
+1. ✓ Studied CUE documentation (type system, modules, registry)
+2. ✓ Determined CUE is the right choice (replaces TOML completely)
+3. ✓ Decided on asset distribution architecture (separate start-assets repo)
+4. ✓ Determined versioning strategy (semver + git tags)
+5. ✓ Designed repository structure (tasks/category/item/ pattern)
+6. ✓ Established module path convention (github.com/grantcarthew/start-task-category-item@v0)
+7. ✓ Created start-assets repository at ./reference/start-assets
+8. ✓ Confirmed order preservation strategy (ordered lists in CUE)
+9. ✓ Researched CUE template capabilities (pattern constraints + text/template)
+10. ✓ Determined template strategy (text/template for runtime placeholders)
+11. ✓ Identified what CUE eliminates from prototype (custom parsers, validation, defaults management)
+12. ✓ Reviewed prototype Task design (DR-009, DR-019, DR-029)
+13. ✓ Decided to remove alias field from tasks (shell already does this better)
+14. ✓ Decided to remove name field from tasks (map key IS the name)
+15. ✓ Created schemas module (github.com/grantcarthew/start-schemas@v0)
+16. ✓ Implemented #Task schema with pure constraints (no defaults)
+17. ✓ Implemented #Index schema for asset discovery
+18. ✓ Created task examples demonstrating user config patterns with defaults
+19. ✓ Created index examples with resolution flows
+20. ✓ Validated schemas with cue vet (all pass)
+21. ✓ Documented pure constraints design philosophy
+22. ✓ Researched OCI registry API capabilities and limitations
+23. ✓ Confirmed need for index.cue (OCI catalog API disabled)
+24. ✓ Designed index key structure (category/item format)
+25. ✓ Documented schema in schemas/README.md
+26. ✓ Created DR-001: User-Controlled Defaults
+27. ✓ Created DR-002: No Name Field
+28. ✓ Created DR-003: Index Category Structure
+29. ✓ Created DR-004: Module Naming Convention
+
+### In Progress
+- Schema design for remaining concepts (roles, contexts, agents)
+  - ✓ Task schema complete
+  - ✓ Index schema complete
+  - Next: Role, Context, Agent schemas
+
+### Next Steps
+1. Design CUE schemas for remaining core concepts
+   - ✓ #Task schema with UTD pattern (COMPLETE)
+   - #Role schema with UTD pattern
+   - #Context schema with required field
+   - #Agent schema with command templates
+   - #Index schema for catalog
+2. Model UTD pattern (file/command/prompt) in CUE
+3. Determine placeholder substitution strategy (CUE vs Go)
+4. Understand runtime context injection (dynamic values)
+5. Study CUE-Go API for loading and validation
+6. Write DR-001: CUE-First Architecture Decision
+7. Write DR-002: Configuration Schema Design
+8. Create working schema examples and validate with CUE CLI
+
+### Deferred to Later Projects
+- Implementation of Go code (P-005)
+- CLI command implementation (P-004)
+- Publishing packages to registry (P-003)
+- Creating production-ready assets (P-002)

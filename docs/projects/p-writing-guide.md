@@ -257,10 +257,26 @@ Good: "Implement CUE loading from Go using the official API"
 
 ---
 
-## Project Numbering
+## Project Numbering and Naming
+
+### File Naming Convention
+
+Format: `p-<NNN>-<category>-<title>.md`
+
+- `NNN` = Three-digit number with leading zeros (001, 002, 003...)
+- `category` = Technology/component/area (cue, cli, assets, distribution, orchestration, etc.)
+- `title` = KISS description of the project
+- All lowercase kebab-case (words separated by hyphens, no underscores or spaces)
+
+Examples:
+- `p-001-cue-foundation-architecture.md`
+- `p-002-assets-concrete-tasks.md`
+- `p-003-distribution-strategy.md`
+- `p-004-cli-minimal-viable.md`
+
+### Numbering
 
 - Sequential: P-001, P-002, P-003, etc.
-- Prefix with `p-` for filenames: `p-001-cue-foundation.md`
 - Get next number from `docs/projects/README.md` index
 - Never reuse numbers
 - Gaps are acceptable (deferred/cancelled projects)

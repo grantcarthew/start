@@ -10,13 +10,11 @@ See [p-writing-guide.md](./p-writing-guide.md) for guidelines on creating and ma
 
 | Project | Title | Status | Started | Completed |
 |---------|-------|--------|---------|-----------|
-| [P-001](./p-001-cue-foundation-architecture.md) | CUE Foundation & Architecture | Proposed | - | - |
-| [P-002](./p-002-concrete-assets.md) | Concrete Assets - Validate Design | Proposed | - | - |
-| [P-003](./p-003-distribution-strategy.md) | Distribution Strategy | Proposed | - | - |
-| [P-004](./p-004-minimal-cli.md) | Minimal CLI Implementation | Proposed | - | - |
-| [P-005](./p-005-orchestration-core.md) | Orchestration Core | Proposed | - | - |
-
-Next Number: P-006
+| [P-001](./p-001-cue-foundation-architecture.md) | CUE Foundation & Architecture | In Progress | 2025-12-01 | - |
+| [P-002](./p-002-assets-validation.md) | Assets Validation | Proposed | - | - |
+| [P-003](./p-003-registry-distribution.md) | Registry Distribution | Proposed | - | - |
+| [P-004](./p-004-cli-minimal-implementation.md) | CLI Minimal Implementation | Proposed | - | - |
+| [P-005](./p-005-orchestration-core-engine.md) | Orchestration Core Engine | Proposed | - | - |
 
 ---
 
@@ -30,31 +28,31 @@ Research CUE capabilities and design the foundational architecture. Establishes 
 
 **Dependencies:** None (starting point)
 
-### P-002: Concrete Assets - Validate Design
+### P-002: Assets Validation
 
 Create real assets (roles, tasks, contexts, agents) in CUE to validate the schema designs from P-001. This provides concrete examples and surfaces design issues early.
 
-**Key Deliverables:** Example assets, refined schemas, DR-003
+**Key Deliverables:** Example assets, refined schemas, additional DRs
 
 **Dependencies:** P-001 (need schemas first)
 
-### P-003: Distribution Strategy
+### P-003: Registry Distribution
 
 Define how assets are distributed and consumed using CUE Central Registry. Research packaging, publishing, versioning, and dependency management.
 
-**Key Deliverables:** Package structure, registry strategy, DR-004
+**Key Deliverables:** Package structure, registry strategy, additional DRs
 
 **Dependencies:** P-002 (need concrete assets to package)
 
-### P-004: Minimal CLI Implementation
+### P-004: CLI Minimal Implementation
 
 Build minimal CLI commands to interact with CUE configurations. Adapted from prototype CLI design but CUE-native.
 
-**Key Deliverables:** `start init`, `start show`, CLI structure, DR-005
+**Key Deliverables:** `start init`, `start show`, CLI structure, additional DRs
 
 **Dependencies:** P-001 (need architecture), P-002 (need examples to test)
 
-### P-005: Orchestration Core
+### P-005: Orchestration Core Engine
 
 Implement core orchestration logic: load CUE from Go, compose prompts, execute agent commands. End-to-end integration.
 
@@ -90,8 +88,9 @@ See [p-writing-guide.md](./p-writing-guide.md) for detailed guidance.
 
 When creating a new project:
 
-1. Use next sequential number: `p-NNN-short-name.md`
-2. Follow the structure in [p-writing-guide.md](./p-writing-guide.md)
-3. Define clear, measurable success criteria
-4. Update this README with project entry
-5. Link dependencies to other projects
+1. List directory to find next number: `ls docs/projects/p-*.md`
+2. Use format: `p-<NNN>-<category>-<title>.md`
+3. Follow the structure in [p-writing-guide.md](./p-writing-guide.md)
+4. Define clear, measurable success criteria
+5. Update this README with project entry
+6. Link dependencies to other projects

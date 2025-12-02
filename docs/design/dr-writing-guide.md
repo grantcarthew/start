@@ -242,6 +242,21 @@ Would a future developer need to understand WHY we made this choice?
 
 ## DR Numbering and Lifecycle
 
+### File Naming Convention
+
+Format: `dr-<NNN>-<category>-<title>.md`
+
+- `NNN` = Three-digit number with leading zeros (001, 002, 003...)
+- `category` = Technology/component/area (cue, cli, index, module, task, config, etc.)
+- `title` = KISS description of the decision
+- All lowercase kebab-case (words separated by hyphens, no underscores or spaces)
+
+Examples:
+- `dr-001-cue-user-controlled-defaults.md`
+- `dr-002-cue-no-name-field.md`
+- `dr-003-index-category-structure.md`
+- `dr-004-module-naming-convention.md`
+
 ### Numbering
 
 - Sequential: DR-001, DR-002, DR-003, etc.
