@@ -98,16 +98,24 @@ This is the critical first project that determines whether CUE can fulfill the r
 - **Orchestration** - Load CUE → Execute → Inject → Render → Launch agent
 - **UTD validation** - Validate "at least one of file/command/prompt" at runtime
 
+### UTD Schema Design
+- **Reusable definition** - #UTD used by tasks, roles, and contexts
+- **Pure schema (no defaults)** - Schema defines constraints only, users set defaults in their config
+- **Content fields** - file, command, prompt (at least one required, validated by Go)
+- **Shell configuration** - Optional shell and timeout overrides
+- **Timeout field naming** - `timeout` not `command_timeout` (simpler, clearer)
+- **Timeout constraint** - 1-3600 seconds (no default in schema, user provides via pattern)
+- **Template syntax** - Go templates with `{{.placeholder}}` not `{placeholder}`
+- **Placeholders** - `{{.file}}`, `{{.file_contents}}`, `{{.command}}`, `{{.command_output}}`, `{{.date}}`
+- **Resolution priority** - prompt > file > command
+
 ### Task Schema Design
+- **Embeds #UTD** - Inherits all UTD fields (file, command, prompt, shell, timeout)
 - **No name field** - Map key IS the task name (e.g., `tasks["code-review"]`), no duplication needed
 - **Pure schema (no defaults)** - Schema defines constraints only, users set defaults in their config
 - **User-controlled defaults** - `tasks: [_]: #Task & {timeout: *120 | _}` applies global defaults in user config
 - **No alias field** - Users can use shell aliases/history instead
-- **Timeout constraint** - 1-3600 seconds (no default in schema, user provides via pattern)
-- **UTD fields** - file, command, prompt (at least one required, validated by Go)
-- **Template syntax** - Go templates with `{{.placeholder}}` not `{placeholder}`
-- **Placeholders** - `{{.instructions}}`, `{{.file}}`, `{{.file_contents}}`, `{{.command}}`, `{{.command_output}}`, `{{.date}}`
-- **Shell override** - Optional per-task shell configuration
+- **Task-specific placeholder** - `{{.instructions}}` for CLI arguments
 - **References not inline** - role/agent are string references, not embedded configs
 
 ## Goals
@@ -157,8 +165,8 @@ Out of Scope:
 - [x] Understand pure constraints design (no defaults in schemas)
 - [x] Understand user-controlled defaults pattern
 - [x] Researched OCI registry capabilities and limitations
-- [ ] Have designed working CUE schemas for roles, contexts, agents
-- [ ] All schemas validate correctly using CUE CLI tools
+- [x] Have designed working CUE schemas for roles, contexts, agents
+- [x] All schemas validate correctly using CUE CLI tools
 - [ ] Understand how to load and validate CUE from Go
 - [x] Documented user-controlled defaults design (DR-001)
 - [x] Documented no-name-field decision (DR-002)
@@ -180,6 +188,10 @@ Design Records:
 - ✓ DR-005: Go Templates for UTD Pattern
 - ✓ DR-006: Shell Configuration and Command Execution
 - ✓ DR-007: UTD Error Handling by Context
+- ✓ DR-008: Context Schema Design
+- ✓ DR-009: Task Schema Design
+- ✓ DR-010: Role Schema Design
+- ✓ DR-011: Agent Schema Design
 
 Documentation:
 - ✓ docs/design/utd-pattern.md - UTD pattern documentation with Go templates
@@ -188,14 +200,19 @@ Documentation:
 - docs/cue/integration-notes.md - CUE-Go integration notes (TODO)
 
 Schemas (reference/start-assets/schemas/):
-- ✓ schemas/task.cue - Task schema definition (#Task) - pure constraints, no defaults
+- ✓ schemas/utd.cue - UTD schema definition (#UTD) - pure constraints, no defaults
+- ✓ schemas/utd_example.cue - UTD examples with 11 usage patterns
+- ✓ schemas/task.cue - Task schema definition (#Task) - embeds #UTD
 - ✓ schemas/task_example.cue - Working examples demonstrating user config patterns
 - ✓ schemas/index.cue - Index schema definition (#Index) for asset discovery
 - ✓ schemas/index_example.cue - Index examples with resolution flows
 - ✓ schemas/README.md - Schema documentation with design philosophy
-- schemas/role.cue - Role schema definition (TODO)
-- schemas/context.cue - Context schema definition (TODO)
-- schemas/agent.cue - Agent schema definition (TODO)
+- ✓ schemas/role.cue - Role schema definition (#Role) - embeds #UTD
+- ✓ schemas/role_example.cue - Role examples with 7 usage patterns
+- ✓ schemas/context.cue - Context schema definition (#Context) - embeds #UTD, adds required/default/tags
+- ✓ schemas/context_example.cue - Context examples with 10 usage patterns
+- ✓ schemas/agent.cue - Agent schema definition (#Agent) - command templates, no UTD
+- ✓ schemas/agent_example.cue - Agent examples with 8 usage patterns
 
 ## Dependencies
 
@@ -412,28 +429,43 @@ This project sets the foundation for everything else. Take time to understand CU
 32. ✓ Created DR-006: Shell Configuration and Command Execution
 33. ✓ Created DR-007: UTD Error Handling by Context
 34. ✓ UTD design complete (documentation + 3 design records)
+35. ✓ Created #UTD schema (utd.cue) - pure constraints, no defaults
+36. ✓ Refactored #Task schema to embed #UTD
+37. ✓ Created UTD examples (utd_example.cue) with 11 usage patterns
+38. ✓ Standardized timeout field naming (timeout not command_timeout)
+39. ✓ Updated all documentation for timeout field consistency
+40. ✓ Validated #UTD schema with cue vet (passes)
+41. ✓ Updated schemas/README.md with #UTD documentation
+42. ✓ Created #Role schema (role.cue) - embeds #UTD
+43. ✓ Created role examples (role_example.cue) with 7 usage patterns
+44. ✓ Created DR-008: Context Selection and Tagging
+45. ✓ Created #Context schema (context.cue) - embeds #UTD, adds required/default/tags
+46. ✓ Created context examples (context_example.cue) with 10 usage patterns
+47. ✓ Created #Agent schema (agent.cue) - minimal, command templates only
+48. ✓ Created agent examples (agent_example.cue) with 8 usage patterns
+49. ✓ All schemas validated with cue vet
+50. ✓ Created DR-009: Task Schema Design
+51. ✓ Created DR-010: Role Schema Design
+52. ✓ Created DR-011: Agent Schema Design
 
 ### In Progress
-- Schema design for remaining concepts (roles, contexts, agents)
-  - ✓ Task schema complete
-  - ✓ Index schema complete
-  - ✓ UTD pattern designed and documented
-  - Next: Create #UTD, #Role, #Context, #Agent schemas in CUE
+- CUE-Go integration research
+  - Understand how to load and validate CUE from Go
+  - Understand runtime context injection (dynamic values)
 
 ### Next Steps
-1. Design CUE schemas for remaining core concepts
-   - ✓ #Task schema with UTD pattern (COMPLETE)
-   - #Role schema with UTD pattern
-   - #Context schema with required field
-   - #Agent schema with command templates
-   - #Index schema for catalog
-2. Model UTD pattern (file/command/prompt) in CUE
-3. Determine placeholder substitution strategy (CUE vs Go)
+1. ✓ Design CUE schemas for all core concepts (COMPLETE)
+   - ✓ #UTD schema (COMPLETE)
+   - ✓ #Task schema (COMPLETE)
+   - ✓ #Index schema (COMPLETE)
+   - ✓ #Role schema (COMPLETE)
+   - ✓ #Context schema (COMPLETE)
+   - ✓ #Agent schema (COMPLETE)
+2. ✓ Model UTD pattern (file/command/prompt) in CUE (COMPLETE)
+3. ✓ Determine placeholder substitution strategy (text/template - COMPLETE)
 4. Understand runtime context injection (dynamic values)
 5. Study CUE-Go API for loading and validation
-6. Write DR-001: CUE-First Architecture Decision
-7. Write DR-002: Configuration Schema Design
-8. Create working schema examples and validate with CUE CLI
+6. ✓ Create working schema examples and validate with CUE CLI (COMPLETE)
 
 ### Deferred to Later Projects
 - Implementation of Go code (P-005)

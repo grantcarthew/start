@@ -24,8 +24,8 @@ Two-level shell configuration with user-specified flags and auto-detection fallb
 
 ```cue
 settings: {
-    shell:           "bash -c"  // Shell with flags
-    command_timeout: 30         // Default timeout in seconds
+    shell:   "bash -c"  // Shell with flags
+    timeout: 30         // Default timeout in seconds
 }
 ```
 
@@ -34,10 +34,10 @@ settings: {
 ```cue
 contexts: {
     "node-version": {
-        command:         "console.log(process.version)"
-        shell:           "node -e"
-        command_timeout: 5
-        prompt:          "Node: {{.command_output}}"
+        command: "console.log(process.version)"
+        shell:   "node -e"
+        timeout: 5
+        prompt:  "Node: {{.command_output}}"
     }
 }
 ```
@@ -270,8 +270,8 @@ Rationale: Users expect commands to run where they invoked `start`, matching sta
 
 **Resolution order:**
 
-1. Section `command_timeout` field (highest priority)
-2. Global `settings.command_timeout`
+1. Section `timeout` field (highest priority)
+2. Global `settings.timeout`
 3. Hardcoded default: 30 seconds
 
 ## Security Considerations
@@ -363,12 +363,12 @@ Resolves to: `node -e "console.log(...)"`
 ```cue
 contexts: {
     "python-analysis": {
-        shell:           "python3 -c"
-        command_timeout: 120
+        shell:   "python3 -c"
+        timeout: 120
         command: """
-            import os
-            print(len([f for f in os.listdir('.') if f.endswith('.py')]))
-            """
+import os
+print(len([f for f in os.listdir('.') if f.endswith('.py')]))
+"""
         prompt: "Python files: {{.command_output}}"
     }
 }
@@ -382,10 +382,10 @@ Resolves to: `python3 -c "..."` with 120 second timeout
 contexts: {
     "project-stats": {
         command: """
-            echo "Files: $(find . -type f | wc -l)"
-            echo "Lines: $(find . -name '*.go' -exec wc -l {} + | tail -1)"
-            """
-        command_timeout: 10
+echo "Files: $(find . -type f | wc -l)"
+echo "Lines: $(find . -name '*.go' -exec wc -l {} + | tail -1)"
+"""
+        timeout: 10
     }
 }
 ```
