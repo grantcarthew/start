@@ -161,11 +161,11 @@ Otherwise:
 ```cue
 file:    "./PROJECT.md"
 command: "git status --short"
-prompt:  """
-	Project: {{.file_contents}}
+prompt: """
+Project: {{.file_contents}}
 
-	Status: {{.command_output}}
-	"""
+Status: {{.command_output}}
+"""
 ```
 
 - Read file if `{{.file}}` or `{{.file_contents}}` used (else warn)
@@ -180,8 +180,8 @@ Define defaults in `config.cue`:
 
 ```cue
 settings: {
-	shell:           "bash"  // Default: auto-detect (bash > sh)
-	command_timeout: 30      // Default: 30 seconds
+	shell:   "bash"  // Default: auto-detect (bash > sh)
+	timeout: 30      // Default: 30 seconds
 }
 ```
 
@@ -192,10 +192,10 @@ Override shell for specific UTD instances:
 ```cue
 contexts: {
 	"node-version": {
-		command:         "console.log(process.version)"
-		shell:           "node"
-		command_timeout: 5
-		prompt:          "Node version: {{.command_output}}"
+		command: "console.log(process.version)"
+		shell:   "node"
+		timeout: 5
+		prompt:  "Node version: {{.command_output}}"
 	}
 }
 ```
@@ -224,13 +224,13 @@ Commands are subject to timeout limits (default 30 seconds):
 ```cue
 contexts: {
 	"quick-check": {
-		command:         "git status"
-		command_timeout: 5   // 5 seconds
+		command: "git status"
+		timeout: 5   // 5 seconds
 	}
 
 	"slow-analysis": {
-		command:         "npm run analyze"
-		command_timeout: 120  // 2 minutes
+		command: "npm run analyze"
+		timeout: 120  // 2 minutes
 	}
 }
 ```
@@ -328,11 +328,11 @@ contexts: {
 	"recent-changes": {
 		command: "git log -5 --oneline"
 		prompt: """
-			Recent commits:
-			{{.command_output}}
+Recent commits:
+{{.command_output}}
 
-			Focus on these changes during the session.
-			"""
+Focus on these changes during the session.
+"""
 	}
 }
 ```
@@ -376,14 +376,14 @@ contexts: {
 		file:    "./PROJECT.md"
 		command: "git status --short"
 		prompt: """
-			# Full Project Context
+# Full Project Context
 
-			## Documentation
-			{{.file_contents}}
+## Documentation
+{{.file_contents}}
 
-			## Working Tree
-			{{.command_output}}
-			"""
+## Working Tree
+{{.command_output}}
+"""
 	}
 }
 ```
@@ -397,12 +397,12 @@ tasks: {
 	"code-review": {
 		command: "git diff --staged"
 		prompt: """
-			Review these changes:
+Review these changes:
 
-			{{.command_output}}
+{{.command_output}}
 
-			Instructions: {{.instructions}}
-			"""
+Instructions: {{.instructions}}
+"""
 	}
 }
 ```
@@ -418,10 +418,10 @@ contexts: {
 	"package-info": {
 		shell:   "node"
 		command: """
-			const pkg = require('./package.json');
-			console.log(`${pkg.name}@${pkg.version}`);
-			console.log(`Dependencies: ${Object.keys(pkg.dependencies).length}`);
-			"""
+const pkg = require('./package.json');
+console.log(`${pkg.name}@${pkg.version}`);
+console.log(`Dependencies: ${Object.keys(pkg.dependencies).length}`);
+"""
 		prompt: "Package details:\n{{.command_output}}"
 	}
 }
@@ -434,13 +434,13 @@ contexts: {
 	"file-list": {
 		command: "ls -1"
 		prompt: """
-			{{if .command_output}}
-			Files found:
-			{{.command_output}}
-			{{else}}
-			No files in directory.
-			{{end}}
-			"""
+{{if .command_output}}
+Files found:
+{{.command_output}}
+{{else}}
+No files in directory.
+{{end}}
+"""
 	}
 }
 ```
@@ -474,11 +474,11 @@ In CUE schemas, UTD is defined as a reusable definition:
 package schemas
 
 #UTD: {
-	file?:            string
-	command?:         string
-	prompt?:          string
-	shell?:           string
-	command_timeout?: int & >=1 & <=3600
+	file?:    string
+	command?: string
+	prompt?:  string
+	shell?:   string
+	timeout?: int & >=1 & <=3600
 
 	// Note: Go validates at least one of file/command/prompt required
 }

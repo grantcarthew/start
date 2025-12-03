@@ -194,13 +194,13 @@ Result: `Current date: 2025-12-02T10:30:00+10:00`
 ```cue
 command: "git status --short"
 prompt: """
-	{{if .command_output}}
-	Changes detected:
-	{{.command_output}}
-	{{else}}
-	Working tree clean.
-	{{end}}
-	"""
+{{if .command_output}}
+Changes detected:
+{{.command_output}}
+{{else}}
+Working tree clean.
+{{end}}
+"""
 ```
 
 **Combined file and command:**
@@ -209,14 +209,14 @@ prompt: """
 file:    "./PROJECT.md"
 command: "git log -5 --oneline"
 prompt: """
-	Project documentation:
-	{{.file_contents}}
+Project documentation:
+{{.file_contents}}
 
-	{{if .command_output}}
-	Recent commits:
-	{{.command_output}}
-	{{end}}
-	"""
+{{if .command_output}}
+Recent commits:
+{{.command_output}}
+{{end}}
+"""
 ```
 
 **Advanced: Custom function (future):**

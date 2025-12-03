@@ -13,6 +13,10 @@ Design Records (DRs) document architectural decisions, algorithms, breaking chan
 | DR-005 | Go Templates for UTD Pattern | UTD | Accepted | 2025-12-02 |
 | DR-006 | Shell Configuration and Command Execution | UTD | Accepted | 2025-12-02 |
 | DR-007 | UTD Error Handling by Context | UTD | Accepted | 2025-12-02 |
+| DR-008 | Context Schema Design | CUE | Accepted | 2025-12-03 |
+| DR-009 | Task Schema Design | CUE | Accepted | 2025-12-03 |
+| DR-010 | Role Schema Design | CUE | Accepted | 2025-12-03 |
+| DR-011 | Agent Schema Design | CUE | Accepted | 2025-12-03 |
 
 ## Process
 
