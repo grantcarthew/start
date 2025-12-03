@@ -17,6 +17,10 @@ Design Records (DRs) document architectural decisions, algorithms, breaking chan
 | DR-009 | Task Schema Design | CUE | Accepted | 2025-12-03 |
 | DR-010 | Role Schema Design | CUE | Accepted | 2025-12-03 |
 | DR-011 | Agent Schema Design | CUE | Accepted | 2025-12-03 |
+| DR-012 | CLI Global Flags | CLI | Accepted | 2025-12-03 |
+| DR-013 | CLI Start Command | CLI | Accepted | 2025-12-03 |
+| DR-014 | CLI Prompt Command | CLI | Accepted | 2025-12-03 |
+| DR-015 | CLI Task Command | CLI | Accepted | 2025-12-03 |
 
 ## Process
 
