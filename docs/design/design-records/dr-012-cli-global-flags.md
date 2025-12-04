@@ -32,6 +32,7 @@ Agent-launching commands (start, prompt, task):
 | `--role` | `-r` | Override role (system prompt) |
 | `--model` | `-m` | Override model selection |
 | `--context` | `-c` | Select contexts by tag |
+| `--dry-run` | | Preview execution without launching agent |
 
 Path-dependent commands:
 
@@ -95,19 +96,20 @@ Warn on irrelevant flags:
 
 ## Flag Applicability Matrix
 
-| Flag | start | prompt | task | show | assets | config | init | doctor |
-|------|-------|--------|------|------|--------|--------|------|--------|
-| `--help` | Y | Y | Y | Y | Y | Y | Y | Y |
-| `--version` | Y | Y | Y | Y | Y | Y | Y | Y |
-| `--verbose` | Y | Y | Y | Y | Y | Y | Y | Y |
-| `--debug` | Y | Y | Y | Y | Y | Y | Y | Y |
-| `--quiet` | Y | Y | Y | Y | Y | Y | Y | Y |
-| `--agent` | Y | Y | Y | Y | - | - | - | - |
-| `--role` | Y | Y | Y | Y | - | - | - | - |
-| `--model` | Y | Y | Y | Y | - | - | - | - |
-| `--context` | Y | Y | Y | - | - | - | - | - |
-| `--directory` | Y | Y | Y | Y | - | - | - | - |
-| `--local` | - | - | - | - | Y | Y | Y | - |
+| Flag | start | prompt | task | show | config | init | doctor |
+|------|-------|--------|------|------|--------|------|--------|
+| `--help` | Y | Y | Y | Y | Y | Y | Y |
+| `--version` | Y | Y | Y | Y | Y | Y | Y |
+| `--verbose` | Y | Y | Y | Y | Y | Y | Y |
+| `--debug` | Y | Y | Y | Y | Y | Y | Y |
+| `--quiet` | Y | Y | Y | Y | Y | Y | Y |
+| `--agent` | Y | Y | Y | Y | - | - | - |
+| `--role` | Y | Y | Y | Y | - | - | - |
+| `--model` | Y | Y | Y | Y | - | - | - |
+| `--context` | Y | Y | Y | - | - | - | - |
+| `--directory` | Y | Y | Y | Y | - | - | - |
+| `--dry-run` | Y | Y | Y | - | - | - | - |
+| `--local` | - | - | - | - | Y | Y | - |
 
 Y = applies, - = silently ignored
 
@@ -164,6 +166,13 @@ Debug flag (`--debug`):
 - Shows all internal operations
 - Config merging, placeholder resolution, command construction
 - Useful for troubleshooting
+
+Dry-run flag (`--dry-run`):
+
+- Performs all resolution steps without executing agent
+- Writes resolved content to temp directory
+- Shows 5-line preview in terminal
+- See DR-016 for full details
 
 ## Implementation Notes
 
