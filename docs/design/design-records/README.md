@@ -21,6 +21,10 @@ Design Records (DRs) document architectural decisions, algorithms, breaking chan
 | DR-013 | CLI Start Command | CLI | Accepted | 2025-12-03 |
 | DR-014 | CLI Prompt Command | CLI | Accepted | 2025-12-03 |
 | DR-015 | CLI Task Command | CLI | Accepted | 2025-12-03 |
+| DR-016 | CLI Dry Run Flag | CLI | Accepted | 2025-12-04 |
+| DR-017 | CLI Show Command | CLI | Accepted | 2025-12-04 |
+| DR-018 | CLI Auto-Setup | CLI | Accepted | 2025-12-04 |
+| DR-019 | Index Bin Field for Agent Detection | Index | Accepted | 2025-12-04 |
 
 ## Process
 

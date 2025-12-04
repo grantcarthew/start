@@ -93,6 +93,7 @@ Applicable flags (see DR-012):
 | `--model` | `-m` | Override model selection |
 | `--context` | `-c` | Select contexts by tag |
 | `--directory` | `-d` | Override working directory |
+| `--dry-run` | | Preview execution without launching agent |
 | `--quiet` | `-q` | Suppress output |
 | `--verbose` | | Detailed output |
 | `--debug` | | Full debug output |
