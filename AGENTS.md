@@ -12,7 +12,7 @@ Avoid references to the prototype in new documentation. This is a new design.
 
 Projects are stored in the docs/projects/ directory. Continue by reading the active project.
 
-Active Project: docs/projects/p-001-cue-foundation-architecture.md
+Active Project: docs/projects/p-002-assets-validation.md
 
 ## Why CUE?
 
