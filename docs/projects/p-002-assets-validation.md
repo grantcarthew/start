@@ -1,7 +1,7 @@
 # P-002: Concrete Assets - Validate Design
 
-- Status: Proposed
-- Started: -
+- Status: In Progress
+- Started: 2025-12-05
 - Completed: -
 
 ## Overview
@@ -45,16 +45,16 @@ Out of Scope:
 
 ## Success Criteria
 
-- [ ] Have 3-5 working role assets that validate correctly
+- [x] Have 3-5 working role assets that validate correctly (3/3 golang roles: assistant, teacher, agent)
 - [ ] Have 3-5 working task assets that validate correctly
 - [ ] Have 2-3 working context assets that validate correctly
 - [ ] Have 2-3 working agent assets that validate correctly
-- [ ] Assets demonstrate key patterns (composition, extension, constraints)
+- [x] Assets demonstrate key patterns (composition, extension, constraints)
 - [ ] CUE validation catches intentional errors (negative testing)
-- [ ] Assets use realistic content (not placeholder text)
-- [ ] Identified and documented at least 2-3 schema improvements
-- [ ] Updated schemas if design issues discovered
-- [ ] Documented asset creation best practices
+- [x] Assets use realistic content (not placeholder text)
+- [x] Identified and documented at least 2-3 schema improvements (module path alignment, import syntax)
+- [x] Updated schemas if design issues discovered (module.cue updated with correct path and source)
+- [x] Documented asset creation best practices (UTD file pattern, role styles)
 
 ## Deliverables
 
@@ -238,3 +238,70 @@ Choose assets that:
 These don't need to be production-ready, but should be realistic enough to validate the design.
 
 This project is complete when we're confident the schema design works for real assets and we've identified any changes needed before moving to distribution (P-003).
+
+## Progress & Decisions
+
+### Completed (2025-12-05)
+
+**Published Schemas to Central Registry:**
+1. ✓ Fixed module path: `github.com/grantcarthew/start-assets/schemas@v0` (aligned with repo structure)
+2. ✓ Added `source: {kind: "git"}` to module.cue
+3. ✓ Published schemas@v0.0.1 to registry.cue.works
+4. ✓ Validated full workflow: publish → import → validate
+
+**Created Three Golang Roles:**
+1. ✓ `roles/golang/assistant/` - Collaborative, friendly, interactive
+2. ✓ `roles/golang/teacher/` - Patient, educational, explains concepts
+3. ✓ `roles/golang/agent/` - Autonomous, minimal interruption, makes decisions
+4. ✓ Each role uses UTD pattern with markdown files (role.md)
+5. ✓ All roles validated successfully with `cue vet`
+
+### Key Discoveries
+
+**Module Path & Registry:**
+- Central Registry requires GitHub repository to exist at module path location
+- Solution: Align module path with actual repo (`start-assets` not `start-schemas`)
+- Module path format: `github.com/grantcarthew/start-assets/<type>/<path>@v0`
+
+**Import Syntax:**
+- Full form: `import "module/path@v0:packagename"`
+- Short form (when basename matches package): `import "module/path@v0"`
+- Our case: `github.com/grantcarthew/start-assets/schemas@v0` (basename `schemas` = package `schemas`)
+
+**Publishing Requirements:**
+- Annotated tags preferred: `git tag -a schemas/v0.0.1 -m "message"`
+- VCS must be clean before publishing
+- Tag must be pushed to GitHub before publishing
+- `source: {kind: "git"}` required in module.cue
+- `cue mod tidy` automatically fetches dependencies
+
+### Key Decisions
+
+**Role Structure:**
+- ✓ Flat structure: `roles/golang/` not `roles/golang/expert/`
+- ✓ Category = technology (golang, docker, python)
+- ✓ Name = interaction style (assistant, teacher, agent)
+- ✓ Full path: `roles/<category>/<style>/`
+
+**Standard Role Styles (applies to all programming languages):**
+- `assistant` - Collaborative partner, asks questions, explains decisions
+- `teacher` - Patient instructor, educational, builds understanding
+- `agent` - Autonomous executor, minimal questions, makes decisions
+
+**Role Content Format:**
+- ✓ Use UTD `file` field with markdown files (role.md)
+- ✓ Keep role content separate from CUE configuration
+- ✓ Customize markdown content for each style
+
+**Versioning:**
+- ✓ Start with v0.0.1 for initial experimental releases
+- ✓ Use annotated tags for all releases
+
+### Next Steps
+
+1. Commit the three golang roles to git
+2. Create tasks (golang/code-review, golang/debug, etc.)
+3. Create contexts (environment, project)
+4. Create agents (claude, gpt)
+5. Test composition and extension patterns
+6. Document any schema issues discovered
