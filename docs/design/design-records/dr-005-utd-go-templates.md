@@ -147,8 +147,8 @@ Prompt: "File: {{ file }}, Date: {{ date }}"
 **Template data structure:**
 
 Provide these fields to Go's template engine:
-- File path (always available as string)
-- File contents (empty string if not read)
+- File path (path to resolved temp file in `.start/temp/`)
+- File contents (resolved template content, empty string if not read)
 - Command string (always available as string)
 - Command output (empty string if not executed)
 - Current date (ISO 8601 timestamp)
@@ -288,7 +288,7 @@ Warning: {{.file_contents}} requested but file not found, using empty string
 
 ## Updates
 
-None yet.
+- 2025-12-08: Clarified that `{{.file}}` returns resolved temp file path, `{{.file_contents}}` returns resolved content. All content files are template-processed and written to `.start/temp/`.
 
 ## See Also
 

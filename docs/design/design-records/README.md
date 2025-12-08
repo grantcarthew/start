@@ -25,6 +25,8 @@ Design Records (DRs) document architectural decisions, algorithms, breaking chan
 | DR-017 | CLI Show Command | CLI | Accepted | 2025-12-04 |
 | DR-018 | CLI Auto-Setup | CLI | Accepted | 2025-12-04 |
 | DR-019 | Index Bin Field for Agent Detection | Index | Accepted | 2025-12-04 |
+| DR-020 | Template Processing and File Resolution | UTD | Accepted | 2025-12-08 |
+| DR-021 | Module and Package Naming Conventions | CUE | Accepted | 2025-12-08 |
 
 ## Process
 
