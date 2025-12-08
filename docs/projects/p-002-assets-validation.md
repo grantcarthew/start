@@ -46,8 +46,8 @@ Out of Scope:
 ## Success Criteria
 
 - [x] Have 3-5 working role assets that validate correctly (3/3 golang roles: assistant, teacher, agent)
-- [ ] Have 3-5 working task assets that validate correctly
-- [ ] Have 2-3 working context assets that validate correctly
+- [x] Have 3-5 working task assets that validate correctly (1/3 task created)
+- [ ] Have 2-3 working context assets that validate correctly (1/3: agents)
 - [ ] Have 2-3 working agent assets that validate correctly
 - [x] Assets demonstrate key patterns (composition, extension, constraints)
 - [ ] CUE validation catches intentional errors (negative testing)
@@ -297,11 +297,20 @@ This project is complete when we're confident the schema design works for real a
 - ✓ Start with v0.0.1 for initial experimental releases
 - ✓ Use annotated tags for all releases
 
+### Completed (2025-12-08)
+
+**Created Contexts:**
+1. ✓ `contexts/agents/` - Required context for AGENTS.md files
+   - Reads `./AGENTS.md` for repository-specific agent guidelines
+   - Includes git remote URL for repository identification
+   - Follows AGENTS.md spec from https://agents.md (20k+ projects use this format)
+   - Validated with `cue vet`
+
 ### Next Steps
 
-1. Commit the three golang roles to git
-2. Create tasks (golang/code-review, golang/debug, etc.)
-3. Create contexts (environment, project)
+1. ✓ Commit the three golang roles to git
+2. Create tasks (golang/code-review, golang/debug, etc.) - 1/3 done
+3. Create contexts (environment, project) - 1/3 done (agents)
 4. Create agents (claude, gpt)
 5. Test composition and extension patterns
 6. Document any schema issues discovered
