@@ -46,29 +46,46 @@ Out of Scope:
 ## Success Criteria
 
 - [x] Have 3-5 working role assets that validate correctly (3/3 golang roles: assistant, teacher, agent)
-- [x] Have 3-5 working task assets that validate correctly (1/3 task created)
+- [x] Have 3-5 working task assets that validate correctly (10/10 golang tasks created)
 - [ ] Have 2-3 working context assets that validate correctly (1/3: agents)
-- [ ] Have 2-3 working agent assets that validate correctly
+- [x] Have 2-3 working agent assets that validate correctly (3/3: claude, gemini, aichat)
 - [x] Assets demonstrate key patterns (composition, extension, constraints)
 - [ ] CUE validation catches intentional errors (negative testing)
 - [x] Assets use realistic content (not placeholder text)
-- [x] Identified and documented at least 2-3 schema improvements (module path alignment, import syntax)
+- [x] Identified and documented at least 2-3 schema improvements (module path alignment, import syntax, role CUE dependencies, @module/ prefix)
 - [x] Updated schemas if design issues discovered (module.cue updated with correct path and source)
 - [x] Documented asset creation best practices (UTD file pattern, role styles)
 
 ## Deliverables
 
-Assets (examples directory):
-- examples/roles/go-expert.cue
-- examples/roles/code-reviewer.cue
-- examples/roles/documentation-writer.cue
-- examples/tasks/pre-commit-review.cue
-- examples/tasks/debug-help.cue
-- examples/tasks/refactor-code.cue
-- examples/contexts/environment.cue
-- examples/contexts/project.cue
-- examples/agents/claude.cue
-- examples/agents/gpt.cue
+Assets (start-assets repository):
+
+Roles:
+- roles/golang/assistant/ ✓ (published v0.0.1)
+- roles/golang/teacher/ ✓ (published v0.0.1)
+- roles/golang/agent/ ✓ (published v0.0.1)
+
+Tasks:
+- tasks/golang/code-review/ ✓
+- tasks/golang/security-audit/ ✓
+- tasks/golang/dependency-analysis/ ✓
+- tasks/golang/api-docs/ ✓
+- tasks/golang/refactor/ ✓
+- tasks/golang/tests/ ✓
+- tasks/golang/error-handling/ ✓
+- tasks/golang/debug/ ✓
+- tasks/golang/performance/ ✓
+- tasks/golang/architecture/ ✓
+
+Contexts:
+- contexts/agents/ ✓
+- contexts/environment/ (pending)
+- contexts/project/ (pending)
+
+Agents:
+- agents/claude/ ✓
+- agents/gemini/ ✓
+- agents/aichat/ ✓
 
 Documentation:
 - docs/cue/asset-patterns.md - Patterns and best practices for creating assets
@@ -77,8 +94,10 @@ Documentation:
 Schema Updates (if needed):
 - Refined schemas in examples/schemas/ based on learnings
 
-Design Record Updates (if schema changed significantly):
-- Update to DR-002 documenting changes and reasoning
+Design Record Updates:
+- DR-009 updated with role union type ✓
+- DR-022 created: Task Role CUE Dependencies ✓
+- DR-023 created: Module Path Prefix ✓
 
 ## Dependencies
 
@@ -306,11 +325,66 @@ This project is complete when we're confident the schema design works for real a
    - Follows AGENTS.md spec from https://agents.md (20k+ projects use this format)
    - Validated with `cue vet`
 
+### Completed (2025-12-09)
+
+**Created Agent Definitions:**
+1. ✓ `agents/claude/` - Claude Code by Anthropic (haiku, sonnet, opus)
+2. ✓ `agents/gemini/` - Gemini CLI by Google (flash, flash-lite, pro)
+3. ✓ `agents/aichat/` - AIChat multi-provider tool (vertexai:gemini variants)
+4. ✓ All agents import schemas correctly and validate with `cue vet`
+5. ✓ Each has proper module.cue with deps and source kind
+
+**Published Roles to Central Registry:**
+1. ✓ Published `roles/golang/assistant@v0.0.1`
+2. ✓ Published `roles/golang/teacher@v0.0.1`
+3. ✓ Published `roles/golang/agent@v0.0.1`
+4. ✓ Verified with `cue mod resolve`
+
+**Created 10 Golang Tasks:**
+1. ✓ `tasks/golang/code-review/` - Comprehensive code review
+2. ✓ `tasks/golang/security-audit/` - Security vulnerability analysis
+3. ✓ `tasks/golang/dependency-analysis/` - Dependency health and updates
+4. ✓ `tasks/golang/api-docs/` - API documentation generation
+5. ✓ `tasks/golang/refactor/` - Code refactoring suggestions
+6. ✓ `tasks/golang/tests/` - Test generation (unit, integration, benchmark)
+7. ✓ `tasks/golang/error-handling/` - Error handling audit
+8. ✓ `tasks/golang/debug/` - Systematic debugging assistance
+9. ✓ `tasks/golang/performance/` - Performance profiling and optimization
+10. ✓ `tasks/golang/architecture/` - Codebase structure analysis
+11. ✓ All tasks import schemas@v0.0.2 and roles/golang/agent@v0.0.1
+12. ✓ All tasks validated with `cue mod tidy` and `cue vet`
+
+**Schema Updates:**
+1. ✓ Updated `role` field: `string` → `string | #Role` (supports CUE dependencies)
+2. ✓ Published schemas@v0.0.2 to Central Registry
+
+**Design Records Created:**
+1. ✓ DR-022: Task Role CUE Dependencies - Documents `role?: string | #Role` pattern
+2. ✓ DR-023: Module Path Prefix - Documents `@module/` prefix for file resolution
+3. ✓ Updated DR-009: Added role union type and published task example
+
+### Key Discoveries (2025-12-09)
+
+**Role as CUE Dependency:**
+- String reference (`role: "golang/agent"`) does NOT create CUE dependency
+- `cue mod tidy` removes unused deps when role is a string
+- Solution: Import role package, use `role: agentRole.role`
+- Schema change: `role?: string | #Role` preserves both patterns
+
+**Module File Resolution:**
+- `file: "./task.md"` won't work for cached modules (cwd is user's project)
+- Solution: `@module/` prefix indicates module-relative path
+- CLI resolves to CUE cache: `os.UserCacheDir()/cue/mod/extract/<module>@<version>/`
+- Platform cache dirs: macOS `~/Library/Caches/cue`, Linux `~/.cache/cue`
+
+**Task Prompt Pattern:**
+- Standard format with custom instructions section
+- `{{.file_contents}}` for task.md content
+- `{{.instructions}}` for user-provided instructions (defaults to "None")
+
 ### Next Steps
 
-1. ✓ Commit the three golang roles to git
-2. Create tasks (golang/code-review, golang/debug, etc.) - 1/3 done
-3. Create contexts (environment, project) - 1/3 done (agents)
-4. Create agents (claude, gpt)
-5. Test composition and extension patterns
-6. Document any schema issues discovered
+1. Create contexts (environment, project) - 1/3 done (agents)
+2. Test composition and extension patterns
+3. Negative testing (CUE validation catches errors)
+4. Publish tasks to CUE Central Registry
