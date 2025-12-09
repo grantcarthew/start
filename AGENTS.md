@@ -96,25 +96,25 @@ Design Records will start fresh at DR-001, as the CUE architecture is fundamenta
 
 ## Local Reference Repositories
 
-The `./reference` directory contains cloned source code and documentation for development reference. Each directory has an INDEX.csv file cataloging its contents:
+The `./Context` directory contains cloned source code and documentation for development reference. Each directory has an INDEX.csv file cataloging its contents:
 
-- **reference/cue** - CUE language source code, standard library, and implementation
+- **Context/cue** - CUE language source code, standard library, and implementation
   - Use for: Understanding CUE internals, package structure, encoding implementations, module system
-  - See: `reference/cue/INDEX.csv` for detailed catalog
+  - See: `Context/cue/INDEX.csv` for detailed catalog
 
-- **reference/cuelang-org** - CUE official documentation site
+- **Context/cuelang-org** - CUE official documentation site
   - Use for: Tutorials, concepts, how-to guides, language reference, examples
-  - See: `reference/cuelang-org/INDEX.csv` for detailed catalog
+  - See: `Context/cuelang-org/INDEX.csv` for detailed catalog
   - Key content: `content/docs/tutorial/` (especially working-with-a-custom-module-registry)
 
-- **reference/start-prototype** - TOML-based prototype with complete design records
+- **Context/start-prototype** - TOML-based prototype with complete design records
   - Use for: Design decisions, CLI interface research, architectural patterns explored
-  - See: `reference/start-prototype/INDEX.csv` for detailed catalog
+  - See: `Context/start-prototype/INDEX.csv` for detailed catalog
   - Key content: `docs/design/design-records/` (44 DRs), `docs/cli/` (command reference)
 
-- **reference/cobra** - Cobra CLI framework source code
+- **Context/cobra** - Cobra CLI framework source code
   - Use for: CLI implementation patterns, command structure, flag handling, shell completions
-  - See: `reference/cobra/INDEX.csv` for detailed catalog
+  - See: `Context/cobra/INDEX.csv` for detailed catalog
 
 ## Development Status
 

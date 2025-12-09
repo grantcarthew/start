@@ -47,7 +47,7 @@ Out of Scope:
 
 - [x] Have 3-5 working role assets that validate correctly (3/3 golang roles: assistant, teacher, agent)
 - [x] Have 3-5 working task assets that validate correctly (10/10 golang tasks created)
-- [ ] Have 2-3 working context assets that validate correctly (1/3: agents)
+- [x] Have 2-3 working context assets that validate correctly (3/3: agents, environment, project)
 - [x] Have 2-3 working agent assets that validate correctly (3/3: claude, gemini, aichat)
 - [x] Assets demonstrate key patterns (composition, extension, constraints)
 - [ ] CUE validation catches intentional errors (negative testing)
@@ -79,8 +79,8 @@ Tasks:
 
 Contexts:
 - contexts/agents/ ✓
-- contexts/environment/ (pending)
-- contexts/project/ (pending)
+- contexts/environment/ ✓
+- contexts/project/ ✓
 
 Agents:
 - agents/claude/ ✓
@@ -316,16 +316,13 @@ This project is complete when we're confident the schema design works for real a
 - ✓ Start with v0.0.1 for initial experimental releases
 - ✓ Use annotated tags for all releases
 
-### Completed (2025-12-08)
+### Completed (2025-12-09)
 
 **Created Contexts:**
-1. ✓ `contexts/agents/` - Required context for AGENTS.md files
-   - Reads `./AGENTS.md` for repository-specific agent guidelines
-   - Includes git remote URL for repository identification
-   - Follows AGENTS.md spec from https://agents.md (20k+ projects use this format)
-   - Validated with `cue vet`
-
-### Completed (2025-12-09)
+1. ✓ `contexts/agents/` - Repository AGENTS.md with git remote URL
+2. ✓ `contexts/environment/` - User environment from ~/Context/ENVIRONMENT.md
+3. ✓ `contexts/project/` - Project documentation from ./project.md
+4. ✓ All contexts import schemas@v0.0.2 and validate with `cue vet`
 
 **Created Agent Definitions:**
 1. ✓ `agents/claude/` - Claude Code by Anthropic (haiku, sonnet, opus)
@@ -384,7 +381,7 @@ This project is complete when we're confident the schema design works for real a
 
 ### Next Steps
 
-1. Create contexts (environment, project) - 1/3 done (agents)
-2. Test composition and extension patterns
-3. Negative testing (CUE validation catches errors)
-4. Publish tasks to CUE Central Registry
+1. Test composition and extension patterns
+2. Negative testing (CUE validation catches errors)
+3. Publish tasks to CUE Central Registry
+4. Publish contexts to CUE Central Registry
