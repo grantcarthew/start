@@ -22,11 +22,11 @@ Schema structure:
 
 ```cue
 #Task: {
-    #UTD                   // file, command, prompt, shell, timeout
-    description?: string   // Human-readable description
-    tags?: [...string]     // For categorization and search
-    role?:  string         // Reference to role by name
-    agent?: string         // Reference to agent by name
+    #UTD                      // file, command, prompt, shell, timeout
+    description?: string      // Human-readable description
+    tags?: [...string]        // For categorization and search
+    role?:  string | #Role    // String reference OR imported role
+    agent?: string            // Reference to agent by name
 }
 ```
 
@@ -115,7 +115,7 @@ From #UTD:
 Task-specific:
 - `description` (string, optional) - Human-readable summary
 - `tags` ([]string, optional) - Keywords for search and categorization
-- `role` (string, optional) - Name of role to use
+- `role` (string | #Role, optional) - String name for runtime resolution, or imported #Role for CUE dependency
 - `agent` (string, optional) - Name of agent to use
 
 ## Validation
@@ -128,7 +128,8 @@ At schema load time (CUE):
 
 At runtime (Go):
 
-- Referenced `role` exists in configuration
+- If `role` is string, referenced role exists in configuration
+- If `role` is #Role struct, extract content directly
 - Referenced `agent` exists in configuration
 - File paths resolve correctly
 - Commands execute successfully
@@ -172,3 +173,29 @@ Task with role override at runtime:
 ```bash
 start task security-audit --role go-expert
 ```
+
+Published task with imported role (CUE dependency):
+
+```cue
+import (
+    "github.com/grantcarthew/start-assets/schemas@v0"
+    agentRole "github.com/grantcarthew/start-assets/roles/golang/agent@v0:agent"
+)
+
+task: schemas.#Task & {
+    description: "Go code review"
+    role: agentRole.role    // Creates CUE module dependency
+    file: "@module/task.md"
+    prompt: """
+        {{.file_contents}}
+
+        ## Custom Instructions
+
+        {{.instructions}}
+        """
+}
+```
+
+## Updates
+
+- 2025-12-09: Changed `role` field from `string` to `string | #Role` to support CUE dependencies (see DR-022)
