@@ -1,8 +1,8 @@
 # P-002: Concrete Assets - Validate Design
 
-- Status: In Progress
+- Status: Completed
 - Started: 2025-12-05
-- Completed: -
+- Completed: 2025-12-09
 
 ## Overview
 
@@ -50,7 +50,7 @@ Out of Scope:
 - [x] Have 2-3 working context assets that validate correctly (3/3: agents, environment, project)
 - [x] Have 2-3 working agent assets that validate correctly (3/3: claude, gemini, aichat)
 - [x] Assets demonstrate key patterns (composition, extension, constraints)
-- [ ] CUE validation catches intentional errors (negative testing)
+- [x] CUE validation catches intentional errors (negative testing)
 - [x] Assets use realistic content (not placeholder text)
 - [x] Identified and documented at least 2-3 schema improvements (module path alignment, import syntax, role CUE dependencies, @module/ prefix)
 - [x] Updated schemas if design issues discovered (module.cue updated with correct path and source)
@@ -66,21 +66,21 @@ Roles:
 - roles/golang/agent/ ✓ (published v0.0.1)
 
 Tasks:
-- tasks/golang/code-review/ ✓
-- tasks/golang/security-audit/ ✓
-- tasks/golang/dependency-analysis/ ✓
-- tasks/golang/api-docs/ ✓
-- tasks/golang/refactor/ ✓
-- tasks/golang/tests/ ✓
-- tasks/golang/error-handling/ ✓
-- tasks/golang/debug/ ✓
-- tasks/golang/performance/ ✓
-- tasks/golang/architecture/ ✓
+- tasks/golang/code-review/ ✓ (published v0.0.1)
+- tasks/golang/security-audit/ ✓ (published v0.0.1)
+- tasks/golang/dependency-analysis/ ✓ (published v0.0.1)
+- tasks/golang/api-docs/ ✓ (published v0.0.1)
+- tasks/golang/refactor/ ✓ (published v0.0.1)
+- tasks/golang/tests/ ✓ (published v0.0.1)
+- tasks/golang/error-handling/ ✓ (published v0.0.1)
+- tasks/golang/debug/ ✓ (published v0.0.1)
+- tasks/golang/performance/ ✓ (published v0.0.1)
+- tasks/golang/architecture/ ✓ (published v0.0.1)
 
 Contexts:
-- contexts/agents/ ✓
-- contexts/environment/ ✓
-- contexts/project/ ✓
+- contexts/agents/ ✓ (published v0.0.1)
+- contexts/environment/ ✓ (published v0.0.1)
+- contexts/project/ ✓ (published v0.0.1)
 
 Agents:
 - agents/claude/ ✓
@@ -360,6 +360,28 @@ This project is complete when we're confident the schema design works for real a
 2. ✓ DR-023: Module Path Prefix - Documents `@module/` prefix for file resolution
 3. ✓ Updated DR-009: Added role union type and published task example
 
+**Published Contexts to Central Registry:**
+1. ✓ Published `contexts/agents@v0.0.1`
+2. ✓ Published `contexts/environment@v0.0.1`
+3. ✓ Published `contexts/project@v0.0.1`
+
+**Published Tasks to Central Registry:**
+1. ✓ Published `tasks/golang/api-docs@v0.0.1`
+2. ✓ Published `tasks/golang/architecture@v0.0.1`
+3. ✓ Published `tasks/golang/code-review@v0.0.1`
+4. ✓ Published `tasks/golang/debug@v0.0.1`
+5. ✓ Published `tasks/golang/dependency-analysis@v0.0.1`
+6. ✓ Published `tasks/golang/error-handling@v0.0.1`
+7. ✓ Published `tasks/golang/performance@v0.0.1`
+8. ✓ Published `tasks/golang/refactor@v0.0.1`
+9. ✓ Published `tasks/golang/security-audit@v0.0.1`
+10. ✓ Published `tasks/golang/tests@v0.0.1`
+
+**Negative Testing (Schema Validation):**
+- ✓ Tested constraint violations: timeout bounds, empty shell, invalid tags, type mismatches
+- ✓ All invalid configurations rejected with clear error messages
+- ✓ Error messages include constraint definition and violation location
+
 ### Key Discoveries (2025-12-09)
 
 **Role as CUE Dependency:**
@@ -379,9 +401,3 @@ This project is complete when we're confident the schema design works for real a
 - `{{.file_contents}}` for task.md content
 - `{{.instructions}}` for user-provided instructions (defaults to "None")
 
-### Next Steps
-
-1. Test composition and extension patterns
-2. Negative testing (CUE validation catches errors)
-3. Publish tasks to CUE Central Registry
-4. Publish contexts to CUE Central Registry

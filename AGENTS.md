@@ -12,7 +12,7 @@ Avoid references to the prototype in new documentation. This is a new design.
 
 Projects are stored in the docs/projects/ directory. Continue by reading the active project.
 
-Active Project: docs/projects/p-002-assets-validation.md
+Active Project: docs/projects/p-003-registry-distribution.md
 
 ## Why CUE?
 
@@ -118,12 +118,10 @@ The `./Context` directory contains cloned source code and documentation for deve
 
 ## Development Status
 
-Currently in design phase. Next steps:
+**Completed:**
+- P-001: CUE Foundation & Architecture (schemas designed and published)
+- P-002: Concrete Assets Validation (17 modules published to CUE Central Registry)
 
-1. Research CUE Central Registry package structure and publishing
-2. Design CUE schemas for roles, tasks, contexts, agents
-3. Define CLI commands (building on prototype CLI docs)
-4. Document core architecture decisions in Design Records
-5. Implement minimal viable orchestrator
+**Current:** P-003 Registry Distribution
 
 The prototype validated that this tool solves a real problem. This version will implement it properly.
