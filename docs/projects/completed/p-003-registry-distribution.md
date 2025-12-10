@@ -56,19 +56,23 @@ Out of Scope:
 ## Deliverables
 
 Design Records:
+
 - DR-004: Asset Distribution via CUE Central Registry
 
 Documentation:
+
 - docs/cue/package-structure.md - How packages are organized
 - docs/cue/publishing-guide.md - How to publish packages to registry
 - docs/cue/versioning-strategy.md - Versioning and dependency management
 
 Test Package:
+
 - Test package published to CUE Central Registry
 - Example of importing and using the package
 - Validation that it works end-to-end
 
 Package Design:
+
 - Package structure template
 - Naming conventions
 - Organization strategy
@@ -76,10 +80,12 @@ Package Design:
 ## Dependencies
 
 Requires:
+
 - P-001 (need schema design)
 - P-002 (need concrete assets to package)
 
 Blocks:
+
 - P-004 (CLI needs to know how packages work)
 - Future asset creation and distribution
 
@@ -174,38 +180,38 @@ Research Phase:
 
 Design Phase:
 
-4. ~~Design package structure~~ ✓ COMPLETED
+1. ~~Design package structure~~ ✓ COMPLETED
    - How to organize roles, tasks, contexts, agents
    - One package vs multiple packages?
    - Package naming conventions
    - Directory structure within packages
 
-5. Design versioning strategy
+2. Design versioning strategy
    - Semantic versioning approach
    - Breaking change policy
    - Backwards compatibility strategy
    - How users specify versions
 
-6. Design package discovery
+3. Design package discovery
    - How users find available packages
    - Package documentation and metadata
    - Search and browsing strategy
 
 Testing Phase:
 
-7. ~~Create test package~~ ✓ COMPLETED
+1. ~~Create test package~~ ✓ COMPLETED
    - Package one or more assets from P-002
    - Create module.cue with metadata
    - Follow CUE registry requirements
    - Test locally first
 
-8. ~~Publish to registry~~ ✓ COMPLETED
+2. ~~Publish to registry~~ ✓ COMPLETED
    - Set up registry authentication
    - Publish test package
    - Verify package appears in registry
    - Test importing from another project
 
-9. ~~Validate end-to-end~~ ✓ COMPLETED
+3. ~~Validate end-to-end~~ ✓ COMPLETED
    - Import package in new CUE file
    - Use assets from package
    - Validate composition works
@@ -213,18 +219,18 @@ Testing Phase:
 
 Documentation Phase:
 
-10. Write DR-004
+1. Write DR-004
     - Why CUE Central Registry vs custom GitHub system
     - Trade-offs and benefits
     - How it simplifies architecture
     - What prototype DRs become obsolete
 
-11. Document publishing process
+2. Document publishing process
     - Step-by-step guide
     - Requirements and prerequisites
     - Common issues and solutions
 
-12. Document package structure
+3. Document package structure
     - Organization patterns
     - Naming conventions
     - Best practices
@@ -232,6 +238,7 @@ Documentation Phase:
 ## Questions & Uncertainties
 
 Registry Mechanics:
+
 - What are the exact requirements for publishing?
 - How does authentication work?
 - Are there package size limits?
@@ -239,30 +246,35 @@ Registry Mechanics:
 - Can packages be unpublished or only deprecated?
 
 Package Organization:
+
 - Should each asset type be a separate package?
 - Or one monolithic package with everything?
 - How granular should packages be?
 - What's the naming convention for start-related packages?
 
 Versioning:
+
 - How do we handle breaking changes to schemas?
 - Can users pin to specific versions?
 - How does dependency resolution work?
 - What happens with version conflicts?
 
 Discovery:
+
 - How do users discover available packages?
 - Is there a registry web UI?
 - Can we provide our own catalog/directory?
 - How do we document what's available?
 
 User Experience:
+
 - How easy is it for users to import packages?
 - Do they need CUE CLI installed?
 - Can start CLI abstract package management?
 - What's the learning curve?
 
 Migration:
+
 - Can we support both CUE packages and local assets?
 - How do users migrate from prototype (if they existed)?
 - What's the transition story?
@@ -289,24 +301,24 @@ High Priority:
 
 Medium Priority:
 
-4. Package discovery
+1. Package discovery
    - Registry UI and search
    - Documentation and metadata
    - How users find packages
 
-5. User workflow
+2. User workflow
    - How users import and use packages
    - CUE CLI requirements
    - Integration with start CLI
 
-6. Prototype comparison
+3. Prototype comparison
    - Complexity of DR-031-042 asset system
    - What CUE registry replaces
    - Architecture simplification
 
 Low Priority:
 
-7. Advanced scenarios
+1. Advanced scenarios
    - Private packages
    - Forking and customization
    - Multiple registries
@@ -314,6 +326,7 @@ Low Priority:
 ## Notes
 
 Prototype Asset System to Replace:
+
 - DR-031: Catalog-Based Asset Architecture
 - DR-032: Asset Metadata Schema
 - DR-033: Asset Resolution Algorithm
@@ -328,6 +341,7 @@ Prototype Asset System to Replace:
 If CUE Central Registry works as expected, all of this complexity becomes unnecessary. That's the hypothesis to validate in this project.
 
 Key Tutorial:
+
 - reference/cuelang-org/content/docs/tutorial/working-with-a-custom-module-registry/en.md
 
 Success Measure:

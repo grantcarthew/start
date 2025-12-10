@@ -9,6 +9,7 @@
 The Unified Template Design (UTD) pattern needs a template syntax for placeholder substitution in prompt text.
 
 Requirements:
+
 - Support placeholder substitution (file paths, command output, dates)
 - Allow both simple substitution and complex logic (conditionals, loops)
 - Minimize custom code (validation, parsing, execution)
@@ -21,6 +22,7 @@ Requirements:
 Use Go's `text/template` package with `{{.placeholder}}` syntax for all UTD template operations.
 
 **Template syntax:**
+
 - `{{.file}}` - File path
 - `{{.file_contents}}` - File contents
 - `{{.command}}` - Command string
@@ -29,6 +31,7 @@ Use Go's `text/template` package with `{{.placeholder}}` syntax for all UTD temp
 - `{{.instructions}}` - Task-specific instructions
 
 **Full Go template support:**
+
 - Conditionals: `{{if .command_output}}...{{end}}`
 - Loops: `{{range .items}}...{{end}}`
 - Functions: `{{.file | trim}}`
@@ -36,6 +39,7 @@ Use Go's `text/template` package with `{{.placeholder}}` syntax for all UTD temp
 - Comments: `{{/* comment */}}`
 
 **Runtime injection:**
+
 - Go code builds template data map
 - Executes `text/template.Execute` with data
 - Returns rendered text or error
@@ -43,29 +47,34 @@ Use Go's `text/template` package with `{{.placeholder}}` syntax for all UTD temp
 ## Why
 
 **Go templates are standard:**
+
 - Part of Go standard library (`text/template`)
 - Well-documented, widely known syntax
 - Battle-tested in production systems
 - Zero external dependencies
 
 **Eliminates custom code:**
+
 - No custom placeholder parser required
 - No custom substitution logic required
 - No custom validation (template validates itself)
 - No custom error messages (Go provides them)
 
 **Powerful yet simple:**
+
 - Simple case: `{{.file_contents}}` (just substitution)
 - Complex case: `{{if .command_output}}...{{else}}...{{end}}`
 - Users choose complexity level
 - Progressive disclosure (learn advanced features as needed)
 
 **Extensibility:**
+
 - Can add custom functions via `template.Funcs()`
 - Can provide helpers (trim, upper, lower, etc.)
 - Future-proof for advanced use cases
 
 **Runtime validation:**
+
 - Template syntax validated during execution
 - Clear error messages for invalid syntax
 - Fails fast on typos (`{{.commnd_output}}` detected)
@@ -73,12 +82,14 @@ Use Go's `text/template` package with `{{.placeholder}}` syntax for all UTD temp
 ## Trade-offs
 
 Accept:
+
 - More verbose syntax (`{{.file}}` vs simpler alternatives)
 - Must escape template syntax in content (`{{` needs `{{"{{"}}`)
 - Learning curve for Go template features
 - Dot prefix required for all placeholders
 
 Gain:
+
 - Zero custom template code
 - Standard, documented syntax
 - Powerful features (conditionals, loops, functions)
@@ -147,6 +158,7 @@ Prompt: "File: {{ file }}, Date: {{ date }}"
 **Template data structure:**
 
 Provide these fields to Go's template engine:
+
 - File path (path to resolved temp file in `.start/temp/`)
 - File contents (resolved template content, empty string if not read)
 - Command string (always available as string)
@@ -165,6 +177,7 @@ Provide these fields to Go's template engine:
 **Lazy evaluation strategy:**
 
 Before reading files or executing commands:
+
 - Scan template for `{{.file_contents}}` placeholder
 - Only read file if placeholder exists
 - Scan template for `{{.command_output}}` placeholder
@@ -174,6 +187,7 @@ Before reading files or executing commands:
 **Custom functions (optional enhancement):**
 
 Template can be extended with custom functions:
+
 - String manipulation: trim, upper, lower
 - Text processing: truncate, indent, wrap
 - Use Go's template.FuncMap to register functions
@@ -229,11 +243,13 @@ prompt:  "Status: {{.command_output | trim | upper}}"
 ## Validation
 
 **At runtime:**
+
 - Template syntax validated by `text/template.Parse()`
 - Unknown placeholders detected (typo: `{{.commnd}}` → error)
 - Template execution errors reported with clear messages
 
 **CUE schema:**
+
 - Fields are strings (CUE doesn't validate Go template syntax)
 - Go runtime performs template validation
 - Invalid templates fail at execution time
@@ -262,12 +278,14 @@ Warning: {{.file_contents}} requested but file not found, using empty string
 ## Security Considerations
 
 **Template execution is safe:**
+
 - Go templates cannot execute arbitrary code
 - No file system access from templates
 - No network access from templates
 - No process execution from templates
 
 **Command execution is controlled:**
+
 - Commands executed by Go code, not templates
 - Templates only receive command output (strings)
 - Command execution subject to timeout limits
@@ -276,12 +294,14 @@ Warning: {{.file_contents}} requested but file not found, using empty string
 ## Future Enhancements
 
 **Custom functions:**
+
 - String manipulation: trim, upper, lower, truncate
 - Formatting: indent, wrap, escape
 - Date formatting: custom date formats
 - Conditionals: isEmpty, isNotEmpty, contains
 
 **Template helpers:**
+
 - File path manipulation: basename, dirname, ext
 - Text processing: lines, words, chars
 - Encoding: base64, json, yaml

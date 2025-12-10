@@ -9,6 +9,7 @@
 UTD commands need to execute in various shells and interpreters (bash, sh, zsh, node, python, ruby, etc.). How should shell selection and command execution be configured?
 
 Requirements:
+
 - Support multiple shells and interpreters
 - Allow per-command shell override
 - Provide sensible defaults
@@ -45,6 +46,7 @@ contexts: {
 **Shell specification format:**
 
 User provides shell binary and flags as single string:
+
 - `"bash -c"` - Standard bash
 - `"bash -euo pipefail -c"` - Bash strict mode
 - `"sh -c"` - POSIX shell
@@ -64,6 +66,7 @@ Implementation splits on whitespace: first element is binary, rest are flags.
 **Auto-detection:**
 
 Only triggered when no shell configured:
+
 1. Use `exec.LookPath("bash")` to check for bash in PATH
 2. If found: use `"bash -c"`
 3. If not found: use `exec.LookPath("sh")` to check for sh
@@ -84,6 +87,7 @@ Only triggered when no shell configured:
 **User-specified flags provide flexibility:**
 
 Users control exact shell invocation:
+
 - Standard mode: `bash -c`
 - Strict mode: `bash -euo pipefail -c`
 - Debugging: `sh -x -c`
@@ -94,6 +98,7 @@ No need for tool to know shell-specific flags.
 **No magic mapping table:**
 
 Tool doesn't need to know that:
+
 - bash uses `-c` flag
 - node uses `-e` flag
 - deno uses `eval` command
@@ -121,12 +126,14 @@ Protects against infinite loops, slow commands, blocked I/O. Allows partial outp
 ## Trade-offs
 
 Accept:
+
 - Users must know shell flag syntax (`-c` vs `-e`)
 - More verbose than implicit flag mapping
 - Shell string parsing could fail on complex quoting
 - Auto-detection adds startup check
 
 Gain:
+
 - Maximum flexibility (any flags, any shell)
 - No hardcoded shell knowledge needed
 - Future-proof (works with new shells)
@@ -239,10 +246,12 @@ Simple space-split works for common cases. Complex quoting in shell field is not
 ## Working Directory
 
 Commands execute in:
+
 - Current working directory (PWD where `start` was invoked)
 - Or directory specified by `--directory` (or `-d`) flag
 
 Commands do NOT execute in:
+
 - User's home directory
 - Config file location
 - Tool installation directory
@@ -256,6 +265,7 @@ Rationale: Users expect commands to run where they invoked `start`, matching sta
 **Default:** 30 seconds (if not specified anywhere)
 
 **Validation:**
+
 - CUE schema enforces range: `int & >=1 & <=3600`
 - Go runtime enforces timeout at execution
 
@@ -302,6 +312,7 @@ Rationale: Users expect commands to run where they invoked `start`, matching sta
 **Preview mode:**
 
 The `start show` command resolves all UTD templates and displays final text without executing agent. Shows:
+
 - Resolved shell and command
 - File paths and preview of contents
 - Commands that would execute
@@ -313,6 +324,7 @@ Users can verify behavior before actual execution.
 ## Unix Only
 
 No Windows support. Design assumes:
+
 - Unix-like shells (bash, sh, zsh, fish)
 - Unix process model (fork/exec, signals)
 - Unix PATH resolution

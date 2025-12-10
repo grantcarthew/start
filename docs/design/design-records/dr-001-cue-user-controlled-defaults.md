@@ -33,6 +33,7 @@ tasks: [_]: #Task & {
 CUE's unification model prevents multiple defaults from working together. When two defaults conflict, CUE treats the field as if NO defaults were provided.
 
 Example problem with schema defaults:
+
 ```cue
 // Schema
 #Task: {timeout: *120 | int}
@@ -46,17 +47,20 @@ tasks: [_]: #Task & {timeout: *300 | int}
 By keeping schemas pure, users have ONE place to set defaults. User with slow local model changes `*120` to `*600` in one line - affects all tasks.
 
 Clear separation:
+
 - Schemas define "what is valid"
 - Users define "what is typical" for their environment
 
 ## Trade-offs
 
 Accept:
+
 - Users must write pattern constraints in their config
 - More initial setup for users
 - Requires understanding CUE's default syntax
 
 Gain:
+
 - Users control ALL defaults in one place
 - No conflicting defaults
 - Flexibility for different environments

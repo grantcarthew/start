@@ -38,6 +38,7 @@ tasks: {
 ```
 
 Go code uses the map key when loading tasks:
+
 ```go
 for taskName, taskConfig := range tasks {
     // taskName = "code-review"
@@ -48,18 +49,21 @@ for taskName, taskConfig := range tasks {
 ## Why
 
 The map key already serves as the identifier:
+
 - Key is required (can't have anonymous map entries)
 - Key is unique within the map
 - Key is how users reference tasks (`start task code-review`)
 - Key is searchable and discoverable
 
 Adding a `name` field would require:
+
 - Pattern constraint to auto-inject: `tasks: [Name=_]: #Task & {name: Name}`
 - Duplication in every task definition
 - Risk of mismatch between key and name field
 - Extra validation to ensure consistency
 
 Removing the field simplifies:
+
 - Schema is simpler (one less field)
 - User config is cleaner (no redundant data)
 - No auto-injection pattern needed
@@ -68,10 +72,12 @@ Removing the field simplifies:
 ## Trade-offs
 
 Accept:
+
 - Task objects don't contain their own name
 - Must pass name separately when task is isolated from map context
 
 Gain:
+
 - Simpler schema
 - No duplication or potential inconsistency
 - Cleaner user configuration

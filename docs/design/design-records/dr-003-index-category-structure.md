@@ -9,6 +9,7 @@
 How should the asset discovery index organize and identify modules?
 
 Options for index keys:
+
 1. Flat keys: `"code-review"` → module path
 2. Category in key: `"golang/code-review"` → module path
 3. Nested structure: `golang: {"code-review": {...}}`
@@ -33,6 +34,7 @@ tasks: {
 ```
 
 This maps to:
+
 - User command: `start task golang/code-review`
 - Directory: `tasks/golang/code-review/`
 - Module: `start-task-golang-code-review@v0`
@@ -40,18 +42,21 @@ This maps to:
 ## Why
 
 Consistency across all layers:
+
 - User types: `golang/code-review`
 - Index lookup: `tasks["golang/code-review"]`
 - Directory path: `tasks/golang/code-review/`
 - Module name includes category for clarity
 
 Categories provide organization:
+
 - Hundreds of tasks need structure
 - `golang/lint`, `golang/test`, `golang/benchmark` group naturally
 - Search can filter by category
 - Browse by category for discovery
 
 Direct lookup efficiency:
+
 ```go
 // User: start task golang/code-review
 indexEntry := index.tasks["golang/code-review"]
@@ -62,11 +67,13 @@ modulePath := indexEntry.module
 ## Trade-offs
 
 Accept:
+
 - Longer keys to type
 - Category required for all assets
 - Must choose appropriate categories
 
 Gain:
+
 - Clear organization at scale
 - Easy to browse by category
 - Consistent user experience (input matches structure)

@@ -162,6 +162,7 @@ contexts: {
 Field definitions:
 
 From #UTD:
+
 - `file` (string, optional) - Path to context file
 - `command` (string, optional) - Command for dynamic content
 - `prompt` (string, optional) - Go template for content composition
@@ -169,6 +170,7 @@ From #UTD:
 - `timeout` (int, optional) - Command timeout in seconds (1-3600)
 
 Context-specific:
+
 - `description` (string, optional) - Human-readable summary
 - `tags` ([]string, optional) - Keywords for grouping and selection (kebab-case)
 - `required` (bool, optional) - Always included in all commands
