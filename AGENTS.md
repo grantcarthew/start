@@ -12,7 +12,7 @@ Avoid references to the prototype in new documentation. This is a new design.
 
 Projects are stored in the docs/projects/ directory. Continue by reading the active project.
 
-Active Project: docs/projects/p-003-registry-distribution.md
+Active Project: docs/projects/p-004-cli-minimal-implementation.md
 
 ## Why CUE?
 
@@ -121,7 +121,8 @@ The `./Context` directory contains cloned source code and documentation for deve
 **Completed:**
 - P-001: CUE Foundation & Architecture (schemas designed and published)
 - P-002: Concrete Assets Validation (17 modules published to CUE Central Registry)
+- P-003: Registry Distribution (20 modules published, prototype comparison documented)
 
-**Current:** P-003 Registry Distribution
+**Current:** P-004 Minimal CLI Implementation
 
 The prototype validated that this tool solves a real problem. This version will implement it properly.
