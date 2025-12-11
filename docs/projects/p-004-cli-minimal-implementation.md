@@ -64,17 +64,17 @@ Out of Scope:
 
 ## Success Criteria
 
-- [ ] Can load CUE configuration from `~/.config/start/` and `./.start/`
-- [ ] Can merge global and local configurations
-- [ ] Can validate CUE against schemas
+- [x] Can load CUE configuration from `~/.config/start/` and `./.start/`
+- [x] Can merge global and local configurations
+- [x] Can validate CUE against schemas
 - [ ] `start show role` displays resolved role content
 - [ ] `start show context` displays resolved context content
 - [ ] `start show agent` displays agent configuration
 - [ ] `start show task` displays task configuration
-- [ ] Validation errors are clear and actionable
+- [x] Validation errors are clear and actionable
 - [ ] `--scope global` and `--scope local` work correctly
 - [ ] Output follows temp directory pattern from DR-016
-- [ ] Tests cover loader, validator, and show command
+- [x] Tests cover loader, validator, and show command
 - [ ] Works with assets from P-002
 
 ## Deliverables
@@ -294,3 +294,41 @@ Key findings:
 Updated P-004 to align with design records.
 
 Next: Phase 1 - CUE Infrastructure (loader, validator, paths)
+
+### 2025-12-11: Phase 1 Complete - CUE Infrastructure
+
+Implemented core CUE infrastructure for loading and validating configurations.
+
+Files created:
+
+- `internal/config/paths.go` - Config directory resolution with XDG support
+- `internal/config/paths_test.go` - 88.9% coverage
+- `internal/cue/loader.go` - CUE loading with two-level merge semantics
+- `internal/cue/loader_test.go` - Comprehensive merge behaviour tests
+- `internal/cue/validator.go` - Validation with functional options
+- `internal/cue/validator_test.go` - Path and concrete validation tests
+- `internal/cue/errors.go` - User-friendly error formatting
+- `internal/cue/errors_test.go` - Error formatting tests
+- `test/testdata/` - Test fixtures for valid, invalid, merge, and schemas
+
+Key decisions documented:
+
+- DR-025: Configuration Merge Semantics - Two-level merge for collections vs settings
+
+Merge semantics implemented:
+
+- Collections (agents, contexts, roles, tasks): Items merge additively by name; same-named items replaced entirely
+- Settings: Fields merge additively; same fields replaced
+- Scalars: Local replaces global
+
+Test coverage:
+
+- `internal/config`: 88.9%
+- `internal/cue`: 85.1%
+
+Code review completed with fixes:
+
+- Fixed type assertion panic risk in `formatValue`
+- Fixed error message formatting to use CUE's `Msg()` method
+
+Next: Phase 2 - Show Command

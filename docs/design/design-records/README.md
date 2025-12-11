@@ -30,6 +30,7 @@ Design Records (DRs) document architectural decisions, algorithms, breaking chan
 | DR-022 | Task Role CUE Dependencies | CUE | Accepted | 2025-12-09 |
 | DR-023 | Module Path Prefix for File Resolution | CUE | Accepted | 2025-12-09 |
 | DR-024 | Testing Strategy | Testing | Accepted | 2025-12-11 |
+| DR-025 | Configuration Merge Semantics | Config | Accepted | 2025-12-11 |
 
 ## Process
 
