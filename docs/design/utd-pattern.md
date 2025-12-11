@@ -180,8 +180,8 @@ Define defaults in `config.cue`:
 
 ```cue
 settings: {
-	shell:   "bash"  // Default: auto-detect (bash > sh)
-	timeout: 30      // Default: 30 seconds
+ shell:   "bash"  // Default: auto-detect (bash > sh)
+ timeout: 30      // Default: 30 seconds
 }
 ```
 
@@ -191,12 +191,12 @@ Override shell for specific UTD instances:
 
 ```cue
 contexts: {
-	"node-version": {
-		command: "console.log(process.version)"
-		shell:   "node"
-		timeout: 5
-		prompt:  "Node version: {{.command_output}}"
-	}
+ "node-version": {
+  command: "console.log(process.version)"
+  shell:   "node"
+  timeout: 5
+  prompt:  "Node version: {{.command_output}}"
+ }
 }
 ```
 
@@ -223,15 +223,15 @@ Commands are subject to timeout limits (default 30 seconds):
 
 ```cue
 contexts: {
-	"quick-check": {
-		command: "git status"
-		timeout: 5   // 5 seconds
-	}
+ "quick-check": {
+  command: "git status"
+  timeout: 5   // 5 seconds
+ }
 
-	"slow-analysis": {
-		command: "npm run analyze"
-		timeout: 120  // 2 minutes
-	}
+ "slow-analysis": {
+  command: "npm run analyze"
+  timeout: 120  // 2 minutes
+ }
 }
 ```
 
@@ -276,9 +276,9 @@ Error handling depends on **where UTD is used**:
 
 ```cue
 roles: {
-	"code-reviewer": {
-		file: "./ROLE.md"
-	}
+ "code-reviewer": {
+  file: "./ROLE.md"
+ }
 }
 ```
 
@@ -288,9 +288,9 @@ Uses file contents directly as role text.
 
 ```cue
 contexts: {
-	"git-status": {
-		command: "git status --short"
-	}
+ "git-status": {
+  command: "git status --short"
+ }
 }
 ```
 
@@ -300,9 +300,9 @@ Uses command output directly as context text.
 
 ```cue
 contexts: {
-	note: {
-		prompt: "Important: This project uses Go 1.21"
-	}
+ note: {
+  prompt: "Important: This project uses Go 1.21"
+ }
 }
 ```
 
@@ -312,10 +312,10 @@ Uses prompt text directly.
 
 ```cue
 contexts: {
-	environment: {
-		file:   "~/reference/ENVIRONMENT.md"
-		prompt: "Read {{.file}} for environment context."
-	}
+ environment: {
+  file:   "~/reference/ENVIRONMENT.md"
+  prompt: "Read {{.file}} for environment context."
+ }
 }
 ```
 
@@ -325,15 +325,15 @@ Injects file path into prompt template.
 
 ```cue
 contexts: {
-	"recent-changes": {
-		command: "git log -5 --oneline"
-		prompt: """
+ "recent-changes": {
+  command: "git log -5 --oneline"
+  prompt: """
 Recent commits:
 {{.command_output}}
 
 Focus on these changes during the session.
 """
-	}
+ }
 }
 ```
 
@@ -359,10 +359,10 @@ Work in progress.
 
 ```cue
 contexts: {
-	project: {
-		file:    "./PROJECT.md"
-		command: "git log -3 --oneline"
-	}
+ project: {
+  file:    "./PROJECT.md"
+  command: "git log -3 --oneline"
+ }
 }
 ```
 
@@ -372,10 +372,10 @@ Command output replaces `{{.command_output}}` in the file.
 
 ```cue
 contexts: {
-	"complete-status": {
-		file:    "./PROJECT.md"
-		command: "git status --short"
-		prompt: """
+ "complete-status": {
+  file:    "./PROJECT.md"
+  command: "git status --short"
+  prompt: """
 # Full Project Context
 
 ## Documentation
@@ -384,7 +384,7 @@ contexts: {
 ## Working Tree
 {{.command_output}}
 """
-	}
+ }
 }
 ```
 
@@ -394,16 +394,16 @@ Both file contents and command output injected into prompt.
 
 ```cue
 tasks: {
-	"code-review": {
-		command: "git diff --staged"
-		prompt: """
+ "code-review": {
+  command: "git diff --staged"
+  prompt: """
 Review these changes:
 
 {{.command_output}}
 
 Instructions: {{.instructions}}
 """
-	}
+ }
 }
 ```
 
@@ -415,15 +415,15 @@ The `{{.instructions}}` placeholder receives `"focus on security"`.
 
 ```cue
 contexts: {
-	"package-info": {
-		shell:   "node"
-		command: """
+ "package-info": {
+  shell:   "node"
+  command: """
 const pkg = require('./package.json');
 console.log(`${pkg.name}@${pkg.version}`);
 console.log(`Dependencies: ${Object.keys(pkg.dependencies).length}`);
 """
-		prompt: "Package details:\n{{.command_output}}"
-	}
+  prompt: "Package details:\n{{.command_output}}"
+ }
 }
 ```
 
@@ -431,9 +431,9 @@ console.log(`Dependencies: ${Object.keys(pkg.dependencies).length}`);
 
 ```cue
 contexts: {
-	"file-list": {
-		command: "ls -1"
-		prompt: """
+ "file-list": {
+  command: "ls -1"
+  prompt: """
 {{if .command_output}}
 Files found:
 {{.command_output}}
@@ -441,7 +441,7 @@ Files found:
 No files in directory.
 {{end}}
 """
-	}
+ }
 }
 ```
 
@@ -474,13 +474,13 @@ In CUE schemas, UTD is defined as a reusable definition:
 package schemas
 
 #UTD: {
-	file?:    string
-	command?: string
-	prompt?:  string
-	shell?:   string
-	timeout?: int & >=1 & <=3600
+ file?:    string
+ command?: string
+ prompt?:  string
+ shell?:   string
+ timeout?: int & >=1 & <=3600
 
-	// Note: Go validates at least one of file/command/prompt required
+ // Note: Go validates at least one of file/command/prompt required
 }
 ```
 
@@ -489,8 +489,8 @@ Tasks, roles, and contexts embed `#UTD`:
 ```cue
 // schemas/role.cue
 #Role: {
-	#UTD
-	description?: string
+ #UTD
+ description?: string
 }
 ```
 

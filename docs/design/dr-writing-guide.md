@@ -10,7 +10,7 @@ Read when: Writing/updating DRs or reconciling docs.
 
 ## Markdown Formatting Note
 
-IMPORTANT: Avoid using bold markdown (`**text**`) in design records. Bold formatting adds no semantic value to large language models but significantly increases token count. Use section headers, lists, and clear structure instead.
+IMPORTANT: Avoid using bold Markdown (`**text**`) in design records. Bold formatting adds no semantic value to large language models but significantly increases token count. Use section headers, lists, and clear structure instead.
 
 Good: Use `## Section Name` and bullet points
 Bad: Use `**Section Name:**` with bold
@@ -252,6 +252,7 @@ Format: `dr-<NNN>-<category>-<title>.md`
 - All lowercase kebab-case (words separated by hyphens, no underscores or spaces)
 
 Examples:
+
 - `dr-001-cue-user-controlled-defaults.md`
 - `dr-002-cue-no-name-field.md`
 - `dr-003-index-category-structure.md`

@@ -101,6 +101,7 @@ Additional focus:
 Field definitions:
 
 From #UTD:
+
 - `file` (string, optional) - Path to system prompt file
 - `command` (string, optional) - Command for dynamic content
 - `prompt` (string, optional) - Go template for prompt composition
@@ -108,6 +109,7 @@ From #UTD:
 - `timeout` (int, optional) - Command timeout in seconds (1-3600)
 
 Role-specific:
+
 - `description` (string, optional) - Human-readable summary
 - `tags` ([]string, optional) - Keywords for search and categorization
 

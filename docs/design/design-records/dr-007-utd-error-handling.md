@@ -9,6 +9,7 @@
 UTD template resolution can fail in various ways (file missing, command fails, template syntax error). How should errors be handled?
 
 The answer depends on WHERE the UTD is used:
+
 - Tasks are user-initiated actions (user expects them to work)
 - Contexts are optional background information (nice-to-have)
 - Roles are optional system prompts (agent can run without them)
@@ -20,18 +21,21 @@ Different contexts need different error handling strategies.
 Error handling depends on the parent entity using UTD.
 
 **Tasks: Fail hard**
+
 - Any UTD error stops execution immediately
 - Exit with code 1
 - Display error message to stdout
 - User must fix configuration
 
 **Contexts: Warn and skip**
+
 - Log warning to stdout with details
 - Skip this context entirely
 - Continue processing other contexts
 - Session proceeds with available contexts
 
 **Roles: Warn and skip**
+
 - Log warning to stdout with details
 - Skip role (no system prompt)
 - Continue execution
@@ -44,6 +48,7 @@ Error handling depends on the parent entity using UTD.
 **Tasks are user-initiated:**
 
 User runs `start task code-review` expecting it to work. If task configuration is broken, failing immediately is correct:
+
 - Clear feedback (task is broken)
 - Prevents wasted time (agent running wrong task)
 - Forces fix (can't proceed with broken task)
@@ -51,6 +56,7 @@ User runs `start task code-review` expecting it to work. If task configuration i
 **Contexts are optional enrichment:**
 
 Contexts provide background information. If one fails:
+
 - Other contexts still valuable
 - Agent can still run effectively
 - Missing context reduces quality but doesn't prevent work
@@ -59,6 +65,7 @@ Contexts provide background information. If one fails:
 **Roles are optional prompts:**
 
 Roles customize agent behavior. If role fails:
+
 - Agent has default behavior
 - Session still useful (general assistant)
 - User can fix role for next session
@@ -67,6 +74,7 @@ Roles customize agent behavior. If role fails:
 **Best effort maximizes utility:**
 
 Multiple contexts, one fails:
+
 - Warn about failed context
 - Use remaining contexts
 - Better than failing completely
@@ -79,33 +87,41 @@ Multiple contexts, one fails:
 **File not found:**
 
 Task:
+
 ```
 Error: file not found: ./PROMPT.md
 Task 'code-review' failed
 ```
+
 Exit code 1
 
 Context/Role:
+
 ```
 Warning: file not found: ~/reference/MISSING.md
 Skipping context 'documentation'
 ```
+
 Continue
 
 **File not readable:**
 
 Task:
+
 ```
 Error: cannot read file: ./prompt.md (permission denied)
 Task 'code-review' failed
 ```
+
 Exit code 1
 
 Context/Role:
+
 ```
 Warning: cannot read file: ./PROJECT.md (permission denied)
 Skipping context 'project'
 ```
+
 Continue
 
 ### Command Errors
@@ -113,56 +129,68 @@ Continue
 **Shell not found:**
 
 Task:
+
 ```
 Error: shell 'nonexistent' not found in PATH
 Task 'analyze' failed
 ```
+
 Exit code 1
 
 Context/Role:
+
 ```
 Warning: shell 'badshell' not found in PATH
 Skipping context 'metrics'
 ```
+
 Continue
 
 **Command exits non-zero:**
 
 Task:
+
 ```
 Error: command failed with exit code 1
 Command: git diff --staged
 Stderr: fatal: not a git repository
 Task 'code-review' failed
 ```
+
 Exit code 1
 
 Context/Role:
+
 ```
 Warning: command failed with exit code 1
 Command: git status
 Stderr: fatal: not a git repository
 Skipping context 'git-status'
 ```
+
 Continue
 
 **Command timeout:**
 
 Task:
+
 ```
 Error: command timeout after 30 seconds
 Command: slow-analysis.sh
 Partial output: "Processing..."
 Task 'analyze' failed
 ```
+
 Exit code 1
 
 Context/Role:
+
 ```
 Warning: command timeout after 30 seconds
 Command: long-running-script
 Using partial output: "..."
 ```
+
 Continue with partial output
 
 ### Template Errors
@@ -170,41 +198,49 @@ Continue with partial output
 **Invalid template syntax:**
 
 Task:
+
 ```
 Error: invalid template syntax
 Template: "File: {{.file_contents"
 Error: template: utd:1: unclosed action
 Task 'review' failed
 ```
+
 Exit code 1
 
 Context/Role:
+
 ```
 Warning: invalid template syntax
 Template: "Status: {{.command_output"
 Error: template: utd:1: unclosed action
 Skipping context 'status'
 ```
+
 Continue
 
 **Unknown placeholder:**
 
 Task:
+
 ```
 Error: unknown placeholder in template
 Template: "Output: {{.commnd_output}}"
 Error: can't evaluate field commnd_output
 Task 'check' failed
 ```
+
 Exit code 1
 
 Context/Role:
+
 ```
 Warning: unknown placeholder in template
 Template: "Data: {{.unknown}}"
 Error: can't evaluate field unknown
 Skipping role 'custom'
 ```
+
 Continue
 
 ### Unused Field Warnings
@@ -212,21 +248,25 @@ Continue
 **File defined but not used:**
 
 All contexts (not an error, just a warning):
+
 ```
 Warning: file defined but not referenced in template
 File: ./unused.md
 Template does not contain {{.file}} or {{.file_contents}}
 ```
+
 Continue (use template as-is, ignore file)
 
 **Command defined but not used:**
 
 All contexts (not an error, just a warning):
+
 ```
 Warning: command defined but not referenced in template
 Command: git status
 Template does not contain {{.command}} or {{.command_output}}
 ```
+
 Continue (use template as-is, ignore command)
 
 ## Partial Failures
@@ -234,41 +274,49 @@ Continue (use template as-is, ignore command)
 **File works, command fails:**
 
 Task:
+
 ```
 Error: command failed while resolving template
 File read successfully: ./PROJECT.md
 Command failed: git log (exit code 128)
 Task 'report' failed
 ```
+
 Exit code 1
 
 Context/Role:
+
 ```
 Warning: command failed while resolving template
 File read successfully: ./PROJECT.md
 Command failed: git log (exit code 128)
 Using file contents only
 ```
+
 Continue with file contents, empty command output
 
 **Command works, file fails:**
 
 Task:
+
 ```
 Error: file not found while resolving template
 Command succeeded: git status
 File not found: ./missing.md
 Task 'status' failed
 ```
+
 Exit code 1
 
 Context/Role:
+
 ```
 Warning: file not found while resolving template
 Command succeeded: git status
 File not found: ./missing.md
 Using command output only
 ```
+
 Continue with command output, empty file contents
 
 ## Multiple Context Failures
@@ -276,6 +324,7 @@ Continue with command output, empty file contents
 **Scenario:** 5 contexts configured, 2 fail
 
 Output:
+
 ```
 Warning: context 'git-status' skipped (command failed)
 Warning: context 'missing-doc' skipped (file not found)
@@ -291,6 +340,7 @@ Session continues with 3 working contexts.
 **Scenario:** All contexts fail
 
 Output:
+
 ```
 Warning: context 'env' skipped (file not found)
 Warning: context 'project' skipped (command failed)
@@ -321,6 +371,7 @@ Skipping <entity-type> '<entity-name>'
 ```
 
 **Details include:**
+
 - File paths (if relevant)
 - Commands (if relevant)
 - Exit codes (if relevant)
@@ -338,12 +389,14 @@ Good: `Warning: command failed with exit code 1 (git diff)`
 ## Trade-offs
 
 Accept:
+
 - More complex error handling logic (parent-dependent)
 - Multiple code paths for same error type
 - Users must understand fail vs warn distinction
 - Partial failures can be confusing
 
 Gain:
+
 - Tasks fail fast (user gets immediate feedback)
 - Contexts are best-effort (maximize utility)
 - Clear distinction between critical and optional
@@ -393,16 +446,19 @@ Skip failures without warnings:
 The tool tries to maximize utility:
 
 **Use what works:**
+
 - 5 contexts, 2 fail → use 3
 - File fails, command works → use command output
 - Command times out → use partial output
 
 **Inform the user:**
+
 - Clear warnings about what failed
 - Explain why it failed
 - Show what's being used instead
 
 **Fail only when critical:**
+
 - Task is broken → fail (user-initiated)
 - Context is broken → skip (optional enrichment)
 - Role is broken → skip (optional behavior)
@@ -466,11 +522,13 @@ Context loaded with whatever data available
 **At configuration load:**
 
 Validate structure only (CUE schema):
+
 - Field types correct
 - Ranges valid (timeout 1-3600)
 - Required fields present
 
 Do NOT validate at load time:
+
 - Files exist (may be created later)
 - Commands work (may depend on runtime state)
 - Templates valid (validated at execution)
@@ -478,6 +536,7 @@ Do NOT validate at load time:
 **At execution time:**
 
 Validate all runtime aspects:
+
 - File existence and readability
 - Shell binary in PATH
 - Command execution

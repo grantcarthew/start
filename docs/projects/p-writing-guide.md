@@ -10,7 +10,7 @@ Read when: Writing/updating project documents or planning work.
 
 ## Markdown Formatting Note
 
-IMPORTANT: Avoid using bold markdown (`**text**`) in project documents. Bold formatting adds no semantic value to large language models but significantly increases token count. Use section headers, lists, and clear structure instead.
+IMPORTANT: Avoid using bold Markdown (`**text**`) in project documents. Bold formatting adds no semantic value to large language models but significantly increases token count. Use section headers, lists, and clear structure instead.
 
 Good: Use `## Section Name` and bullet points
 Bad: Use `**Section Name:**` with bold
@@ -83,7 +83,7 @@ Add as needed:
 
 ## Projects vs Design Records
 
-### Projects Are:
+### Projects Are
 
 - Work packages with clear deliverables
 - Time-bounded efforts
@@ -92,7 +92,7 @@ Add as needed:
 - Can span research, design, and implementation
 - Answer: "What are we doing?"
 
-### Design Records Are:
+### Design Records Are
 
 - Architectural decisions
 - Focus on **why we chose** a specific approach
@@ -101,7 +101,7 @@ Add as needed:
 - Permanent record of reasoning
 - Answer: "Why did we do it this way?"
 
-### Relationship:
+### Relationship
 
 A single project may create multiple DRs. For example:
 
@@ -145,11 +145,13 @@ Clear in/out of scope definitions:
 **Scope:**
 
 In Scope:
+
 - Research CUE language features relevant to configuration
 - Design schemas for core concepts
 - Test CUE validation and composition
 
 Out of Scope:
+
 - Go integration (covered in P-005)
 - CLI implementation (covered in P-004)
 - Registry publishing (covered in P-003)
@@ -269,6 +271,7 @@ Format: `p-<NNN>-<category>-<title>.md`
 - All lowercase kebab-case (words separated by hyphens, no underscores or spaces)
 
 Examples:
+
 - `p-001-cue-foundation-architecture.md`
 - `p-002-assets-concrete-tasks.md`
 - `p-003-distribution-strategy.md`
@@ -403,6 +406,7 @@ Make CUE work.
 ```
 
 Problems:
+
 - Vague goals
 - No success criteria
 - No clear deliverables

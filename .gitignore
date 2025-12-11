@@ -8,7 +8,11 @@
 # AI and Documentation Files
 
 # Reference Directory
-Context/
+context/*
+!context/README.md
+!context/docs/
+context/docs/*
+!context/docs/README.md
 
 # Go Binary Output
 snag

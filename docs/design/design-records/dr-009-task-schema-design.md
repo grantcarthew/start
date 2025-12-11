@@ -106,6 +106,7 @@ Focus on: {{.instructions}}
 Field definitions:
 
 From #UTD:
+
 - `file` (string, optional) - Path to file for content
 - `command` (string, optional) - Shell command to execute
 - `prompt` (string, optional) - Go template with placeholders
@@ -113,6 +114,7 @@ From #UTD:
 - `timeout` (int, optional) - Command timeout in seconds (1-3600)
 
 Task-specific:
+
 - `description` (string, optional) - Human-readable summary
 - `tags` ([]string, optional) - Keywords for search and categorization
 - `role` (string | #Role, optional) - String name for runtime resolution, or imported #Role for CUE dependency

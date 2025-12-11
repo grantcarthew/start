@@ -56,14 +56,14 @@ start init                      # Initialize CUE configuration
 
 The prototype explored the design space and validated the core concepts. Key architectural changes:
 
-| Aspect | Prototype (TOML) | This Version (CUE) |
-|--------|------------------|-------------------|
-| Config format | TOML (unordered tables) | CUE (ordered, typed) |
+| Aspect             | Prototype (TOML)         | This Version (CUE)   |
+| ------------------ | ------------------------ | -------------------- |
+| Config format      | TOML (unordered tables)  | CUE (ordered, typed) |
 | Asset distribution | Custom GitHub API system | CUE Central Registry |
-| Validation | Custom Go code | CUE schemas |
-| Package management | Custom catalog/cache | CUE modules |
-| Schema definition | Documentation only | Enforced by CUE |
-| Order preservation | Failed assumption | Native support |
+| Validation         | Custom Go code           | CUE schemas          |
+| Package management | Custom catalog/cache     | CUE modules          |
+| Schema definition  | Documentation only       | Enforced by CUE      |
+| Order preservation | Failed assumption        | Native support       |
 
 ## Documentation
 
@@ -82,11 +82,23 @@ This project uses Document Driven Development. Design decisions are documented i
 **Location:** `docs/design/design-records/`
 
 **Process:**
+
 - Create DRs for architectural decisions, algorithms, breaking changes, API/CLI structure
 - Get next DR number from `docs/design/design-records/README.md`
 - Follow reconciliation process after 5-10 DRs
 
 Design Records will start fresh at DR-001, as the CUE architecture is fundamentally different from the prototype.
+
+## Testing
+
+When implementing code, ensure it is testable. Read `docs/design/design-records/dr-024-testing-strategy.md` for the testing approach.
+
+Key principles:
+
+- Test real behaviour over mocks (use actual CUE validation, real files via `t.TempDir()`)
+- Design functions to accept interfaces/parameters rather than reaching for globals
+- Use table-driven tests for multiple cases
+- Run tests via `scripts/invoke-tests`
 
 ## References
 
@@ -119,6 +131,7 @@ The `./Context` directory contains cloned source code and documentation for deve
 ## Development Status
 
 **Completed:**
+
 - P-001: CUE Foundation & Architecture (schemas designed and published)
 - P-002: Concrete Assets Validation (17 modules published to CUE Central Registry)
 - P-003: Registry Distribution (20 modules published, prototype comparison documented)

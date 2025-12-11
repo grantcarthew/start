@@ -11,6 +11,7 @@ brew install cue
 ```
 
 Verify installation:
+
 ```bash
 cue version
 ```
@@ -28,6 +29,7 @@ This will prompt you to visit a URL and enter a device code. The login credentia
 Your module must be in a GitHub repository. The CUE Central Registry verifies ownership by checking that the repository exists at the module path location.
 
 **Important:** The module path must match the GitHub repository structure:
+
 - ✅ Good: Module at `github.com/user/repo/path@v0` with repo at `github.com/user/repo`
 - ❌ Bad: Module at `github.com/user/module-name@v0` without repo at `github.com/user/module-name`
 
@@ -42,6 +44,7 @@ cue mod init github.com/user/repo/path@v0 --source=git
 ```
 
 This creates:
+
 - `cue.mod/` directory
 - `cue.mod/module.cue` file
 
@@ -102,11 +105,13 @@ git tag -a path/v0.0.1 -m "Release v0.0.1 - initial release"
 ```
 
 **Tag naming convention:**
+
 - For modules in subdirectories: `subdirectory/v0.0.1`
 - For root modules: `v0.0.1`
 - Always use semantic versioning: `vMAJOR.MINOR.PATCH`
 
 Example from our schemas:
+
 ```bash
 git tag -a schemas/v0.0.1 -m "Release schemas v0.0.1 - initial schema definitions"
 ```
@@ -120,6 +125,7 @@ git push origin path/v0.0.1
 ```
 
 Example:
+
 ```bash
 git push origin schemas/v0.0.1
 ```
@@ -135,6 +141,7 @@ cue mod publish v0.0.1 --verbose
 **Note:** Use just the version number (not the full tag path).
 
 Successful output:
+
 ```
 published github.com/user/repo/path@v0.0.1 to registry.cue.works/github.com/user/repo/path:v0.0.1
 ```
@@ -156,10 +163,12 @@ myValue: path.#MyDefinition & {
 ```
 
 **Import syntax rules:**
+
 - Full form: `import "module/path@v0:packagename"`
 - Short form (when basename = package name): `import "module/path@v0"`
 
 Example: If module path is `github.com/user/repo/schemas@v0` and package is `schemas`:
+
 - Short: `import "github.com/user/repo/schemas@v0"` ✅ (recommended)
 - Full: `import "github.com/user/repo/schemas@v0:schemas"` ✅ (explicit)
 
@@ -172,6 +181,7 @@ cue mod tidy
 ```
 
 This automatically:
+
 - Fetches dependencies from the registry
 - Updates `cue.mod/module.cue` with dependency versions
 - Downloads modules to the shared cache
@@ -187,6 +197,7 @@ cue vet your-file.cue
 ### Issue: "repository must exist before publishing"
 
 **Error:**
+
 ```
 403 Forbidden: denied: repository github.com/user/module must exist before publishing
 ```
@@ -196,12 +207,14 @@ cue vet your-file.cue
 **Solution:** Align your module path with your actual repository structure.
 
 Before:
+
 ```cue
 module: "github.com/user/start-schemas@v0"
 // But repo is at github.com/user/start-assets
 ```
 
 After:
+
 ```cue
 module: "github.com/user/start-assets/schemas@v0"
 // Matches repo structure
@@ -210,6 +223,7 @@ module: "github.com/user/start-assets/schemas@v0"
 ### Issue: "no source field found"
 
 **Error:**
+
 ```
 no source field found in cue.mod/module.cue
 ```
@@ -225,6 +239,7 @@ source: {
 ### Issue: "VCS state is not clean"
 
 **Error:**
+
 ```
 VCS state is not clean
 ```
@@ -240,6 +255,7 @@ git commit -m "your message"
 ### Issue: Import fails after publishing
 
 **Error:**
+
 ```
 cannot find package "github.com/user/repo/path@v0"
 ```
@@ -273,6 +289,7 @@ repo/
 ### 3. Documentation
 
 Include a README.md in each module directory explaining:
+
 - What the module provides
 - How to import it
 - Example usage
