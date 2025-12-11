@@ -6,324 +6,291 @@
 
 ## Overview
 
-Build minimal CLI commands to interact with CUE configurations. This project implements just enough CLI functionality to validate the architecture works end-to-end, adapting the well-designed CLI interface from the prototype but making it CUE-native.
+Build minimal CLI infrastructure to validate the CUE-based architecture works end-to-end. This project implements just enough functionality to prove Go can load, validate, and work with CUE configurations.
 
-The focus is on core commands that prove the system works, not comprehensive coverage. Complexity comes later after validation.
+The focus is on core infrastructure that enables future commands, not comprehensive CLI coverage.
+
+## Required Reading
+
+Before working on this project, read these design records:
+
+| DR | Title | Why |
+|----|-------|-----|
+| DR-012 | CLI Global Flags | Defines all flags and applicability matrix |
+| DR-013 | CLI Start Command | Root command execution flow |
+| DR-016 | CLI Dry Run Flag | Output directory patterns, file structure |
+| DR-017 | CLI Show Command | Show subcommands and output format |
+| DR-018 | CLI Auto-Setup | First-run behaviour, no mandatory init |
+| DR-024 | Testing Strategy | Test patterns, what to mock, file organisation |
+
+Also review:
+
+- `docs/cue/integration-notes.md` - CUE Go API patterns
+- `Context/cobra/command.go` - Cobra command structure
+- `Context/cobra/command_test.go` - Cobra testing patterns
 
 ## Goals
 
-1. Implement start init command to generate initial CUE configuration
-2. Implement start show command to display and validate configuration
-3. Implement basic configuration loading and validation from Go
-4. Validate that CLI can load CUE configs and report errors
+1. Implement CUE loading and validation infrastructure
+2. Implement `start show` command to display and validate configuration
+3. Implement global flags (DR-012)
+4. Validate that CLI can load CUE configs and report errors helpfully
 5. Test with real CUE assets from P-002
-6. Document CLI architecture and command structure
-7. Create foundation for future CLI expansion
+6. Create foundation for auto-setup (DR-018) and future commands
 
 ## Scope
 
 In Scope:
 
-- Initialize project with CUE configuration (start init)
-- Display and validate configuration (start show)
-- Load CUE from Go using official CUE API
-- Validate CUE and report helpful errors
-- Basic flag handling (--role, --agent, etc.)
-- Use Cobra framework (reference/cobra available)
-- Create DR-005: CLI Command Structure
+- CUE loading from Go using official CUE API
+- CUE validation with user-friendly error messages
+- `start show` command with subcommands (role, context, agent, task)
+- Global flags: `--verbose`, `--debug`, `--quiet`, `--help`, `--version`
+- Show-specific flags: `--scope`
+- Temp directory output pattern (per DR-016/DR-017)
 - Basic error handling and user feedback
+- Tests following DR-024 patterns
 
 Out of Scope:
 
+- Auto-setup flow (P-005 - needs registry integration)
+- Agent execution (P-005)
 - Task execution (P-005)
-- Agent orchestration (P-005)
-- Package management commands (future)
-- Shell completion (future)
-- Interactive browsing (future)
-- Doctor/health check commands (future)
-- All commands except init and show
+- `--dry-run` flag (needs agent execution context)
+- Agent-specific flags: `--agent`, `--role`, `--model`, `--context`
+- Package management commands
+- Shell completion
+- Interactive prompts
 
 ## Success Criteria
 
-- [ ] start init creates valid CUE configuration files
-- [ ] start show displays configuration correctly
-- [ ] start show reports validation errors helpfully
-- [ ] Can load and validate CUE from Go using official API
+- [ ] Can load CUE configuration from `~/.config/start/` and `./.start/`
+- [ ] Can merge global and local configurations
+- [ ] Can validate CUE against schemas
+- [ ] `start show role` displays resolved role content
+- [ ] `start show context` displays resolved context content
+- [ ] `start show agent` displays agent configuration
+- [ ] `start show task` displays task configuration
+- [ ] Validation errors are clear and actionable
+- [ ] `--scope global` and `--scope local` work correctly
+- [ ] Output follows temp directory pattern from DR-016
+- [ ] Tests cover loader, validator, and show command
 - [ ] Works with assets from P-002
-- [ ] Created DR-005: CLI Command Structure
-- [ ] CLI follows patterns from reference/cobra
-- [ ] Error messages are clear and actionable
-- [ ] Basic help text and usage documentation
 
 ## Deliverables
 
 CLI Commands:
 
-- cmd/start/init.go - Initialize command
-- cmd/start/show.go - Show/validate command
-- cmd/start/root.go - Root command setup
+- `internal/cli/root.go` - Root command with global flags
+- `internal/cli/show.go` - Show command with subcommands
+- `internal/cli/flags.go` - Centralised flag definitions
 
-Go Implementation:
+CUE Infrastructure:
 
-- internal/cue/loader.go - CUE loading from Go
-- internal/cue/validator.go - CUE validation
-- internal/config/config.go - Configuration structure
+- `internal/cue/loader.go` - Load CUE from directories
+- `internal/cue/validator.go` - Validate and report errors
+- `internal/cue/errors.go` - User-friendly error formatting
 
-Design Records:
+Configuration:
 
-- DR-005: CLI Command Structure and Organization
-
-Documentation:
-
-- docs/cli/start.md - Root command documentation
-- docs/cli/start-init.md - Init command documentation
-- docs/cli/start-show.md - Show command documentation
-- docs/cue/go-integration.md - CUE-Go integration patterns
+- `internal/config/config.go` - Configuration structures
+- `internal/config/paths.go` - Config directory resolution
 
 Tests:
 
-- Test init creates valid files
-- Test show validates correctly
-- Test error handling
+- `internal/cue/loader_test.go`
+- `internal/cue/validator_test.go`
+- `internal/cli/show_test.go`
+- `test/testdata/` - CUE fixtures for testing
+
+## Non-Deliverables
+
+These are explicitly NOT part of this project:
+
+- `start init` command - Auto-setup in P-005 replaces this
+- Agent execution - P-005
+- Registry fetching - P-005
+- CLI documentation in `docs/cli/` - After commands stabilise
+
+## Technical Approach
+
+### Phase 1: CUE Infrastructure
+
+1. Implement CUE loader
+   - Load from directory using `load.Instances()`
+   - Handle missing directories gracefully
+   - Support both global and local config paths
+   - Merge configurations using CUE unification
+
+2. Implement CUE validator
+   - Validate against schemas
+   - Convert CUE errors to user-friendly messages
+   - Include file path and line numbers
+   - Suggest fixes where possible
+
+3. Implement config path resolution
+   - Global: `~/.config/start/`
+   - Local: `./.start/`
+   - Handle missing directories
+   - Detect which configs exist
+
+### Phase 2: Show Command
+
+4. Implement show command structure
+   - Parent `show` command
+   - Subcommands: `role`, `context`, `agent`, `task`
+   - `--scope` flag for global/local filtering
+
+5. Implement show role
+   - Load and validate configuration
+   - Extract role by name (or default)
+   - Process UTD (read files, but skip commands for now)
+   - Write to temp directory
+   - Display 5-line preview
+
+6. Implement show context/agent/task
+   - Same pattern as show role
+   - Handle "show all" for contexts
+
+7. Implement temp directory output
+   - Create `/tmp/start-YYYYMMDDHHmmss/`
+   - Handle timestamp collisions
+   - Write markdown files
+
+### Phase 3: Global Flags
+
+8. Implement global flags
+   - `--verbose` - Detailed output
+   - `--debug` - Full debug output
+   - `--quiet` - Suppress output
+   - `--help` - Show help (Cobra default)
+   - `--version` - Show version
+
+9. Implement output modes
+   - Normal: 5-line preview + file path
+   - Verbose: Additional metadata
+   - Debug: Full resolution trace
+   - Quiet: File path only
+
+### Phase 4: Testing
+
+10. Write tests per DR-024
+    - Unit tests for loader, validator
+    - Integration tests for show command
+    - Use real CUE files via `t.TempDir()`
+    - Table-driven tests for error cases
+
+11. Test with P-002 assets
+    - Copy example configs to test directories
+    - Verify validation passes
+    - Verify output is correct
+
+## Directory Structure
+
+```
+start/
+├── cmd/start/
+│   └── main.go
+├── internal/
+│   ├── cli/
+│   │   ├── root.go
+│   │   ├── root_test.go
+│   │   ├── show.go
+│   │   ├── show_test.go
+│   │   └── flags.go
+│   ├── cue/
+│   │   ├── loader.go
+│   │   ├── loader_test.go
+│   │   ├── validator.go
+│   │   ├── validator_test.go
+│   │   └── errors.go
+│   └── config/
+│       ├── config.go
+│       └── paths.go
+├── test/
+│   ├── testdata/
+│   │   ├── valid/
+│   │   └── invalid/
+│   └── integration/
+│       └── show_test.go
+└── scripts/
+    └── invoke-tests
+```
 
 ## Dependencies
 
 Requires:
 
-- P-001 (need architecture and schemas)
-- P-002 (need assets to test with)
-- P-003 (need to understand package loading)
+- P-001 (CUE schemas)
+- P-002 (example assets to test with)
+- P-003 (understanding of module structure)
 
 Blocks:
 
-- P-005 (orchestration needs CLI foundation)
+- P-005 (orchestration needs this foundation)
 
-## Technical Approach
+## Questions Resolved
 
-Setup Phase:
+These questions from the original P-004 are now answered by design records:
 
-1. Initialize Go project
-   - Create go.mod with CUE dependencies
-   - Set up Cobra CLI framework
-   - Create basic project structure
-   - Set up testing framework
-
-2. Study reference implementations
-   - Review reference/cobra patterns
-   - Review prototype CLI docs (reference/start-prototype/docs/cli/)
-   - Study CUE Go API (reference/cue/doc/)
-
-Implementation Phase:
-
-1. Implement start init
-   - Generate cue.mod/module.cue
-   - Create starter configuration files
-   - Set up directory structure
-   - Provide helpful output and next steps
-
-2. Implement CUE loading
-   - Use CUE Go API to load configurations
-   - Handle file not found gracefully
-   - Handle invalid CUE with clear errors
-   - Extract configuration values to Go structs
-
-3. Implement start show
-   - Load CUE configuration
-   - Validate against schemas
-   - Display formatted output
-   - Report validation errors with context
-
-4. Implement error handling
-   - CUE validation errors to user-friendly messages
-   - File system errors with helpful suggestions
-   - Configuration errors with fix guidance
-
-Testing Phase:
-
-1. Test with P-002 assets
-   - Use example roles, tasks, contexts, agents
-   - Verify validation works
-   - Test error cases
-   - Verify output is useful
-
-2. Test edge cases
-   - Missing files
-   - Invalid CUE syntax
-   - Schema violations
-   - Empty configurations
-
-Documentation Phase:
-
-1. Write DR-005
-   - CLI command structure
-   - Why these commands first
-   - How it relates to prototype CLI design
-   - Future expansion strategy
-
-2. Write CLI documentation
-    - Command reference docs
-    - Usage examples
-    - Common workflows
-    - Troubleshooting
-
-3. Document Go-CUE integration
-    - Loading patterns
-    - Validation patterns
-    - Error handling patterns
-    - Best practices discovered
-
-## Questions & Uncertainties
-
-CUE Go API:
-
-- What's the best way to load CUE files from Go?
-- How do we handle CUE validation errors?
-- Can we get structured error information?
-- What's the performance of loading and validation?
-- How do we extract values to Go structs?
-
-CLI Design:
-
-- Should init be interactive or flag-driven?
-- What should show display (raw CUE, formatted, JSON)?
-- How verbose should validation errors be?
-- Should show validate or just display?
-
-Configuration Structure:
-
-- Single file or multiple files for init?
-- What directory structure should init create?
-- Where do CUE configs live (root, .start/, etc.)?
-- How do we handle global vs project configs?
-
-Error Handling:
-
-- How detailed should error messages be?
-- Should we show CUE errors raw or translate?
-- How do we guide users to fix issues?
-- What's the balance between helpful and overwhelming?
-
-Prototype Adaptation:
-
-- Which CLI patterns from prototype still apply?
-- What changes because of CUE?
-- Which commands are most valuable first?
-- How do we evolve from minimal to complete?
-
-## Research Areas
-
-High Priority:
-
-1. CUE Go API
-   - Loading CUE files
-   - Validation from Go
-   - Error handling
-   - Value extraction
-
-2. Cobra patterns
-   - Command structure
-   - Flag handling
-   - Subcommands
-   - Help text
-
-3. Configuration loading
-   - File discovery
-   - Multiple file handling
-   - Merging configurations
-   - Default values
-
-Medium Priority:
-
-1. Error message design
-   - User-friendly validation errors
-   - Helpful suggestions
-   - Context and location
-   - Fix guidance
-
-2. Output formatting
-   - CUE display formats
-   - JSON output option
-   - Human-readable formatting
-   - Validation results
-
-Low Priority:
-
-1. Future expansion
-   - Additional commands
-   - Flag standardization
-   - Configuration options
-   - Plugin architecture
+| Question | Answer | Source |
+|----------|--------|--------|
+| Should init be interactive? | No mandatory init; auto-setup on first run | DR-018 |
+| What should show display? | 5-line preview + temp file | DR-017 |
+| Where do configs live? | `~/.config/start/` and `./.start/` | DR-013 |
+| How verbose should errors be? | User-friendly with file/line info | DR-017 |
 
 ## Notes
 
-Prototype CLI Reference:
+Why no `start init`:
 
-- reference/start-prototype/docs/cli/ - Well-designed CLI interface
-- Adapt concepts, not implementation
-- Many commands deferred to future projects
+DR-018 defines auto-setup behaviour where `start` (the root command) automatically detects agents and configures on first run. A separate `init` command is only needed for advanced use cases (local config, custom roles) which is P-005 scope.
 
-Key Difference from Prototype:
-The prototype built comprehensive CLI upfront. This project builds minimal viable CLI to validate architecture, then expands based on learnings.
+Why show command first:
 
-Command Priority Rationale:
+- Validates CUE loading works
+- Validates error handling works
+- Doesn't require agent execution
+- Useful for debugging during development
+- Foundation for `--dry-run` later
 
-- init: Users need to start somewhere
-- show: Users need to validate configs work
-- Everything else: Deferred until core orchestration works (P-005)
+Relationship to DR-005:
 
-This is not the final CLI - it's the minimal CLI needed to prove the architecture. More commands come after P-005 validates end-to-end orchestration.
-
-Go Project Structure:
-
-- cmd/start/ - CLI entry point (main.go only)
-- internal/cli/ - Cobra commands (root.go, init.go, show.go)
-- internal/cue/ - CUE loading and validation
-- internal/config/ - Configuration structures
-
-This project is complete when we can initialize a project and validate its CUE configuration, proving the Go-CUE integration works.
+The original P-004 mentioned creating "DR-005: CLI Command Structure" but DR-005 already exists (Go Templates for UTD Pattern). CLI structure is defined across DR-012 through DR-018.
 
 ## Progress Log
 
-### 2025-12-10: Step 1 Complete - Go Project Initialized
+### 2025-12-10: Step 1 Complete - Go Project Initialised
 
-Completed Step 1 (Initialize Go project) from Technical Approach.
+Completed initial Go project setup.
 
-**Research conducted:**
+Files created:
 
-- Reviewed official Go module layout docs (go.dev/doc/modules/layout)
-- Reviewed golang-standards/project-layout patterns (cloned to ~/context/golang-project-layout/)
-- Reviewed Cobra user guide for CLI patterns
-- Confirmed latest dependency versions via Go proxy
-
-**Files created:**
-
-- `go.mod` - Module with Cobra v1.10.2 dependency (CUE v0.15.1 added but not yet used)
+- `go.mod` - Module with Cobra v1.10.2, CUE v0.15.1
 - `go.sum` - Generated dependency checksums
-- `cmd/start/main.go` - Minimal entry point, calls internal/cli.Execute()
-- `internal/cli/root.go` - Root Cobra command with Execute() function
+- `cmd/start/main.go` - Minimal entry point
+- `internal/cli/root.go` - Root Cobra command
 
-**Directory structure established:**
-
-```
-start/
-├── go.mod
-├── go.sum
-├── cmd/
-│   └── start/
-│       └── main.go
-├── internal/
-│   ├── cli/
-│   │   └── root.go
-│   ├── config/
-│   └── cue/
-```
-
-**Verified:**
+Verified:
 
 - Build succeeds: `go build ./cmd/start/`
-- CLI runs: `go run ./cmd/start/ --help` outputs description
+- CLI runs: `go run ./cmd/start/ --help`
 
-**Next steps:**
+### 2025-12-11: Step 2 Complete - Reference Study
 
-- Step 2: Study reference implementations (Cobra patterns, prototype CLI, CUE Go API)
-- Step 3: Implement `start init` command
+Reviewed reference implementations:
+
+- Cobra patterns from `Context/cobra/`
+- CUE Go API from `docs/cue/integration-notes.md`
+- Design records DR-012 through DR-018
+
+Key findings:
+
+- DR-018 changes init from prototype design to auto-setup
+- DR-017 defines show command output format
+- DR-012 defines all global flags
+- Prototype CLI docs are reference only, not specification
+
+Updated P-004 to align with design records.
+
+Next: Phase 1 - CUE Infrastructure (loader, validator, paths)

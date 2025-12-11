@@ -1,4 +1,4 @@
-# P-005: Orchestration Core
+# P-005: Orchestration Core Engine
 
 - Status: Proposed
 - Started: -
@@ -6,347 +6,350 @@
 
 ## Overview
 
-Implement the core orchestration logic that ties everything together: load CUE configurations, compose prompts from roles/tasks/contexts, execute agent commands, and handle the complete end-to-end workflow. This is where start actually becomes a working AI agent orchestrator.
+Implement the core orchestration engine that ties everything together: auto-setup for first run, prompt composition from CUE configurations, UTD template processing, and agent execution. This is where `start` becomes a working AI agent orchestrator.
 
-This project brings together all previous work (P-001 architecture, P-002 assets, P-003 distribution, P-004 CLI foundation) into a functioning system.
+This project brings together all previous work (P-001 schemas, P-002 assets, P-003 distribution, P-004 CLI foundation) into a functioning system.
+
+## Required Reading
+
+Before working on this project, read these design records:
+
+| DR | Title | Why |
+|----|-------|-----|
+| DR-005 | Go Templates for UTD Pattern | Template syntax, placeholders, execution flow |
+| DR-006 | Shell Configuration and Command Execution | Shell selection, timeout, command execution |
+| DR-007 | UTD Error Handling by Context | Fail vs warn based on entity type |
+| DR-013 | CLI Start Command | Root command execution flow |
+| DR-014 | CLI Prompt Command | Prompt command with minimal context |
+| DR-015 | CLI Task Command | Task execution, resolution, dependencies |
+| DR-016 | CLI Dry Run Flag | Dry run output, temp directory pattern |
+| DR-018 | CLI Auto-Setup | First-run agent detection and configuration |
+| DR-019 | Index Bin Field for Agent Detection | Agent binary detection |
+| DR-020 | Template Processing and File Resolution | Temp file naming, `.start/temp/` directory |
+| DR-024 | Testing Strategy | Test patterns, what to mock |
+
+Also review:
+
+- `docs/cue/integration-notes.md` - CUE Go API, value extraction
+- P-004 deliverables (loader, validator, config paths)
 
 ## Goals
 
-1. Implement prompt composition from CUE configurations
-2. Implement placeholder substitution in commands and prompts
-3. Implement agent command execution
-4. Implement task execution workflow
-5. Implement process replacement execution model
-6. Document orchestration architecture in design records
-7. Create CLI documentation for execution commands
+1. Implement auto-setup flow (DR-018)
+2. Implement UTD template processing (DR-005, DR-020)
+3. Implement shell command execution (DR-006)
+4. Implement prompt composition from roles, tasks, contexts
+5. Implement agent command execution
+6. Implement `start`, `start prompt`, `start task` commands
+7. Implement `--dry-run` flag (DR-016)
 8. Validate end-to-end workflow with real assets
 
 ## Scope
 
 In Scope:
 
+- Auto-setup: agent detection, registry fetch, config write (DR-018)
+- UTD template processing with Go templates (DR-005)
+- Shell command execution with timeout (DR-006)
+- Error handling by entity type (DR-007)
+- Temp file management in `.start/temp/` (DR-020)
 - Prompt composition from roles, tasks, contexts
-- Placeholder substitution system
-- Agent command execution
-- Task execution (start task <name>)
-- Interactive session (start with role)
-- Process replacement execution
-- Shell quote escaping for substitution
-- Context injection and ordering
-- Create DR-006: Prompt Composition Architecture
-- Create DR-007: Placeholder Substitution System
-- Create DR-008: Execution Model and Process Replacement
-- CLI documentation for task and interactive commands
+- Agent command building and execution
+- Process replacement execution model (syscall.Exec on Unix)
+- `start` command (DR-013)
+- `start prompt` command (DR-014)
+- `start task` command (DR-015)
+- `--dry-run` flag (DR-016)
+- Agent-specific flags: `--agent`, `--role`, `--model`, `--context`
+- Tests following DR-024 patterns
 
 Out of Scope:
 
-- Advanced CLI features (completion, doctor, etc.)
 - Package management commands
 - Configuration editing commands
-- Asset browsing and discovery
-- Performance optimization
+- Shell completion
+- Doctor/health check commands
+- Windows support (Unix only per DR-006)
 - Streaming output handling
-- Error recovery and retry logic
+- Multi-agent workflows
 
 ## Success Criteria
 
-- [ ] Can execute a task end-to-end with real CUE assets
-- [ ] Can start interactive session with specified role
-- [ ] Prompt composition works correctly (role + task + contexts)
-- [ ] Placeholder substitution handles all required patterns
-- [ ] Shell quote escaping prevents injection vulnerabilities
-- [ ] Process replacement execution works (syscall.Exec on Unix)
-- [ ] Context order preservation works for prompt injection
-- [ ] Created DR-006: Prompt Composition Architecture
-- [ ] Created DR-007: Placeholder Substitution System
-- [ ] Created DR-008: Execution Model and Process Replacement
-- [ ] CLI documentation complete for task and interactive commands
-- [ ] Can demonstrate working system with example workflow
+- [ ] First run with no config triggers auto-setup (DR-018)
+- [ ] Auto-setup detects agents, prompts if multiple, writes config
+- [ ] UTD templates process correctly (file, command, prompt fields)
+- [ ] Shell commands execute with timeout protection
+- [ ] Error handling follows DR-007 (tasks fail, contexts warn)
+- [ ] Temp files written to `.start/temp/` with meaningful names
+- [ ] `start` launches agent with merged config, contexts, role
+- [ ] `start prompt "text"` launches with custom prompt
+- [ ] `start task name` executes task workflow
+- [ ] `--dry-run` writes output files without executing agent
+- [ ] Works with assets from P-002
+- [ ] End-to-end demo: `start` works from zero config to agent launch
 
 ## Deliverables
 
-Design Records:
-
-- DR-006: Prompt Composition Architecture
-- DR-007: Placeholder Substitution System
-- DR-008: Execution Model and Process Replacement
-- Possibly DR-009: Context Injection and Ordering (if complex)
-
 CLI Commands:
 
-- cmd/start/task.go - Task execution command
-- cmd/start/interactive.go - Interactive session (or in root.go)
+- `internal/cli/start.go` - Start command (RunE for root)
+- `internal/cli/prompt.go` - Prompt command
+- `internal/cli/task.go` - Task command
 
-Go Implementation:
+Orchestration:
 
-- internal/orchestration/composer.go - Prompt composition
-- internal/orchestration/substitution.go - Placeholder substitution
-- internal/orchestration/executor.go - Agent execution
-- internal/orchestration/context.go - Context handling
-- internal/orchestration/escaping.go - Shell quote escaping
+- `internal/orchestration/autosetup.go` - First-run auto-setup
+- `internal/orchestration/composer.go` - Prompt composition
+- `internal/orchestration/executor.go` - Agent execution
+- `internal/orchestration/template.go` - UTD template processing
 
-CLI Documentation:
+Shell Execution:
 
-- docs/cli/start-task.md - Task execution documentation
-- docs/cli/start-interactive.md - Interactive session documentation (or update start.md)
+- `internal/shell/runner.go` - Command execution with timeout
+- `internal/shell/detection.go` - Shell auto-detection
 
-Architecture Documentation:
+Temp Files:
 
-- docs/architecture/orchestration-flow.md - End-to-end flow documentation
-- docs/architecture/prompt-composition.md - How prompts are built
-- docs/architecture/execution-model.md - How agents are executed
+- `internal/temp/manager.go` - Temp directory and file management
 
 Tests:
 
-- Prompt composition tests
-- Placeholder substitution tests
-- Shell escaping tests
-- End-to-end integration tests
+- Unit tests for template, shell, composer
+- Integration tests for commands
+- E2E tests for full workflows
+
+## Non-Deliverables
+
+These are explicitly NOT part of this project:
+
+- New design records (all required DRs already exist)
+- CLI documentation (after commands stabilise)
+- Package management
+- `start init` as a command (auto-setup replaces it)
+
+## Technical Approach
+
+### Phase 1: Auto-Setup (DR-018)
+
+1. Implement agent detection
+   - Fetch index from registry (or use cached)
+   - Check each agent's `bin` field against PATH using `exec.LookPath()`
+   - Return list of detected agents
+
+2. Implement auto-setup flow
+   - Check for existing config (`~/.config/start/`, `./.start/`)
+   - If no config: enter auto-setup mode
+   - If one agent detected: use it
+   - If multiple detected: prompt for selection (TTY) or error (non-TTY)
+   - Fetch agent package from registry
+   - Write to `~/.config/start/agents.cue`
+   - Continue with execution
+
+3. Implement registry interaction
+   - Fetch index
+   - Fetch agent package
+   - Use CUE module tooling
+
+### Phase 2: UTD Template Processing (DR-005, DR-020)
+
+4. Implement template processor
+   - Parse content as Go template
+   - Build template data map (file, command, date, instructions)
+   - Execute template
+   - Return resolved content
+
+5. Implement lazy evaluation
+   - Scan template for `{{.file_contents}}` - read file only if present
+   - Scan template for `{{.command_output}}` - execute only if present
+   - Avoid unnecessary I/O
+
+6. Implement temp file management (DR-020)
+   - Create `.start/temp/` directory
+   - Generate path-derived names (e.g., `role-golang-assistant.md`)
+   - Write resolved content
+   - Warn if not in `.gitignore`
+
+### Phase 3: Shell Execution (DR-006)
+
+7. Implement shell runner
+   - Parse shell string (e.g., `"bash -c"` → binary + flags)
+   - Build command with user command appended
+   - Set working directory
+   - Execute with timeout (context.WithTimeout)
+   - Capture stdout/stderr
+
+8. Implement timeout handling
+   - SIGTERM on timeout
+   - Wait 1 second
+   - SIGKILL if still running
+   - Return partial output
+
+9. Implement shell auto-detection
+   - Check for bash in PATH
+   - Fallback to sh
+   - Error if neither found
+
+### Phase 4: Prompt Composition
+
+10. Implement prompt composer
+    - Load selected contexts (required + default/tagged)
+    - Process each context through UTD
+    - Concatenate in definition order
+    - Append task prompt or custom text
+    - Return final composed prompt
+
+11. Implement role resolution
+    - Load selected role
+    - Process through UTD
+    - Return for system prompt injection
+
+12. Implement agent command building
+    - Load agent configuration
+    - Build command from template
+    - Substitute placeholders (role, prompt, model, bin)
+    - Apply shell escaping
+
+### Phase 5: Agent Execution
+
+13. Implement agent executor
+    - Build final command string
+    - On Unix: use syscall.Exec for process replacement
+    - Handle exec errors
+
+14. Implement dry-run mode (DR-016)
+    - Create `/tmp/start-YYYYMMDDHHmmss/`
+    - Write role.md, prompt.md, command.txt
+    - Display 5-line preview
+    - Exit without executing agent
+
+### Phase 6: Commands
+
+15. Implement start command (DR-013)
+    - Check for config, trigger auto-setup if needed
+    - Load config, select agent/role/contexts
+    - Compose prompt, resolve role
+    - Execute agent (or dry-run)
+
+16. Implement prompt command (DR-014)
+    - Required contexts only (no defaults)
+    - Custom text appended
+    - Same execution flow
+
+17. Implement task command (DR-015)
+    - Resolve task by name
+    - Process task UTD (with instructions)
+    - Use task's role if specified
+    - Same execution flow
+
+### Phase 7: Testing
+
+18. Write tests per DR-024
+    - Template processing: real templates, table-driven
+    - Shell execution: use `echo` and simple commands
+    - Composer: real CUE configs via `t.TempDir()`
+    - Commands: Cobra testing pattern
+
+19. E2E testing
+    - Full workflow with mock agent (echo binary)
+    - Verify output files in dry-run mode
+    - Test auto-setup with mocked PATH
+
+## Directory Structure
+
+```
+start/
+├── internal/
+│   ├── cli/
+│   │   ├── root.go
+│   │   ├── start.go
+│   │   ├── prompt.go
+│   │   ├── task.go
+│   │   └── flags.go
+│   ├── orchestration/
+│   │   ├── autosetup.go
+│   │   ├── autosetup_test.go
+│   │   ├── composer.go
+│   │   ├── composer_test.go
+│   │   ├── executor.go
+│   │   ├── executor_test.go
+│   │   ├── template.go
+│   │   └── template_test.go
+│   ├── shell/
+│   │   ├── runner.go
+│   │   ├── runner_test.go
+│   │   ├── detection.go
+│   │   └── detection_test.go
+│   ├── temp/
+│   │   ├── manager.go
+│   │   └── manager_test.go
+│   ├── cue/
+│   │   └── (from P-004)
+│   └── config/
+│       └── (from P-004)
+├── test/
+│   ├── integration/
+│   │   ├── start_test.go
+│   │   ├── prompt_test.go
+│   │   └── task_test.go
+│   └── e2e/
+│       └── workflow_test.go
+└── scripts/
+    └── invoke-tests
+```
 
 ## Dependencies
 
 Requires:
 
-- P-001 (need architecture foundation)
-- P-002 (need assets to test with)
-- P-003 (need to understand package loading)
-- P-004 (need CLI foundation and CUE loading)
+- P-001 (CUE schemas)
+- P-002 (example assets to test with)
+- P-003 (registry distribution)
+- P-004 (CUE loading, validation, show command, global flags)
 
 Blocks:
 
 - Nothing - this completes the core system
 
-## Technical Approach
+## Questions Resolved
 
-Composition Phase:
+These questions are answered by existing design records:
 
-1. Design prompt composition architecture
-   - How roles, tasks, and contexts combine
-   - Order of composition (role → task → contexts)
-   - Override and precedence rules
-   - Write DR-006 documenting decisions
-
-2. Implement prompt composer
-   - Load role definition from CUE
-   - Load task definition from CUE
-   - Load context definitions from CUE
-   - Combine into final prompt
-   - Preserve context order for injection
-
-3. Test composition
-   - Test with P-002 assets
-   - Verify order preservation
-   - Test override behavior
-   - Validate output prompts
-
-Substitution Phase:
-
-1. Design placeholder substitution system
-   - Identify all placeholder patterns needed
-   - Design substitution algorithm
-   - Handle edge cases and escaping
-   - Write DR-007 documenting system
-
-2. Implement placeholder substitution
-   - Support {model}, {prompt}, {instructions}, etc.
-   - Handle nested placeholders if needed
-   - Implement shell quote escaping (critical for security)
-   - Write DR-008 for escaping strategy (adapt from prototype DR-044)
-
-3. Test substitution
-   - Test all placeholder patterns
-   - Test escaping with malicious input
-   - Test edge cases (empty values, special chars)
-   - Validate security (no injection vulnerabilities)
-
-Execution Phase:
-
-1. Design execution model
-   - Process replacement vs child process
-   - Signal handling
-   - Exit code propagation
-   - Write DR-008 documenting execution model (adapt from prototype DR-043)
-
-2. Implement agent executor
-   - Compose final command from agent template
-   - Apply placeholder substitution
-   - Execute with process replacement (syscall.Exec on Unix)
-   - Handle Windows differences if needed
-
-3. Test execution
-   - Test with real agents (Claude, GPT if available)
-   - Test with mock agents for CI
-   - Test error handling
-   - Verify process replacement works
-
-Integration Phase:
-
-1. Implement start task command
-    - Parse task name
-    - Load task from CUE
-    - Compose prompt
-    - Execute agent
-    - Write CLI documentation
-
-2. Implement interactive session
-    - Use default or specified role
-    - Compose prompt from role + contexts
-    - Execute agent interactively
-    - Write CLI documentation
-
-3. End-to-end testing
-    - Full workflow with real assets
-    - Test multiple tasks
-    - Test different roles
-    - Test different agents
-
-Documentation Phase:
-
-1. Write all DRs
-    - DR-006: Prompt Composition
-    - DR-007: Placeholder Substitution
-    - DR-008: Execution Model
-    - Any additional DRs discovered
-
-2. Write CLI documentation
-    - start task command reference
-    - Interactive session documentation
-    - Usage examples and workflows
-
-3. Write architecture documentation
-    - Orchestration flow diagrams
-    - Prompt composition details
-    - Execution model explanation
-
-## Questions & Uncertainties
-
-Prompt Composition:
-
-- What's the exact order of composition?
-- How do task instructions override role prompts?
-- How are contexts injected (prepend, append, interleave)?
-- What's the format of the final composed prompt?
-- How do we preserve context order from CUE?
-
-Placeholder Substitution:
-
-- What placeholders are needed beyond {model}, {prompt}, {instructions}?
-- How do we handle missing placeholder values?
-- Should substitution be recursive (placeholders in placeholders)?
-- How do we validate placeholder syntax?
-- What escaping is required for different contexts (shell, JSON, etc.)?
-
-Execution Model:
-
-- Does process replacement work on all platforms?
-- How do we handle Windows (no exec equivalent)?
-- What about signal handling and cleanup?
-- How do we test process replacement?
-- What's the fallback if exec fails?
-
-Security:
-
-- How do we prevent command injection via placeholders?
-- Is shell quote escaping sufficient?
-- Should we validate/sanitize inputs?
-- What about path traversal in file references?
-
-Context Handling:
-
-- How do we determine which contexts to load?
-- How do we handle missing required contexts?
-- How do we validate context content?
-- What if contexts reference files that don't exist?
-
-Agent Compatibility:
-
-- How do we handle different agent CLIs (different arg patterns)?
-- What about agents that need API keys or config?
-- How do we test without actual API access?
-- What's the mock/test strategy?
-
-## Research Areas
-
-High Priority:
-
-1. Prompt composition patterns
-   - How to combine role, task, and contexts
-   - Order and precedence
-   - Override mechanisms
-   - Format and structure
-
-2. Placeholder substitution
-   - All needed placeholders
-   - Substitution algorithm
-   - Edge case handling
-   - Security considerations
-
-3. Shell quote escaping
-   - Escaping strategies for different shells
-   - Security testing
-   - Edge cases with special characters
-   - Reference implementation patterns
-
-Medium Priority:
-
-1. Process replacement
-   - syscall.Exec usage in Go
-   - Platform differences
-   - Error handling
-   - Testing strategies
-
-2. Context injection
-   - How contexts are ordered
-   - How order is preserved from CUE
-   - How to inject into prompts
-   - Format considerations
-
-3. Agent command patterns
-   - Common CLI patterns across agents
-   - Template syntax needed
-   - Compatibility considerations
-
-Low Priority:
-
-1. Performance
-   - CUE loading performance
-   - Composition overhead
-   - Optimization opportunities
-
-2. Advanced features
-   - Streaming output
-   - Interactive prompt building
-   - Multi-agent workflows
+| Question | Answer | Source |
+|----------|--------|--------|
+| What's the order of composition? | Contexts first (definition order), then task/prompt | DR-013, DR-015 |
+| How are contexts selected? | Required always, default for `start`, tagged via `-c` | DR-013, DR-014, DR-015 |
+| What placeholders are needed? | file, file_contents, command, command_output, date, instructions, role, role_file, prompt, bin, model | DR-005, DR-020 |
+| How do we handle missing values? | Tasks fail, contexts/roles warn and skip | DR-007 |
+| What shell to use? | User-specified string, or auto-detect bash/sh | DR-006 |
+| Where do temp files go? | `.start/temp/` with path-derived names | DR-020 |
+| How does process replacement work? | syscall.Exec on Unix, no Windows support | DR-006 |
 
 ## Notes
 
-Prototype Patterns to Adapt:
+Why auto-setup in P-005:
 
-- DR-043: Process Replacement Execution Model - Core concept still applies
-- DR-044: Shell Quote Escaping - Security critical, adapt for CUE
-- DR-007: Placeholders - Concept carries over, implementation differs
+Auto-setup (DR-018) requires registry fetching which depends on P-003 distribution work. It also requires the CLI foundation from P-004. It's the first thing users experience, so it belongs in the orchestration project.
 
-Key Security Consideration:
-Shell quote escaping is critical. Improper escaping allows command injection. Must handle all edge cases and special characters correctly.
+Security considerations:
 
-Context Order Preservation:
-This was a core requirement that TOML couldn't satisfy. Must validate that CUE preserves field order and that we maintain it through composition.
+- Shell quote escaping is critical (prevent command injection)
+- Timeout protection prevents infinite loops
+- Commands run with user's permissions (no escalation)
+- Preview with `--dry-run` before execution
 
-Testing Strategy:
+Testing strategy for agent execution:
 
-- Unit tests for composition, substitution, escaping
-- Integration tests with mock agents
-- Manual testing with real agents
-- Security testing with malicious input
+- Create a mock agent binary (bash script that echoes arguments)
+- Test command construction without actual API calls
+- E2E tests use the mock agent
+- Manual testing with real agents (Claude, etc.)
 
-Success Demonstration:
-Create a video or documented workflow showing:
+Success demonstration:
 
-1. start init creates project
-2. start show validates config
-3. start task pre-commit-review executes successfully
-4. start with role go-expert launches interactive session
+The project is complete when this workflow works:
 
-This proves the entire system works end-to-end.
-
-This project is complete when we have a working orchestrator that can execute tasks and interactive sessions using CUE configurations and real agents. All core functionality implemented, all DRs written, all CLI docs complete.
+1. User has no config, runs `start`
+2. Auto-setup detects claude, fetches config
+3. `start` launches Claude with contexts
+4. `start task code-review` executes a task
+5. `start --dry-run` shows what would execute
