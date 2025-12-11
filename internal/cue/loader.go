@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"cuelang.org/go/cue"
-	"cuelang.org/go/cue/ast"
 	"cuelang.org/go/cue/cuecontext"
 	cueformat "cuelang.org/go/cue/format"
 	"cuelang.org/go/cue/load"
@@ -271,12 +270,7 @@ func formatValue(v cue.Value) (string, error) {
 		cue.Optional(true),
 	)
 
-	// Format the syntax node
-	node, ok := syn.(ast.Node)
-	if !ok {
-		return "", fmt.Errorf("unexpected syntax type: %T", syn)
-	}
-	b, err := cueformat.Node(node)
+	b, err := cueformat.Node(syn)
 	if err != nil {
 		return "", err
 	}
