@@ -15,7 +15,7 @@ context/docs/*
 !context/docs/README.md
 
 # Go Binary Output
-snag
+start
 *.exe
 *.exe~
 *.dll
@@ -78,3 +78,4 @@ debug
 # Project-specific
 bin/
 test/output/
+.start/

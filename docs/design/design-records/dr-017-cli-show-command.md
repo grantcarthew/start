@@ -1,24 +1,25 @@
 # DR-017: CLI Show Command
 
 - Date: 2025-12-04
+- Updated: 2025-12-12
 - Status: Accepted
 - Category: CLI
 
 ## Problem
 
-Users need to inspect resolved configuration content for debugging and understanding. This includes viewing roles, contexts, agents, and tasks after UTD processing (files read, commands executed, templates applied). Content can be large, making full terminal output impractical.
+Users need to inspect resolved configuration content for debugging and understanding. This includes viewing roles, contexts, agents, and tasks after UTD processing (files read, commands executed, templates applied).
 
 ## Decision
 
-The `start show` command displays resolved content after UTD processing and config merging. Output is written to a temporary directory with a 5-line preview shown in the terminal.
+The `start show` command displays resolved content after UTD processing and config merging. Output goes directly to stdout. Plural aliases are supported for convenience.
 
 Synopsis:
 
 ```bash
-start show role [name]
-start show context [name]
-start show agent [name]
-start show task [name]
+start show role [name]      # or: start show roles [name]
+start show context [name]   # or: start show contexts [name]
+start show agent [name]     # or: start show agents [name]
+start show task [name]      # or: start show tasks [name]
 ```
 
 ## Why
@@ -36,12 +37,11 @@ Distinct from raw config:
 - Show command displays resolved content (actual text)
 - Different use cases, different commands
 
-File-based output:
+Direct stdout output:
 
-- Resolved content can be very large
-- Users can inspect files with their preferred editor
-- Markdown files get syntax highlighting
-- Consistent with `--dry-run` output pattern
+- Simpler user experience (no temp files to manage)
+- Content is immediately visible and pipeable
+- For very large content, users can redirect to file if needed
 
 Inspect without executing:
 
@@ -49,15 +49,10 @@ Inspect without executing:
 - Check context resolution without running a task
 - Verify agent configuration is correct
 
-## Output Directory
+Plural aliases:
 
-Same pattern as `--dry-run`:
-
-```
-/tmp/start-YYYYMMDDHHmmss/
-```
-
-On collision (same second), append incrementing suffix: `-1`, `-2`, etc.
+- Natural language flexibility (`show agents` vs `show agent`)
+- Consistent with user expectations from other CLIs
 
 ## Subcommands
 
@@ -66,29 +61,34 @@ On collision (same second), append incrementing suffix: `-1`, `-2`, etc.
 Display resolved role content after UTD processing.
 
 ```bash
-start show role              # Show default role
+start show role              # List roles, show first/default
 start show role <name>       # Show named role
 start show role --scope global
 start show role --scope local
 ```
 
-Output file: `role.md`
+Output (no name - shows list and first role):
 
-Terminal output:
+```
+Roles: assistant, code-reviewer
+
+Showing: assistant (first in config)
+───────────────────────────────────────────────────────────────────────────────
+Description: General purpose assistant
+
+You are a helpful assistant skilled in software development.
+```
+
+Output (with name):
 
 ```
 Role: code-reviewer
-===============================================================================
-Source: global config
+───────────────────────────────────────────────────────────────────────────────
+Description: Expert code reviewer
 
 You are an expert code reviewer with deep knowledge of software
 engineering best practices, security vulnerabilities, and performance
 optimization.
-
-Focus on:
-... (342 more lines)
-
-Full content: /tmp/start-20251204111532/role.md (2.3 KB)
 ```
 
 ### start show context
@@ -96,58 +96,34 @@ Full content: /tmp/start-20251204111532/role.md (2.3 KB)
 Display resolved context content after UTD processing.
 
 ```bash
-start show context           # Show all contexts
+start show context           # List contexts with metadata
 start show context <name>    # Show named context
 start show context --scope global
 start show context --scope local
 ```
 
-Output files:
-
-- Single context: `context-<name>.md`
-- All contexts: `contexts.md` (concatenated with headers)
-
-Terminal output (single context):
+Output (no name - list only with metadata):
 
 ```
-Context: git-status
-===============================================================================
-Source: local config
-Required: false
+Contexts: environment, project, git-status
+
+Default: project
+Required: environment
+
 Tags: git, status
+```
+
+Output (with name):
+
+```
+Contexts: environment, project, git-status
+
+Context: git-status
+───────────────────────────────────────────────────────────────────────────────
 Command: git status --short
 
-Working tree status:
- M main.go
- M README.md
-?? newfile.go
-... (12 more lines)
-
-Full content: /tmp/start-20251204111532/context-git-status.md (456 bytes)
-```
-
-Terminal output (all contexts):
-
-```
-Contexts (4 total)
-===============================================================================
-
-environment (global, required):
-  Read ~/reference/ENVIRONMENT.md for environment context.
-  ... (2 more lines)
-
-project (local, default):
-  Read ./PROJECT.md. Respond with summary.
-
-git-status (local, tagged: git):
-  Working tree status:
-   M main.go
-  ... (8 more lines)
-
-agents (local, required):
-  Read ./AGENTS.md for repository overview.
-
-Full content: /tmp/start-20251204111532/contexts.md (4.2 KB)
+Working tree status: {{.command_output}}
+Tags: git, status
 ```
 
 ### start show agent
@@ -155,68 +131,67 @@ Full content: /tmp/start-20251204111532/contexts.md (4.2 KB)
 Display effective agent configuration after config merging.
 
 ```bash
-start show agent             # Show default agent
+start show agent             # List agents, show first/default
 start show agent <name>      # Show named agent
 start show agent --scope global
 start show agent --scope local
 ```
 
-Output file: `agent-<name>.md`
-
-Terminal output:
+Output (no name - shows list and first agent):
 
 ```
-Agent: claude
-===============================================================================
-Source: global config
-Description: Anthropic Claude via Claude Code CLI
+Agents: claude, gemini
 
-Command template:
-  {bin} --model {model} --system-prompt '{role}' '{prompt}'
+Showing: claude (first in config)
+───────────────────────────────────────────────────────────────────────────────
+Description: Claude by Anthropic
 
 Binary: claude
-Default model: sonnet (claude-sonnet-4-20250514)
+Command: {{.bin}} --model {{.model}} '{{.prompt}}'
 
 Models:
-  haiku  -> claude-3-5-haiku-20241022
-  sonnet -> claude-sonnet-4-20250514
-  opus   -> claude-opus-4-20250514
-
-Full content: /tmp/start-20251204111532/agent-claude.md (312 bytes)
+  sonnet: claude-sonnet-4-20250514
+  opus: claude-opus-4-20250514
 ```
-
-Note: Agent configuration is typically small enough to display fully in terminal. File is still written for consistency.
 
 ### start show task
 
 Display resolved task prompt template.
 
 ```bash
-start show task <name>       # Show named task (required)
+start show task              # List tasks
+start show task <name>       # Show named task
 start show task --scope global
 start show task --scope local
 ```
 
-Output file: `task-<name>.md`
-
-Terminal output:
+Output (no name - list only):
 
 ```
-Task: code-review
-===============================================================================
-Source: global config
-Description: Review code for quality and best practices
-Role: code-reviewer
-Agent: (uses default)
+Tasks: review, explain
+```
+
+Output (with name):
+
+```
+Tasks: review, explain
+
+Task: review
+───────────────────────────────────────────────────────────────────────────────
+Description: Review staged changes
+
 Command: git diff --staged
 
 Review the following changes:
 
 ## Instructions
 {{.instructions}}
-... (15 more lines)
 
-Full content: /tmp/start-20251204111532/task-code-review.md (1.2 KB)
+## Changes
+\`\`\`diff
+{{.command_output}}
+\`\`\`
+Role: code-reviewer
 ```
 
 Note: Task show displays the template with placeholders visible. Use `start task <name> --dry-run` to see fully resolved output with placeholders filled.
@@ -235,7 +210,7 @@ Global flags that apply:
 |------|-------|-------------|
 | `--verbose` | | Show additional metadata and resolution details |
 | `--debug` | | Show full resolution trace |
-| `--quiet` | `-q` | Show only file path, no preview |
+| `--quiet` | `-q` | Minimal output |
 | `--directory` | `-d` | Override working directory |
 
 ## Resolution Behavior
@@ -265,15 +240,15 @@ With `--scope local`:
 | 0 | Success |
 | 1 | Configuration error |
 | 2 | Named item not found |
-| 3 | File/directory error (UTD resolution failed) |
+| 3 | UTD resolution failed |
 
 ## Trade-offs
 
 Accept:
 
 - Executes UTD processing (commands run, files read) to show resolved content
-- Creates temp files even for small content
 - Another command to learn beyond config commands
+- Large content may overflow terminal
 
 Gain:
 
@@ -281,18 +256,18 @@ Gain:
 - Inspect individual components without full execution
 - Debug UTD processing issues
 - Understand config merging behavior
-- Large content is inspectable in editor
-- Consistent pattern with `--dry-run`
+- Simple output directly to stdout (pipeable, redirectable)
+- No temp file management
 
 ## Alternatives
 
-Terminal-only output with truncation:
+File-based output with preview:
 
-- Pro: No file management
-- Pro: Simpler implementation
-- Con: Large roles/contexts are unusable
-- Con: Inconsistent with `--dry-run` approach
-- Rejected: File-based is more practical and consistent
+- Pro: Handles very large content gracefully
+- Pro: Consistent with `--dry-run` approach
+- Con: Extra step to view full content
+- Con: Temp files accumulate
+- Rejected: Direct stdout simpler for typical use; users can redirect if needed
 
 Extend config commands with --resolved flag:
 
@@ -314,7 +289,15 @@ Subcommand structure:
 
 - `show` is a Cobra command with subcommands
 - Each subcommand (role, context, agent, task) handles its type
+- Plural aliases supported (agents, roles, contexts, tasks)
 - Shared flags defined on parent show command
+
+Default behavior by type:
+
+- **agent/role**: List all + show first/default with content
+- **context/task**: List only (no content unless name specified)
+
+Rationale: Agents and roles have a "current" concept (first in config or default), so showing one makes sense. Contexts and tasks are collections selected by name or tag, so listing is more useful.
 
 UTD processing:
 
@@ -324,13 +307,6 @@ UTD processing:
 
 Output formatting:
 
-- Write full content to temp file
-- Display first 5 lines in terminal
-- Show line count for remaining content
-- Show file path and size
-
-Temp directory:
-
-- Same timestamp-based naming as `--dry-run`
-- Reuse directory creation logic
-- Handle collision with suffix
+- Full content written to stdout
+- Separator lines for visual structure
+- List of available items shown when applicable

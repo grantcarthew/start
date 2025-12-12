@@ -1,8 +1,8 @@
 # P-004: Minimal CLI Implementation
 
-- Status: In Progress
+- Status: Completed
 - Started: 2025-12-10
-- Completed: -
+- Completed: 2025-12-12
 
 ## Overview
 
@@ -22,6 +22,7 @@ Before working on this project, read these design records:
 | DR-017 | CLI Show Command | Show subcommands and output format |
 | DR-018 | CLI Auto-Setup | First-run behaviour, no mandatory init |
 | DR-024 | Testing Strategy | Test patterns, what to mock, file organisation |
+| DR-026 | CLI Logic and I/O Separation | Architecture pattern for testable commands |
 
 Also review:
 
@@ -67,15 +68,15 @@ Out of Scope:
 - [x] Can load CUE configuration from `~/.config/start/` and `./.start/`
 - [x] Can merge global and local configurations
 - [x] Can validate CUE against schemas
-- [ ] `start show role` displays resolved role content
-- [ ] `start show context` displays resolved context content
-- [ ] `start show agent` displays agent configuration
-- [ ] `start show task` displays task configuration
+- [x] `start show role` displays resolved role content
+- [x] `start show context` displays resolved context content
+- [x] `start show agent` displays agent configuration
+- [x] `start show task` displays task configuration
 - [x] Validation errors are clear and actionable
-- [ ] `--scope global` and `--scope local` work correctly
-- [ ] Output follows temp directory pattern from DR-016
+- [x] `--scope global` and `--scope local` work correctly
+- [x] Output follows temp directory pattern from DR-016
 - [x] Tests cover loader, validator, and show command
-- [ ] Works with assets from P-002
+- [x] Works with assets from P-002
 
 ## Deliverables
 
@@ -332,3 +333,67 @@ Code review completed with fixes:
 - Fixed error message formatting to use CUE's `Msg()` method
 
 Next: Phase 2 - Show Command
+
+### 2025-12-12: Phase 2 Complete - Show Command
+
+Implemented all show subcommands with proper architecture.
+
+Files created:
+
+- `internal/cli/show.go` - Show command with subcommands (agent, role, context, task)
+- `internal/cli/show_test.go` - Unit and integration tests
+
+Architecture pattern established (DR-026):
+
+- Logic functions (`prepareShow*`) return `ShowResult` struct, no I/O
+- Output function (`printPreview`) accepts `io.Writer`, handles formatting
+- Command functions (`runShow*`) are thin glue wiring Cobra to logic + output
+
+This pattern ensures testability without mocking and will be used for all future commands.
+
+Features implemented:
+
+- `start show agent [name]` - Display agent configuration
+- `start show role [name]` - Display role content
+- `start show context [name]` - Display context(s), all if no name
+- `start show task <name>` - Display task template (name required)
+- `--scope` flag - Filter by `global` or `local` config
+- Temp directory output `/tmp/start-YYYYMMDDHHmmss/` with collision handling
+- 5-line preview with "more lines" indicator and file path/size
+
+Key fix:
+
+- CUE path lookups for hyphenated names (e.g., `code-reviewer`) require `cue.MakePath(cue.Str(name))` instead of `cue.ParsePath(name)` which interprets hyphens as subtraction
+
+Test coverage:
+
+- Logic tests for each `prepareShow*` function
+- Integration tests via Cobra with buffer capture
+- Utility tests for `formatSize`, `createTempDir`, `printPreview`
+
+All tests passing.
+
+### 2025-12-12: P-002 Asset Testing Complete
+
+Tested CLI show commands with P-002-style assets using schemas from CUE Central Registry.
+
+Test setup:
+
+- Created `test/integration/registry/` with CUE module importing `github.com/grantcarthew/start-assets/schemas@v0`
+- Config mirrors P-002 patterns: agents (claude, gemini), contexts (environment, project, git-status), roles (golang-agent, golang-assistant), tasks (code-review, debug)
+- `cue mod tidy` successfully fetched schemas@v0.0.2 from registry.cue.works
+- `cue vet` validated config against published schemas
+
+Commands tested:
+
+- `start show agent claude` - Displays Claude agent with all fields
+- `start show agent gemini` - Displays Gemini agent
+- `start show role golang-agent` - Displays autonomous agent role
+- `start show role golang-assistant` - Displays collaborative assistant role
+- `start show context` - Lists all 3 contexts
+- `start show context git-status` - Displays single context with hyphenated name
+- `start show task code-review` - Displays task with role reference
+
+All show commands work correctly with P-002-style assets.
+
+**All success criteria met. P-004 ready for completion.**
