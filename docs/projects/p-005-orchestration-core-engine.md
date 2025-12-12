@@ -1,7 +1,7 @@
 # P-005: Orchestration Core Engine
 
-- Status: Proposed
-- Started: -
+- Status: In Progress
+- Started: 2025-12-12
 - Completed: -
 
 ## Overview
@@ -77,14 +77,14 @@ Out of Scope:
 
 - [ ] First run with no config triggers auto-setup (DR-018)
 - [ ] Auto-setup detects agents, prompts if multiple, writes config
-- [ ] UTD templates process correctly (file, command, prompt fields)
-- [ ] Shell commands execute with timeout protection
-- [ ] Error handling follows DR-007 (tasks fail, contexts warn)
-- [ ] Temp files written to `.start/temp/` with meaningful names
-- [ ] `start` launches agent with merged config, contexts, role
-- [ ] `start prompt "text"` launches with custom prompt
-- [ ] `start task name` executes task workflow
-- [ ] `--dry-run` writes output files without executing agent
+- [x] UTD templates process correctly (file, command, prompt fields)
+- [x] Shell commands execute with timeout protection
+- [x] Error handling follows DR-007 (tasks fail, contexts warn)
+- [x] Temp files written to `.start/temp/` with meaningful names
+- [x] `start` launches agent with merged config, contexts, role
+- [x] `start prompt "text"` launches with custom prompt
+- [x] `start task name` executes task workflow
+- [x] `--dry-run` writes output files without executing agent
 - [ ] Works with assets from P-002
 - [ ] End-to-end demo: `start` works from zero config to agent launch
 
@@ -323,6 +323,56 @@ These questions are answered by existing design records:
 | What shell to use? | User-specified string, or auto-detect bash/sh | DR-006 |
 | Where do temp files go? | `.start/temp/` with path-derived names | DR-020 |
 | How does process replacement work? | syscall.Exec on Unix, no Windows support | DR-006 |
+
+## Progress
+
+### Completed (2025-12-12)
+
+Phase 2: UTD Template Processing
+
+- `internal/orchestration/template.go` - Template processor with lazy evaluation
+- Supports placeholders: File, FileContents, Command, CommandOutput, Date, Instructions
+- Only reads files/executes commands when placeholder is actually used
+
+Phase 3: Shell Command Execution
+
+- `internal/shell/runner.go` - Command execution with timeout (SIGTERM/SIGKILL)
+- `internal/shell/detection.go` - Shell auto-detection (bash, fallback to sh)
+- Process group management for clean termination
+
+Temp File Management
+
+- `internal/temp/manager.go` - Dry-run directories and UTD temp files
+- Path-derived filenames (e.g., `role-code-reviewer.md`)
+- Gitignore checking for `.start/temp/`
+
+Phase 4: Prompt Composition
+
+- `internal/orchestration/composer.go` - Context selection and prompt building
+- Supports required, default, and tagged context selection
+- Role resolution with UTD processing
+- Task resolution with instructions placeholder
+
+Phase 5: Agent Execution
+
+- `internal/orchestration/executor.go` - Command building and process replacement
+- Model resolution from agent config
+- Shell escaping for security
+- Dry-run command generation
+
+All unit tests passing (55+ test functions, 248 test cases across 6 packages).
+
+Phase 6: CLI Commands
+
+- `internal/cli/start.go` - Root command with RunE, dry-run support, flag handling
+- `internal/cli/prompt.go` - Prompt command (required contexts only)
+- `internal/cli/task.go` - Task command with instructions placeholder
+- All commands support `--dry-run`, `--agent`, `--role`, `--model`, `--context` flags
+- Process replacement via syscall.Exec for agent execution
+
+### Pending
+
+Phase 1: Auto-Setup (deferred - requires registry interaction)
 
 ## Notes
 
