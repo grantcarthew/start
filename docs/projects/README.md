@@ -12,7 +12,6 @@ See [p-writing-guide.md](./p-writing-guide.md) for guidelines on creating and ma
 
 | Project | Title | Status | Started |
 |---------|-------|--------|---------|
-| [P-004](./p-004-cli-minimal-implementation.md) | CLI Minimal Implementation | Proposed | - |
 | [P-005](./p-005-orchestration-core-engine.md) | Orchestration Core Engine | Proposed | - |
 
 ### Completed Projects
@@ -22,20 +21,13 @@ See [p-writing-guide.md](./p-writing-guide.md) for guidelines on creating and ma
 | [P-001](./completed/p-001-cue-foundation-architecture.md) | CUE Foundation & Architecture | 2025-12-05 |
 | [P-002](./completed/p-002-assets-validation.md) | Assets Validation | 2025-12-08 |
 | [P-003](./completed/p-003-registry-distribution.md) | Registry Distribution | 2025-12-10 |
+| [P-004](./completed/p-004-cli-minimal-implementation.md) | CLI Minimal Implementation | 2025-12-12 |
 
 ---
 
 ## Project Overview
 
 ### Active
-
-#### P-004: CLI Minimal Implementation
-
-Build minimal CLI commands to interact with CUE configurations. Adapted from prototype CLI design but CUE-native.
-
-**Key Deliverables:** `start init`, `start show`, CLI structure, additional DRs
-
-**Dependencies:** P-001, P-002, P-003
 
 #### P-005: Orchestration Core Engine
 
@@ -46,6 +38,14 @@ Implement core orchestration logic: load CUE from Go, compose prompts, execute a
 **Dependencies:** P-001, P-004
 
 ### Completed
+
+#### P-004: CLI Minimal Implementation
+
+Built minimal CLI infrastructure to validate CUE-based architecture end-to-end. Implemented CUE loading/validation, `start show` command with subcommands, and global flags.
+
+**Key Deliverables:** CUE loader/validator, show command, DR-025 (merge semantics), DR-026 (I/O separation)
+
+**Dependencies:** P-001, P-002, P-003
 
 #### P-001: CUE Foundation & Architecture
 
