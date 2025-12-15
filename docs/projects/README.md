@@ -12,7 +12,16 @@ See [p-writing-guide.md](./p-writing-guide.md) for guidelines on creating and ma
 
 | Project | Title | Status | Started |
 |---------|-------|--------|---------|
-| [P-005](./p-005-orchestration-core-engine.md) | Orchestration Core Engine | Proposed | - |
+| [P-006](./p-006-auto-setup.md) | Auto-Setup | In Progress | 2025-12-15 |
+
+### Proposed Projects
+
+| Project | Title | Dependencies |
+|---------|-------|--------------|
+| [P-007](./p-007-package-management.md) | Package Management | P-006 |
+| [P-008](./p-008-configuration-editing.md) | Configuration Editing | P-004, P-006 |
+| [P-009](./p-009-doctor-diagnostics.md) | Doctor & Diagnostics | P-004, P-006 |
+| [P-010](./p-010-shell-completion.md) | Shell Completion | All prior projects |
 
 ### Completed Projects
 
@@ -22,6 +31,7 @@ See [p-writing-guide.md](./p-writing-guide.md) for guidelines on creating and ma
 | [P-002](./completed/p-002-assets-validation.md) | Assets Validation | 2025-12-08 |
 | [P-003](./completed/p-003-registry-distribution.md) | Registry Distribution | 2025-12-10 |
 | [P-004](./completed/p-004-cli-minimal-implementation.md) | CLI Minimal Implementation | 2025-12-12 |
+| [P-005](./completed/p-005-orchestration-core-engine.md) | Orchestration Core Engine | 2025-12-15 |
 
 ---
 
@@ -29,15 +39,57 @@ See [p-writing-guide.md](./p-writing-guide.md) for guidelines on creating and ma
 
 ### Active
 
-#### P-005: Orchestration Core Engine
+#### P-006: Auto-Setup
 
-Implement core orchestration logic: load CUE from Go, compose prompts, execute agent commands. End-to-end integration.
+First-run experience: detect installed AI CLI tools, fetch configuration from registry, write to user config. Enables zero-config to agent launch workflow.
 
-**Key Deliverables:** Working orchestrator, Go-CUE integration, execution model
+**Key Deliverables:** Registry interaction, agent detection, auto-setup flow, E2E validation
 
-**Dependencies:** P-001, P-004
+**Dependencies:** P-001, P-002, P-003, P-004, P-005
+
+### Proposed
+
+#### P-007: Package Management
+
+Package management commands for discovering, adding, and updating assets from CUE Central Registry.
+
+**Key Deliverables:** `start pkg` commands (search, add, list, info, update)
+
+**Dependencies:** P-006
+
+#### P-008: Configuration Editing
+
+Configuration editing commands for managing agents, roles, contexts, and tasks without manually editing CUE files.
+
+**Key Deliverables:** `start config` commands for all entity types
+
+**Dependencies:** P-004, P-006
+
+#### P-009: Doctor & Diagnostics
+
+Health checks, configuration validation, and diagnostics to help users identify and fix issues.
+
+**Key Deliverables:** `start doctor` command with validation checks and fix suggestions
+
+**Dependencies:** P-004, P-006
+
+#### P-010: Shell Completion
+
+Shell completion for bash, zsh, and fish with dynamic value completion.
+
+**Key Deliverables:** `start completion` commands, dynamic completers for agents/roles/tasks
+
+**Dependencies:** All prior projects
 
 ### Completed
+
+#### P-005: Orchestration Core Engine
+
+Core orchestration logic: UTD template processing, shell execution, prompt composition, agent execution, CLI commands (start, prompt, task).
+
+**Key Deliverables:** Template processor, shell runner, composer, executor, CLI commands
+
+**Dependencies:** P-001, P-004
 
 #### P-004: CLI Minimal Implementation
 
