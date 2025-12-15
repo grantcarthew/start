@@ -32,6 +32,7 @@ Design Records (DRs) document architectural decisions, algorithms, breaking chan
 | DR-024 | Testing Strategy | Testing | Accepted | 2025-12-11 |
 | DR-025 | Configuration Merge Semantics | Config | Accepted | 2025-12-11 |
 | DR-026 | CLI Logic and I/O Separation | CLI | Accepted | 2025-12-12 |
+| DR-027 | Registry Module Fetching | Registry | Accepted | 2025-12-15 |
 
 ## Process
 
@@ -56,3 +57,4 @@ Common categories used in DRs:
 - Role - Role definitions
 - Context - Context document configuration
 - Testing - Testing strategy and patterns
+- Registry - CUE registry interaction and module fetching

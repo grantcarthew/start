@@ -61,24 +61,24 @@ This project follows the standard development workflow:
 
 ### Phase 1: Research and Design
 
-- [ ] Read all required documentation
-- [ ] Research CUE Go API for module fetching
-- [ ] Discuss findings and options
-- [ ] Create DR for registry interaction (if trade-offs exist)
+- [x] Read all required documentation
+- [x] Research CUE Go API for module fetching
+- [x] Discuss findings and options
+- [x] Create DR for registry interaction (if trade-offs exist)
 
 ### Phase 2: Implementation
 
-- [ ] Implement registry interaction
-- [ ] Implement agent detection
-- [ ] Implement auto-setup flow
-- [ ] Integrate with existing CLI commands
+- [x] Implement registry interaction
+- [x] Implement agent detection
+- [x] Implement auto-setup flow
+- [x] Integrate with existing CLI commands
 
 ### Phase 3: Validation
 
-- [ ] Write unit tests
-- [ ] Write integration tests
-- [ ] Write E2E tests
-- [ ] Manual testing with real agents
+- [x] Write unit tests
+- [x] Write integration tests
+- [ ] Write E2E tests (blocked until index published)
+- [x] Create index module for publishing
 
 ### Phase 4: Review
 
@@ -96,19 +96,19 @@ Files:
 - `internal/orchestration/autosetup.go` - Auto-setup flow
 - `test/e2e/autosetup_test.go` - E2E tests
 
-Design Records (if needed):
+Design Records:
 
-- DR-0XX: Registry Interaction - CUE Go API for module fetching
+- DR-027: Registry Module Fetching - CUE Go API, index location, config writing, error handling
 
 ## Technical Approach
 
-To be determined after Phase 1 research. Key questions:
+Determined in Phase 1 research (see DR-027):
 
-1. What CUE Go API to use for module fetching?
-2. Where does the index live (module path, version)?
-3. How to extract/write fetched config to disk?
-4. Caching strategy for index and packages?
-5. Error handling for network failures?
+1. CUE Go API: `modconfig.NewRegistry()` - handles auth, caching, registry resolution
+2. Index location: `github.com/grantcarthew/start-assets/index@v0`
+3. Config writing: Decode CUE to Go struct (`orchestration.Agent`), encode back to CUE
+4. Caching: Use CUE's native cache (`~/.cache/cue/`)
+5. Error handling: Retry with exponential backoff (2-3 attempts), then exit code 2
 
 ## Dependencies
 
@@ -124,4 +124,47 @@ Requires:
 ### 2025-12-15
 
 - Project created
-- Phase 1 (Research and Design) starting
+- Phase 1 (Research and Design) completed
+- Read required documentation (DR-018, DR-019, dr-writing-guide.md, integration-notes.md)
+- Researched CUE Go API: modconfig, modregistry, modcache packages
+- Key decisions made:
+  - Index location: `github.com/grantcarthew/start-assets/index@v0`
+  - API: `modconfig.NewRegistry()` for auth and caching
+  - Config writing: decode to Go struct, encode to CUE
+  - Error handling: retry with exponential backoff
+- Created DR-027: Registry Module Fetching
+- Phase 2 (Implementation) completed:
+  - `internal/registry/client.go` - Registry client with retry logic
+  - `internal/registry/index.go` - Index fetching and parsing
+  - `internal/detection/agent.go` - PATH-based agent detection
+  - `internal/orchestration/autosetup.go` - Auto-setup flow
+  - `internal/cli/start.go` - CLI integration
+- All tests passing
+- Phase 3 (Validation) mostly complete:
+  - Unit tests: `internal/detection/agent_test.go`, `internal/registry/index_test.go`, `internal/orchestration/autosetup_test.go`
+  - Integration tests: `test/integration/autosetup_test.go`
+  - Created index module: `context/start-assets/index/`
+  - Index module published to registry
+
+### Session 2 (2025-12-15 continued)
+
+Fixed issues with index loading:
+- Changed `IndexModulePath` from `@v0` to `@v0.0.1` (canonical version required by `module.ParseVersion`)
+- Changed `load.Config.Package` from `"*"` to `"index"` (wildcard creates empty synthetic package)
+- Added `modconfig.Registry` parameter to `LoadIndex` for dependency resolution
+- Updated tests to include `package index` declaration
+
+Manual testing progress:
+- Index fetching: Working
+- Agent detection: Working (detects aichat, claude, gemini)
+- TTY prompt: Working (displays selection menu)
+- Version resolution: Added `ResolveLatestVersion` to convert `@v0` to canonical version
+
+**Current Bug**: `ResolveLatestVersion` fails with "no versions found"
+```
+Error: resolving agent version: no versions found for github.com/grantcarthew/start-assets/agents/claude@v0
+```
+The `ModuleVersions` API call returns empty. Investigation needed:
+- Check if module path format is correct for the versions API
+- May need to strip the version suffix before querying
+- Test with `cue mod` CLI to compare behavior
