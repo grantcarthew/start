@@ -12,7 +12,7 @@ Avoid references to the prototype in new documentation. This is a new design.
 
 Projects are stored in the docs/projects/ directory. Continue by reading the active project.
 
-Active Project: docs/projects/p-005-orchestration-core-engine.md
+Active Project: docs/projects/p-006-auto-setup.md
 
 ## Why CUE?
 
@@ -136,7 +136,8 @@ The `./Context` directory contains cloned source code and documentation for deve
 - P-002: Concrete Assets Validation (17 modules published to CUE Central Registry)
 - P-003: Registry Distribution (20 modules published, prototype comparison documented)
 - P-004: Minimal CLI Implementation (CUE loading, show command, global flags)
+- P-005: Orchestration Core Engine (template processing, shell execution, composition, CLI commands)
 
-**Current:** P-005 Orchestration Core Engine
+**Current:** P-006 Auto-Setup
 
 The prototype validated that this tool solves a real problem. This version will implement it properly.

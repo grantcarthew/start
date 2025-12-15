@@ -1,8 +1,8 @@
 # P-005: Orchestration Core Engine
 
-- Status: In Progress
+- Status: Complete
 - Started: 2025-12-12
-- Completed: -
+- Completed: 2025-12-15
 
 ## Overview
 
@@ -75,8 +75,6 @@ Out of Scope:
 
 ## Success Criteria
 
-- [ ] First run with no config triggers auto-setup (DR-018)
-- [ ] Auto-setup detects agents, prompts if multiple, writes config
 - [x] UTD templates process correctly (file, command, prompt fields)
 - [x] Shell commands execute with timeout protection
 - [x] Error handling follows DR-007 (tasks fail, contexts warn)
@@ -85,8 +83,11 @@ Out of Scope:
 - [x] `start prompt "text"` launches with custom prompt
 - [x] `start task name` executes task workflow
 - [x] `--dry-run` writes output files without executing agent
-- [ ] Works with assets from P-002
-- [ ] End-to-end demo: `start` works from zero config to agent launch
+
+Deferred to P-006:
+
+- Auto-setup (first run, agent detection, config writing)
+- E2E validation with P-002 assets
 
 ## Deliverables
 
@@ -370,9 +371,9 @@ Phase 6: CLI Commands
 - All commands support `--dry-run`, `--agent`, `--role`, `--model`, `--context` flags
 - Process replacement via syscall.Exec for agent execution
 
-### Pending
+### Deferred
 
-Phase 1: Auto-Setup (deferred - requires registry interaction)
+Phase 1: Auto-Setup moved to P-006.
 
 ## Notes
 
