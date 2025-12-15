@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -12,6 +13,7 @@ import (
 	"github.com/grantcarthew/start/internal/shell"
 	"github.com/grantcarthew/start/internal/temp"
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 )
 
 // Command flags
@@ -241,17 +243,51 @@ func printPreviewLines(w io.Writer, text string, n int) {
 }
 
 // loadMergedConfig loads and merges global and local configuration.
+// If no configuration exists, it triggers auto-setup.
 func loadMergedConfig() (internalcue.LoadResult, error) {
+	return loadMergedConfigWithIO(os.Stdout, os.Stderr, os.Stdin)
+}
+
+// loadMergedConfigWithIO loads configuration with custom I/O streams.
+func loadMergedConfigWithIO(stdout, stderr io.Writer, stdin io.Reader) (internalcue.LoadResult, error) {
 	paths, err := config.ResolvePaths("")
 	if err != nil {
 		return internalcue.LoadResult{}, fmt.Errorf("resolving config paths: %w", err)
 	}
 
+	// Trigger auto-setup if no config exists
 	if !paths.AnyExists() {
-		return internalcue.LoadResult{}, fmt.Errorf("no configuration found (checked %s and %s)", paths.Global, paths.Local)
+		if err := runAutoSetup(stdout, stderr, stdin); err != nil {
+			return internalcue.LoadResult{}, err
+		}
+		// Re-resolve paths after auto-setup
+		paths, err = config.ResolvePaths("")
+		if err != nil {
+			return internalcue.LoadResult{}, fmt.Errorf("resolving config paths: %w", err)
+		}
 	}
 
 	dirs := paths.ForScope(config.ScopeMerged)
 	loader := internalcue.NewLoader()
 	return loader.Load(dirs)
+}
+
+// runAutoSetup runs the auto-setup flow.
+func runAutoSetup(stdout, stderr io.Writer, stdin io.Reader) error {
+	// Check if stdin is a TTY
+	isTTY := false
+	if f, ok := stdin.(*os.File); ok {
+		isTTY = term.IsTerminal(int(f.Fd()))
+	}
+
+	autoSetup := orchestration.NewAutoSetup(stdout, stderr, stdin, isTTY)
+	ctx := context.Background()
+
+	_, err := autoSetup.Run(ctx)
+	if err != nil {
+		return fmt.Errorf("auto-setup failed: %w", err)
+	}
+
+	fmt.Fprintln(stdout)
+	return nil
 }
