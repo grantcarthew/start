@@ -48,10 +48,10 @@ Out of Scope:
 
 - [x] First run with no config triggers auto-setup
 - [x] Auto-setup detects agents via PATH checking
-- [ ] Single agent detected: auto-selects without prompt (needs testing with single agent)
+- [x] Single agent detected: auto-selects without prompt
 - [x] Multiple agents detected: prompts user to select
 - [x] Non-TTY with multiple agents: exits with error
-- [ ] No agents detected: helpful error message (needs testing with no agents)
+- [x] No agents detected: helpful error message
 - [x] Selected agent config written to ~/.config/start/
 - [x] E2E demo: zero config to agent launch works
 
@@ -77,7 +77,7 @@ This project follows the standard development workflow:
 
 - [x] Write unit tests
 - [x] Write integration tests
-- [ ] Write E2E tests (no longer blocked - agents published)
+- [x] Write E2E tests
 - [x] Create index module for publishing
 
 ### Phase 4: Review
@@ -194,3 +194,28 @@ Test fixes:
 - Agent module loading: Working (with registry and correct package name)
 - Config writing: Working (agents.cue + config.cue)
 - Agent launch: Working (claude, gemini, aichat all tested)
+
+### Session 4 (2025-12-16)
+
+Completed remaining validation work:
+
+Unit tests added to `internal/orchestration/autosetup_test.go`:
+- `TestNoAgentsError` - verifies helpful error message with installation suggestions
+- `TestNoAgentsError_EmptyIndex` - handles empty index case
+- `TestPromptSelection_NonTTY` - verifies error for multiple agents in non-TTY
+- `TestPromptSelection_TTY_ValidNumber` - number selection works
+- `TestPromptSelection_TTY_ValidName` - name selection works
+- `TestPromptSelection_TTY_InvalidNumber` - rejects out-of-range numbers
+- `TestPromptSelection_TTY_InvalidName` - rejects unknown names
+
+E2E tests created in `test/e2e/autosetup_test.go`:
+- `TestE2E_AutoSetup_SingleAgent` - single agent auto-selects without prompt
+- `TestE2E_AutoSetup_NoAgents` - helpful error when no agents in PATH
+- `TestE2E_AutoSetup_MultipleAgents_NonTTY` - error for multiple agents in non-TTY
+- `TestE2E_AutoSetup_ExistingConfig_SkipsSetup` - skips auto-setup when config exists
+
+Manual test scripts created in `scripts/`:
+- `test-single-agent.sh` - tests single agent scenario with restricted PATH
+- `test-no-agents.sh` - tests no agents scenario with restricted PATH
+
+All success criteria now complete. Ready for external code review.
