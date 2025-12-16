@@ -175,10 +175,22 @@ Fixed two additional bugs in `loadAgentFromModule`:
 
 Added `Registry()` getter to `internal/registry/client.go`.
 
-**Result**: Auto-setup now works end-to-end:
+Additional fixes:
+- Split config output: `agents.cue` for agents, `config.cue` for settings
+- Agent selection now accepts both number (`3`) and name (`gemini`)
+- Quote model names with hyphens in generated CUE (`"flash-lite"`)
+- Added lookup for singular `agent:` field (registry module style)
+- UI: Removed `[1-3]` from selection prompt, replaced `===` with unicode `─`
+
+Test fixes:
+- Added HOME isolation to `setupTestConfig` for global scope tests
+- Skipped `TestExecute_NoConfig` (integration test requiring network)
+- Added `TestGenerateSettingsCUE`
+
+**Result**: Auto-setup now works end-to-end for all three agents:
 - Index fetching: Working
 - Agent detection: Working (detects aichat, claude, gemini)
 - Version resolution: Working
 - Agent module loading: Working (with registry and correct package name)
-- Config writing: Working
-- Agent launch: Working
+- Config writing: Working (agents.cue + config.cue)
+- Agent launch: Working (claude, gemini, aichat all tested)
