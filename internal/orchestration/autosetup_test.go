@@ -7,6 +7,8 @@ import (
 
 	"cuelang.org/go/cue/cuecontext"
 	"github.com/grantcarthew/start/internal/config"
+	"github.com/grantcarthew/start/internal/detection"
+	"github.com/grantcarthew/start/internal/registry"
 )
 
 func TestNeedsSetup(t *testing.T) {
@@ -222,5 +224,224 @@ models: {
 	}
 	if len(agent.Models) != 2 {
 		t.Errorf("expected 2 models, got %d", len(agent.Models))
+	}
+}
+
+func TestNoAgentsError(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	stdin := strings.NewReader("")
+
+	as := NewAutoSetup(stdout, stderr, stdin, false)
+
+	index := &registry.Index{
+		Agents: map[string]registry.IndexEntry{
+			"ai/claude": {
+				Module:      "github.com/test/claude@v0",
+				Bin:         "claude",
+				Description: "Anthropic Claude CLI",
+			},
+			"ai/gemini": {
+				Module:      "github.com/test/gemini@v0",
+				Bin:         "gemini",
+				Description: "Google Gemini CLI",
+			},
+		},
+	}
+
+	err := as.noAgentsError(index)
+
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	errMsg := err.Error()
+
+	// Check for helpful message components
+	if !strings.Contains(errMsg, "No AI CLI tools detected") {
+		t.Error("error should mention no tools detected")
+	}
+	if !strings.Contains(errMsg, "Install one of") {
+		t.Error("error should suggest installation")
+	}
+	if !strings.Contains(errMsg, "claude") {
+		t.Error("error should list claude")
+	}
+	if !strings.Contains(errMsg, "gemini") {
+		t.Error("error should list gemini")
+	}
+	if !strings.Contains(errMsg, "run 'start' again") {
+		t.Error("error should suggest running start again")
+	}
+}
+
+func TestNoAgentsError_EmptyIndex(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	stdin := strings.NewReader("")
+
+	as := NewAutoSetup(stdout, stderr, stdin, false)
+
+	index := &registry.Index{
+		Agents: map[string]registry.IndexEntry{},
+	}
+
+	err := as.noAgentsError(index)
+
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	errMsg := err.Error()
+	if !strings.Contains(errMsg, "No AI CLI tools detected") {
+		t.Error("error should mention no tools detected")
+	}
+}
+
+func TestPromptSelection_NonTTY(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	stdin := strings.NewReader("")
+
+	as := NewAutoSetup(stdout, stderr, stdin, false) // isTTY = false
+
+	detected := []detection.DetectedAgent{
+		{
+			Key:   "ai/claude",
+			Entry: registry.IndexEntry{Bin: "claude", Description: "Claude CLI"},
+		},
+		{
+			Key:   "ai/gemini",
+			Entry: registry.IndexEntry{Bin: "gemini", Description: "Gemini CLI"},
+		},
+	}
+
+	_, err := as.promptSelection(detected)
+
+	if err == nil {
+		t.Fatal("expected error for non-TTY with multiple agents")
+	}
+
+	errMsg := err.Error()
+	if !strings.Contains(errMsg, "multiple AI CLI tools detected") {
+		t.Error("error should mention multiple tools detected")
+	}
+	if !strings.Contains(errMsg, "claude") {
+		t.Error("error should list claude")
+	}
+	if !strings.Contains(errMsg, "gemini") {
+		t.Error("error should list gemini")
+	}
+}
+
+func TestPromptSelection_TTY_ValidNumber(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	stdin := strings.NewReader("2\n")
+
+	as := NewAutoSetup(stdout, stderr, stdin, true) // isTTY = true
+
+	detected := []detection.DetectedAgent{
+		{
+			Key:   "ai/claude",
+			Entry: registry.IndexEntry{Bin: "claude", Description: "Claude CLI"},
+		},
+		{
+			Key:   "ai/gemini",
+			Entry: registry.IndexEntry{Bin: "gemini", Description: "Gemini CLI"},
+		},
+	}
+
+	selected, err := as.promptSelection(detected)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if selected.Key != "ai/gemini" {
+		t.Errorf("expected ai/gemini, got %s", selected.Key)
+	}
+}
+
+func TestPromptSelection_TTY_ValidName(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	stdin := strings.NewReader("claude\n")
+
+	as := NewAutoSetup(stdout, stderr, stdin, true)
+
+	detected := []detection.DetectedAgent{
+		{
+			Key:   "ai/claude",
+			Entry: registry.IndexEntry{Bin: "claude", Description: "Claude CLI"},
+		},
+		{
+			Key:   "ai/gemini",
+			Entry: registry.IndexEntry{Bin: "gemini", Description: "Gemini CLI"},
+		},
+	}
+
+	selected, err := as.promptSelection(detected)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if selected.Entry.Bin != "claude" {
+		t.Errorf("expected claude, got %s", selected.Entry.Bin)
+	}
+}
+
+func TestPromptSelection_TTY_InvalidNumber(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	stdin := strings.NewReader("5\n")
+
+	as := NewAutoSetup(stdout, stderr, stdin, true)
+
+	detected := []detection.DetectedAgent{
+		{
+			Key:   "ai/claude",
+			Entry: registry.IndexEntry{Bin: "claude"},
+		},
+		{
+			Key:   "ai/gemini",
+			Entry: registry.IndexEntry{Bin: "gemini"},
+		},
+	}
+
+	_, err := as.promptSelection(detected)
+
+	if err == nil {
+		t.Fatal("expected error for invalid number")
+	}
+
+	if !strings.Contains(err.Error(), "invalid selection") {
+		t.Errorf("expected 'invalid selection' error, got: %v", err)
+	}
+}
+
+func TestPromptSelection_TTY_InvalidName(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	stdin := strings.NewReader("nonexistent\n")
+
+	as := NewAutoSetup(stdout, stderr, stdin, true)
+
+	detected := []detection.DetectedAgent{
+		{
+			Key:   "ai/claude",
+			Entry: registry.IndexEntry{Bin: "claude"},
+		},
+	}
+
+	_, err := as.promptSelection(detected)
+
+	if err == nil {
+		t.Fatal("expected error for invalid name")
+	}
+
+	if !strings.Contains(err.Error(), "invalid selection") {
+		t.Errorf("expected 'invalid selection' error, got: %v", err)
 	}
 }
