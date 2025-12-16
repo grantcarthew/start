@@ -16,7 +16,7 @@ import (
 	"golang.org/x/term"
 )
 
-// Command flags
+// Command flags - package-level for access by subcommands
 var (
 	flagAgent   string
 	flagRole    string
@@ -26,20 +26,6 @@ var (
 	flagQuiet   bool
 	flagVerbose bool
 )
-
-func init() {
-	// Add flags to root command
-	rootCmd.PersistentFlags().StringVarP(&flagAgent, "agent", "a", "", "Override agent selection")
-	rootCmd.PersistentFlags().StringVarP(&flagRole, "role", "r", "", "Override role (system prompt)")
-	rootCmd.PersistentFlags().StringVarP(&flagModel, "model", "m", "", "Override model selection")
-	rootCmd.PersistentFlags().StringSliceVarP(&flagContext, "context", "c", nil, "Select contexts by tag")
-	rootCmd.PersistentFlags().BoolVar(&flagDryRun, "dry-run", false, "Preview execution without launching agent")
-	rootCmd.PersistentFlags().BoolVarP(&flagQuiet, "quiet", "q", false, "Suppress output")
-	rootCmd.PersistentFlags().BoolVar(&flagVerbose, "verbose", false, "Detailed output")
-
-	// Set RunE on root command for `start` execution
-	rootCmd.RunE = runStart
-}
 
 // runStart executes the start command (root command with no subcommand).
 func runStart(cmd *cobra.Command, args []string) error {

@@ -25,52 +25,53 @@ type ShowResult struct {
 	AllTags          []string // All unique tags across items
 }
 
-var showCmd = &cobra.Command{
-	Use:   "show",
-	Short: "Display resolved configuration content",
-	Long:  `Display resolved configuration content after UTD processing and config merging.`,
-}
-
-var showRoleCmd = &cobra.Command{
-	Use:     "role [name]",
-	Aliases: []string{"roles"},
-	Short:   "Display resolved role content",
-	Long:    `Display resolved role content after UTD processing.`,
-	Args:    cobra.MaximumNArgs(1),
-	RunE:    runShowRole,
-}
-
-var showContextCmd = &cobra.Command{
-	Use:     "context [name]",
-	Aliases: []string{"contexts"},
-	Short:   "Display resolved context content",
-	Long:    `Display resolved context content after UTD processing.`,
-	Args:    cobra.MaximumNArgs(1),
-	RunE:    runShowContext,
-}
-
-var showAgentCmd = &cobra.Command{
-	Use:     "agent [name]",
-	Aliases: []string{"agents"},
-	Short:   "Display agent configuration",
-	Long:    `Display effective agent configuration after config merging.`,
-	Args:    cobra.MaximumNArgs(1),
-	RunE:    runShowAgent,
-}
-
-var showTaskCmd = &cobra.Command{
-	Use:     "task [name]",
-	Aliases: []string{"tasks"},
-	Short:   "Display task template",
-	Long:    `Display resolved task prompt template.`,
-	Args:    cobra.MaximumNArgs(1),
-	RunE:    runShowTask,
-}
-
 // showScope holds the --scope flag value
 var showScope string
 
-func init() {
+// addShowCommand adds the show command and its subcommands to the parent command.
+func addShowCommand(parent *cobra.Command) {
+	showCmd := &cobra.Command{
+		Use:   "show",
+		Short: "Display resolved configuration content",
+		Long:  `Display resolved configuration content after UTD processing and config merging.`,
+	}
+
+	showRoleCmd := &cobra.Command{
+		Use:     "role [name]",
+		Aliases: []string{"roles"},
+		Short:   "Display resolved role content",
+		Long:    `Display resolved role content after UTD processing.`,
+		Args:    cobra.MaximumNArgs(1),
+		RunE:    runShowRole,
+	}
+
+	showContextCmd := &cobra.Command{
+		Use:     "context [name]",
+		Aliases: []string{"contexts"},
+		Short:   "Display resolved context content",
+		Long:    `Display resolved context content after UTD processing.`,
+		Args:    cobra.MaximumNArgs(1),
+		RunE:    runShowContext,
+	}
+
+	showAgentCmd := &cobra.Command{
+		Use:     "agent [name]",
+		Aliases: []string{"agents"},
+		Short:   "Display agent configuration",
+		Long:    `Display effective agent configuration after config merging.`,
+		Args:    cobra.MaximumNArgs(1),
+		RunE:    runShowAgent,
+	}
+
+	showTaskCmd := &cobra.Command{
+		Use:     "task [name]",
+		Aliases: []string{"tasks"},
+		Short:   "Display task template",
+		Long:    `Display resolved task prompt template.`,
+		Args:    cobra.MaximumNArgs(1),
+		RunE:    runShowTask,
+	}
+
 	// Add --scope flag to show command
 	showCmd.PersistentFlags().StringVar(&showScope, "scope", "", "Show from specific scope: global or local")
 
@@ -80,8 +81,8 @@ func init() {
 	showCmd.AddCommand(showAgentCmd)
 	showCmd.AddCommand(showTaskCmd)
 
-	// Add show to root
-	rootCmd.AddCommand(showCmd)
+	// Add show to parent
+	parent.AddCommand(showCmd)
 }
 
 // runShowRole displays resolved role content.

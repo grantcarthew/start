@@ -10,16 +10,17 @@ func TestExecute_NoConfig(t *testing.T) {
 	// Skip: This test triggers auto-setup which requires network access
 	// and creates CUE cache with read-only directories that can't be cleaned up.
 	// The auto-setup flow is tested in integration tests instead.
-	t.Skip("Skipping: auto-setup requires network access and creates uncleanbale cache")
+	t.Skip("Skipping: auto-setup requires network access and creates uncleanable cache")
 }
 
 func TestExecute_Help(t *testing.T) {
 	buf := new(bytes.Buffer)
-	rootCmd.SetOut(buf)
-	rootCmd.SetErr(buf)
-	rootCmd.SetArgs([]string{"--help"})
+	cmd := NewRootCmd()
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	cmd.SetArgs([]string{"--help"})
 
-	err := Execute()
+	err := cmd.Execute()
 	if err != nil {
 		t.Fatalf("Execute(--help) error = %v", err)
 	}
@@ -35,11 +36,12 @@ func TestExecute_Help(t *testing.T) {
 
 func TestExecute_Version(t *testing.T) {
 	buf := new(bytes.Buffer)
-	rootCmd.SetOut(buf)
-	rootCmd.SetErr(buf)
-	rootCmd.SetArgs([]string{"--help"})
+	cmd := NewRootCmd()
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	cmd.SetArgs([]string{"--help"})
 
-	err := Execute()
+	err := cmd.Execute()
 	if err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
