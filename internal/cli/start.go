@@ -162,7 +162,7 @@ func executeDryRun(w io.Writer, executor *orchestration.Executor, cfg orchestrat
 // printExecutionInfo prints the execution summary.
 func printExecutionInfo(w io.Writer, agent orchestration.Agent, model string, result orchestration.ComposeResult) {
 	fmt.Fprintln(w, "Starting AI Agent")
-	fmt.Fprintln(w, strings.Repeat("=", 79))
+	fmt.Fprintln(w, strings.Repeat("─", 79))
 
 	modelStr := model
 	if modelStr == "" {
@@ -191,7 +191,7 @@ func printExecutionInfo(w io.Writer, agent orchestration.Agent, model string, re
 // printDryRunSummary prints the dry-run summary per DR-016.
 func printDryRunSummary(w io.Writer, agent orchestration.Agent, model string, result orchestration.ComposeResult, dir string) {
 	fmt.Fprintln(w, "Dry Run - Agent Not Executed")
-	fmt.Fprintln(w, strings.Repeat("=", 79))
+	fmt.Fprintln(w, strings.Repeat("─", 79))
 
 	modelStr := model
 	if modelStr == "" {

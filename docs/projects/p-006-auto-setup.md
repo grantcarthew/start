@@ -46,14 +46,14 @@ Out of Scope:
 
 ## Success Criteria
 
-- [ ] First run with no config triggers auto-setup
-- [ ] Auto-setup detects agents via PATH checking
-- [ ] Single agent detected: auto-selects without prompt
-- [ ] Multiple agents detected: prompts user to select
-- [ ] Non-TTY with multiple agents: exits with error
-- [ ] No agents detected: helpful error message
-- [ ] Selected agent config written to ~/.config/start/
-- [ ] E2E demo: zero config to agent launch works
+- [x] First run with no config triggers auto-setup
+- [x] Auto-setup detects agents via PATH checking
+- [ ] Single agent detected: auto-selects without prompt (needs testing with single agent)
+- [x] Multiple agents detected: prompts user to select
+- [x] Non-TTY with multiple agents: exits with error
+- [ ] No agents detected: helpful error message (needs testing with no agents)
+- [x] Selected agent config written to ~/.config/start/
+- [x] E2E demo: zero config to agent launch works
 
 ## Workflow
 
@@ -77,14 +77,14 @@ This project follows the standard development workflow:
 
 - [x] Write unit tests
 - [x] Write integration tests
-- [ ] Write E2E tests (blocked until index published)
+- [ ] Write E2E tests (no longer blocked - agents published)
 - [x] Create index module for publishing
 
 ### Phase 4: Review
 
 - [ ] External code review (if significant changes)
 - [ ] Fix reported issues
-- [ ] Update project document
+- [x] Update project document
 
 ## Deliverables
 
@@ -160,11 +160,25 @@ Manual testing progress:
 - TTY prompt: Working (displays selection menu)
 - Version resolution: Added `ResolveLatestVersion` to convert `@v0` to canonical version
 
-**Current Bug**: `ResolveLatestVersion` fails with "no versions found"
-```
-Error: resolving agent version: no versions found for github.com/grantcarthew/start-assets/agents/claude@v0
-```
-The `ModuleVersions` API call returns empty. Investigation needed:
-- Check if module path format is correct for the versions API
-- May need to strip the version suffix before querying
-- Test with `cue mod` CLI to compare behavior
+### Session 3 (2025-12-16)
+
+Root cause: Agent modules were not published to registry (not a code bug).
+
+Published agent modules to CUE Central Registry:
+- `github.com/grantcarthew/start-assets/agents/claude@v0.0.1`
+- `github.com/grantcarthew/start-assets/agents/gemini@v0.0.1`
+- `github.com/grantcarthew/start-assets/agents/aichat@v0.0.1`
+
+Fixed two additional bugs in `loadAgentFromModule`:
+1. Added `Registry` parameter to `load.Config` for schema dependency resolution
+2. Changed `Package: "*"` to actual package name (e.g., "claude") - wildcard creates empty synthetic package
+
+Added `Registry()` getter to `internal/registry/client.go`.
+
+**Result**: Auto-setup now works end-to-end:
+- Index fetching: Working
+- Agent detection: Working (detects aichat, claude, gemini)
+- Version resolution: Working
+- Agent module loading: Working (with registry and correct package name)
+- Config writing: Working
+- Agent launch: Working

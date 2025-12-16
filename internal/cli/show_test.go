@@ -83,8 +83,13 @@ tasks: {
 		t.Fatalf("changing to temp dir: %v", err)
 	}
 
+	// Also set temp HOME for global scope isolation
+	origHome := os.Getenv("HOME")
+	os.Setenv("HOME", dir)
+
 	cleanup := func() {
 		os.Chdir(origDir)
+		os.Setenv("HOME", origHome)
 	}
 
 	return dir, cleanup

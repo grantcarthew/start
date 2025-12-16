@@ -37,6 +37,11 @@ type FetchResult struct {
 	SourceDir string
 }
 
+// Registry returns the underlying modconfig.Registry for use with cue/load.
+func (c *Client) Registry() modconfig.Registry {
+	return c.registry
+}
+
 // Fetch downloads a module from the registry with retry logic.
 // The module path should include version, e.g., "github.com/user/repo/path@v0".
 func (c *Client) Fetch(ctx context.Context, modulePath string) (FetchResult, error) {
