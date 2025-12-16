@@ -14,6 +14,7 @@ import (
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/cuecontext"
 	"cuelang.org/go/cue/load"
+	"cuelang.org/go/mod/modconfig"
 
 	"github.com/grantcarthew/start/internal/config"
 	"github.com/grantcarthew/start/internal/detection"
@@ -101,7 +102,7 @@ func (a *AutoSetup) Run(ctx context.Context) (*AutoSetupResult, error) {
 	}
 
 	// Load agent from fetched module
-	agent, err := loadAgentFromModule(agentResult.SourceDir, selected.Key)
+	agent, err := loadAgentFromModule(agentResult.SourceDir, selected.Key, client.Registry())
 	if err != nil {
 		return nil, fmt.Errorf("loading agent: %w", err)
 	}
@@ -180,7 +181,7 @@ func (a *AutoSetup) promptSelection(detected []detection.DetectedAgent) (detecti
 	}
 
 	fmt.Fprintln(a.stdout)
-	fmt.Fprintf(a.stdout, "Select agent [1-%d]: ", len(detected))
+	fmt.Fprint(a.stdout, "Select agent: ")
 
 	reader := bufio.NewReader(a.stdin)
 	input, err := reader.ReadString('\n')
@@ -189,21 +190,40 @@ func (a *AutoSetup) promptSelection(detected []detection.DetectedAgent) (detecti
 	}
 
 	input = strings.TrimSpace(input)
-	choice, err := strconv.Atoi(input)
-	if err != nil || choice < 1 || choice > len(detected) {
-		return detection.DetectedAgent{}, fmt.Errorf("invalid selection: %s", input)
+
+	// Try parsing as number first
+	if choice, err := strconv.Atoi(input); err == nil {
+		if choice >= 1 && choice <= len(detected) {
+			return detected[choice-1], nil
+		}
+		return detection.DetectedAgent{}, fmt.Errorf("invalid selection: %s (choose 1-%d)", input, len(detected))
 	}
 
-	return detected[choice-1], nil
+	// Try matching by name
+	inputLower := strings.ToLower(input)
+	for _, d := range detected {
+		if strings.ToLower(d.Entry.Bin) == inputLower || strings.ToLower(d.Key) == inputLower {
+			return d, nil
+		}
+	}
+
+	return detection.DetectedAgent{}, fmt.Errorf("invalid selection: %s", input)
 }
 
 // loadAgentFromModule loads an agent from a fetched module directory.
-func loadAgentFromModule(dir, key string) (Agent, error) {
+func loadAgentFromModule(dir, key string, reg modconfig.Registry) (Agent, error) {
 	cctx := cuecontext.New()
 
+	// Extract package name from key (e.g., "ai/claude" -> "claude")
+	pkgName := key
+	if idx := strings.LastIndex(key, "/"); idx != -1 {
+		pkgName = key[idx+1:]
+	}
+
 	cfg := &load.Config{
-		Dir:     dir,
-		Package: "*",
+		Dir:      dir,
+		Package:  pkgName,
+		Registry: reg,
 	}
 
 	insts := load.Instances([]string{"."}, cfg)
@@ -221,13 +241,7 @@ func loadAgentFromModule(dir, key string) (Agent, error) {
 		return Agent{}, fmt.Errorf("building module: %w", err)
 	}
 
-	// Extract agent name from key (e.g., "ai/claude" -> "claude")
-	name := key
-	if idx := strings.LastIndex(key, "/"); idx != -1 {
-		name = key[idx+1:]
-	}
-
-	return extractAgentFromValue(v, name)
+	return extractAgentFromValue(v, pkgName)
 }
 
 // extractAgentFromValue extracts agent config from a CUE value.
@@ -235,10 +249,14 @@ func extractAgentFromValue(v cue.Value, name string) (Agent, error) {
 	var agent Agent
 	agent.Name = name
 
-	// Try looking up under "agents" first
+	// Try looking up under "agents" map first (user config style)
 	agentVal := v.LookupPath(cue.ParsePath("agents")).LookupPath(cue.MakePath(cue.Str(name)))
 	if !agentVal.Exists() {
-		// Try root level (module might define agent directly)
+		// Try singular "agent" field (registry module style)
+		agentVal = v.LookupPath(cue.ParsePath("agent"))
+	}
+	if !agentVal.Exists() {
+		// Try root level as last resort
 		agentVal = v
 	}
 
@@ -301,12 +319,17 @@ func (a *AutoSetup) writeConfig(agent Agent) (string, error) {
 		return "", fmt.Errorf("creating config directory: %w", err)
 	}
 
-	// Generate CUE content
-	content := generateAgentCUE(agent)
+	// Write agents.cue
+	agentContent := generateAgentCUE(agent)
+	agentPath := filepath.Join(paths.Global, "agents.cue")
+	if err := os.WriteFile(agentPath, []byte(agentContent), 0644); err != nil {
+		return "", fmt.Errorf("writing agents file: %w", err)
+	}
 
-	// Write to agents.cue
-	configPath := filepath.Join(paths.Global, "agents.cue")
-	if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
+	// Write config.cue with settings
+	configContent := generateSettingsCUE(agent.Name)
+	configPath := filepath.Join(paths.Global, "config.cue")
+	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
 		return "", fmt.Errorf("writing config file: %w", err)
 	}
 
@@ -343,16 +366,26 @@ func generateAgentCUE(agent Agent) string {
 		sort.Strings(modelNames)
 
 		for _, name := range modelNames {
-			sb.WriteString(fmt.Sprintf("\t\t\t%s: %q\n", name, agent.Models[name]))
+			// Quote model names that contain special characters
+			sb.WriteString(fmt.Sprintf("\t\t\t%q: %q\n", name, agent.Models[name]))
 		}
 		sb.WriteString("\t\t}\n")
 	}
 
 	sb.WriteString("\t}\n")
 	sb.WriteString("}\n")
-	sb.WriteString("\n")
+
+	return sb.String()
+}
+
+// generateSettingsCUE generates CUE content for settings.
+func generateSettingsCUE(defaultAgent string) string {
+	var sb strings.Builder
+
+	sb.WriteString("// Auto-generated by start auto-setup\n")
+	sb.WriteString("// Edit this file to customize your settings\n\n")
 	sb.WriteString("settings: {\n")
-	sb.WriteString(fmt.Sprintf("\tdefault_agent: %q\n", agent.Name))
+	sb.WriteString(fmt.Sprintf("\tdefault_agent: %q\n", defaultAgent))
 	sb.WriteString("}\n")
 
 	return sb.String()

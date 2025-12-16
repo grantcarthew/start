@@ -78,11 +78,26 @@ func TestGenerateAgentCUE(t *testing.T) {
 	if !strings.Contains(content, `models:`) {
 		t.Error("missing models field")
 	}
-	if !strings.Contains(content, `default_agent:`) {
+	if !strings.Contains(content, "Auto-generated") {
+		t.Error("missing auto-generated comment")
+	}
+	// Settings should NOT be in agents.cue (it goes in config.cue)
+	if strings.Contains(content, `default_agent:`) {
+		t.Error("default_agent should not be in agents.cue")
+	}
+}
+
+func TestGenerateSettingsCUE(t *testing.T) {
+	content := generateSettingsCUE("claude")
+
+	if !strings.Contains(content, `default_agent: "claude"`) {
 		t.Error("missing default_agent in settings")
 	}
 	if !strings.Contains(content, "Auto-generated") {
 		t.Error("missing auto-generated comment")
+	}
+	if !strings.Contains(content, "settings:") {
+		t.Error("missing settings block")
 	}
 }
 

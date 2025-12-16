@@ -173,7 +173,7 @@ func executeTaskDryRun(w io.Writer, executor *orchestration.Executor, cfg orches
 // printTaskExecutionInfo prints the task execution summary.
 func printTaskExecutionInfo(w io.Writer, agent orchestration.Agent, model string, result orchestration.ComposeResult, taskName, instructions string, taskResult orchestration.ProcessResult) {
 	fmt.Fprintf(w, "Starting Task: %s\n", taskName)
-	fmt.Fprintln(w, strings.Repeat("=", 79))
+	fmt.Fprintln(w, strings.Repeat("─", 79))
 
 	modelStr := model
 	if modelStr == "" {
@@ -209,7 +209,7 @@ func printTaskExecutionInfo(w io.Writer, agent orchestration.Agent, model string
 // printTaskDryRunSummary prints the task dry-run summary.
 func printTaskDryRunSummary(w io.Writer, agent orchestration.Agent, model string, result orchestration.ComposeResult, dir, taskName, instructions string) {
 	fmt.Fprintf(w, "Dry Run - Task: %s\n", taskName)
-	fmt.Fprintln(w, strings.Repeat("=", 79))
+	fmt.Fprintln(w, strings.Repeat("─", 79))
 
 	modelStr := model
 	if modelStr == "" {
