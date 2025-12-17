@@ -297,3 +297,195 @@ func TestPrintPreviewLines(t *testing.T) {
 		})
 	}
 }
+
+func TestFindTask(t *testing.T) {
+	resetFlags()
+	tmpDir := setupStartTestConfig(t)
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getting working dir: %v", err)
+	}
+	defer os.Chdir(origDir)
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("changing to temp dir: %v", err)
+	}
+
+	// Load config for testing
+	cfg, err := loadMergedConfig()
+	if err != nil {
+		t.Fatalf("loading config: %v", err)
+	}
+
+	tests := []struct {
+		name      string
+		taskName  string
+		wantMatch string
+		wantErr   bool
+		errContains string
+	}{
+		{
+			name:      "exact match",
+			taskName:  "test-task",
+			wantMatch: "test-task",
+			wantErr:   false,
+		},
+		{
+			name:      "prefix match",
+			taskName:  "test",
+			wantMatch: "test-task",
+			wantErr:   false,
+		},
+		{
+			name:        "no match",
+			taskName:    "nonexistent",
+			wantErr:     true,
+			errContains: "not found",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := findTask(cfg, tt.taskName)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("expected error, got nil")
+					return
+				}
+				if tt.errContains != "" && !strings.Contains(err.Error(), tt.errContains) {
+					t.Errorf("error = %q, want containing %q", err.Error(), tt.errContains)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+				return
+			}
+
+			if result != tt.wantMatch {
+				t.Errorf("findTask() = %q, want %q", result, tt.wantMatch)
+			}
+		})
+	}
+}
+
+func TestFindTask_AmbiguousPrefix(t *testing.T) {
+	resetFlags()
+	tmpDir := t.TempDir()
+	configDir := filepath.Join(tmpDir, ".start")
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		t.Fatalf("creating config dir: %v", err)
+	}
+
+	// Create config with multiple tasks that share a prefix
+	config := `
+agents: {
+	echo: {
+		bin: "echo"
+		command: "{{.Bin}} test"
+	}
+}
+
+tasks: {
+	"review-code": {
+		prompt: "Review code"
+	}
+	"review-docs": {
+		prompt: "Review documentation"
+	}
+	"review-tests": {
+		prompt: "Review tests"
+	}
+}
+
+settings: {
+	default_agent: "echo"
+}
+`
+	configFile := filepath.Join(configDir, "config.cue")
+	if err := os.WriteFile(configFile, []byte(config), 0644); err != nil {
+		t.Fatalf("writing config: %v", err)
+	}
+
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getting working dir: %v", err)
+	}
+	defer os.Chdir(origDir)
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("changing to temp dir: %v", err)
+	}
+
+	cfg, err := loadMergedConfig()
+	if err != nil {
+		t.Fatalf("loading config: %v", err)
+	}
+
+	// Ambiguous prefix should return error
+	_, err = findTask(cfg, "review")
+	if err == nil {
+		t.Error("expected error for ambiguous prefix")
+		return
+	}
+
+	if !strings.Contains(err.Error(), "ambiguous") {
+		t.Errorf("error = %q, want containing 'ambiguous'", err.Error())
+	}
+
+	// Should list matching tasks
+	if !strings.Contains(err.Error(), "review-code") || !strings.Contains(err.Error(), "review-docs") {
+		t.Errorf("error should list matching tasks: %v", err)
+	}
+}
+
+func TestFindTask_NoTasksDefined(t *testing.T) {
+	resetFlags()
+	tmpDir := t.TempDir()
+	configDir := filepath.Join(tmpDir, ".start")
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		t.Fatalf("creating config dir: %v", err)
+	}
+
+	// Create config without tasks
+	config := `
+agents: {
+	echo: {
+		bin: "echo"
+		command: "{{.Bin}} test"
+	}
+}
+
+settings: {
+	default_agent: "echo"
+}
+`
+	configFile := filepath.Join(configDir, "config.cue")
+	if err := os.WriteFile(configFile, []byte(config), 0644); err != nil {
+		t.Fatalf("writing config: %v", err)
+	}
+
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getting working dir: %v", err)
+	}
+	defer os.Chdir(origDir)
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("changing to temp dir: %v", err)
+	}
+
+	cfg, err := loadMergedConfig()
+	if err != nil {
+		t.Fatalf("loading config: %v", err)
+	}
+
+	_, err = findTask(cfg, "anything")
+	if err == nil {
+		t.Error("expected error when no tasks defined")
+		return
+	}
+
+	if !strings.Contains(err.Error(), "no tasks defined") {
+		t.Errorf("error = %q, want containing 'no tasks defined'", err.Error())
+	}
+}
