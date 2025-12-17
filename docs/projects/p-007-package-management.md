@@ -1,7 +1,7 @@
 # P-007: Package Management
 
-- Status: Proposed
-- Started: -
+- Status: In Progress
+- Started: 2025-12-17
 - Completed: -
 
 ## Overview
@@ -31,11 +31,13 @@ Implement package management commands for discovering, adding, and updating asse
 
 In Scope:
 
-- `start pkg search` - Search registry for packages
-- `start pkg add` - Install package from registry
-- `start pkg list` - List installed packages
-- `start pkg info` - Show package details
-- `start pkg update` - Update installed packages
+- `start assets browse` - Open GitHub asset registry in browser
+- `start assets search` - Search registry index for packages
+- `start assets add` - Install package from registry
+- `start assets list` - List installed packages with update status
+- `start assets info` - Show package details
+- `start assets update` - Update installed packages
+- `start assets index` - Regenerate index.cue (asset repo maintainers)
 - Integration with CUE Central Registry
 
 Out of Scope:
@@ -47,30 +49,35 @@ Out of Scope:
 
 ## Success Criteria
 
-- [ ] `start pkg search <query>` finds packages in registry
-- [ ] `start pkg add <package>` installs to config
-- [ ] `start pkg list` shows installed packages
-- [ ] `start pkg info <package>` shows package details
-- [ ] `start pkg update` updates installed packages
+- [ ] `start assets browse` opens GitHub asset registry in browser
+- [ ] `start assets search <query>` finds packages in registry
+- [ ] `start assets add <package>` installs to config
+- [ ] `start assets list` shows installed packages with update status
+- [ ] `start assets info <package>` shows package details
+- [ ] `start assets update` updates installed packages
+- [ ] `start assets index` regenerates index in asset repos
 - [ ] Works with packages published in P-002/P-003
 
 ## Workflow
 
 ### Phase 1: Research and Design
 
-- [ ] Read all required documentation
-- [ ] Review prototype asset commands for UX patterns
-- [ ] Research CUE registry API for search/fetch
-- [ ] Discuss CLI interface options
-- [ ] Create DR for package management CLI
+- [x] Read all required documentation
+- [x] Review prototype asset commands for UX patterns
+- [x] Research CUE registry API for search/fetch
+- [x] Discuss CLI interface options
+- [x] Create DR for package management CLI (DR-028)
 
 ### Phase 2: Implementation
 
-- [ ] Implement registry search
-- [ ] Implement package installation
-- [ ] Implement package listing
-- [ ] Implement package info
-- [ ] Implement package updates
+- [ ] Implement assets command group
+- [ ] Implement browse subcommand
+- [ ] Implement search subcommand
+- [ ] Implement add subcommand
+- [ ] Implement list subcommand
+- [ ] Implement info subcommand
+- [ ] Implement update subcommand
+- [ ] Implement index subcommand
 
 ### Phase 3: Validation
 
@@ -88,27 +95,36 @@ Out of Scope:
 
 Files:
 
-- `internal/cli/pkg.go` - Package command group
-- `internal/cli/pkg_search.go` - Search subcommand
-- `internal/cli/pkg_add.go` - Add subcommand
-- `internal/cli/pkg_list.go` - List subcommand
-- `internal/cli/pkg_info.go` - Info subcommand
-- `internal/cli/pkg_update.go` - Update subcommand
-- `internal/registry/` - Registry interaction (may extend P-006 work)
+- `internal/cli/assets.go` - Assets command group
+- `internal/cli/assets_browse.go` - Browse subcommand
+- `internal/cli/assets_search.go` - Search subcommand
+- `internal/cli/assets_add.go` - Add subcommand
+- `internal/cli/assets_list.go` - List subcommand
+- `internal/cli/assets_info.go` - Info subcommand
+- `internal/cli/assets_update.go` - Update subcommand
+- `internal/cli/assets_index.go` - Index subcommand
+- `internal/registry/` - Registry interaction (extends P-006 work)
 
 Design Records:
 
-- DR-0XX: Package Management CLI
+- DR-028: CLI Assets Command
 
 ## Technical Approach
 
-To be determined after Phase 1 research. Key questions:
+Decisions from Phase 1 research (see DR-028):
 
-1. What CUE registry API is available for search?
-2. How to present search results (table, list, interactive)?
-3. How to handle version selection during install?
-4. Where to write installed packages (global vs local)?
-5. How to track installed packages for updates?
+1. **Search**: Fetch index from CUE registry (`github.com/grantcarthew/start-assets/index@v0`), search locally with substring matching
+2. **Results**: Grouped by type (agents, roles, tasks, contexts), alphabetical within type
+3. **Versions**: Use `@v0` major version, CUE resolves to latest compatible automatically
+4. **Scope**: Global (`~/.config/start/`) by default, `--local` flag for project (`./.start/`)
+5. **Updates**: Re-fetch modules to get latest within major version
+6. **Asset repo detection**: Check for `agents/`, `roles/`, `tasks/`, `contexts/` directories
+
+Reuse existing infrastructure:
+
+- `internal/registry.Client` for module fetching (from P-006)
+- `internal/registry.FetchIndex()` for index retrieval
+- `IndexEntry` struct with module, description, tags, bin
 
 ## Dependencies
 
@@ -118,4 +134,10 @@ Requires:
 
 ## Progress
 
-(No progress yet - project not started)
+### 2025-12-17
+
+- Completed Phase 1: Research and Design
+- Reviewed prototype asset commands for UX patterns
+- Discussed CLI interface options and made key decisions
+- Created DR-028: CLI Assets Command
+- Updated project document with decisions and file structure
