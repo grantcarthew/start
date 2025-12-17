@@ -14,19 +14,19 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var taskCmd = &cobra.Command{
-	Use:   "task [name] [instructions]",
-	Short: "Run a predefined task",
-	Long: `Run a predefined task with optional instructions.
+// addTaskCommand adds the task command to the parent command.
+func addTaskCommand(parent *cobra.Command) {
+	taskCmd := &cobra.Command{
+		Use:   "task [name] [instructions]",
+		Short: "Run a predefined task",
+		Long: `Run a predefined task with optional instructions.
 
 Tasks are reusable workflows defined in configuration.
 Instructions are passed to the task template via the {{.Instructions}} placeholder.`,
-	Args: cobra.RangeArgs(1, 2),
-	RunE: runTask,
-}
-
-func init() {
-	rootCmd.AddCommand(taskCmd)
+		Args: cobra.RangeArgs(1, 2),
+		RunE: runTask,
+	}
+	parent.AddCommand(taskCmd)
 }
 
 // runTask executes the task command.

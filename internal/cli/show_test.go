@@ -586,11 +586,12 @@ func TestShowCommandIntegration(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			buf := new(bytes.Buffer)
-			rootCmd.SetOut(buf)
-			rootCmd.SetErr(buf)
-			rootCmd.SetArgs(tt.args)
+			cmd := NewRootCmd()
+			cmd.SetOut(buf)
+			cmd.SetErr(buf)
+			cmd.SetArgs(tt.args)
 
-			err := Execute()
+			err := cmd.Execute()
 
 			if tt.wantErr {
 				if err == nil {

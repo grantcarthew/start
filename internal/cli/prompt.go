@@ -5,19 +5,19 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var promptCmd = &cobra.Command{
-	Use:   "prompt [text]",
-	Short: "Launch AI agent with custom prompt",
-	Long: `Launch AI agent with a custom prompt and only required contexts.
+// addPromptCommand adds the prompt command to the parent command.
+func addPromptCommand(parent *cobra.Command) {
+	promptCmd := &cobra.Command{
+		Use:   "prompt [text]",
+		Short: "Launch AI agent with custom prompt",
+		Long: `Launch AI agent with a custom prompt and only required contexts.
 
 Default contexts are excluded to keep the prompt focused.
 Use -c default to explicitly include default contexts.`,
-	Args: cobra.MaximumNArgs(1),
-	RunE: runPrompt,
-}
-
-func init() {
-	rootCmd.AddCommand(promptCmd)
+		Args: cobra.MaximumNArgs(1),
+		RunE: runPrompt,
+	}
+	parent.AddCommand(promptCmd)
 }
 
 // runPrompt executes the prompt command.

@@ -66,7 +66,7 @@ func (m *Manager) WriteDryRunFiles(dir string, role, prompt, command string) err
 
 	for name, content := range files {
 		path := filepath.Join(dir, name)
-		if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		if err := os.WriteFile(path, []byte(content), 0600); err != nil {
 			return fmt.Errorf("writing %s: %w", name, err)
 		}
 	}
@@ -94,7 +94,7 @@ func (m *Manager) WriteUTDFile(entityType, name, content string) (string, error)
 	fileName := deriveFileName(entityType, name)
 	filePath := filepath.Join(m.BaseDir, fileName)
 
-	if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(filePath, []byte(content), 0600); err != nil {
 		return "", fmt.Errorf("writing UTD file: %w", err)
 	}
 
