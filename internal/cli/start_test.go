@@ -442,6 +442,12 @@ settings: {
 func TestFindTask_NoTasksDefined(t *testing.T) {
 	resetFlags()
 	tmpDir := t.TempDir()
+
+	// Isolate from global config
+	oldHome := os.Getenv("HOME")
+	os.Setenv("HOME", tmpDir)
+	defer os.Setenv("HOME", oldHome)
+
 	configDir := filepath.Join(tmpDir, ".start")
 	if err := os.MkdirAll(configDir, 0755); err != nil {
 		t.Fatalf("creating config dir: %v", err)
