@@ -70,20 +70,20 @@ Out of Scope:
 
 ### Phase 2: Implementation
 
-- [ ] Implement assets command group
-- [ ] Implement browse subcommand
-- [ ] Implement search subcommand
-- [ ] Implement add subcommand
-- [ ] Implement list subcommand
-- [ ] Implement info subcommand
-- [ ] Implement update subcommand
-- [ ] Implement index subcommand
+- [x] Implement assets command group
+- [x] Implement browse subcommand
+- [x] Implement search subcommand
+- [x] Implement add subcommand
+- [x] Implement list subcommand
+- [x] Implement info subcommand
+- [x] Implement update subcommand
+- [x] Implement index subcommand
 
 ### Phase 3: Validation
 
-- [ ] Write unit tests
-- [ ] Write integration tests
-- [ ] Manual testing with real registry
+- [x] Write unit tests
+- [x] Write integration tests
+- [x] Manual testing with real registry
 
 ### Phase 4: Review
 
@@ -141,3 +141,37 @@ Requires:
 - Discussed CLI interface options and made key decisions
 - Created DR-028: CLI Assets Command
 - Updated project document with decisions and file structure
+
+### 2025-12-17 (Session 2)
+
+- Completed Phase 2: Implementation
+  - Implemented `assets.go` - command group scaffold with constants and flags
+  - Implemented `assets_browse.go` - opens GitHub asset repo in browser
+  - Implemented `assets_search.go` - searches index with scoring and grouping
+  - Implemented `assets_add.go` - installs asset with TTY selection prompt
+  - Implemented `assets_list.go` - lists installed assets from config
+  - Implemented `assets_info.go` - shows detailed asset information
+  - Implemented `assets_update.go` - updates installed assets
+  - Implemented `assets_index.go` - regenerates index.cue for maintainers
+- Wrote unit tests in `assets_test.go`
+  - TestSearchIndex, TestMatchScore, TestCategoryOrder
+  - TestPrintSearchResults, TestIsAssetRepo, TestAssetTypeToConfigFile
+  - TestGenerateAssetCUE, TestGenerateIndexCUE, TestAssetsCommandExists
+- Wrote integration tests in `test/integration/assets_test.go`
+  - TestIntegration_AssetsIndexCommand - tests index generation with mock repo
+  - TestIntegration_AssetsIndexNotAssetRepo - tests error handling
+  - TestIntegration_AssetsListWithConfig - tests list with real config
+  - TestIntegration_AssetsListNoConfig - tests graceful handling of missing config
+  - TestIntegration_SearchIndex - tests search functionality
+  - TestIntegration_AssetsCommandHelp - tests help output
+- All tests passing (unit + integration)
+
+### 2025-12-17 (Session 3)
+
+- Fixed `assets add` to properly fetch and inline asset content
+  - Originally wrote comment stubs instead of actual content
+  - Added `client.ResolveLatestVersion()` to resolve @v0 to canonical version (e.g., @v0.0.1)
+  - Added `extractAssetContent()` to load fetched module and extract CUE values
+  - Added `formatAssetStruct()` and `formatFieldValue()` to format concrete field values
+  - Now properly writes description, tags, role, file, prompt fields to config
+- Verified complete add→list workflow works with real registry

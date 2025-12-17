@@ -30,6 +30,7 @@ It manages prompt composition, context injection, and workflow automation.`,
 	addShowCommand(cmd)
 	addPromptCommand(cmd)
 	addTaskCommand(cmd)
+	addAssetsCommand(cmd)
 
 	return cmd
 }
