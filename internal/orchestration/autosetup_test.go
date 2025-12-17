@@ -2,6 +2,8 @@ package orchestration
 
 import (
 	"bytes"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -443,5 +445,243 @@ func TestPromptSelection_TTY_InvalidName(t *testing.T) {
 
 	if !strings.Contains(err.Error(), "invalid selection") {
 		t.Errorf("expected 'invalid selection' error, got: %v", err)
+	}
+}
+
+func TestWriteConfig(t *testing.T) {
+	// Create a temporary home directory
+	tmpDir := t.TempDir()
+
+	// Override HOME and XDG_CONFIG_HOME to use temp directory
+	oldHome := os.Getenv("HOME")
+	oldXDG := os.Getenv("XDG_CONFIG_HOME")
+	os.Setenv("HOME", tmpDir)
+	os.Setenv("XDG_CONFIG_HOME", filepath.Join(tmpDir, ".config"))
+	defer func() {
+		os.Setenv("HOME", oldHome)
+		os.Setenv("XDG_CONFIG_HOME", oldXDG)
+	}()
+
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	stdin := strings.NewReader("")
+
+	as := NewAutoSetup(stdout, stderr, stdin, false)
+
+	agent := Agent{
+		Name:         "test-agent",
+		Bin:          "test-bin",
+		Command:      "{{.bin}} --model {{.model}}",
+		DefaultModel: "default",
+		Description:  "Test agent for unit tests",
+		Models: map[string]string{
+			"fast": "fast-model-id",
+			"slow": "slow-model-id",
+		},
+	}
+
+	configPath, err := as.writeConfig(agent)
+	if err != nil {
+		t.Fatalf("writeConfig() error = %v", err)
+	}
+
+	// Verify config path is returned
+	if configPath == "" {
+		t.Error("expected non-empty config path")
+	}
+
+	// Verify agents.cue was created
+	agentsPath := filepath.Join(filepath.Dir(configPath), "agents.cue")
+	agentsContent, err := os.ReadFile(agentsPath)
+	if err != nil {
+		t.Fatalf("reading agents.cue: %v", err)
+	}
+
+	agentsStr := string(agentsContent)
+	if !strings.Contains(agentsStr, `"test-agent"`) {
+		t.Error("agents.cue should contain agent name")
+	}
+	if !strings.Contains(agentsStr, `bin:`) {
+		t.Error("agents.cue should contain bin field")
+	}
+	if !strings.Contains(agentsStr, `command:`) {
+		t.Error("agents.cue should contain command field")
+	}
+	if !strings.Contains(agentsStr, `default_model:`) {
+		t.Error("agents.cue should contain default_model field")
+	}
+	if !strings.Contains(agentsStr, `models:`) {
+		t.Error("agents.cue should contain models field")
+	}
+	if !strings.Contains(agentsStr, `"fast"`) {
+		t.Error("agents.cue should contain fast model")
+	}
+
+	// Verify config.cue was created
+	configContent, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatalf("reading config.cue: %v", err)
+	}
+
+	configStr := string(configContent)
+	if !strings.Contains(configStr, `default_agent: "test-agent"`) {
+		t.Error("config.cue should set default_agent")
+	}
+	if !strings.Contains(configStr, `settings:`) {
+		t.Error("config.cue should contain settings block")
+	}
+}
+
+func TestWriteConfig_MinimalAgent(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	oldHome := os.Getenv("HOME")
+	oldXDG := os.Getenv("XDG_CONFIG_HOME")
+	os.Setenv("HOME", tmpDir)
+	os.Setenv("XDG_CONFIG_HOME", filepath.Join(tmpDir, ".config"))
+	defer func() {
+		os.Setenv("HOME", oldHome)
+		os.Setenv("XDG_CONFIG_HOME", oldXDG)
+	}()
+
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	stdin := strings.NewReader("")
+
+	as := NewAutoSetup(stdout, stderr, stdin, false)
+
+	// Minimal agent with only required fields
+	agent := Agent{
+		Name:    "minimal",
+		Bin:     "minimal-bin",
+		Command: "{{.bin}}",
+	}
+
+	configPath, err := as.writeConfig(agent)
+	if err != nil {
+		t.Fatalf("writeConfig() error = %v", err)
+	}
+
+	// Verify agents.cue was created
+	agentsPath := filepath.Join(filepath.Dir(configPath), "agents.cue")
+	agentsContent, err := os.ReadFile(agentsPath)
+	if err != nil {
+		t.Fatalf("reading agents.cue: %v", err)
+	}
+
+	agentsStr := string(agentsContent)
+
+	// Should have required fields
+	if !strings.Contains(agentsStr, `bin:`) {
+		t.Error("agents.cue should contain bin field")
+	}
+	if !strings.Contains(agentsStr, `command:`) {
+		t.Error("agents.cue should contain command field")
+	}
+
+	// Should NOT have optional fields when empty
+	if strings.Contains(agentsStr, `default_model:`) {
+		t.Error("agents.cue should not have default_model when empty")
+	}
+	if strings.Contains(agentsStr, `description:`) {
+		t.Error("agents.cue should not have description when empty")
+	}
+	if strings.Contains(agentsStr, `models:`) {
+		t.Error("agents.cue should not have models when empty")
+	}
+}
+
+func TestExtractAgentFromValue_NestedAgentsMap(t *testing.T) {
+	// Test extraction from nested agents map (user config style)
+	cueSrc := `
+agents: {
+	claude: {
+		bin: "claude"
+		command: "{{.bin}} chat"
+		default_model: "sonnet"
+	}
+}
+`
+	ctx := cuecontext.New()
+	v := ctx.CompileString(cueSrc)
+	if err := v.Err(); err != nil {
+		t.Fatalf("failed to compile test CUE: %v", err)
+	}
+
+	agent, err := extractAgentFromValue(v, "claude")
+	if err != nil {
+		t.Fatalf("extractAgentFromValue failed: %v", err)
+	}
+
+	if agent.Bin != "claude" {
+		t.Errorf("wrong bin: %s", agent.Bin)
+	}
+	if agent.Command != "{{.bin}} chat" {
+		t.Errorf("wrong command: %s", agent.Command)
+	}
+}
+
+func TestExtractAgentFromValue_SingularAgentField(t *testing.T) {
+	// Test extraction from singular agent field (registry module style)
+	cueSrc := `
+agent: {
+	bin: "gemini"
+	command: "{{.bin}} --model {{.model}}"
+	default_model: "pro"
+}
+`
+	ctx := cuecontext.New()
+	v := ctx.CompileString(cueSrc)
+	if err := v.Err(); err != nil {
+		t.Fatalf("failed to compile test CUE: %v", err)
+	}
+
+	agent, err := extractAgentFromValue(v, "gemini")
+	if err != nil {
+		t.Fatalf("extractAgentFromValue failed: %v", err)
+	}
+
+	if agent.Bin != "gemini" {
+		t.Errorf("wrong bin: %s", agent.Bin)
+	}
+	if agent.DefaultModel != "pro" {
+		t.Errorf("wrong default_model: %s", agent.DefaultModel)
+	}
+}
+
+func TestExtractAgentFromValue_NestedModelID(t *testing.T) {
+	// Test extraction of models with nested id field (object format)
+	cueSrc := `
+bin: "test"
+command: "{{.bin}}"
+models: {
+	fast: {
+		id: "fast-model-id"
+		description: "Fast model"
+	}
+	slow: {
+		id: "slow-model-id"
+	}
+}
+`
+	ctx := cuecontext.New()
+	v := ctx.CompileString(cueSrc)
+	if err := v.Err(); err != nil {
+		t.Fatalf("failed to compile test CUE: %v", err)
+	}
+
+	agent, err := extractAgentFromValue(v, "test")
+	if err != nil {
+		t.Fatalf("extractAgentFromValue failed: %v", err)
+	}
+
+	if len(agent.Models) != 2 {
+		t.Errorf("expected 2 models, got %d", len(agent.Models))
+	}
+	if agent.Models["fast"] != "fast-model-id" {
+		t.Errorf("wrong fast model: %s", agent.Models["fast"])
+	}
+	if agent.Models["slow"] != "slow-model-id" {
+		t.Errorf("wrong slow model: %s", agent.Models["slow"])
 	}
 }

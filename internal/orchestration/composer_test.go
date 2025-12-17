@@ -434,3 +434,187 @@ func TestExtractUTDFields(t *testing.T) {
 		t.Errorf("Timeout = %d, want 60", fields.Timeout)
 	}
 }
+
+func TestGetDefaultRole(t *testing.T) {
+	ctx := cuecontext.New()
+
+	tests := []struct {
+		name     string
+		config   string
+		wantRole string
+	}{
+		{
+			name: "uses settings.default_role",
+			config: `
+				settings: {
+					default_role: "expert"
+				}
+				roles: {
+					assistant: { prompt: "You are an assistant." }
+					expert: { prompt: "You are an expert." }
+				}
+			`,
+			wantRole: "expert",
+		},
+		{
+			name: "falls back to first role when no default",
+			config: `
+				roles: {
+					first: { prompt: "First role." }
+					second: { prompt: "Second role." }
+				}
+			`,
+			wantRole: "first",
+		},
+		{
+			name:     "returns empty when no roles defined",
+			config:   `{}`,
+			wantRole: "",
+		},
+		{
+			name: "returns empty when settings exists but no default_role",
+			config: `
+				settings: {
+					default_agent: "claude"
+				}
+			`,
+			wantRole: "",
+		},
+		{
+			name: "returns empty when roles is empty",
+			config: `
+				roles: {}
+			`,
+			wantRole: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := ctx.CompileString(tt.config)
+			if err := cfg.Err(); err != nil {
+				t.Fatalf("compile config: %v", err)
+			}
+
+			processor := NewTemplateProcessor(nil, nil, "")
+			composer := NewComposer(processor, "")
+
+			result := composer.getDefaultRole(cfg)
+			if result != tt.wantRole {
+				t.Errorf("getDefaultRole() = %q, want %q", result, tt.wantRole)
+			}
+		})
+	}
+}
+
+func TestComposer_ResolveContext_Errors(t *testing.T) {
+	ctx := cuecontext.New()
+
+	tests := []struct {
+		name       string
+		config     string
+		contextName string
+		wantErr    string
+	}{
+		{
+			name: "context not found",
+			config: `
+				contexts: {
+					env: { prompt: "Environment" }
+				}
+			`,
+			contextName: "nonexistent",
+			wantErr:     "context not found",
+		},
+		{
+			name: "invalid UTD - no file, command, or prompt",
+			config: `
+				contexts: {
+					invalid: {
+						description: "This context has no UTD fields"
+					}
+				}
+			`,
+			contextName: "invalid",
+			wantErr:     "invalid UTD",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := ctx.CompileString(tt.config)
+			if err := cfg.Err(); err != nil {
+				t.Fatalf("compile config: %v", err)
+			}
+
+			processor := NewTemplateProcessor(nil, nil, "")
+			composer := NewComposer(processor, "")
+
+			_, err := composer.resolveContext(cfg, tt.contextName)
+			if err == nil {
+				t.Error("expected error, got nil")
+				return
+			}
+
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Errorf("error = %q, want containing %q", err.Error(), tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestComposer_ResolveRole_Errors(t *testing.T) {
+	ctx := cuecontext.New()
+
+	tests := []struct {
+		name     string
+		config   string
+		roleName string
+		wantErr  string
+	}{
+		{
+			name: "role not found",
+			config: `
+				roles: {
+					assistant: { prompt: "You are an assistant." }
+				}
+			`,
+			roleName: "nonexistent",
+			wantErr:  "role not found",
+		},
+		{
+			name: "invalid UTD - no file, command, or prompt",
+			config: `
+				roles: {
+					invalid: {
+						description: "This role has no UTD fields"
+					}
+				}
+			`,
+			roleName: "invalid",
+			wantErr:  "invalid UTD",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := ctx.CompileString(tt.config)
+			if err := cfg.Err(); err != nil {
+				t.Fatalf("compile config: %v", err)
+			}
+
+			processor := NewTemplateProcessor(nil, nil, "")
+			composer := NewComposer(processor, "")
+
+			_, err := composer.resolveRole(cfg, tt.roleName)
+			if err == nil {
+				t.Error("expected error, got nil")
+				return
+			}
+
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Errorf("error = %q, want containing %q", err.Error(), tt.wantErr)
+			}
+		})
+	}
+}
