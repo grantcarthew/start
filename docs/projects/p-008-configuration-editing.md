@@ -1,7 +1,7 @@
 # P-008: Configuration Editing
 
-- Status: Proposed
-- Started: -
+- Status: In Progress
+- Started: 2025-12-18
 - Completed: -
 
 ## Overview
@@ -32,12 +32,12 @@ Implement configuration editing commands for managing agents, roles, contexts, a
 
 In Scope:
 
-- `start config agent` - Agent management (new, edit, remove, default)
-- `start config role` - Role management (new, edit, remove, default)
-- `start config context` - Context management (new, edit, remove)
-- `start config task` - Task management (new, edit, remove)
+- `start config agent` - Agent management (list, add, show, edit, remove, default)
+- `start config role` - Role management (list, add, show, edit, remove, default)
+- `start config context` - Context management (list, add, show, edit, remove)
+- `start config task` - Task management (list, add, show, edit, remove)
 - Support for --local flag to target local config
-- Interactive prompts for required fields
+- Hybrid input: flags for any field, interactive prompts for missing required fields
 
 Out of Scope:
 
@@ -48,23 +48,26 @@ Out of Scope:
 
 ## Success Criteria
 
-- [ ] `start config agent new` creates new agent config
+- [ ] `start config agent add` creates new agent config
 - [ ] `start config agent edit <name>` edits existing agent
+- [ ] `start config agent edit` (no name) opens file in $EDITOR
 - [ ] `start config agent remove <name>` removes agent
 - [ ] `start config agent default <name>` sets default agent
+- [ ] `start config agent list` displays all agents
+- [ ] `start config agent show <name>` displays single agent details
 - [ ] Same pattern works for role, context, task
 - [ ] --local flag targets .start/ instead of ~/.config/start/
-- [ ] Interactive prompts guide users through required fields
+- [ ] Flags allow scripted usage, prompts fill missing required fields
 
 ## Workflow
 
 ### Phase 1: Research and Design
 
-- [ ] Read all required documentation
-- [ ] Review prototype config commands for UX patterns
-- [ ] Discuss interactive vs non-interactive approaches
-- [ ] Discuss CUE file editing strategies
-- [ ] Create DR for configuration editing CLI
+- [x] Read all required documentation
+- [x] Review prototype config commands for UX patterns
+- [x] Discuss interactive vs non-interactive approaches
+- [x] Discuss CUE file editing strategies
+- [x] Create DR for configuration editing CLI (DR-029)
 
 ### Phase 2: Implementation
 
@@ -98,17 +101,23 @@ Files:
 
 Design Records:
 
-- DR-0XX: Configuration Editing CLI
+- DR-029: CLI Configuration Editing Commands
 
 ## Technical Approach
 
-To be determined after Phase 1 research. Key questions:
+Decisions from Phase 1 (documented in DR-029):
 
-1. How to edit CUE files programmatically (preserve comments, formatting)?
-2. Interactive prompts vs flag-based input?
-3. How to handle schema validation during editing?
-4. Editor integration ($EDITOR) for complex fields like prompts?
-5. How to handle config file creation if none exists?
+1. CUE file editing: Template-based generation, one top-level key per file (agents.cue contains only `agents: {...}`). Regenerate entire file on modification. No AST manipulation.
+
+2. Input handling: Hybrid approach - flags for any field, interactive prompts for missing required fields. Fully scriptable when all flags provided.
+
+3. Validation: Validate after every write operation. Immediate feedback on configuration issues.
+
+4. Editor integration: File-level only. `start config <type> edit` (no name) opens file in $EDITOR. No editor integration for individual fields.
+
+5. File creation: Generate files using template functions (following `generateAgentCUE` pattern from auto-setup).
+
+6. Backups: None (can be added later if needed). Users rely on version control.
 
 ## Dependencies
 
@@ -119,4 +128,4 @@ Requires:
 
 ## Progress
 
-(No progress yet - project not started)
+2025-12-18: Phase 1 complete. Created DR-029 documenting all design decisions. Ready for Phase 2 implementation.
