@@ -85,7 +85,7 @@ func TestGenerateAgentCUE(t *testing.T) {
 	if !strings.Contains(content, "Auto-generated") {
 		t.Error("missing auto-generated comment")
 	}
-	// Settings should NOT be in agents.cue (it goes in config.cue)
+	// Settings should NOT be in agents.cue (it goes in settings.cue)
 	if strings.Contains(content, `default_agent:`) {
 		t.Error("default_agent should not be in agents.cue")
 	}
@@ -517,18 +517,18 @@ func TestWriteConfig(t *testing.T) {
 		t.Error("agents.cue should contain fast model")
 	}
 
-	// Verify config.cue was created
+	// Verify settings.cue was created
 	configContent, err := os.ReadFile(configPath)
 	if err != nil {
-		t.Fatalf("reading config.cue: %v", err)
+		t.Fatalf("reading settings.cue: %v", err)
 	}
 
 	configStr := string(configContent)
 	if !strings.Contains(configStr, `default_agent: "test-agent"`) {
-		t.Error("config.cue should set default_agent")
+		t.Error("settings.cue should set default_agent")
 	}
 	if !strings.Contains(configStr, `settings:`) {
-		t.Error("config.cue should contain settings block")
+		t.Error("settings.cue should contain settings block")
 	}
 }
 

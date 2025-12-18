@@ -21,7 +21,7 @@ func TestNewLoader(t *testing.T) {
 func TestLoader_Load(t *testing.T) {
 	t.Run("single directory with valid CUE", func(t *testing.T) {
 		dir := t.TempDir()
-		writeCUEFile(t, dir, "config.cue", `
+		writeCUEFile(t, dir, "settings.cue", `
 			name: "test"
 			value: 42
 		`)
@@ -51,14 +51,14 @@ func TestLoader_Load(t *testing.T) {
 		localDir := t.TempDir()
 
 		// Global config defines globalOnly field
-		writeCUEFile(t, globalDir, "config.cue", `
+		writeCUEFile(t, globalDir, "settings.cue", `
 			globalOnly: true
 			shared: "from-global"
 		`)
 
 		// Local config defines localOnly field
 		// Different keys are additive (union)
-		writeCUEFile(t, localDir, "config.cue", `
+		writeCUEFile(t, localDir, "settings.cue", `
 			localOnly: true
 		`)
 
@@ -107,13 +107,13 @@ func TestLoader_Load(t *testing.T) {
 		localDir := t.TempDir()
 
 		// Global config
-		writeCUEFile(t, globalDir, "config.cue", `
+		writeCUEFile(t, globalDir, "settings.cue", `
 			name: "global-value"
 			timeout: 30
 		`)
 
 		// Local config - same key should completely replace
-		writeCUEFile(t, localDir, "config.cue", `
+		writeCUEFile(t, localDir, "settings.cue", `
 			name: "local-value"
 		`)
 
@@ -144,7 +144,7 @@ func TestLoader_Load(t *testing.T) {
 
 	t.Run("skips non-existent directory", func(t *testing.T) {
 		existingDir := t.TempDir()
-		writeCUEFile(t, existingDir, "config.cue", `name: "exists"`)
+		writeCUEFile(t, existingDir, "settings.cue", `name: "exists"`)
 
 		nonExistent := filepath.Join(t.TempDir(), "does-not-exist")
 
@@ -167,7 +167,7 @@ func TestLoader_Load(t *testing.T) {
 	t.Run("skips directory without CUE files", func(t *testing.T) {
 		emptyDir := t.TempDir()
 		cueDir := t.TempDir()
-		writeCUEFile(t, cueDir, "config.cue", `name: "cue"`)
+		writeCUEFile(t, cueDir, "settings.cue", `name: "cue"`)
 
 		l := NewLoader()
 		result, err := l.Load([]string{emptyDir, cueDir})
@@ -221,10 +221,10 @@ func TestLoader_Load(t *testing.T) {
 		localDir := t.TempDir()
 
 		// Global defines name as string
-		writeCUEFile(t, globalDir, "config.cue", `name: "global"`)
+		writeCUEFile(t, globalDir, "settings.cue", `name: "global"`)
 
 		// Local defines name as number - replacement allows this
-		writeCUEFile(t, localDir, "config.cue", `name: 42`)
+		writeCUEFile(t, localDir, "settings.cue", `name: 42`)
 
 		l := NewLoader()
 		result, err := l.Load([]string{globalDir, localDir})
@@ -246,7 +246,7 @@ func TestLoader_Load(t *testing.T) {
 func TestLoader_LoadSingle(t *testing.T) {
 	t.Run("valid directory", func(t *testing.T) {
 		dir := t.TempDir()
-		writeCUEFile(t, dir, "config.cue", `value: 123`)
+		writeCUEFile(t, dir, "settings.cue", `value: 123`)
 
 		l := NewLoader()
 		v, err := l.LoadSingle(dir)
@@ -326,7 +326,7 @@ func TestHasCUEFiles(t *testing.T) {
 	}{
 		{
 			name:  "has cue file",
-			files: map[string]string{"config.cue": "x: 1"},
+			files: map[string]string{"settings.cue": "x: 1"},
 			want:  true,
 		},
 		{
@@ -346,7 +346,7 @@ func TestHasCUEFiles(t *testing.T) {
 		},
 		{
 			name:  "mixed files",
-			files: map[string]string{"readme.md": "# test", "config.cue": "x: 1"},
+			files: map[string]string{"readme.md": "# test", "settings.cue": "x: 1"},
 			want:  true,
 		},
 		{
@@ -486,7 +486,7 @@ func TestLoader_MergeSemantics(t *testing.T) {
 		localDir := t.TempDir()
 
 		// Global defines agents.claude
-		writeCUEFile(t, globalDir, "config.cue", `
+		writeCUEFile(t, globalDir, "settings.cue", `
 			agents: {
 				claude: {
 					command: "claude"
@@ -496,7 +496,7 @@ func TestLoader_MergeSemantics(t *testing.T) {
 		`)
 
 		// Local defines agents.gemini
-		writeCUEFile(t, localDir, "config.cue", `
+		writeCUEFile(t, localDir, "settings.cue", `
 			agents: {
 				gemini: {
 					command: "gemini"
@@ -534,7 +534,7 @@ func TestLoader_MergeSemantics(t *testing.T) {
 		localDir := t.TempDir()
 
 		// Global defines roles.reviewer with multiple fields
-		writeCUEFile(t, globalDir, "config.cue", `
+		writeCUEFile(t, globalDir, "settings.cue", `
 			roles: {
 				reviewer: {
 					description: "Global reviewer"
@@ -546,7 +546,7 @@ func TestLoader_MergeSemantics(t *testing.T) {
 
 		// Local defines roles.reviewer with different fields
 		// This should completely replace, not merge fields
-		writeCUEFile(t, localDir, "config.cue", `
+		writeCUEFile(t, localDir, "settings.cue", `
 			roles: {
 				reviewer: {
 					description: "Local reviewer"
@@ -582,7 +582,7 @@ func TestLoader_MergeSemantics(t *testing.T) {
 		localDir := t.TempDir()
 
 		// Global settings
-		writeCUEFile(t, globalDir, "config.cue", `
+		writeCUEFile(t, globalDir, "settings.cue", `
 			settings: {
 				timeout: 120
 				shell: "/bin/bash"
@@ -591,7 +591,7 @@ func TestLoader_MergeSemantics(t *testing.T) {
 		`)
 
 		// Local settings - only overrides some fields
-		writeCUEFile(t, localDir, "config.cue", `
+		writeCUEFile(t, localDir, "settings.cue", `
 			settings: {
 				default_agent: "gemini"
 				default_role: "reviewer"
@@ -646,7 +646,7 @@ func TestLoader_MergeSemantics(t *testing.T) {
 		localDir := t.TempDir()
 
 		// Global with all collection types
-		writeCUEFile(t, globalDir, "config.cue", `
+		writeCUEFile(t, globalDir, "settings.cue", `
 			agents: {
 				claude: { command: "claude" }
 			}
@@ -662,7 +662,7 @@ func TestLoader_MergeSemantics(t *testing.T) {
 		`)
 
 		// Local adds to each collection
-		writeCUEFile(t, localDir, "config.cue", `
+		writeCUEFile(t, localDir, "settings.cue", `
 			agents: {
 				gemini: { command: "gemini" }
 			}
@@ -706,7 +706,7 @@ func TestLoader_MergeSemantics(t *testing.T) {
 func TestLoader_LoadWithPackage(t *testing.T) {
 	t.Run("loads file with package declaration", func(t *testing.T) {
 		dir := t.TempDir()
-		writeCUEFile(t, dir, "config.cue", `
+		writeCUEFile(t, dir, "settings.cue", `
 			package myconfig
 
 			name: "test"

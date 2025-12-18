@@ -326,9 +326,9 @@ func (a *AutoSetup) writeConfig(agent Agent) (string, error) {
 		return "", fmt.Errorf("writing agents file: %w", err)
 	}
 
-	// Write config.cue with settings
+	// Write settings.cue with settings
 	configContent := generateSettingsCUE(agent.Name)
-	configPath := filepath.Join(paths.Global, "config.cue")
+	configPath := filepath.Join(paths.Global, "settings.cue")
 	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
 		return "", fmt.Errorf("writing config file: %w", err)
 	}

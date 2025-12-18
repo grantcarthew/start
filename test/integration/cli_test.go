@@ -76,7 +76,7 @@ settings: {
 	default_role: "assistant"
 }
 `
-	configFile := filepath.Join(configDir, "config.cue")
+	configFile := filepath.Join(configDir, "settings.cue")
 	if err := os.WriteFile(configFile, []byte(config), 0644); err != nil {
 		t.Fatalf("writing config: %v", err)
 	}

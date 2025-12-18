@@ -204,7 +204,7 @@ tasks: {
 	}
 }
 `
-	if err := os.WriteFile(filepath.Join(configDir, "config.cue"), []byte(config), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(configDir, "settings.cue"), []byte(config), 0644); err != nil {
 		t.Fatalf("writing config: %v", err)
 	}
 

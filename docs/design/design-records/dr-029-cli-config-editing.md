@@ -151,7 +151,7 @@ The `--local` flag targets local configuration (`./.start/`) instead of global (
 | `show` | Shows from merged config | Shows local only |
 | `edit` | Prompts if item in both | Edits local |
 | `remove` | Prompts if item in both | Removes from local |
-| `default` | Writes to global config.cue | Writes to local config.cue |
+| `default` | Writes to global settings.cue | Writes to local settings.cue |
 
 ### File Organisation
 
@@ -163,7 +163,7 @@ Each file contains one top-level key:
 | `roles.cue` | `roles: { ... }` |
 | `contexts.cue` | `contexts: { ... }` |
 | `tasks.cue` | `tasks: { ... }` |
-| `config.cue` | `settings: { ... }` |
+| `settings.cue` | `settings: { ... }` |
 
 ### Generation Pattern
 
@@ -242,7 +242,7 @@ Set default agent:
 
 ```bash
 start config agent default claude
-# Writes default_agent: "claude" to config.cue settings
+# Writes default_agent: "claude" to settings.cue
 ```
 
 Add to local config:

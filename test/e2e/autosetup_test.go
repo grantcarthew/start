@@ -129,9 +129,9 @@ func TestE2E_AutoSetup_SingleAgent(t *testing.T) {
 		t.Error("agents.cue was not created")
 	}
 
-	configFile := filepath.Join(tmpDir, ".config", "start", "config.cue")
+	configFile := filepath.Join(tmpDir, ".config", "start", "settings.cue")
 	if _, err := os.Stat(configFile); os.IsNotExist(err) {
-		t.Error("config.cue was not created")
+		t.Error("settings.cue was not created")
 	}
 
 	// Check agents.cue content
@@ -147,14 +147,14 @@ func TestE2E_AutoSetup_SingleAgent(t *testing.T) {
 		t.Error("agents.cue should contain bin field")
 	}
 
-	// Check config.cue content
+	// Check settings.cue content
 	configContent, err := os.ReadFile(configFile)
 	if err != nil {
-		t.Fatalf("failed to read config.cue: %v", err)
+		t.Fatalf("failed to read settings.cue: %v", err)
 	}
 
 	if !strings.Contains(string(configContent), `default_agent: "claude"`) {
-		t.Error("config.cue should set default_agent to claude")
+		t.Error("settings.cue should set default_agent to claude")
 	}
 }
 
@@ -303,8 +303,8 @@ func TestE2E_AutoSetup_ExistingConfig_SkipsSetup(t *testing.T) {
 	default_agent: "test"
 }
 `
-	if err := os.WriteFile(filepath.Join(configDir, "config.cue"), []byte(settingsContent), 0644); err != nil {
-		t.Fatalf("failed to write config.cue: %v", err)
+	if err := os.WriteFile(filepath.Join(configDir, "settings.cue"), []byte(settingsContent), 0644); err != nil {
+		t.Fatalf("failed to write settings.cue: %v", err)
 	}
 
 	cmd := exec.Command(binary)
