@@ -36,6 +36,7 @@ In Scope:
 - `start config role` - Role management (list, add, show, edit, remove, default)
 - `start config context` - Context management (list, add, show, edit, remove)
 - `start config task` - Task management (list, add, show, edit, remove)
+- `start config settings` - Settings management (list, get, set, edit)
 - Support for --local flag to target local config
 - Hybrid input: flags for any field, interactive prompts for missing required fields
 
@@ -98,12 +99,16 @@ Files:
 - `internal/cli/config_role.go` - Role subcommands
 - `internal/cli/config_context.go` - Context subcommands
 - `internal/cli/config_task.go` - Task subcommands
+- `internal/cli/config_settings.go` - Settings subcommands
 - `internal/cli/config_test.go` - Unit tests for config commands
 - `internal/cli/config_integration_test.go` - Integration tests for full workflows
+- `context/start-assets/schemas/settings.cue` - Settings schema
+- `context/start-assets/schemas/settings_example.cue` - Settings examples
 
 Design Records:
 
 - DR-029: CLI Configuration Editing Commands
+- DR-030: Settings Schema (config.cue rename, settings CLI)
 
 ## Technical Approach
 
@@ -160,3 +165,15 @@ Manual testing verified:
 - Task list/show displays existing code-review task
 - Local context creation works with --local flag
 - Generated CUE files are valid syntax
+
+2025-12-18: Added settings management:
+- Renamed `config.cue` to `settings.cue` across codebase for consistency
+- Created DR-030 documenting settings schema and CLI design
+- Implemented `start config settings` command with positional interface:
+  - `start config settings` - list all settings
+  - `start config settings <key>` - show setting value
+  - `start config settings <key> <value>` - set setting value
+  - `start config settings edit` - open in $EDITOR
+- Created settings schema (`settings.cue`, `settings_example.cue`) in start-assets
+- Added 8 unit tests for settings command
+- Updated all 20 dependent CUE modules to schemas v0.0.3

@@ -599,8 +599,8 @@ func runConfigAgentDefault(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("creating config directory: %w", err)
 	}
 
-	// Update settings in config.cue
-	configPath := filepath.Join(configDir, "config.cue")
+	// Update settings in settings.cue
+	configPath := filepath.Join(configDir, "settings.cue")
 	if err := writeDefaultAgentSetting(configPath, name); err != nil {
 		return fmt.Errorf("writing config file: %w", err)
 	}
@@ -805,7 +805,7 @@ func writeAgentsFile(path string, agents map[string]AgentConfig) error {
 	return os.WriteFile(path, []byte(sb.String()), 0644)
 }
 
-// loadConfigForScope loads the config.cue settings for the scope.
+// loadConfigForScope loads the settings.cue settings for the scope.
 func loadConfigForScope(localOnly bool) (cue.Value, error) {
 	paths, err := config.ResolvePaths("")
 	if err != nil {

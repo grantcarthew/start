@@ -299,7 +299,7 @@ func TestAssetTypeToConfigFile(t *testing.T) {
 		{"roles", "roles.cue"},
 		{"tasks", "tasks.cue"},
 		{"contexts", "contexts.cue"},
-		{"unknown", "config.cue"},
+		{"unknown", "settings.cue"},
 	}
 
 	for _, tt := range tests {

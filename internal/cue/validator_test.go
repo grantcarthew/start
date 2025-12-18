@@ -191,18 +191,18 @@ func TestValidationError_Error(t *testing.T) {
 		},
 		{
 			name:   "with filename",
-			err:    &ValidationError{Filename: "config.cue", Message: "syntax error"},
-			expect: "config.cue: syntax error",
+			err:    &ValidationError{Filename: "settings.cue", Message: "syntax error"},
+			expect: "settings.cue: syntax error",
 		},
 		{
 			name:   "with filename and line",
-			err:    &ValidationError{Filename: "config.cue", Line: 10, Message: "unexpected token"},
-			expect: "config.cue:10: unexpected token",
+			err:    &ValidationError{Filename: "settings.cue", Line: 10, Message: "unexpected token"},
+			expect: "settings.cue:10: unexpected token",
 		},
 		{
 			name:   "filename takes precedence over path",
-			err:    &ValidationError{Filename: "config.cue", Path: "x.y", Message: "error"},
-			expect: "config.cue: error",
+			err:    &ValidationError{Filename: "settings.cue", Path: "x.y", Message: "error"},
+			expect: "settings.cue: error",
 		},
 	}
 

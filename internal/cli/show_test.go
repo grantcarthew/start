@@ -69,7 +69,7 @@ tasks: {
 	}
 }
 `
-	configPath := filepath.Join(startDir, "config.cue")
+	configPath := filepath.Join(startDir, "settings.cue")
 	if err := os.WriteFile(configPath, []byte(config), 0644); err != nil {
 		t.Fatalf("writing config: %v", err)
 	}

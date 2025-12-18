@@ -176,7 +176,7 @@ Status: {{.command_output}}
 
 ### Global Settings
 
-Define defaults in `config.cue`:
+Define defaults in `settings.cue`:
 
 ```cue
 settings: {

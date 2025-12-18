@@ -655,8 +655,8 @@ func runConfigRoleDefault(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("creating config directory: %w", err)
 	}
 
-	// Update settings in config.cue
-	configPath := filepath.Join(configDir, "config.cue")
+	// Update settings in settings.cue
+	configPath := filepath.Join(configDir, "settings.cue")
 	if err := writeDefaultRoleSetting(configPath, name); err != nil {
 		return fmt.Errorf("writing config file: %w", err)
 	}

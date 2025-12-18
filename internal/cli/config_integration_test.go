@@ -173,14 +173,14 @@ func TestConfigAgent_FullWorkflow(t *testing.T) {
 			t.Fatalf("default failed: %v", err)
 		}
 
-		// Verify config.cue was created with default_agent
-		configPath := filepath.Join(globalDir, "config.cue")
+		// Verify settings.cue was created with default_agent
+		configPath := filepath.Join(globalDir, "settings.cue")
 		content, err := os.ReadFile(configPath)
 		if err != nil {
-			t.Fatalf("failed to read config.cue: %v", err)
+			t.Fatalf("failed to read settings.cue: %v", err)
 		}
 		if !strings.Contains(string(content), `default_agent:`) {
-			t.Errorf("config.cue missing default_agent: %s", content)
+			t.Errorf("settings.cue missing default_agent: %s", content)
 		}
 	})
 

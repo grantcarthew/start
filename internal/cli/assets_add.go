@@ -213,7 +213,7 @@ func assetTypeToConfigFile(category string) string {
 	case "contexts":
 		return "contexts.cue"
 	default:
-		return "config.cue"
+		return "settings.cue"
 	}
 }
 

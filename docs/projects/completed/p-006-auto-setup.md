@@ -176,7 +176,7 @@ Fixed two additional bugs in `loadAgentFromModule`:
 Added `Registry()` getter to `internal/registry/client.go`.
 
 Additional fixes:
-- Split config output: `agents.cue` for agents, `config.cue` for settings
+- Split config output: `agents.cue` for agents, `settings.cue` for settings
 - Agent selection now accepts both number (`3`) and name (`gemini`)
 - Quote model names with hyphens in generated CUE (`"flash-lite"`)
 - Added lookup for singular `agent:` field (registry module style)

@@ -359,7 +359,7 @@ func TestConfigAgentDefault_Show(t *testing.T) {
 	configContent := `settings: {
 	default_agent: "claude"
 }`
-	if err := os.WriteFile(filepath.Join(globalDir, "config.cue"), []byte(configContent), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(globalDir, "settings.cue"), []byte(configContent), 0644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -685,5 +685,308 @@ func TestScopeString(t *testing.T) {
 	}
 	if scopeString(false) != "global" {
 		t.Errorf("scopeString(false) = %q, want 'global'", scopeString(false))
+	}
+}
+
+// Settings command tests
+
+func TestConfigSettingsList_NoConfig(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	origWd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chdir(origWd) }()
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := NewRootCmd()
+	stdout := &bytes.Buffer{}
+	cmd.SetOut(stdout)
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"config", "settings"})
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := stdout.String()
+	if !strings.Contains(output, "No settings configured") {
+		t.Errorf("expected 'No settings configured', got: %s", output)
+	}
+}
+
+func TestConfigSettingsList_WithSettings(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	globalDir := filepath.Join(tmpDir, "start")
+	if err := os.MkdirAll(globalDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	settingsContent := `settings: {
+	default_agent: "claude"
+	timeout: 120
+}`
+	if err := os.WriteFile(filepath.Join(globalDir, "settings.cue"), []byte(settingsContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	origWd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chdir(origWd) }()
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := NewRootCmd()
+	stdout := &bytes.Buffer{}
+	cmd.SetOut(stdout)
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"config", "settings"})
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := stdout.String()
+	if !strings.Contains(output, "default_agent: claude") {
+		t.Errorf("expected 'default_agent: claude', got: %s", output)
+	}
+	if !strings.Contains(output, "timeout: 120") {
+		t.Errorf("expected 'timeout: 120', got: %s", output)
+	}
+}
+
+func TestConfigSettingsShow_SingleKey(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	globalDir := filepath.Join(tmpDir, "start")
+	if err := os.MkdirAll(globalDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	settingsContent := `settings: {
+	default_agent: "gemini"
+}`
+	if err := os.WriteFile(filepath.Join(globalDir, "settings.cue"), []byte(settingsContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	origWd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chdir(origWd) }()
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := NewRootCmd()
+	stdout := &bytes.Buffer{}
+	cmd.SetOut(stdout)
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"config", "settings", "default_agent"})
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := stdout.String()
+	if !strings.Contains(output, "default_agent: gemini") {
+		t.Errorf("expected 'default_agent: gemini', got: %s", output)
+	}
+}
+
+func TestConfigSettingsShow_NotSet(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	globalDir := filepath.Join(tmpDir, "start")
+	if err := os.MkdirAll(globalDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	settingsContent := `settings: {
+	default_agent: "claude"
+}`
+	if err := os.WriteFile(filepath.Join(globalDir, "settings.cue"), []byte(settingsContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	origWd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chdir(origWd) }()
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := NewRootCmd()
+	stdout := &bytes.Buffer{}
+	cmd.SetOut(stdout)
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"config", "settings", "shell"})
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := stdout.String()
+	if !strings.Contains(output, "shell: (not set)") {
+		t.Errorf("expected 'shell: (not set)', got: %s", output)
+	}
+}
+
+func TestConfigSettingsShow_InvalidKey(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	origWd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chdir(origWd) }()
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := NewRootCmd()
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	cmd.SetOut(stdout)
+	cmd.SetErr(stderr)
+	cmd.SetArgs([]string{"config", "settings", "invalid_key"})
+
+	err = cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error for invalid key")
+	}
+
+	if !strings.Contains(err.Error(), "unknown setting") {
+		t.Errorf("expected 'unknown setting' error, got: %v", err)
+	}
+}
+
+func TestConfigSettingsSet(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	origWd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chdir(origWd) }()
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := NewRootCmd()
+	stdout := &bytes.Buffer{}
+	cmd.SetOut(stdout)
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"config", "settings", "default_agent", "claude"})
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := stdout.String()
+	if !strings.Contains(output, `Set default_agent to "claude"`) {
+		t.Errorf("expected set confirmation, got: %s", output)
+	}
+
+	// Verify file was created
+	settingsPath := filepath.Join(tmpDir, "start", "settings.cue")
+	content, err := os.ReadFile(settingsPath)
+	if err != nil {
+		t.Fatalf("failed to read settings file: %v", err)
+	}
+
+	if !strings.Contains(string(content), `default_agent: "claude"`) {
+		t.Errorf("settings file missing default_agent, content: %s", content)
+	}
+}
+
+func TestConfigSettingsSet_Integer(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	origWd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chdir(origWd) }()
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := NewRootCmd()
+	stdout := &bytes.Buffer{}
+	cmd.SetOut(stdout)
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"config", "settings", "timeout", "60"})
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify file has integer value (no quotes)
+	settingsPath := filepath.Join(tmpDir, "start", "settings.cue")
+	content, err := os.ReadFile(settingsPath)
+	if err != nil {
+		t.Fatalf("failed to read settings file: %v", err)
+	}
+
+	if !strings.Contains(string(content), "timeout: 60") {
+		t.Errorf("settings file missing timeout as integer, content: %s", content)
+	}
+	// Make sure it's NOT quoted
+	if strings.Contains(string(content), `timeout: "60"`) {
+		t.Errorf("timeout should not be quoted, content: %s", content)
+	}
+}
+
+func TestConfigSettingsSet_InvalidValue(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	origWd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chdir(origWd) }()
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := NewRootCmd()
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	cmd.SetOut(stdout)
+	cmd.SetErr(stderr)
+	cmd.SetArgs([]string{"config", "settings", "timeout", "not-a-number"})
+
+	err = cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error for non-integer timeout")
+	}
+
+	if !strings.Contains(err.Error(), "requires an integer value") {
+		t.Errorf("expected integer value error, got: %v", err)
 	}
 }

@@ -28,6 +28,7 @@ Use --local to target project-specific configuration.`,
 	addConfigRoleCommand(configCmd)
 	addConfigContextCommand(configCmd)
 	addConfigTaskCommand(configCmd)
+	addConfigSettingsCommand(configCmd)
 
 	parent.AddCommand(configCmd)
 }
