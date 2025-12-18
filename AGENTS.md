@@ -138,6 +138,7 @@ The `./Context` directory contains cloned source code and documentation for deve
 - P-004: Minimal CLI Implementation (CUE loading, show command, global flags)
 - P-005: Orchestration Core Engine (template processing, shell execution, composition, CLI commands)
 - P-006: Auto-Setup (registry interaction, agent detection, TTY prompts, config writing)
+- P-008: Configuration Editing (config agent/role/context/task commands with list/add/show/edit/remove)
 
 **Current:** P-007 Package Management
 

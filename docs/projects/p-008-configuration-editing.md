@@ -1,8 +1,8 @@
 # P-008: Configuration Editing
 
-- Status: In Progress
+- Status: Complete (pending optional external review)
 - Started: 2025-12-18
-- Completed: -
+- Completed: 2025-12-18
 
 ## Overview
 
@@ -48,16 +48,17 @@ Out of Scope:
 
 ## Success Criteria
 
-- [ ] `start config agent add` creates new agent config
-- [ ] `start config agent edit <name>` edits existing agent
-- [ ] `start config agent edit` (no name) opens file in $EDITOR
-- [ ] `start config agent remove <name>` removes agent
-- [ ] `start config agent default <name>` sets default agent
-- [ ] `start config agent list` displays all agents
-- [ ] `start config agent show <name>` displays single agent details
-- [ ] Same pattern works for role, context, task
-- [ ] --local flag targets .start/ instead of ~/.config/start/
-- [ ] Flags allow scripted usage, prompts fill missing required fields
+- [x] `start config agent add` creates new agent config
+- [x] `start config agent edit <name>` edits existing agent
+- [x] `start config agent edit` (no name) opens file in $EDITOR
+- [x] `start config agent remove <name>` removes agent
+- [x] `start config agent default <name>` sets default agent
+- [x] `start config agent list` displays all agents
+- [x] `start config agent show <name>` displays single agent details
+- [x] Same pattern works for role, context, task
+- [x] --local flag targets .start/ instead of ~/.config/start/
+- [x] Flags allow scripted usage, prompts fill missing required fields
+- [x] Plural aliases work (e.g., `start config agents` = `start config agent`)
 
 ## Workflow
 
@@ -71,22 +72,22 @@ Out of Scope:
 
 ### Phase 2: Implementation
 
-- [ ] Implement config agent commands
-- [ ] Implement config role commands
-- [ ] Implement config context commands
-- [ ] Implement config task commands
+- [x] Implement config agent commands
+- [x] Implement config role commands
+- [x] Implement config context commands
+- [x] Implement config task commands
 
 ### Phase 3: Validation
 
-- [ ] Write unit tests
-- [ ] Write integration tests
-- [ ] Manual testing with real configs
+- [x] Write unit tests
+- [x] Write integration tests
+- [x] Manual testing with real configs
 
 ### Phase 4: Review
 
 - [ ] External code review (if significant changes)
 - [ ] Fix reported issues
-- [ ] Update project document
+- [x] Update project document
 
 ## Deliverables
 
@@ -97,7 +98,8 @@ Files:
 - `internal/cli/config_role.go` - Role subcommands
 - `internal/cli/config_context.go` - Context subcommands
 - `internal/cli/config_task.go` - Task subcommands
-- `internal/config/editor.go` - CUE file editing utilities
+- `internal/cli/config_test.go` - Unit tests for config commands
+- `internal/cli/config_integration_test.go` - Integration tests for full workflows
 
 Design Records:
 
@@ -129,3 +131,32 @@ Requires:
 ## Progress
 
 2025-12-18: Phase 1 complete. Created DR-029 documenting all design decisions. Ready for Phase 2 implementation.
+
+2025-12-18: Phase 2 and Phase 3 (unit tests) complete. Implemented all config commands:
+- `start config agent` - list, add, show, edit, remove, default
+- `start config role` - list, add, show, edit, remove, default
+- `start config context` - list, add, show, edit, remove
+- `start config task` - list, add, show, edit, remove
+
+All commands support:
+- `--local` flag to target project-specific config
+- Hybrid input (flags for scripted use, interactive prompts for missing fields)
+- Template-based CUE file generation
+- Graceful handling of empty/missing config directories
+- Plural aliases (`start config agents` works same as `start config agent`)
+
+Unit tests added in config_test.go covering list, show, add, remove operations.
+
+Integration tests added in config_integration_test.go covering:
+- Full agent workflow (add, list, show, default, remove)
+- Full role workflow (add with file/prompt, list, show)
+- Full context workflow (add required/default, list with markers)
+- Full task workflow (add with role, list, show)
+- Local/global config isolation (--local flag)
+
+Manual testing verified:
+- Real global config loads correctly
+- Agent list/show displays existing gemini config
+- Task list/show displays existing code-review task
+- Local context creation works with --local flag
+- Generated CUE files are valid syntax
