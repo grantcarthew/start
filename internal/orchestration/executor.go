@@ -109,7 +109,9 @@ func (e *Executor) Execute(cfg ExecuteConfig) error {
 		}
 	}
 
-	// Use syscall.Exec to replace current process
+	// Unix-only: syscall.Exec replaces the current process with the agent.
+	// This is intentional - no wrapper overhead, clean process model.
+	// Windows is not supported. See DR-006 for platform scope.
 	args := []string{shell, "-c", cmdStr}
 	env := os.Environ()
 
@@ -149,9 +151,15 @@ func (e *Executor) ExecuteWithoutReplace(cfg ExecuteConfig) (string, error) {
 	return stdout.String(), nil
 }
 
-// escapeForShell escapes a string for use in shell commands.
+// escapeForShell prepares a string for safe use in shell commands.
+// It expands environment variables (e.g., $HOME, ${USER}) using Go's os.ExpandEnv,
+// then escapes single quotes for shell safety. This allows users to reference
+// environment variables in prompts while preventing shell command injection.
+// Command execution should use the UTD command field instead.
 func escapeForShell(s string) string {
-	// Replace single quotes with escaped version
+	// Expand environment variables in Go (safe - no command execution)
+	s = os.ExpandEnv(s)
+	// Escape single quotes for shell safety
 	s = strings.ReplaceAll(s, "'", "'\"'\"'")
 	return s
 }

@@ -93,7 +93,9 @@ func (r *Runner) RunWithResult(command, workingDir, shell string, timeout int) (
 		cmd.Dir = workingDir
 	}
 
-	// Set process group for clean termination
+	// Unix-only: Create process group for clean termination on timeout.
+	// Allows killing child processes spawned by the command.
+	// Windows is not supported. See DR-006 for platform scope.
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
 	// Capture output
@@ -110,7 +112,7 @@ func (r *Runner) RunWithResult(command, workingDir, shell string, timeout int) (
 	// Check for timeout
 	if ctx.Err() == context.DeadlineExceeded {
 		result.TimedOut = true
-		// Kill process group if still running
+		// Unix-only: Kill entire process group (negative PID) to clean up children.
 		if cmd.Process != nil {
 			_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
 		}
