@@ -34,6 +34,7 @@ Design Records (DRs) document architectural decisions, algorithms, breaking chan
 | DR-026 | CLI Logic and I/O Separation | CLI | Accepted | 2025-12-12 |
 | DR-027 | Registry Module Fetching | Registry | Accepted | 2025-12-15 |
 | DR-028 | CLI Assets Command | CLI | Accepted | 2025-12-17 |
+| DR-029 | CLI Configuration Editing Commands | CLI | Accepted | 2025-12-18 |
 
 ## Process
 
