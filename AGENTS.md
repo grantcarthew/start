@@ -12,7 +12,7 @@ Avoid references to the prototype in new documentation. This is a new design.
 
 Projects are stored in the docs/projects/ directory. Continue by reading the active project.
 
-Active Project: docs/projects/p-007-package-management.md
+Active Project: docs/projects/p-008-configuration-editing.md
 
 ## Why CUE?
 

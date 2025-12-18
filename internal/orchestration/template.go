@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"text/template"
 	"time"
@@ -68,7 +69,7 @@ func (r *DefaultFileReader) Read(path string) (string, error) {
 		if err != nil {
 			return "", fmt.Errorf("expanding home directory: %w", err)
 		}
-		path = home + path[1:]
+		path = filepath.Join(home, path[2:])
 	}
 
 	content, err := os.ReadFile(path)

@@ -1,8 +1,8 @@
 # P-007: Package Management
 
-- Status: In Progress
+- Status: Complete
 - Started: 2025-12-17
-- Completed: -
+- Completed: 2025-12-18
 
 ## Overview
 
@@ -49,14 +49,14 @@ Out of Scope:
 
 ## Success Criteria
 
-- [ ] `start assets browse` opens GitHub asset registry in browser
-- [ ] `start assets search <query>` finds packages in registry
-- [ ] `start assets add <package>` installs to config
-- [ ] `start assets list` shows installed packages with update status
-- [ ] `start assets info <package>` shows package details
-- [ ] `start assets update` updates installed packages
-- [ ] `start assets index` regenerates index in asset repos
-- [ ] Works with packages published in P-002/P-003
+- [x] `start assets browse` opens GitHub asset registry in browser
+- [x] `start assets search <query>` finds packages in registry
+- [x] `start assets add <package>` installs to config
+- [x] `start assets list` shows installed packages with update status
+- [x] `start assets info <package>` shows package details
+- [x] `start assets update` updates installed packages
+- [x] `start assets index` regenerates index in asset repos
+- [x] Works with packages published in P-002/P-003
 
 ## Workflow
 
@@ -87,9 +87,9 @@ Out of Scope:
 
 ### Phase 4: Review
 
-- [ ] External code review (if significant changes)
-- [ ] Fix reported issues
-- [ ] Update project document
+- [x] External code review (if significant changes)
+- [x] Fix reported issues
+- [x] Update project document
 
 ## Deliverables
 
@@ -175,3 +175,14 @@ Requires:
   - Added `formatAssetStruct()` and `formatFieldValue()` to format concrete field values
   - Now properly writes description, tags, role, file, prompt fields to config
 - Verified complete add→list workflow works with real registry
+
+### 2025-12-18
+
+- Completed Phase 4: Review
+  - External code review identified 4 findings (2 critical, 2 major)
+  - Fixed path expansion in `template.go` to use `filepath.Join()` (finding 2.2)
+  - Addressed shell injection concern (finding 1.1) by implementing `os.ExpandEnv()` in `escapeForShell()` - allows env var expansion while preventing command execution
+  - Findings 1.2 (Unix syscalls) and 2.1 (shell detection) confirmed as by-design for Unix-only tool
+  - Updated DR-011 with Security Considerations section documenting the escaping approach
+  - Added `TestEscapeForShell_EnvExpansion` tests for new behaviour
+- Project complete

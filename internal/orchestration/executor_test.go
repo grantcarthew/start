@@ -124,16 +124,69 @@ func TestExecutor_BuildCommand(t *testing.T) {
 
 func TestEscapeForShell(t *testing.T) {
 	tests := []struct {
+		name  string
 		input string
 		want  string
 	}{
-		{"simple text", "simple text"},
-		{"it's a test", "it'\"'\"'s a test"},
-		{"no quotes here", "no quotes here"},
+		{"simple text", "simple text", "simple text"},
+		{"single quote escaping", "it's a test", "it'\"'\"'s a test"},
+		{"no quotes", "no quotes here", "no quotes here"},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.input, func(t *testing.T) {
+		t.Run(tt.name, func(t *testing.T) {
+			got := escapeForShell(tt.input)
+			if got != tt.want {
+				t.Errorf("escapeForShell(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestEscapeForShell_EnvExpansion(t *testing.T) {
+	// Set test environment variables
+	t.Setenv("TEST_VAR", "expanded_value")
+	t.Setenv("TEST_USER", "testuser")
+
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{
+			name:  "expands $VAR syntax",
+			input: "Hello $TEST_VAR",
+			want:  "Hello expanded_value",
+		},
+		{
+			name:  "expands ${VAR} syntax",
+			input: "Hello ${TEST_USER}",
+			want:  "Hello testuser",
+		},
+		{
+			name:  "undefined var becomes empty",
+			input: "Hello $UNDEFINED_VAR_XYZ",
+			want:  "Hello ",
+		},
+		{
+			name:  "command substitution not executed",
+			input: "$(echo pwned)",
+			want:  "$(echo pwned)",
+		},
+		{
+			name:  "backticks not executed",
+			input: "`echo pwned`",
+			want:  "`echo pwned`",
+		},
+		{
+			name:  "combined env and quotes",
+			input: "$TEST_USER's files",
+			want:  "testuser'\"'\"'s files",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
 			got := escapeForShell(tt.input)
 			if got != tt.want {
 				t.Errorf("escapeForShell(%q) = %q, want %q", tt.input, got, tt.want)

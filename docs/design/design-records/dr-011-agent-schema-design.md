@@ -205,3 +205,61 @@ start --agent claude --model sonnet    # → claude-3-7-sonnet-20250219
 start --agent claude --model gpt-4     # → gpt-4 (passed through)
 start --agent claude                   # → claude-3-7-sonnet-20250219 (default)
 ```
+
+## Security Considerations
+
+**Placeholder escaping:**
+
+Agent command templates use single quotes around placeholders:
+
+```cue
+command: "{{.bin}} --prompt '{{.prompt}}' --system '{{.role}}'"
+```
+
+The `{{.prompt}}` and `{{.role}}` values are processed before shell execution:
+
+1. **Environment variable expansion**: `$VAR` and `${VAR}` syntax is expanded using Go's `os.ExpandEnv()`. This allows users to reference environment variables in prompts (e.g., `$HOME`, `$USER`, `$PROJECT_NAME`).
+
+2. **Single quote escaping**: Single quotes are escaped for shell safety (`'` becomes `'"'"'`).
+
+3. **No command execution**: Shell command substitution (`$(...)`) and backticks are NOT executed. They pass through as literal text, protected by single-quote escaping.
+
+**Why this design:**
+
+- Environment variables in prompts are a useful feature (reference `$PROJECT_NAME`, `$USER`, etc.)
+- Command execution in prompts is a security risk (arbitrary code execution)
+- UTD provides `command` field for controlled command execution with timeout protection
+- Clear separation: prompts get variable expansion, commands get shell execution
+
+**Template convention:**
+
+Agent templates MUST wrap user-provided placeholders in single quotes:
+
+```cue
+// Correct - single quotes protect against injection
+command: "agent --prompt '{{.prompt}}'"
+
+// UNSAFE - no quotes allows shell interpretation
+command: "agent --prompt {{.prompt}}"
+```
+
+Published agents in the registry follow this convention.
+
+**Command execution path:**
+
+If users need command output in their prompt, they use the UTD pattern:
+
+```cue
+contexts: {
+    "git-branch": {
+        command: "git branch --show-current"
+        prompt:  "Current branch: {{.CommandOutput}}"
+    }
+}
+```
+
+This executes through the shell runner with timeout protection, not through shell expansion in the prompt string.
+
+## Updates
+
+- 2025-12-18: Added Security Considerations section documenting placeholder escaping, environment variable expansion via `os.ExpandEnv()`, and single-quote convention for templates.
