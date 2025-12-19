@@ -138,12 +138,14 @@ Requires:
 2025-12-18: Phase 1 complete. Created DR-029 documenting all design decisions. Ready for Phase 2 implementation.
 
 2025-12-18: Phase 2 and Phase 3 (unit tests) complete. Implemented all config commands:
+
 - `start config agent` - list, add, show, edit, remove, default
 - `start config role` - list, add, show, edit, remove, default
 - `start config context` - list, add, show, edit, remove
 - `start config task` - list, add, show, edit, remove
 
 All commands support:
+
 - `--local` flag to target project-specific config
 - Hybrid input (flags for scripted use, interactive prompts for missing fields)
 - Template-based CUE file generation
@@ -153,6 +155,7 @@ All commands support:
 Unit tests added in config_test.go covering list, show, add, remove operations.
 
 Integration tests added in config_integration_test.go covering:
+
 - Full agent workflow (add, list, show, default, remove)
 - Full role workflow (add with file/prompt, list, show)
 - Full context workflow (add required/default, list with markers)
@@ -160,6 +163,7 @@ Integration tests added in config_integration_test.go covering:
 - Local/global config isolation (--local flag)
 
 Manual testing verified:
+
 - Real global config loads correctly
 - Agent list/show displays existing gemini config
 - Task list/show displays existing code-review task
@@ -167,6 +171,7 @@ Manual testing verified:
 - Generated CUE files are valid syntax
 
 2025-12-18: Added settings management:
+
 - Renamed `config.cue` to `settings.cue` across codebase for consistency
 - Created DR-030 documenting settings schema and CLI design
 - Implemented `start config settings` command with positional interface:
@@ -179,6 +184,7 @@ Manual testing verified:
 - Updated all 20 dependent CUE modules to schemas v0.0.3
 
 2025-12-19: External code review completed. Fixed reported issues:
+
 - Centralized CUE key constants (`internal/cue/keys.go`) to prevent typos
 - Removed `os.ExpandEnv` from `escapeForShell` - environment variables no longer expanded in prompts
 - Refactored CLI logic - extracted common setup from `start.go` and `task.go` into `prepareExecutionEnv()` helper

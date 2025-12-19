@@ -36,6 +36,7 @@ It manages prompt composition, context injection, and workflow automation.`,
 	addAssetsCommand(cmd)
 	addConfigCommand(cmd)
 	addDoctorCommand(cmd)
+	addCompletionCommand(cmd)
 
 	return cmd
 }

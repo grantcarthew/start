@@ -149,12 +149,14 @@ Requires:
 ### Session 2 (2025-12-15 continued)
 
 Fixed issues with index loading:
+
 - Changed `IndexModulePath` from `@v0` to `@v0.0.1` (canonical version required by `module.ParseVersion`)
 - Changed `load.Config.Package` from `"*"` to `"index"` (wildcard creates empty synthetic package)
 - Added `modconfig.Registry` parameter to `LoadIndex` for dependency resolution
 - Updated tests to include `package index` declaration
 
 Manual testing progress:
+
 - Index fetching: Working
 - Agent detection: Working (detects aichat, claude, gemini)
 - TTY prompt: Working (displays selection menu)
@@ -165,17 +167,20 @@ Manual testing progress:
 Root cause: Agent modules were not published to registry (not a code bug).
 
 Published agent modules to CUE Central Registry:
+
 - `github.com/grantcarthew/start-assets/agents/claude@v0.0.1`
 - `github.com/grantcarthew/start-assets/agents/gemini@v0.0.1`
 - `github.com/grantcarthew/start-assets/agents/aichat@v0.0.1`
 
 Fixed two additional bugs in `loadAgentFromModule`:
+
 1. Added `Registry` parameter to `load.Config` for schema dependency resolution
 2. Changed `Package: "*"` to actual package name (e.g., "claude") - wildcard creates empty synthetic package
 
 Added `Registry()` getter to `internal/registry/client.go`.
 
 Additional fixes:
+
 - Split config output: `agents.cue` for agents, `settings.cue` for settings
 - Agent selection now accepts both number (`3`) and name (`gemini`)
 - Quote model names with hyphens in generated CUE (`"flash-lite"`)
@@ -183,11 +188,13 @@ Additional fixes:
 - UI: Removed `[1-3]` from selection prompt, replaced `===` with unicode `─`
 
 Test fixes:
+
 - Added HOME isolation to `setupTestConfig` for global scope tests
 - Skipped `TestExecute_NoConfig` (integration test requiring network)
 - Added `TestGenerateSettingsCUE`
 
 **Result**: Auto-setup now works end-to-end for all three agents:
+
 - Index fetching: Working
 - Agent detection: Working (detects aichat, claude, gemini)
 - Version resolution: Working
@@ -200,6 +207,7 @@ Test fixes:
 Completed remaining validation work:
 
 Unit tests added to `internal/orchestration/autosetup_test.go`:
+
 - `TestNoAgentsError` - verifies helpful error message with installation suggestions
 - `TestNoAgentsError_EmptyIndex` - handles empty index case
 - `TestPromptSelection_NonTTY` - verifies error for multiple agents in non-TTY
@@ -209,12 +217,14 @@ Unit tests added to `internal/orchestration/autosetup_test.go`:
 - `TestPromptSelection_TTY_InvalidName` - rejects unknown names
 
 E2E tests created in `test/e2e/autosetup_test.go`:
+
 - `TestE2E_AutoSetup_SingleAgent` - single agent auto-selects without prompt
 - `TestE2E_AutoSetup_NoAgents` - helpful error when no agents in PATH
 - `TestE2E_AutoSetup_MultipleAgents_NonTTY` - error for multiple agents in non-TTY
 - `TestE2E_AutoSetup_ExistingConfig_SkipsSetup` - skips auto-setup when config exists
 
 Manual test scripts created in `scripts/`:
+
 - `test-single-agent.sh` - tests single agent scenario with restricted PATH
 - `test-no-agents.sh` - tests no agents scenario with restricted PATH
 

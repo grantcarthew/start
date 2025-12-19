@@ -153,18 +153,18 @@ These are explicitly NOT part of this project:
 
 ### Phase 2: UTD Template Processing (DR-005, DR-020)
 
-4. Implement template processor
+1. Implement template processor
    - Parse content as Go template
    - Build template data map (file, command, date, instructions)
    - Execute template
    - Return resolved content
 
-5. Implement lazy evaluation
+2. Implement lazy evaluation
    - Scan template for `{{.file_contents}}` - read file only if present
    - Scan template for `{{.command_output}}` - execute only if present
    - Avoid unnecessary I/O
 
-6. Implement temp file management (DR-020)
+3. Implement temp file management (DR-020)
    - Create `.start/temp/` directory
    - Generate path-derived names (e.g., `role-golang-assistant.md`)
    - Write resolved content
@@ -172,39 +172,39 @@ These are explicitly NOT part of this project:
 
 ### Phase 3: Shell Execution (DR-006)
 
-7. Implement shell runner
+1. Implement shell runner
    - Parse shell string (e.g., `"bash -c"` → binary + flags)
    - Build command with user command appended
    - Set working directory
    - Execute with timeout (context.WithTimeout)
    - Capture stdout/stderr
 
-8. Implement timeout handling
+2. Implement timeout handling
    - SIGTERM on timeout
    - Wait 1 second
    - SIGKILL if still running
    - Return partial output
 
-9. Implement shell auto-detection
+3. Implement shell auto-detection
    - Check for bash in PATH
    - Fallback to sh
    - Error if neither found
 
 ### Phase 4: Prompt Composition
 
-10. Implement prompt composer
+1. Implement prompt composer
     - Load selected contexts (required + default/tagged)
     - Process each context through UTD
     - Concatenate in definition order
     - Append task prompt or custom text
     - Return final composed prompt
 
-11. Implement role resolution
+2. Implement role resolution
     - Load selected role
     - Process through UTD
     - Return for system prompt injection
 
-12. Implement agent command building
+3. Implement agent command building
     - Load agent configuration
     - Build command from template
     - Substitute placeholders (role, prompt, model, bin)
@@ -212,12 +212,12 @@ These are explicitly NOT part of this project:
 
 ### Phase 5: Agent Execution
 
-13. Implement agent executor
+1. Implement agent executor
     - Build final command string
     - On Unix: use syscall.Exec for process replacement
     - Handle exec errors
 
-14. Implement dry-run mode (DR-016)
+2. Implement dry-run mode (DR-016)
     - Create `/tmp/start-YYYYMMDDHHmmss/`
     - Write role.md, prompt.md, command.txt
     - Display 5-line preview
@@ -225,18 +225,18 @@ These are explicitly NOT part of this project:
 
 ### Phase 6: Commands
 
-15. Implement start command (DR-013)
+1. Implement start command (DR-013)
     - Check for config, trigger auto-setup if needed
     - Load config, select agent/role/contexts
     - Compose prompt, resolve role
     - Execute agent (or dry-run)
 
-16. Implement prompt command (DR-014)
+2. Implement prompt command (DR-014)
     - Required contexts only (no defaults)
     - Custom text appended
     - Same execution flow
 
-17. Implement task command (DR-015)
+3. Implement task command (DR-015)
     - Resolve task by name
     - Process task UTD (with instructions)
     - Use task's role if specified
@@ -244,13 +244,13 @@ These are explicitly NOT part of this project:
 
 ### Phase 7: Testing
 
-18. Write tests per DR-024
+1. Write tests per DR-024
     - Template processing: real templates, table-driven
     - Shell execution: use `echo` and simple commands
     - Composer: real CUE configs via `t.TempDir()`
     - Commands: Cobra testing pattern
 
-19. E2E testing
+2. E2E testing
     - Full workflow with mock agent (echo binary)
     - Verify output files in dry-run mode
     - Test auto-setup with mocked PATH
