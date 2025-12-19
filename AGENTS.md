@@ -12,7 +12,7 @@ Avoid references to the prototype in new documentation. This is a new design.
 
 Projects are stored in the `docs/projects/` directory. Continue by reading the active project.
 
-Active Project: docs/projects/p-009-doctor-diagnostics.md
+Active Project: None - P-009 complete, awaiting next project
 
 Project Workflow:
 - Active projects are in `docs/projects/`
@@ -146,7 +146,8 @@ The `./Context` directory contains cloned source code and documentation for deve
 - P-006: Auto-Setup (registry interaction, agent detection, TTY prompts, config writing)
 - P-007: Package Management (assets commands for browsing/installing registry packages)
 - P-008: Configuration Editing (config agent/role/context/task/settings commands)
+- P-009: Doctor Diagnostics (health checks, configuration validation, fix suggestions)
 
-**Current:** P-009 Doctor Diagnostics
+**Current:** None - awaiting next project
 
 The prototype validated that this tool solves a real problem. This version will implement it properly.
