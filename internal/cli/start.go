@@ -18,14 +18,23 @@ import (
 
 // Command flags - package-level for access by subcommands
 var (
-	flagAgent   string
-	flagRole    string
-	flagModel   string
-	flagContext []string
-	flagDryRun  bool
-	flagQuiet   bool
-	flagVerbose bool
+	flagAgent     string
+	flagRole      string
+	flagModel     string
+	flagContext   []string
+	flagDirectory string
+	flagDryRun    bool
+	flagQuiet     bool
+	flagVerbose   bool
+	flagDebug     bool
 )
+
+// debugf prints debug output if --debug flag is set.
+func debugf(format string, args ...interface{}) {
+	if flagDebug {
+		fmt.Printf("[DEBUG] "+format+"\n", args...)
+	}
+}
 
 // ExecutionEnv holds the common execution environment for start and task commands.
 type ExecutionEnv struct {
@@ -39,22 +48,33 @@ type ExecutionEnv struct {
 // prepareExecutionEnv prepares the common execution environment.
 // This is shared between executeStart and executeTask to avoid code duplication.
 func prepareExecutionEnv() (*ExecutionEnv, error) {
-	// Load configuration
-	cfg, err := loadMergedConfig()
-	if err != nil {
-		return nil, fmt.Errorf("loading configuration: %w", err)
+	// Determine working directory
+	var workingDir string
+	var err error
+	if flagDirectory != "" {
+		workingDir = flagDirectory
+		debugf("Working directory (from --directory): %s", workingDir)
+	} else {
+		workingDir, err = os.Getwd()
+		if err != nil {
+			return nil, fmt.Errorf("getting working directory: %w", err)
+		}
+		debugf("Working directory (from pwd): %s", workingDir)
 	}
 
-	// Get working directory
-	workingDir, err := os.Getwd()
+	// Load configuration (uses workingDir for local config lookup)
+	cfg, err := loadMergedConfigFromDir(workingDir)
 	if err != nil {
-		return nil, fmt.Errorf("getting working directory: %w", err)
+		return nil, fmt.Errorf("loading configuration: %w", err)
 	}
 
 	// Select agent
 	agentName := flagAgent
 	if agentName == "" {
 		agentName = orchestration.GetDefaultAgent(cfg.Value)
+		debugf("Agent (from config default): %s", agentName)
+	} else {
+		debugf("Agent (from --agent flag): %s", agentName)
 	}
 	if agentName == "" {
 		return nil, fmt.Errorf("no agent configured")
@@ -64,6 +84,8 @@ func prepareExecutionEnv() (*ExecutionEnv, error) {
 	if err != nil {
 		return nil, fmt.Errorf("loading agent: %w", err)
 	}
+	debugf("Agent binary: %s", agent.Bin)
+	debugf("Agent command template: %s", agent.Command)
 
 	// Create shell runner and template processor
 	shellRunner := shell.NewRunner()
@@ -96,14 +118,29 @@ func executeStart(stdout, stderr io.Writer, selection orchestration.ContextSelec
 		return err
 	}
 
+	debugf("Context selection: required=%t, defaults=%t, tags=%v",
+		selection.IncludeRequired, selection.IncludeDefaults, selection.Tags)
+
 	// Compose prompt with role
 	result, err := env.Composer.ComposeWithRole(env.Cfg.Value, selection, flagRole, customText, "")
 	if err != nil {
 		return fmt.Errorf("composing prompt: %w", err)
 	}
 
+	debugf("Role resolved: %s", result.RoleName)
+	for _, ctx := range result.Contexts {
+		debugf("Context included: %s", ctx.Name)
+	}
+
 	// Print warnings
 	printWarnings(stderr, result.Warnings)
+
+	// Determine effective model
+	model := flagModel
+	if model == "" {
+		model = env.Agent.DefaultModel
+	}
+	debugf("Model: %s", model)
 
 	// Build execution config
 	execConfig := orchestration.ExecuteConfig{
@@ -113,6 +150,14 @@ func executeStart(stdout, stderr io.Writer, selection orchestration.ContextSelec
 		Prompt:     result.Prompt,
 		WorkingDir: env.WorkingDir,
 		DryRun:     flagDryRun,
+	}
+
+	// Build and log final command
+	if flagDebug {
+		cmdStr, err := env.Executor.BuildCommand(execConfig)
+		if err == nil {
+			debugf("Final command: %s", cmdStr)
+		}
 	}
 
 	if flagDryRun {
@@ -259,29 +304,40 @@ func printPreviewLines(w io.Writer, text string, n int) {
 // loadMergedConfig loads and merges global and local configuration.
 // If no configuration exists, it triggers auto-setup.
 func loadMergedConfig() (internalcue.LoadResult, error) {
-	return loadMergedConfigWithIO(os.Stdout, os.Stderr, os.Stdin)
+	return loadMergedConfigFromDir("")
+}
+
+// loadMergedConfigFromDir loads configuration using the specified working directory
+// for local config resolution. If workingDir is empty, uses current directory.
+func loadMergedConfigFromDir(workingDir string) (internalcue.LoadResult, error) {
+	return loadMergedConfigWithIO(os.Stdout, os.Stderr, os.Stdin, workingDir)
 }
 
 // loadMergedConfigWithIO loads configuration with custom I/O streams.
-func loadMergedConfigWithIO(stdout, stderr io.Writer, stdin io.Reader) (internalcue.LoadResult, error) {
-	paths, err := config.ResolvePaths("")
+func loadMergedConfigWithIO(stdout, stderr io.Writer, stdin io.Reader, workingDir string) (internalcue.LoadResult, error) {
+	paths, err := config.ResolvePaths(workingDir)
 	if err != nil {
 		return internalcue.LoadResult{}, fmt.Errorf("resolving config paths: %w", err)
 	}
 
+	debugf("Global config path: %s (exists: %t)", paths.Global, paths.GlobalExists)
+	debugf("Local config path: %s (exists: %t)", paths.Local, paths.LocalExists)
+
 	// Trigger auto-setup if no config exists
 	if !paths.AnyExists() {
+		debugf("No config found, triggering auto-setup")
 		if err := runAutoSetup(stdout, stderr, stdin); err != nil {
 			return internalcue.LoadResult{}, err
 		}
 		// Re-resolve paths after auto-setup
-		paths, err = config.ResolvePaths("")
+		paths, err = config.ResolvePaths(workingDir)
 		if err != nil {
 			return internalcue.LoadResult{}, fmt.Errorf("resolving config paths: %w", err)
 		}
 	}
 
 	dirs := paths.ForScope(config.ScopeMerged)
+	debugf("Loading config from: %v", dirs)
 	loader := internalcue.NewLoader()
 	return loader.Load(dirs)
 }

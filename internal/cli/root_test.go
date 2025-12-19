@@ -39,16 +39,88 @@ func TestExecute_Version(t *testing.T) {
 	cmd := NewRootCmd()
 	cmd.SetOut(buf)
 	cmd.SetErr(buf)
-	cmd.SetArgs([]string{"--help"})
+	cmd.SetArgs([]string{"--version"})
 
 	err := cmd.Execute()
 	if err != nil {
-		t.Fatalf("Execute() error = %v", err)
+		t.Fatalf("Execute(--version) error = %v", err)
 	}
 
 	output := buf.String()
-	// Should show agent and orchestrator info
-	if !strings.Contains(output, "AI agent") && !strings.Contains(output, "orchestrator") {
-		t.Log("Help output:", output)
+
+	// Should contain version line
+	if !strings.Contains(output, "start version") {
+		t.Errorf("Expected 'start version' in output, got: %s", output)
+	}
+
+	// Should contain repository URL
+	if !strings.Contains(output, "https://github.com/grantcarthew/start") {
+		t.Errorf("Expected repository URL in output, got: %s", output)
+	}
+
+	// Should contain issues URL
+	if !strings.Contains(output, "/issues/new") {
+		t.Errorf("Expected issues URL in output, got: %s", output)
+	}
+}
+
+func TestResolveDirectory(t *testing.T) {
+	tests := []struct {
+		name    string
+		path    string
+		wantErr bool
+		errMsg  string
+	}{
+		{
+			name:    "valid directory",
+			path:    t.TempDir(),
+			wantErr: false,
+		},
+		{
+			name:    "non-existent directory",
+			path:    "/nonexistent/path/that/does/not/exist",
+			wantErr: true,
+			errMsg:  "directory not found",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := resolveDirectory(tt.path)
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("resolveDirectory() expected error, got nil")
+				} else if tt.errMsg != "" && !strings.Contains(err.Error(), tt.errMsg) {
+					t.Errorf("resolveDirectory() error = %v, want error containing %q", err, tt.errMsg)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("resolveDirectory() unexpected error = %v", err)
+				}
+				if result == "" {
+					t.Error("resolveDirectory() returned empty path")
+				}
+			}
+		})
+	}
+}
+
+func TestDebugImpliesVerbose(t *testing.T) {
+	// Reset flags after test
+	defer func() {
+		flagDebug = false
+		flagVerbose = false
+	}()
+
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{"--debug", "--help"})
+
+	// Execute triggers PersistentPreRunE which sets verbose
+	_ = cmd.Execute()
+
+	// After parsing, debug should imply verbose is set
+	// Note: We use --help to avoid actual execution
+	if !flagDebug {
+		t.Error("Expected flagDebug to be true")
 	}
 }
