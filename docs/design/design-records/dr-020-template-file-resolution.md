@@ -199,13 +199,13 @@ Environment: {{.command_output}}
 Agent command using file path:
 
 ```
-GEMINI_SYSTEM_MD='{{.role_file}}' {{.bin}} --model {{.model}} '{{.prompt}}'
+GEMINI_SYSTEM_MD={{.role_file}} {{.bin}} --model {{.model}} {{.prompt}}
 ```
 
 Agent command using inline content:
 
 ```
-{{.bin}} --model {{.model}} --append-system-prompt '{{.role}}' '{{.prompt}}'
+{{.bin}} --model {{.model}} --append-system-prompt {{.role}} {{.prompt}}
 ```
 
 Escaping template syntax:

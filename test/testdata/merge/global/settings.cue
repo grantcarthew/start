@@ -3,7 +3,7 @@
 
 agents: {
 	"claude": {
-		command:       "claude --model {{.model}} '{{.prompt}}'"
+		command:       "claude --model {{.model}} {{.prompt}}"
 		bin:           "claude"
 		description:   "Claude by Anthropic"
 		default_model: "sonnet"

@@ -147,7 +147,7 @@ Showing: claude (first in config)
 Description: Claude by Anthropic
 
 Binary: claude
-Command: {{.bin}} --model {{.model}} '{{.prompt}}'
+Command: {{.bin}} --model {{.model}} {{.prompt}}
 
 Models:
   sonnet: claude-sonnet-4-20250514

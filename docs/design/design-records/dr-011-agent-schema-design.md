@@ -83,7 +83,7 @@ Gain:
 - Extremely flexible agent definitions
 - Simple schema, easy to understand
 - No false negatives from over-strict validation
-- Debug agents like `echo "{{.prompt}}"` work naturally
+- Debug agents like `echo {{.prompt}}` work naturally
 
 ## Structure
 
@@ -93,7 +93,7 @@ Agent configuration:
 agents: {
     "claude": {
         bin:         "claude"
-        command:     "{{.bin}} --model {{.model}} --append-system-prompt '{{.role}}' '{{.prompt}}'"
+        command:     "{{.bin}} --model {{.model}} --append-system-prompt {{.role}} {{.prompt}}"
         description: "Claude Code by Anthropic"
         default_model: "sonnet"
         models: {
@@ -132,7 +132,7 @@ Full-featured agent:
 ```cue
 agents: "claude": {
     bin:         "claude"
-    command:     "{{.bin}} --model {{.model}} --append-system-prompt '{{.role}}' '{{.prompt}}'"
+    command:     "{{.bin}} --model {{.model}} --append-system-prompt {{.role}} {{.prompt}}"
     description: "Claude Code by Anthropic"
     default_model: "sonnet"
     models: {
@@ -147,7 +147,7 @@ Minimal agent:
 
 ```cue
 agents: "simple": {
-    command: "my-ai-tool '{{.prompt}}'"
+    command: "my-ai-tool {{.prompt}}"
 }
 ```
 
@@ -155,7 +155,7 @@ Custom script wrapper:
 
 ```cue
 agents: "custom": {
-    command:     "./scripts/ai-wrapper.sh --role '{{.role}}' --prompt '{{.prompt}}'"
+    command:     "./scripts/ai-wrapper.sh --role {{.role}} --prompt {{.prompt}}"
     description: "Project-specific AI wrapper"
 }
 ```
@@ -164,7 +164,7 @@ Debug/test agent:
 
 ```cue
 agents: "echo": {
-    command:     "echo 'Would send: {{.prompt}}'"
+    command:     "echo {{.prompt}}"
     description: "Debug agent that echoes the prompt"
 }
 ```
@@ -174,7 +174,7 @@ Local LLM:
 ```cue
 agents: "ollama": {
     bin:         "ollama"
-    command:     "{{.bin}} run {{.model}} '{{.prompt}}'"
+    command:     "{{.bin}} run {{.model}} {{.prompt}}"
     description: "Ollama local LLM runner"
     default_model: "llama3"
     models: {
@@ -208,44 +208,48 @@ start --agent claude                   # → claude-3-7-sonnet-20250219 (default
 
 ## Security Considerations
 
-**Placeholder escaping:**
+**Automatic shell escaping:**
 
-Agent command templates use single quotes around placeholders:
+All placeholder values are automatically wrapped in single quotes and escaped by the executor. Template authors should NOT add quotes around placeholders:
 
 ```cue
+// Correct - placeholders are auto-quoted
+command: "{{.bin}} --prompt {{.prompt}} --system {{.role}}"
+
+// WRONG - causes double-quoting, breaks command
 command: "{{.bin}} --prompt '{{.prompt}}' --system '{{.role}}'"
 ```
 
-The `{{.prompt}}` and `{{.role}}` values are processed before shell execution:
+**How escaping works:**
 
-1. **Environment variable expansion**: `$VAR` and `${VAR}` syntax is expanded using Go's `os.ExpandEnv()`. This allows users to reference environment variables in prompts (e.g., `$HOME`, `$USER`, `$PROJECT_NAME`).
+1. **Single-quote wrapping**: All placeholder values are wrapped in single quotes
+2. **Internal quote escaping**: Single quotes within values become `'"'"'`
+3. **Tilde expansion**: Path fields (`{{.bin}}`, `{{.role_file}}`) have `~` expanded before quoting (shell won't expand `~` inside quotes)
+4. **No shell expansion**: `$VAR`, `$(cmd)`, and backticks are preserved as literals (protected by single quotes)
 
-2. **Single quote escaping**: Single quotes are escaped for shell safety (`'` becomes `'"'"'`).
+**Template validation:**
 
-3. **No command execution**: Shell command substitution (`$(...)`) and backticks are NOT executed. They pass through as literal text, protected by single-quote escaping.
+The executor validates templates and rejects quoted placeholders with a clear error:
 
-**Why this design:**
+```
+template contains quoted placeholder '{{.prompt}}'
 
-- Environment variables in prompts are a useful feature (reference `$PROJECT_NAME`, `$USER`, etc.)
-- Command execution in prompts is a security risk (arbitrary code execution)
-- UTD provides `command` field for controlled command execution with timeout protection
-- Clear separation: prompts get variable expansion, commands get shell execution
+Placeholders are automatically shell-escaped and quoted.
+Remove the surrounding quotes from your command template:
 
-**Template convention:**
-
-Agent templates MUST wrap user-provided placeholders in single quotes:
-
-```cue
-// Correct - single quotes protect against injection
-command: "agent --prompt '{{.prompt}}'"
-
-// UNSAFE - no quotes allows shell interpretation
-command: "agent --prompt {{.prompt}}"
+  Before: --prompt '{{.prompt}}'
+  After:  --prompt {{.prompt}}
 ```
 
-Published agents in the registry follow this convention.
+**Why automatic escaping:**
 
-**Command execution path:**
+- Prevents shell injection vulnerabilities by default
+- Simpler template syntax (no manual quoting)
+- Consistent escaping across all placeholders
+- Template validation catches errors early
+- Published agents in the registry use this convention
+
+**Command execution for dynamic content:**
 
 If users need command output in their prompt, they use the UTD pattern:
 
@@ -253,7 +257,7 @@ If users need command output in their prompt, they use the UTD pattern:
 contexts: {
     "git-branch": {
         command: "git branch --show-current"
-        prompt:  "Current branch: {{.CommandOutput}}"
+        prompt:  "Current branch: {{.command_output}}"
     }
 }
 ```
@@ -262,4 +266,5 @@ This executes through the shell runner with timeout protection, not through shel
 
 ## Updates
 
+- 2025-12-19: Changed to automatic shell escaping. Placeholders are now auto-quoted; templates must NOT include quotes around placeholders. Added template validation to detect and reject quoted placeholders with clear error messages. Added tilde expansion for path fields.
 - 2025-12-18: Added Security Considerations section documenting placeholder escaping, environment variable expansion via `os.ExpandEnv()`, and single-quote convention for templates.

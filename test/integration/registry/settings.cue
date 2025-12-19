@@ -7,7 +7,7 @@ import "github.com/grantcarthew/start-assets/schemas@v0"
 agents: {
 	claude: schemas.#Agent & {
 		bin:           "claude"
-		command:       "{{.bin}} --model {{.model}} --permission-mode default --append-system-prompt-file '{{.role_file}}' '{{.prompt}}'"
+		command:       "{{.bin}} --model {{.model}} --permission-mode default --append-system-prompt-file {{.role_file}} {{.prompt}}"
 		description:   "Claude Code by Anthropic - agentic coding assistant"
 		default_model: "sonnet"
 		models: {
@@ -19,7 +19,7 @@ agents: {
 	}
 	gemini: schemas.#Agent & {
 		bin:           "gemini"
-		command:       "{{.bin}} --model {{.model}} '{{.prompt}}'"
+		command:       "{{.bin}} --model {{.model}} {{.prompt}}"
 		description:   "Google Gemini CLI"
 		default_model: "flash"
 		models: {

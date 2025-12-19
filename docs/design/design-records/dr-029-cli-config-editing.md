@@ -176,7 +176,7 @@ Files are generated using template functions (following `generateAgentCUE` patte
 agents: {
     "claude": {
         bin:     "claude"
-        command: "claude --model {{.model}} '{{.prompt}}'"
+        command: "claude --model {{.model}} {{.prompt}}"
         // ... other fields
     }
 }
@@ -206,7 +206,7 @@ Add agent via flags:
 start config agent add \
   --name gemini \
   --bin gemini \
-  --command '{{.bin}} --model {{.model}} "{{.prompt}}"' \
+  --command '{{.bin}} --model {{.model}} {{.prompt}}' \
   --default-model flash
 ```
 

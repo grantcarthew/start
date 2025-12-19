@@ -72,7 +72,7 @@ Agent command templates use Go template conditionals to handle missing values:
 ```cue
 agents: "claude": {
     bin:     "claude"
-    command: "{{.bin}}{{if .model}} --model {{.model}}{{end}}{{if .role}} --append-system-prompt '{{.role}}'{{end}}{{if .prompt}} '{{.prompt}}'{{end}}"
+    command: "{{.bin}}{{if .model}} --model {{.model}}{{end}}{{if .role}} --append-system-prompt {{.role}}{{end}}{{if .prompt}} {{.prompt}}{{end}}"
     default_model: "sonnet"
     models: {
         sonnet: "claude-sonnet-4-20250514"

@@ -4,7 +4,7 @@
 // Add a new agent (deep merge - both claude from global and gemini coexist)
 agents: {
 	gemini: {
-		command:       "gemini --model {{.model}} '{{.prompt}}'"
+		command:       "gemini --model {{.model}} {{.prompt}}"
 		bin:           "gemini"
 		description:   "Google Gemini"
 		default_model: "pro"

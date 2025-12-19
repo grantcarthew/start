@@ -177,10 +177,10 @@ Agent command examples:
 
 ```cue
 agents: "claude": {
-    command: "{{.bin}} --model {{.model}} --append-system-prompt '{{.role}}' '{{.prompt}}'"
+    command: "{{.bin}} --model {{.model}} --append-system-prompt {{.role}} {{.prompt}}"
 }
 
 agents: "gemini": {
-    command: "GEMINI_SYSTEM_MD='{{.role_file}}' {{.bin}} --model {{.model}} '{{.prompt}}'"
+    command: "GEMINI_SYSTEM_MD={{.role_file}} {{.bin}} --model {{.model}} {{.prompt}}"
 }
 ```

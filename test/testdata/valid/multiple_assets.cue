@@ -6,7 +6,7 @@ import "github.com/grantcarthew/start/test/testdata/schemas"
 agents: {
 	"claude": schemas.#Agent & {
 		bin:         "claude"
-		command:     "{{.bin}} --model {{.model}} '{{.prompt}}'"
+		command:     "{{.bin}} --model {{.model}} {{.prompt}}"
 		description: "Claude by Anthropic"
 		default_model: "sonnet"
 		models: {
@@ -16,7 +16,7 @@ agents: {
 	}
 	"gemini": schemas.#Agent & {
 		bin:         "gemini"
-		command:     "{{.bin}} --model {{.model}} '{{.prompt}}'"
+		command:     "{{.bin}} --model {{.model}} {{.prompt}}"
 		description: "Google Gemini"
 		default_model: "pro"
 		models: {

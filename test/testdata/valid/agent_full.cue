@@ -5,7 +5,7 @@ import "github.com/grantcarthew/start/test/testdata/schemas"
 // Full-featured agent with all optional fields
 agents: "claude": schemas.#Agent & {
 	bin:         "claude"
-	command:     "{{.bin}} --model {{.model}} --append-system-prompt '{{.role}}' '{{.prompt}}'"
+	command:     "{{.bin}} --model {{.model}} --append-system-prompt {{.role}} {{.prompt}}"
 	description: "Claude Code by Anthropic"
 	default_model: "sonnet"
 	models: {
