@@ -3,13 +3,11 @@ package cli
 import (
 	"fmt"
 	"io"
-	"os"
 	"strings"
 
 	"cuelang.org/go/cue"
 	internalcue "github.com/grantcarthew/start/internal/cue"
 	"github.com/grantcarthew/start/internal/orchestration"
-	"github.com/grantcarthew/start/internal/shell"
 	"github.com/grantcarthew/start/internal/temp"
 	"github.com/spf13/cobra"
 )
@@ -42,47 +40,21 @@ func runTask(cmd *cobra.Command, args []string) error {
 
 // executeTask handles task execution.
 func executeTask(stdout, stderr io.Writer, taskName, instructions string) error {
-	// Load configuration
-	cfg, err := loadMergedConfig()
+	env, err := prepareExecutionEnv()
 	if err != nil {
-		return fmt.Errorf("loading configuration: %w", err)
+		return err
 	}
-
-	// Get working directory
-	workingDir, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("getting working directory: %w", err)
-	}
-
-	// Create shell runner and template processor
-	shellRunner := shell.NewRunner()
-	processor := orchestration.NewTemplateProcessor(nil, shellRunner, workingDir)
-	composer := orchestration.NewComposer(processor, workingDir)
 
 	// Resolve task
-	taskResult, err := composer.ResolveTask(cfg.Value, taskName, instructions)
+	taskResult, err := env.Composer.ResolveTask(env.Cfg.Value, taskName, instructions)
 	if err != nil {
 		return fmt.Errorf("resolving task: %w", err)
 	}
 
-	// Get task's role if specified, else use flag or default
+	// Get task's role if specified, else use flag
 	roleName := flagRole
 	if roleName == "" {
-		roleName = orchestration.GetTaskRole(cfg.Value, taskName)
-	}
-
-	// Select agent
-	agentName := flagAgent
-	if agentName == "" {
-		agentName = orchestration.GetDefaultAgent(cfg.Value)
-	}
-	if agentName == "" {
-		return fmt.Errorf("no agent configured")
-	}
-
-	agent, err := orchestration.ExtractAgent(cfg.Value, agentName)
-	if err != nil {
-		return fmt.Errorf("loading agent: %w", err)
+		roleName = orchestration.GetTaskRole(env.Cfg.Value, taskName)
 	}
 
 	// Per DR-015: required contexts only for tasks
@@ -93,46 +65,36 @@ func executeTask(stdout, stderr io.Writer, taskName, instructions string) error 
 	}
 
 	// Compose contexts and resolve role
-	composeResult, err := composer.ComposeWithRole(cfg.Value, selection, roleName, taskResult.Content, "")
+	composeResult, err := env.Composer.ComposeWithRole(env.Cfg.Value, selection, roleName, taskResult.Content, "")
 	if err != nil {
 		return fmt.Errorf("composing prompt: %w", err)
 	}
 
 	// Print warnings
-	for _, w := range taskResult.Warnings {
-		if !flagQuiet {
-			fmt.Fprintf(stderr, "Warning: %s\n", w)
-		}
-	}
-	for _, w := range composeResult.Warnings {
-		if !flagQuiet {
-			fmt.Fprintf(stderr, "Warning: %s\n", w)
-		}
-	}
+	printWarnings(stderr, taskResult.Warnings)
+	printWarnings(stderr, composeResult.Warnings)
 
 	// Build execution config
 	execConfig := orchestration.ExecuteConfig{
-		Agent:      agent,
+		Agent:      env.Agent,
 		Model:      flagModel,
 		Role:       composeResult.Role,
 		Prompt:     composeResult.Prompt,
-		WorkingDir: workingDir,
+		WorkingDir: env.WorkingDir,
 		DryRun:     flagDryRun,
 	}
 
-	executor := orchestration.NewExecutor(workingDir)
-
 	if flagDryRun {
-		return executeTaskDryRun(stdout, executor, execConfig, composeResult, agent, taskName, instructions)
+		return executeTaskDryRun(stdout, env.Executor, execConfig, composeResult, env.Agent, taskName, instructions)
 	}
 
 	// Print execution info
 	if !flagQuiet {
-		printTaskExecutionInfo(stdout, agent, flagModel, composeResult, taskName, instructions, taskResult)
+		printTaskExecutionInfo(stdout, env.Agent, flagModel, composeResult, taskName, instructions, taskResult)
 	}
 
 	// Execute agent (replaces current process)
-	return executor.Execute(execConfig)
+	return env.Executor.Execute(execConfig)
 }
 
 // executeTaskDryRun handles --dry-run mode for tasks.
@@ -251,7 +213,7 @@ func printTaskDryRunSummary(w io.Writer, agent orchestration.Agent, model string
 
 // findTask attempts to find a task by exact name or prefix match.
 func findTask(cfg internalcue.LoadResult, name string) (string, error) {
-	tasks := cfg.Value.LookupPath(cue.ParsePath("tasks"))
+	tasks := cfg.Value.LookupPath(cue.ParsePath(internalcue.KeyTasks))
 	if !tasks.Exists() {
 		return "", fmt.Errorf("no tasks defined")
 	}

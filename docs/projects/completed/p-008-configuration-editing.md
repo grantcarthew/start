@@ -1,6 +1,6 @@
 # P-008: Configuration Editing
 
-- Status: Complete (pending optional external review)
+- Status: Complete
 - Started: 2025-12-18
 - Completed: 2025-12-18
 
@@ -86,8 +86,8 @@ Out of Scope:
 
 ### Phase 4: Review
 
-- [ ] External code review (if significant changes)
-- [ ] Fix reported issues
+- [x] External code review (if significant changes)
+- [x] Fix reported issues
 - [x] Update project document
 
 ## Deliverables
@@ -177,3 +177,10 @@ Manual testing verified:
 - Created settings schema (`settings.cue`, `settings_example.cue`) in start-assets
 - Added 8 unit tests for settings command
 - Updated all 20 dependent CUE modules to schemas v0.0.3
+
+2025-12-19: External code review completed. Fixed reported issues:
+- Centralized CUE key constants (`internal/cue/keys.go`) to prevent typos
+- Removed `os.ExpandEnv` from `escapeForShell` - environment variables no longer expanded in prompts
+- Refactored CLI logic - extracted common setup from `start.go` and `task.go` into `prepareExecutionEnv()` helper
+- Added Windows startup guard in `root.go` with clear error message
+- Updated tests to reflect new behaviour

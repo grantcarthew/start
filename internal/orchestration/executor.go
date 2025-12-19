@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"cuelang.org/go/cue"
+	internalcue "github.com/grantcarthew/start/internal/cue"
 )
 
 // Agent represents an agent configuration.
@@ -152,16 +153,12 @@ func (e *Executor) ExecuteWithoutReplace(cfg ExecuteConfig) (string, error) {
 }
 
 // escapeForShell prepares a string for safe use in shell commands.
-// It expands environment variables (e.g., $HOME, ${USER}) using Go's os.ExpandEnv,
-// then escapes single quotes for shell safety. This allows users to reference
-// environment variables in prompts while preventing shell command injection.
-// Command execution should use the UTD command field instead.
+// It escapes single quotes for shell safety, preventing shell command injection.
+// Note: Environment variables (e.g., $HOME) are NOT expanded. Use literal values
+// in prompts or the UTD command field for dynamic content.
 func escapeForShell(s string) string {
-	// Expand environment variables in Go (safe - no command execution)
-	s = os.ExpandEnv(s)
 	// Escape single quotes for shell safety
-	s = strings.ReplaceAll(s, "'", "'\"'\"'")
-	return s
+	return strings.ReplaceAll(s, "'", "'\"'\"'")
 }
 
 // ExtractAgent extracts agent configuration from CUE value.
@@ -169,7 +166,7 @@ func ExtractAgent(cfg cue.Value, name string) (Agent, error) {
 	var agent Agent
 	agent.Name = name
 
-	agentVal := cfg.LookupPath(cue.ParsePath("agents")).LookupPath(cue.MakePath(cue.Str(name)))
+	agentVal := cfg.LookupPath(cue.ParsePath(internalcue.KeyAgents)).LookupPath(cue.MakePath(cue.Str(name)))
 	if !agentVal.Exists() {
 		return agent, fmt.Errorf("agent %q not found", name)
 	}
@@ -221,14 +218,14 @@ func ExtractAgent(cfg cue.Value, name string) (Agent, error) {
 // GetDefaultAgent returns the name of the default agent.
 func GetDefaultAgent(cfg cue.Value) string {
 	// Check settings.default_agent
-	if def := cfg.LookupPath(cue.ParsePath("settings.default_agent")); def.Exists() {
+	if def := cfg.LookupPath(cue.ParsePath(internalcue.KeySettings + ".default_agent")); def.Exists() {
 		if s, err := def.String(); err == nil {
 			return s
 		}
 	}
 
 	// Fall back to first agent in definition order
-	agents := cfg.LookupPath(cue.ParsePath("agents"))
+	agents := cfg.LookupPath(cue.ParsePath(internalcue.KeyAgents))
 	if agents.Exists() {
 		iter, err := agents.Fields()
 		if err == nil && iter.Next() {

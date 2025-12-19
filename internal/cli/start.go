@@ -27,6 +27,59 @@ var (
 	flagVerbose bool
 )
 
+// ExecutionEnv holds the common execution environment for start and task commands.
+type ExecutionEnv struct {
+	Cfg        internalcue.LoadResult
+	WorkingDir string
+	Agent      orchestration.Agent
+	Composer   *orchestration.Composer
+	Executor   *orchestration.Executor
+}
+
+// prepareExecutionEnv prepares the common execution environment.
+// This is shared between executeStart and executeTask to avoid code duplication.
+func prepareExecutionEnv() (*ExecutionEnv, error) {
+	// Load configuration
+	cfg, err := loadMergedConfig()
+	if err != nil {
+		return nil, fmt.Errorf("loading configuration: %w", err)
+	}
+
+	// Get working directory
+	workingDir, err := os.Getwd()
+	if err != nil {
+		return nil, fmt.Errorf("getting working directory: %w", err)
+	}
+
+	// Select agent
+	agentName := flagAgent
+	if agentName == "" {
+		agentName = orchestration.GetDefaultAgent(cfg.Value)
+	}
+	if agentName == "" {
+		return nil, fmt.Errorf("no agent configured")
+	}
+
+	agent, err := orchestration.ExtractAgent(cfg.Value, agentName)
+	if err != nil {
+		return nil, fmt.Errorf("loading agent: %w", err)
+	}
+
+	// Create shell runner and template processor
+	shellRunner := shell.NewRunner()
+	processor := orchestration.NewTemplateProcessor(nil, shellRunner, workingDir)
+	composer := orchestration.NewComposer(processor, workingDir)
+	executor := orchestration.NewExecutor(workingDir)
+
+	return &ExecutionEnv{
+		Cfg:        cfg,
+		WorkingDir: workingDir,
+		Agent:      agent,
+		Composer:   composer,
+		Executor:   executor,
+	}, nil
+}
+
 // runStart executes the start command (root command with no subcommand).
 func runStart(cmd *cobra.Command, args []string) error {
 	return executeStart(cmd.OutOrStdout(), cmd.ErrOrStderr(), orchestration.ContextSelection{
@@ -38,76 +91,51 @@ func runStart(cmd *cobra.Command, args []string) error {
 
 // executeStart is the shared execution logic for start commands.
 func executeStart(stdout, stderr io.Writer, selection orchestration.ContextSelection, customText string) error {
-	// Load configuration
-	cfg, err := loadMergedConfig()
+	env, err := prepareExecutionEnv()
 	if err != nil {
-		return fmt.Errorf("loading configuration: %w", err)
+		return err
 	}
-
-	// Get working directory
-	workingDir, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("getting working directory: %w", err)
-	}
-
-	// Select agent
-	agentName := flagAgent
-	if agentName == "" {
-		agentName = orchestration.GetDefaultAgent(cfg.Value)
-	}
-	if agentName == "" {
-		return fmt.Errorf("no agent configured")
-	}
-
-	agent, err := orchestration.ExtractAgent(cfg.Value, agentName)
-	if err != nil {
-		return fmt.Errorf("loading agent: %w", err)
-	}
-
-	// Select role
-	roleName := flagRole
-
-	// Create shell runner and template processor
-	shellRunner := shell.NewRunner()
-	processor := orchestration.NewTemplateProcessor(nil, shellRunner, workingDir)
-	composer := orchestration.NewComposer(processor, workingDir)
 
 	// Compose prompt with role
-	result, err := composer.ComposeWithRole(cfg.Value, selection, roleName, customText, "")
+	result, err := env.Composer.ComposeWithRole(env.Cfg.Value, selection, flagRole, customText, "")
 	if err != nil {
 		return fmt.Errorf("composing prompt: %w", err)
 	}
 
 	// Print warnings
-	for _, w := range result.Warnings {
-		if !flagQuiet {
-			fmt.Fprintf(stderr, "Warning: %s\n", w)
-		}
-	}
+	printWarnings(stderr, result.Warnings)
 
 	// Build execution config
 	execConfig := orchestration.ExecuteConfig{
-		Agent:      agent,
+		Agent:      env.Agent,
 		Model:      flagModel,
 		Role:       result.Role,
 		Prompt:     result.Prompt,
-		WorkingDir: workingDir,
+		WorkingDir: env.WorkingDir,
 		DryRun:     flagDryRun,
 	}
 
-	executor := orchestration.NewExecutor(workingDir)
-
 	if flagDryRun {
-		return executeDryRun(stdout, executor, execConfig, result, agent)
+		return executeDryRun(stdout, env.Executor, execConfig, result, env.Agent)
 	}
 
 	// Print execution info
 	if !flagQuiet {
-		printExecutionInfo(stdout, agent, flagModel, result)
+		printExecutionInfo(stdout, env.Agent, flagModel, result)
 	}
 
 	// Execute agent (replaces current process)
-	return executor.Execute(execConfig)
+	return env.Executor.Execute(execConfig)
+}
+
+// printWarnings prints warnings to stderr if not in quiet mode.
+func printWarnings(stderr io.Writer, warnings []string) {
+	if flagQuiet {
+		return
+	}
+	for _, w := range warnings {
+		fmt.Fprintf(stderr, "Warning: %s\n", w)
+	}
 }
 
 // executeDryRun handles --dry-run mode.

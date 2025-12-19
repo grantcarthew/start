@@ -668,7 +668,7 @@ func loadTasksFromDir(dir string) (map[string]TaskConfig, error) {
 		return tasks, err
 	}
 
-	tasksVal := cfg.LookupPath(cue.ParsePath("tasks"))
+	tasksVal := cfg.LookupPath(cue.ParsePath(internalcue.KeyTasks))
 	if !tasksVal.Exists() {
 		return tasks, nil
 	}

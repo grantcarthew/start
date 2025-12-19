@@ -273,7 +273,7 @@ func loadSettingsFromDir(dir string) (map[string]string, error) {
 	}
 
 	// Extract settings
-	settingsVal := result.Value.LookupPath(cue.ParsePath("settings"))
+	settingsVal := result.Value.LookupPath(cue.ParsePath(internalcue.KeySettings))
 	if !settingsVal.Exists() {
 		return settings, nil
 	}
