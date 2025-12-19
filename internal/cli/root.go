@@ -1,6 +1,9 @@
 package cli
 
 import (
+	"fmt"
+	"runtime"
+
 	"github.com/spf13/cobra"
 )
 
@@ -38,5 +41,8 @@ It manages prompt composition, context injection, and workflow automation.`,
 
 // Execute runs the root command. This is the main entry point for the CLI.
 func Execute() error {
+	if runtime.GOOS == "windows" {
+		return fmt.Errorf("start does not support Windows (see DR-006 for platform scope)")
+	}
 	return NewRootCmd().Execute()
 }

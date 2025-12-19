@@ -17,6 +17,7 @@ import (
 	"cuelang.org/go/mod/modconfig"
 
 	"github.com/grantcarthew/start/internal/config"
+	internalcue "github.com/grantcarthew/start/internal/cue"
 	"github.com/grantcarthew/start/internal/detection"
 	"github.com/grantcarthew/start/internal/registry"
 )
@@ -250,7 +251,7 @@ func extractAgentFromValue(v cue.Value, name string) (Agent, error) {
 	agent.Name = name
 
 	// Try looking up under "agents" map first (user config style)
-	agentVal := v.LookupPath(cue.ParsePath("agents")).LookupPath(cue.MakePath(cue.Str(name)))
+	agentVal := v.LookupPath(cue.ParsePath(internalcue.KeyAgents)).LookupPath(cue.MakePath(cue.Str(name)))
 	if !agentVal.Exists() {
 		// Try singular "agent" field (registry module style)
 		agentVal = v.LookupPath(cue.ParsePath("agent"))

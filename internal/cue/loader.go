@@ -116,10 +116,10 @@ func (l *Loader) Load(dirs []string) (LoadResult, error) {
 // Items within these collections are merged additively by name, with later
 // values replacing earlier values for the same item name.
 var collectionKeys = map[string]bool{
-	"agents":   true,
-	"contexts": true,
-	"roles":    true,
-	"tasks":    true,
+	KeyAgents:   true,
+	KeyContexts: true,
+	KeyRoles:    true,
+	KeyTasks:    true,
 }
 
 // mergeWithReplacement merges multiple CUE values with two-level merge semantics:

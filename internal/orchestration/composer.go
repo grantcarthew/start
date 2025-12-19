@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"cuelang.org/go/cue"
+	internalcue "github.com/grantcarthew/start/internal/cue"
 )
 
 // ContextSelection specifies which contexts to include.
@@ -118,7 +119,7 @@ func (c *Composer) ComposeWithRole(cfg cue.Value, selection ContextSelection, ro
 
 // selectContexts returns contexts matching the selection criteria in definition order.
 func (c *Composer) selectContexts(cfg cue.Value, selection ContextSelection) ([]Context, error) {
-	contextsVal := cfg.LookupPath(cue.ParsePath("contexts"))
+	contextsVal := cfg.LookupPath(cue.ParsePath(internalcue.KeyContexts))
 	if !contextsVal.Exists() {
 		return nil, nil // No contexts defined is OK
 	}
@@ -200,7 +201,7 @@ func (c *Composer) selectContexts(cfg cue.Value, selection ContextSelection) ([]
 
 // resolveContext resolves a context through UTD processing.
 func (c *Composer) resolveContext(cfg cue.Value, name string) (ProcessResult, error) {
-	ctxVal := cfg.LookupPath(cue.ParsePath("contexts")).LookupPath(cue.MakePath(cue.Str(name)))
+	ctxVal := cfg.LookupPath(cue.ParsePath(internalcue.KeyContexts)).LookupPath(cue.MakePath(cue.Str(name)))
 	if !ctxVal.Exists() {
 		return ProcessResult{}, fmt.Errorf("context not found")
 	}
@@ -215,7 +216,7 @@ func (c *Composer) resolveContext(cfg cue.Value, name string) (ProcessResult, er
 
 // resolveRole resolves a role through UTD processing.
 func (c *Composer) resolveRole(cfg cue.Value, name string) (string, error) {
-	roleVal := cfg.LookupPath(cue.ParsePath("roles")).LookupPath(cue.MakePath(cue.Str(name)))
+	roleVal := cfg.LookupPath(cue.ParsePath(internalcue.KeyRoles)).LookupPath(cue.MakePath(cue.Str(name)))
 	if !roleVal.Exists() {
 		return "", fmt.Errorf("role not found")
 	}
@@ -236,14 +237,14 @@ func (c *Composer) resolveRole(cfg cue.Value, name string) (string, error) {
 // getDefaultRole returns the default role name from config.
 func (c *Composer) getDefaultRole(cfg cue.Value) string {
 	// Check settings.default_role
-	if def := cfg.LookupPath(cue.ParsePath("settings.default_role")); def.Exists() {
+	if def := cfg.LookupPath(cue.ParsePath(internalcue.KeySettings + ".default_role")); def.Exists() {
 		if s, err := def.String(); err == nil {
 			return s
 		}
 	}
 
 	// Fall back to first role in definition order
-	roles := cfg.LookupPath(cue.ParsePath("roles"))
+	roles := cfg.LookupPath(cue.ParsePath(internalcue.KeyRoles))
 	if roles.Exists() {
 		iter, err := roles.Fields()
 		if err == nil && iter.Next() {
@@ -281,7 +282,7 @@ func extractUTDFields(v cue.Value) UTDFields {
 
 // ResolveTask resolves a task by name and processes its UTD.
 func (c *Composer) ResolveTask(cfg cue.Value, name, instructions string) (ProcessResult, error) {
-	taskVal := cfg.LookupPath(cue.ParsePath("tasks")).LookupPath(cue.MakePath(cue.Str(name)))
+	taskVal := cfg.LookupPath(cue.ParsePath(internalcue.KeyTasks)).LookupPath(cue.MakePath(cue.Str(name)))
 	if !taskVal.Exists() {
 		return ProcessResult{}, fmt.Errorf("task %q not found", name)
 	}
@@ -296,7 +297,7 @@ func (c *Composer) ResolveTask(cfg cue.Value, name, instructions string) (Proces
 
 // GetTaskRole returns the role specified for a task.
 func GetTaskRole(cfg cue.Value, taskName string) string {
-	taskVal := cfg.LookupPath(cue.ParsePath("tasks")).LookupPath(cue.MakePath(cue.Str(taskName)))
+	taskVal := cfg.LookupPath(cue.ParsePath(internalcue.KeyTasks)).LookupPath(cue.MakePath(cue.Str(taskName)))
 	if !taskVal.Exists() {
 		return ""
 	}

@@ -156,7 +156,7 @@ func prepareShowRole(name, scope string) (ShowResult, error) {
 		return ShowResult{}, err
 	}
 
-	roles := cfg.Value.LookupPath(cue.ParsePath("roles"))
+	roles := cfg.Value.LookupPath(cue.ParsePath(internalcue.KeyRoles))
 	if !roles.Exists() {
 		return ShowResult{}, fmt.Errorf("no roles defined in configuration")
 	}
@@ -204,7 +204,7 @@ func prepareShowContext(name, scope string) (ShowResult, error) {
 		return ShowResult{}, err
 	}
 
-	contexts := cfg.Value.LookupPath(cue.ParsePath("contexts"))
+	contexts := cfg.Value.LookupPath(cue.ParsePath(internalcue.KeyContexts))
 	if !contexts.Exists() {
 		return ShowResult{}, fmt.Errorf("no contexts defined in configuration")
 	}
@@ -296,7 +296,7 @@ func prepareShowAgent(name, scope string) (ShowResult, error) {
 		return ShowResult{}, err
 	}
 
-	agents := cfg.Value.LookupPath(cue.ParsePath("agents"))
+	agents := cfg.Value.LookupPath(cue.ParsePath(internalcue.KeyAgents))
 	if !agents.Exists() {
 		return ShowResult{}, fmt.Errorf("no agents defined in configuration")
 	}
@@ -344,7 +344,7 @@ func prepareShowTask(name, scope string) (ShowResult, error) {
 		return ShowResult{}, err
 	}
 
-	tasks := cfg.Value.LookupPath(cue.ParsePath("tasks"))
+	tasks := cfg.Value.LookupPath(cue.ParsePath(internalcue.KeyTasks))
 	if !tasks.Exists() {
 		return ShowResult{}, fmt.Errorf("no tasks defined in configuration")
 	}

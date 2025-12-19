@@ -143,30 +143,28 @@ func TestEscapeForShell(t *testing.T) {
 	}
 }
 
-func TestEscapeForShell_EnvExpansion(t *testing.T) {
-	// Set test environment variables
-	t.Setenv("TEST_VAR", "expanded_value")
-	t.Setenv("TEST_USER", "testuser")
-
+func TestEscapeForShell_NoEnvExpansion(t *testing.T) {
+	// Environment variables should NOT be expanded (changed per code review).
+	// Only single quote escaping is performed for shell safety.
 	tests := []struct {
 		name  string
 		input string
 		want  string
 	}{
 		{
-			name:  "expands $VAR syntax",
+			name:  "preserves $VAR syntax",
 			input: "Hello $TEST_VAR",
-			want:  "Hello expanded_value",
+			want:  "Hello $TEST_VAR",
 		},
 		{
-			name:  "expands ${VAR} syntax",
+			name:  "preserves ${VAR} syntax",
 			input: "Hello ${TEST_USER}",
-			want:  "Hello testuser",
+			want:  "Hello ${TEST_USER}",
 		},
 		{
-			name:  "undefined var becomes empty",
+			name:  "preserves undefined var",
 			input: "Hello $UNDEFINED_VAR_XYZ",
-			want:  "Hello ",
+			want:  "Hello $UNDEFINED_VAR_XYZ",
 		},
 		{
 			name:  "command substitution not executed",
@@ -179,9 +177,14 @@ func TestEscapeForShell_EnvExpansion(t *testing.T) {
 			want:  "`echo pwned`",
 		},
 		{
-			name:  "combined env and quotes",
+			name:  "preserves dollar sign with quotes",
 			input: "$TEST_USER's files",
-			want:  "testuser'\"'\"'s files",
+			want:  "$TEST_USER'\"'\"'s files",
+		},
+		{
+			name:  "preserves literal dollar amounts",
+			input: "Cost is $100",
+			want:  "Cost is $100",
 		},
 	}
 

@@ -739,7 +739,7 @@ func loadRolesFromDir(dir string) (map[string]RoleConfig, error) {
 		return roles, err
 	}
 
-	rolesVal := cfg.LookupPath(cue.ParsePath("roles"))
+	rolesVal := cfg.LookupPath(cue.ParsePath(internalcue.KeyRoles))
 	if !rolesVal.Exists() {
 		return roles, nil
 	}

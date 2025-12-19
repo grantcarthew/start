@@ -686,7 +686,7 @@ func loadAgentsFromDir(dir string) (map[string]AgentConfig, error) {
 		return agents, err
 	}
 
-	agentsVal := cfg.LookupPath(cue.ParsePath("agents"))
+	agentsVal := cfg.LookupPath(cue.ParsePath(internalcue.KeyAgents))
 	if !agentsVal.Exists() {
 		return agents, nil
 	}

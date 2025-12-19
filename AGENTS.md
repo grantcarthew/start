@@ -10,9 +10,15 @@ Avoid references to the prototype in new documentation. This is a new design.
 
 ### Active Project
 
-Projects are stored in the docs/projects/ directory. Continue by reading the active project.
+Projects are stored in the `docs/projects/` directory. Continue by reading the active project.
 
-Active Project: docs/projects/p-008-configuration-editing.md
+Active Project: docs/projects/p-009-doctor-diagnostics.md
+
+Project Workflow:
+- Active projects are in `docs/projects/`
+- When a project is complete, move it to `docs/projects/completed/`
+- Update this file to point to the next active project
+- Update the Development Status section below
 
 ## Why CUE?
 
@@ -138,8 +144,9 @@ The `./Context` directory contains cloned source code and documentation for deve
 - P-004: Minimal CLI Implementation (CUE loading, show command, global flags)
 - P-005: Orchestration Core Engine (template processing, shell execution, composition, CLI commands)
 - P-006: Auto-Setup (registry interaction, agent detection, TTY prompts, config writing)
-- P-008: Configuration Editing (config agent/role/context/task commands with list/add/show/edit/remove)
+- P-007: Package Management (assets commands for browsing/installing registry packages)
+- P-008: Configuration Editing (config agent/role/context/task/settings commands)
 
-**Current:** P-007 Package Management
+**Current:** P-009 Doctor Diagnostics
 
 The prototype validated that this tool solves a real problem. This version will implement it properly.

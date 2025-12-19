@@ -714,7 +714,7 @@ func loadContextsFromDir(dir string) (map[string]ContextConfig, error) {
 		return contexts, err
 	}
 
-	contextsVal := cfg.LookupPath(cue.ParsePath("contexts"))
+	contextsVal := cfg.LookupPath(cue.ParsePath(internalcue.KeyContexts))
 	if !contextsVal.Exists() {
 		return contexts, nil
 	}
