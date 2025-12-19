@@ -37,6 +37,7 @@ Design Records (DRs) document architectural decisions, algorithms, breaking chan
 | DR-029 | CLI Configuration Editing Commands | CLI | Accepted | 2025-12-18 |
 | DR-030 | Settings Schema | Config | Accepted | 2025-12-18 |
 | DR-031 | CLI Doctor Command | CLI | Accepted | 2025-12-19 |
+| DR-032 | CLI Shell Completion | CLI | Accepted | 2025-12-19 |
 
 ## Process
 

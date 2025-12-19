@@ -137,37 +137,37 @@ These are explicitly NOT part of this project:
 
 ### Phase 2: Show Command
 
-4. Implement show command structure
+1. Implement show command structure
    - Parent `show` command
    - Subcommands: `role`, `context`, `agent`, `task`
    - `--scope` flag for global/local filtering
 
-5. Implement show role
+2. Implement show role
    - Load and validate configuration
    - Extract role by name (or default)
    - Process UTD (read files, but skip commands for now)
    - Write to temp directory
    - Display 5-line preview
 
-6. Implement show context/agent/task
+3. Implement show context/agent/task
    - Same pattern as show role
    - Handle "show all" for contexts
 
-7. Implement temp directory output
+4. Implement temp directory output
    - Create `/tmp/start-YYYYMMDDHHmmss/`
    - Handle timestamp collisions
-   - Write markdown files
+   - Write Markdown files
 
 ### Phase 3: Global Flags
 
-8. Implement global flags
+1. Implement global flags
    - `--verbose` - Detailed output
    - `--debug` - Full debug output
    - `--quiet` - Suppress output
    - `--help` - Show help (Cobra default)
    - `--version` - Show version
 
-9. Implement output modes
+2. Implement output modes
    - Normal: 5-line preview + file path
    - Verbose: Additional metadata
    - Debug: Full resolution trace
@@ -175,13 +175,13 @@ These are explicitly NOT part of this project:
 
 ### Phase 4: Testing
 
-10. Write tests per DR-024
+1. Write tests per DR-024
     - Unit tests for loader, validator
     - Integration tests for show command
     - Use real CUE files via `t.TempDir()`
     - Table-driven tests for error cases
 
-11. Test with P-002 assets
+2. Test with P-002 assets
     - Copy example configs to test directories
     - Verify validation passes
     - Verify output is correct

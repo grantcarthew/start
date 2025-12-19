@@ -12,7 +12,7 @@ Avoid references to the prototype in new documentation. This is a new design.
 
 Projects are stored in the `docs/projects/` directory. Continue by reading the active project.
 
-Active Project: None - P-009 complete, awaiting next project
+Active Project: None - P-010 complete, awaiting next project
 
 Project Workflow:
 - Active projects are in `docs/projects/`
@@ -147,6 +147,7 @@ The `./Context` directory contains cloned source code and documentation for deve
 - P-007: Package Management (assets commands for browsing/installing registry packages)
 - P-008: Configuration Editing (config agent/role/context/task/settings commands)
 - P-009: Doctor Diagnostics (health checks, configuration validation, fix suggestions)
+- P-010: Shell Completion (bash, zsh, fish tab-completion, documentation guides)
 
 **Current:** None - awaiting next project
 

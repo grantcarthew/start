@@ -29,6 +29,7 @@ These functions cannot be unit tested due to their nature but are covered by E2E
 **Reason:** Uses `syscall.Exec` which replaces the current process. Cannot return to test code after execution.
 
 **Mitigation:**
+
 - `ExecuteWithoutReplace()` provides equivalent logic and is fully tested
 - `BuildCommand()` is tested at 92.9%
 - E2E tests in `test/e2e/autosetup_test.go` exercise the full execution path
@@ -40,6 +41,7 @@ These functions cannot be unit tested due to their nature but are covered by E2E
 **Reason:** Main entry point that orchestrates network calls (registry fetch), file I/O (config writing), and interactive prompts. Testing requires mocking the entire registry client.
 
 **Mitigation:**
+
 - All component functions are individually tested:
   - `NeedsSetup()` - 100%
   - `promptSelection()` - 96.3%
@@ -57,6 +59,7 @@ These functions cannot be unit tested due to their nature but are covered by E2E
 **Reason:** Requires fetched CUE module from registry. The module loading uses `cue/load` which expects real filesystem paths from the registry cache.
 
 **Mitigation:**
+
 - `extractAgentFromValue()` is tested at 100% with all CUE value formats
 - Integration between loader and agent extraction is verified
 - E2E tests exercise the complete module loading path
@@ -68,6 +71,7 @@ These functions cannot be unit tested due to their nature but are covered by E2E
 **Reason:** Wrapper that calls `Fetch()` then `LoadIndex()`. Requires network access to CUE Central Registry.
 
 **Mitigation:**
+
 - `Fetch()` is tested at 94.1% with retry logic and context cancellation
 - `LoadIndex()` is tested at 83.3%
 - E2E tests use real registry

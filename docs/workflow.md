@@ -24,6 +24,7 @@ Present the feature scope to the user for confirmation.
 ### 2. Read Required Documentation
 
 Read all relevant documentation:
+
 - Project document (goals, scope, success criteria)
 - Related design records
 - Existing code that will be modified
@@ -33,6 +34,7 @@ Summarise findings for the user.
 ### 3. Discuss Options
 
 Have an interactive discussion about:
+
 - Implementation approaches
 - Trade-offs between options
 - Questions that need answers
@@ -45,6 +47,7 @@ Do not proceed until the user is satisfied with the direction.
 Read dr-writing-guide.md for DR structure.
 
 Draft a design record covering:
+
 - Problem being solved
 - Decision made
 - Why this approach
@@ -56,6 +59,7 @@ User reviews and approves before finalising.
 ### 5. Implement
 
 Implement the feature according to the DR:
+
 - Write the code
 - Write tests (unit, integration, e2e as appropriate)
 - Follow existing code patterns
@@ -77,6 +81,7 @@ Fix any reported issues.
 ### 8. Update Project
 
 Update the project document:
+
 - Mark completed items in success criteria
 - Add progress notes
 - Identify next feature
@@ -88,6 +93,7 @@ Return to step 1 for the next feature.
 ## Step Flexibility
 
 Users may:
+
 - **Skip step 4** for simple features not requiring a DR
 - **Combine steps** when appropriate
 - **Revisit earlier steps** if new information emerges
