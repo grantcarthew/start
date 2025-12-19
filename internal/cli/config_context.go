@@ -328,7 +328,8 @@ func runConfigContextAdd(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("writing contexts file: %w", err)
 	}
 
-	if !flagQuiet {
+	flags := getFlags(cmd)
+	if !flags.Quiet {
 		fmt.Fprintf(stdout, "Added context %q to %s config\n", name, scopeName)
 		fmt.Fprintf(stdout, "Config: %s\n", contextPath)
 	}
@@ -634,7 +635,8 @@ func runConfigContextRemove(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("writing contexts file: %w", err)
 	}
 
-	if !flagQuiet {
+	flags := getFlags(cmd)
+	if !flags.Quiet {
 		fmt.Fprintf(stdout, "Removed context %q\n", name)
 	}
 

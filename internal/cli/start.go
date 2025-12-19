@@ -16,22 +16,35 @@ import (
 	"golang.org/x/term"
 )
 
-// Command flags - package-level for access by subcommands
-var (
-	flagAgent     string
-	flagRole      string
-	flagModel     string
-	flagContext   []string
-	flagDirectory string
-	flagDryRun    bool
-	flagQuiet     bool
-	flagVerbose   bool
-	flagDebug     bool
-)
+// flagsKey is the context key for storing Flags.
+type flagsKey struct{}
 
-// debugf prints debug output if --debug flag is set.
-func debugf(format string, args ...interface{}) {
-	if flagDebug {
+// Flags holds all CLI flag values. Each command instance gets its own Flags,
+// enabling parallel test execution without shared state.
+type Flags struct {
+	Agent     string
+	Role      string
+	Model     string
+	Context   []string
+	Directory string
+	DryRun    bool
+	Quiet     bool
+	Verbose   bool
+	Debug     bool
+}
+
+// getFlags retrieves Flags from the command context.
+func getFlags(cmd *cobra.Command) *Flags {
+	if f, ok := cmd.Context().Value(flagsKey{}).(*Flags); ok {
+		return f
+	}
+	// Fallback for commands without context (shouldn't happen in normal use)
+	return &Flags{}
+}
+
+// debugf prints debug output if debug mode is enabled.
+func debugf(flags *Flags, format string, args ...interface{}) {
+	if flags.Debug {
 		fmt.Printf("[DEBUG] "+format+"\n", args...)
 	}
 }
@@ -47,19 +60,19 @@ type ExecutionEnv struct {
 
 // prepareExecutionEnv prepares the common execution environment.
 // This is shared between executeStart and executeTask to avoid code duplication.
-func prepareExecutionEnv() (*ExecutionEnv, error) {
+func prepareExecutionEnv(flags *Flags) (*ExecutionEnv, error) {
 	// Determine working directory
 	var workingDir string
 	var err error
-	if flagDirectory != "" {
-		workingDir = flagDirectory
-		debugf("Working directory (from --directory): %s", workingDir)
+	if flags.Directory != "" {
+		workingDir = flags.Directory
+		debugf(flags, "Working directory (from --directory): %s", workingDir)
 	} else {
 		workingDir, err = os.Getwd()
 		if err != nil {
 			return nil, fmt.Errorf("getting working directory: %w", err)
 		}
-		debugf("Working directory (from pwd): %s", workingDir)
+		debugf(flags, "Working directory (from pwd): %s", workingDir)
 	}
 
 	// Load configuration (uses workingDir for local config lookup)
@@ -69,12 +82,12 @@ func prepareExecutionEnv() (*ExecutionEnv, error) {
 	}
 
 	// Select agent
-	agentName := flagAgent
+	agentName := flags.Agent
 	if agentName == "" {
 		agentName = orchestration.GetDefaultAgent(cfg.Value)
-		debugf("Agent (from config default): %s", agentName)
+		debugf(flags, "Agent (from config default): %s", agentName)
 	} else {
-		debugf("Agent (from --agent flag): %s", agentName)
+		debugf(flags, "Agent (from --agent flag): %s", agentName)
 	}
 	if agentName == "" {
 		return nil, fmt.Errorf("no agent configured")
@@ -84,8 +97,8 @@ func prepareExecutionEnv() (*ExecutionEnv, error) {
 	if err != nil {
 		return nil, fmt.Errorf("loading agent: %w", err)
 	}
-	debugf("Agent binary: %s", agent.Bin)
-	debugf("Agent command template: %s", agent.Command)
+	debugf(flags, "Agent binary: %s", agent.Bin)
+	debugf(flags, "Agent command template: %s", agent.Command)
 
 	// Create shell runner and template processor
 	shellRunner := shell.NewRunner()
@@ -104,69 +117,70 @@ func prepareExecutionEnv() (*ExecutionEnv, error) {
 
 // runStart executes the start command (root command with no subcommand).
 func runStart(cmd *cobra.Command, args []string) error {
-	return executeStart(cmd.OutOrStdout(), cmd.ErrOrStderr(), orchestration.ContextSelection{
+	flags := getFlags(cmd)
+	return executeStart(cmd.OutOrStdout(), cmd.ErrOrStderr(), flags, orchestration.ContextSelection{
 		IncludeRequired: true,
 		IncludeDefaults: true,
-		Tags:            flagContext,
+		Tags:            flags.Context,
 	}, "")
 }
 
 // executeStart is the shared execution logic for start commands.
-func executeStart(stdout, stderr io.Writer, selection orchestration.ContextSelection, customText string) error {
-	env, err := prepareExecutionEnv()
+func executeStart(stdout, stderr io.Writer, flags *Flags, selection orchestration.ContextSelection, customText string) error {
+	env, err := prepareExecutionEnv(flags)
 	if err != nil {
 		return err
 	}
 
-	debugf("Context selection: required=%t, defaults=%t, tags=%v",
+	debugf(flags, "Context selection: required=%t, defaults=%t, tags=%v",
 		selection.IncludeRequired, selection.IncludeDefaults, selection.Tags)
 
 	// Compose prompt with role
-	result, err := env.Composer.ComposeWithRole(env.Cfg.Value, selection, flagRole, customText, "")
+	result, err := env.Composer.ComposeWithRole(env.Cfg.Value, selection, flags.Role, customText, "")
 	if err != nil {
 		return fmt.Errorf("composing prompt: %w", err)
 	}
 
-	debugf("Role resolved: %s", result.RoleName)
+	debugf(flags, "Role resolved: %s", result.RoleName)
 	for _, ctx := range result.Contexts {
-		debugf("Context included: %s", ctx.Name)
+		debugf(flags, "Context included: %s", ctx.Name)
 	}
 
 	// Print warnings
-	printWarnings(stderr, result.Warnings)
+	printWarnings(flags, stderr, result.Warnings)
 
 	// Determine effective model
-	model := flagModel
+	model := flags.Model
 	if model == "" {
 		model = env.Agent.DefaultModel
 	}
-	debugf("Model: %s", model)
+	debugf(flags, "Model: %s", model)
 
 	// Build execution config
 	execConfig := orchestration.ExecuteConfig{
 		Agent:      env.Agent,
-		Model:      flagModel,
+		Model:      flags.Model,
 		Role:       result.Role,
 		Prompt:     result.Prompt,
 		WorkingDir: env.WorkingDir,
-		DryRun:     flagDryRun,
+		DryRun:     flags.DryRun,
 	}
 
 	// Build and log final command
-	if flagDebug {
+	if flags.Debug {
 		cmdStr, err := env.Executor.BuildCommand(execConfig)
 		if err == nil {
-			debugf("Final command: %s", cmdStr)
+			debugf(flags, "Final command: %s", cmdStr)
 		}
 	}
 
-	if flagDryRun {
+	if flags.DryRun {
 		return executeDryRun(stdout, env.Executor, execConfig, result, env.Agent)
 	}
 
 	// Print execution info
-	if !flagQuiet {
-		printExecutionInfo(stdout, env.Agent, flagModel, result)
+	if !flags.Quiet {
+		printExecutionInfo(stdout, env.Agent, flags.Model, result)
 	}
 
 	// Execute agent (replaces current process)
@@ -174,8 +188,8 @@ func executeStart(stdout, stderr io.Writer, selection orchestration.ContextSelec
 }
 
 // printWarnings prints warnings to stderr if not in quiet mode.
-func printWarnings(stderr io.Writer, warnings []string) {
-	if flagQuiet {
+func printWarnings(flags *Flags, stderr io.Writer, warnings []string) {
+	if flags.Quiet {
 		return
 	}
 	for _, w := range warnings {
@@ -320,12 +334,8 @@ func loadMergedConfigWithIO(stdout, stderr io.Writer, stdin io.Reader, workingDi
 		return internalcue.LoadResult{}, fmt.Errorf("resolving config paths: %w", err)
 	}
 
-	debugf("Global config path: %s (exists: %t)", paths.Global, paths.GlobalExists)
-	debugf("Local config path: %s (exists: %t)", paths.Local, paths.LocalExists)
-
 	// Trigger auto-setup if no config exists
 	if !paths.AnyExists() {
-		debugf("No config found, triggering auto-setup")
 		if err := runAutoSetup(stdout, stderr, stdin); err != nil {
 			return internalcue.LoadResult{}, err
 		}
@@ -337,7 +347,6 @@ func loadMergedConfigWithIO(stdout, stderr io.Writer, stdin io.Reader, workingDi
 	}
 
 	dirs := paths.ForScope(config.ScopeMerged)
-	debugf("Loading config from: %v", dirs)
 	loader := internalcue.NewLoader()
 	return loader.Load(dirs)
 }

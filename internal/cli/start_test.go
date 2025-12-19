@@ -10,15 +10,9 @@ import (
 	"github.com/grantcarthew/start/internal/orchestration"
 )
 
-// resetFlags resets all global flags to their default values.
-func resetFlags() {
-	flagAgent = ""
-	flagRole = ""
-	flagModel = ""
-	flagContext = nil
-	flagDryRun = false
-	flagQuiet = false
-	flagVerbose = false
+// testFlags returns a Flags struct with default values for testing.
+func testFlags() *Flags {
+	return &Flags{}
 }
 
 // setupStartTestConfig creates a minimal CUE config for start command testing.
@@ -82,7 +76,6 @@ settings: {
 }
 
 func TestExecuteStart_DryRun(t *testing.T) {
-	resetFlags()
 	tmpDir := setupStartTestConfig(t)
 	origDir, err := os.Getwd()
 	if err != nil {
@@ -93,8 +86,7 @@ func TestExecuteStart_DryRun(t *testing.T) {
 		t.Fatalf("changing to temp dir: %v", err)
 	}
 
-	// Set flags directly
-	flagDryRun = true
+	flags := &Flags{DryRun: true}
 
 	selection := orchestration.ContextSelection{
 		IncludeRequired: true,
@@ -104,7 +96,7 @@ func TestExecuteStart_DryRun(t *testing.T) {
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
 
-	err = executeStart(stdout, stderr, selection, "")
+	err = executeStart(stdout, stderr, flags, selection, "")
 	if err != nil {
 		t.Fatalf("executeStart() error = %v", err)
 	}
@@ -128,7 +120,6 @@ func TestExecuteStart_DryRun(t *testing.T) {
 }
 
 func TestExecuteStart_ContextSelection(t *testing.T) {
-	resetFlags()
 	tmpDir := setupStartTestConfig(t)
 	origDir, err := os.Getwd()
 	if err != nil {
@@ -139,7 +130,7 @@ func TestExecuteStart_ContextSelection(t *testing.T) {
 		t.Fatalf("changing to temp dir: %v", err)
 	}
 
-	flagDryRun = true
+	flags := &Flags{DryRun: true}
 
 	tests := []struct {
 		name        string
@@ -169,7 +160,7 @@ func TestExecuteStart_ContextSelection(t *testing.T) {
 			stdout := new(bytes.Buffer)
 			stderr := new(bytes.Buffer)
 
-			err := executeStart(stdout, stderr, tt.selection, "")
+			err := executeStart(stdout, stderr, flags, tt.selection, "")
 			if err != nil {
 				t.Fatalf("executeStart() error = %v", err)
 			}
@@ -183,7 +174,6 @@ func TestExecuteStart_ContextSelection(t *testing.T) {
 }
 
 func TestExecuteTask_DryRun(t *testing.T) {
-	resetFlags()
 	tmpDir := setupStartTestConfig(t)
 	origDir, err := os.Getwd()
 	if err != nil {
@@ -194,12 +184,12 @@ func TestExecuteTask_DryRun(t *testing.T) {
 		t.Fatalf("changing to temp dir: %v", err)
 	}
 
-	flagDryRun = true
+	flags := &Flags{DryRun: true}
 
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
 
-	err = executeTask(stdout, stderr, "test-task", "focus on testing")
+	err = executeTask(stdout, stderr, flags, "test-task", "focus on testing")
 	if err != nil {
 		t.Fatalf("executeTask() error = %v", err)
 	}
@@ -299,7 +289,6 @@ func TestPrintPreviewLines(t *testing.T) {
 }
 
 func TestFindTask(t *testing.T) {
-	resetFlags()
 	tmpDir := setupStartTestConfig(t)
 	origDir, err := os.Getwd()
 	if err != nil {
@@ -371,7 +360,6 @@ func TestFindTask(t *testing.T) {
 }
 
 func TestFindTask_AmbiguousPrefix(t *testing.T) {
-	resetFlags()
 	tmpDir := t.TempDir()
 	configDir := filepath.Join(tmpDir, ".start")
 	if err := os.MkdirAll(configDir, 0755); err != nil {
@@ -440,7 +428,6 @@ settings: {
 }
 
 func TestFindTask_NoTasksDefined(t *testing.T) {
-	resetFlags()
 	tmpDir := t.TempDir()
 
 	// Isolate from global config

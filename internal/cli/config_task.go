@@ -297,7 +297,8 @@ func runConfigTaskAdd(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("writing tasks file: %w", err)
 	}
 
-	if !flagQuiet {
+	flags := getFlags(cmd)
+	if !flags.Quiet {
 		fmt.Fprintf(stdout, "Added task %q to %s config\n", name, scopeName)
 		fmt.Fprintf(stdout, "Config: %s\n", taskPath)
 	}
@@ -589,7 +590,8 @@ func runConfigTaskRemove(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("writing tasks file: %w", err)
 	}
 
-	if !flagQuiet {
+	flags := getFlags(cmd)
+	if !flags.Quiet {
 		fmt.Fprintf(stdout, "Removed task %q\n", name)
 	}
 
