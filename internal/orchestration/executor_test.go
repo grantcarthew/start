@@ -1,6 +1,7 @@
 package orchestration
 
 import (
+	"os"
 	"strings"
 	"testing"
 
@@ -24,7 +25,8 @@ func TestExecutor_BuildCommand(t *testing.T) {
 					Command: "{{.bin}} chat",
 				},
 			},
-			wantContain: "claude chat",
+			// bin is now shell-escaped and quoted
+			wantContain: "'claude' chat",
 		},
 		{
 			name: "command with model",
@@ -38,7 +40,8 @@ func TestExecutor_BuildCommand(t *testing.T) {
 					DefaultModel: "sonnet",
 				},
 			},
-			wantContain: "claude-sonnet-4-20250514",
+			// All placeholders are now shell-escaped and quoted
+			wantContain: "'claude-sonnet-4-20250514'",
 		},
 		{
 			name: "command with model override",
@@ -54,18 +57,19 @@ func TestExecutor_BuildCommand(t *testing.T) {
 				},
 				Model: "opus",
 			},
-			wantContain: "claude-opus-4-20250514",
+			wantContain: "'claude-opus-4-20250514'",
 		},
 		{
 			name: "command with role",
 			config: ExecuteConfig{
 				Agent: Agent{
 					Bin:     "claude",
-					Command: "{{.bin}} --system '{{.role}}'",
+					Command: "{{.bin}} --system {{.role}}",
 				},
 				Role: "You are a code reviewer.",
 			},
-			wantContain: "You are a code reviewer",
+			// escapeForShell wraps in single quotes
+			wantContain: "'You are a code reviewer.'",
 		},
 		{
 			name: "command with role file",
@@ -76,7 +80,8 @@ func TestExecutor_BuildCommand(t *testing.T) {
 				},
 				RoleFile: "/tmp/role.md",
 			},
-			wantContain: "/tmp/role.md",
+			// File paths are also quoted now
+			wantContain: "'/tmp/role.md'",
 		},
 		{
 			name: "conditional model in template",
@@ -86,7 +91,8 @@ func TestExecutor_BuildCommand(t *testing.T) {
 					Command: "{{.bin}}{{if .model}} --model {{.model}}{{end}}",
 				},
 			},
-			wantContain: "claude",
+			// bin is also quoted now
+			wantContain: "'claude'",
 		},
 		{
 			name: "invalid template",
@@ -128,9 +134,10 @@ func TestEscapeForShell(t *testing.T) {
 		input string
 		want  string
 	}{
-		{"simple text", "simple text", "simple text"},
-		{"single quote escaping", "it's a test", "it'\"'\"'s a test"},
-		{"no quotes", "no quotes here", "no quotes here"},
+		{"simple text", "simple text", "'simple text'"},
+		{"single quote escaping", "it's a test", "'it'\"'\"'s a test'"},
+		{"no quotes", "no quotes here", "'no quotes here'"},
+		{"empty string", "", "''"},
 	}
 
 	for _, tt := range tests {
@@ -144,8 +151,8 @@ func TestEscapeForShell(t *testing.T) {
 }
 
 func TestEscapeForShell_NoEnvExpansion(t *testing.T) {
-	// Environment variables should NOT be expanded (changed per code review).
-	// Only single quote escaping is performed for shell safety.
+	// Environment variables should NOT be expanded (they're safely quoted).
+	// Single quotes prevent shell expansion of $VAR, $(cmd), and `cmd`.
 	tests := []struct {
 		name  string
 		input string
@@ -154,37 +161,37 @@ func TestEscapeForShell_NoEnvExpansion(t *testing.T) {
 		{
 			name:  "preserves $VAR syntax",
 			input: "Hello $TEST_VAR",
-			want:  "Hello $TEST_VAR",
+			want:  "'Hello $TEST_VAR'",
 		},
 		{
 			name:  "preserves ${VAR} syntax",
 			input: "Hello ${TEST_USER}",
-			want:  "Hello ${TEST_USER}",
+			want:  "'Hello ${TEST_USER}'",
 		},
 		{
 			name:  "preserves undefined var",
 			input: "Hello $UNDEFINED_VAR_XYZ",
-			want:  "Hello $UNDEFINED_VAR_XYZ",
+			want:  "'Hello $UNDEFINED_VAR_XYZ'",
 		},
 		{
 			name:  "command substitution not executed",
 			input: "$(echo pwned)",
-			want:  "$(echo pwned)",
+			want:  "'$(echo pwned)'",
 		},
 		{
 			name:  "backticks not executed",
 			input: "`echo pwned`",
-			want:  "`echo pwned`",
+			want:  "'`echo pwned`'",
 		},
 		{
 			name:  "preserves dollar sign with quotes",
 			input: "$TEST_USER's files",
-			want:  "$TEST_USER'\"'\"'s files",
+			want:  "'$TEST_USER'\"'\"'s files'",
 		},
 		{
 			name:  "preserves literal dollar amounts",
 			input: "Cost is $100",
-			want:  "Cost is $100",
+			want:  "'Cost is $100'",
 		},
 	}
 
@@ -193,6 +200,143 @@ func TestEscapeForShell_NoEnvExpansion(t *testing.T) {
 			got := escapeForShell(tt.input)
 			if got != tt.want {
 				t.Errorf("escapeForShell(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestExpandTilde(t *testing.T) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Skipf("cannot get home directory: %v", err)
+	}
+
+	tests := []struct {
+		name string
+		path string
+		want string
+	}{
+		{
+			name: "empty string",
+			path: "",
+			want: "",
+		},
+		{
+			name: "just tilde",
+			path: "~",
+			want: home,
+		},
+		{
+			name: "tilde with path",
+			path: "~/bin/claude",
+			want: home + "/bin/claude",
+		},
+		{
+			name: "tilde in middle (not expanded)",
+			path: "/path/~/file",
+			want: "/path/~/file",
+		},
+		{
+			name: "no tilde",
+			path: "/usr/bin/claude",
+			want: "/usr/bin/claude",
+		},
+		{
+			name: "relative path",
+			path: "./bin/claude",
+			want: "./bin/claude",
+		},
+		{
+			name: "tilde without slash (not expanded)",
+			path: "~user/bin",
+			want: "~user/bin",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := expandTilde(tt.path)
+			if got != tt.want {
+				t.Errorf("expandTilde(%q) = %q, want %q", tt.path, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestValidateCommandTemplate(t *testing.T) {
+	tests := []struct {
+		name    string
+		tmpl    string
+		wantErr bool
+		errMsg  string
+	}{
+		{
+			name:    "valid template without quotes",
+			tmpl:    "{{.bin}} --prompt {{.prompt}}",
+			wantErr: false,
+		},
+		{
+			name:    "valid template with all placeholders",
+			tmpl:    "{{.bin}} --model {{.model}} --system {{.role}} --prompt {{.prompt}}",
+			wantErr: false,
+		},
+		{
+			name:    "invalid single-quoted prompt",
+			tmpl:    "{{.bin}} --prompt '{{.prompt}}'",
+			wantErr: true,
+			errMsg:  "quoted placeholder",
+		},
+		{
+			name:    "invalid double-quoted prompt",
+			tmpl:    `{{.bin}} --prompt "{{.prompt}}"`,
+			wantErr: true,
+			errMsg:  "quoted placeholder",
+		},
+		{
+			name:    "invalid single-quoted role",
+			tmpl:    "{{.bin}} --system '{{.role}}'",
+			wantErr: true,
+			errMsg:  "quoted placeholder",
+		},
+		{
+			name:    "invalid single-quoted model",
+			tmpl:    "{{.bin}} --model '{{.model}}'",
+			wantErr: true,
+			errMsg:  "quoted placeholder",
+		},
+		{
+			name:    "invalid single-quoted bin",
+			tmpl:    "'{{.bin}}' --prompt {{.prompt}}",
+			wantErr: true,
+			errMsg:  "quoted placeholder",
+		},
+		{
+			name:    "invalid single-quoted role_file",
+			tmpl:    "{{.bin}} --system-file '{{.role_file}}'",
+			wantErr: true,
+			errMsg:  "quoted placeholder",
+		},
+		{
+			name:    "invalid single-quoted date",
+			tmpl:    "{{.bin}} --timestamp '{{.date}}'",
+			wantErr: true,
+			errMsg:  "quoted placeholder",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateCommandTemplate(tt.tmpl)
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("ValidateCommandTemplate() expected error, got nil")
+				} else if tt.errMsg != "" && !strings.Contains(err.Error(), tt.errMsg) {
+					t.Errorf("ValidateCommandTemplate() error = %q, want containing %q", err.Error(), tt.errMsg)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("ValidateCommandTemplate() unexpected error = %v", err)
+				}
 			}
 		})
 	}

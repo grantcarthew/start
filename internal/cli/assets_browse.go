@@ -24,8 +24,9 @@ func addAssetsBrowseCommand(parent *cobra.Command) {
 // runAssetsBrowse opens the asset repository URL in the default browser.
 func runAssetsBrowse(cmd *cobra.Command, args []string) error {
 	url := DefaultAssetRepoURL
+	flags := getFlags(cmd)
 
-	if !flagQuiet {
+	if !flags.Quiet {
 		fmt.Fprintf(cmd.OutOrStdout(), "Opening %s\n", url)
 	}
 

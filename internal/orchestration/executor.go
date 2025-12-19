@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 	"syscall"
 	"text/template"
@@ -13,6 +14,31 @@ import (
 	"cuelang.org/go/cue"
 	internalcue "github.com/grantcarthew/start/internal/cue"
 )
+
+// quotedPlaceholderPattern detects placeholders that are incorrectly wrapped in quotes.
+// Since escapeForShell wraps all placeholder values in single quotes, templates should NOT
+// include quotes around any placeholder.
+var quotedPlaceholderPattern = regexp.MustCompile(`['"]{{\.(?:bin|model|role|role_file|prompt|date)}}['"]`)
+
+// expandTilde expands a leading ~ to the user's home directory.
+// This is necessary because single-quoted strings in shell don't expand ~.
+func expandTilde(path string) string {
+	if path == "" {
+		return path
+	}
+	if path == "~" {
+		if home, err := os.UserHomeDir(); err == nil {
+			return home
+		}
+		return path
+	}
+	if len(path) > 1 && path[0] == '~' && path[1] == '/' {
+		if home, err := os.UserHomeDir(); err == nil {
+			return home + path[1:]
+		}
+	}
+	return path
+}
 
 // Agent represents an agent configuration.
 type Agent struct {
@@ -50,8 +76,35 @@ func NewExecutor(workingDir string) *Executor {
 	return &Executor{workingDir: workingDir}
 }
 
+// ValidateCommandTemplate checks for common template errors.
+// Returns an error if the template contains quoted placeholders like '{{.prompt}}'
+// since escapeForShell already wraps values in single quotes.
+func ValidateCommandTemplate(tmpl string) error {
+	if match := quotedPlaceholderPattern.FindString(tmpl); match != "" {
+		// Extract the placeholder name from the match
+		placeholder := strings.TrimPrefix(match, "'{{.")
+		placeholder = strings.TrimPrefix(placeholder, "\"{{.")
+		placeholder = strings.TrimSuffix(placeholder, "}}'")
+		placeholder = strings.TrimSuffix(placeholder, "}}\"")
+
+		return fmt.Errorf(`template contains quoted placeholder %s
+
+Placeholders are automatically shell-escaped and quoted.
+Remove the surrounding quotes from your command template:
+
+  Before: --%s '%s'
+  After:  --%s %s`, match, placeholder, "{{."+placeholder+"}}", placeholder, "{{."+placeholder+"}}")
+	}
+	return nil
+}
+
 // BuildCommand builds the agent command from template and config.
 func (e *Executor) BuildCommand(cfg ExecuteConfig) (string, error) {
+	// Validate template for common errors
+	if err := ValidateCommandTemplate(cfg.Agent.Command); err != nil {
+		return "", err
+	}
+
 	// Resolve model name to actual model string
 	model := cfg.Model
 	if model == "" {
@@ -63,14 +116,16 @@ func (e *Executor) BuildCommand(cfg ExecuteConfig) (string, error) {
 		}
 	}
 
-	// Build template data with lowercase keys to match CUE conventions
+	// Build template data with lowercase keys to match CUE conventions.
+	// All values are shell-escaped and wrapped in single quotes for safety.
+	// Path-like fields (bin, role_file) have ~ expanded since shell won't do it in quotes.
 	data := CommandData{
-		"bin":       cfg.Agent.Bin,
-		"model":     model,
+		"bin":       escapeForShell(expandTilde(cfg.Agent.Bin)),
+		"model":     escapeForShell(model),
 		"role":      escapeForShell(cfg.Role),
-		"role_file": cfg.RoleFile,
+		"role_file": escapeForShell(expandTilde(cfg.RoleFile)),
 		"prompt":    escapeForShell(cfg.Prompt),
-		"date":      time.Now().Format(time.RFC3339),
+		"date":      escapeForShell(time.Now().Format(time.RFC3339)),
 	}
 
 	// Parse and execute command template
@@ -153,12 +208,20 @@ func (e *Executor) ExecuteWithoutReplace(cfg ExecuteConfig) (string, error) {
 }
 
 // escapeForShell prepares a string for safe use in shell commands.
-// It escapes single quotes for shell safety, preventing shell command injection.
+// It wraps the value in single quotes and escapes internal single quotes,
+// preventing shell command injection. The returned value is already quoted -
+// templates should use {{.prompt}} directly, NOT '{{.prompt}}'.
+//
+// Example: "hello 'world'" becomes "'hello '\"'\"'world'\"'\"''"
+//
 // Note: Environment variables (e.g., $HOME) are NOT expanded. Use literal values
-// in prompts or the UTD command field for dynamic content.
+// in prompts or the command field for dynamic content.
 func escapeForShell(s string) string {
-	// Escape single quotes for shell safety
-	return strings.ReplaceAll(s, "'", "'\"'\"'")
+	// Escape single quotes: replace ' with '"'"'
+	// This ends the single-quoted string, adds a double-quoted literal quote,
+	// then restarts the single-quoted string.
+	escaped := strings.ReplaceAll(s, "'", "'\"'\"'")
+	return "'" + escaped + "'"
 }
 
 // ExtractAgent extracts agent configuration from CUE value.

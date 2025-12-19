@@ -27,12 +27,14 @@ func runPrompt(cmd *cobra.Command, args []string) error {
 		customText = args[0]
 	}
 
+	flags := getFlags(cmd)
+
 	// Per DR-014: required contexts only, no defaults
 	selection := orchestration.ContextSelection{
 		IncludeRequired: true,
 		IncludeDefaults: false,
-		Tags:            flagContext,
+		Tags:            flags.Context,
 	}
 
-	return executeStart(cmd.OutOrStdout(), cmd.ErrOrStderr(), selection, customText)
+	return executeStart(cmd.OutOrStdout(), cmd.ErrOrStderr(), flags, selection, customText)
 }

@@ -46,6 +46,7 @@ Use --local to install to project config (./.start/).`,
 func runAssetsAdd(cmd *cobra.Command, args []string) error {
 	query := args[0]
 	ctx := context.Background()
+	flags := getFlags(cmd)
 
 	// Create registry client
 	client, err := registry.NewClient()
@@ -54,7 +55,7 @@ func runAssetsAdd(cmd *cobra.Command, args []string) error {
 	}
 
 	// Fetch index
-	if !flagQuiet {
+	if !flags.Quiet {
 		fmt.Fprintln(cmd.OutOrStdout(), "Fetching index...")
 	}
 	index, err := client.FetchIndex(ctx)
@@ -102,7 +103,7 @@ func runAssetsAdd(cmd *cobra.Command, args []string) error {
 	}
 
 	// Fetch the actual asset module from registry
-	if !flagQuiet {
+	if !flags.Quiet {
 		fmt.Fprintln(cmd.OutOrStdout(), "Fetching asset...")
 	}
 
@@ -137,7 +138,7 @@ func runAssetsAdd(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("writing config: %w", err)
 	}
 
-	if !flagQuiet {
+	if !flags.Quiet {
 		fmt.Fprintf(cmd.OutOrStdout(), "\nInstalled %s/%s to %s config\n", selected.Category, selected.Name, scopeName)
 		fmt.Fprintf(cmd.OutOrStdout(), "Config: %s\n", configPath)
 	}

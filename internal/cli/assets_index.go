@@ -68,7 +68,8 @@ func runAssetsIndex(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("writing index: %w", err)
 	}
 
-	if !flagQuiet {
+	flags := getFlags(cmd)
+	if !flags.Quiet {
 		printIndexSummary(cmd.OutOrStdout(), index, indexPath)
 	}
 

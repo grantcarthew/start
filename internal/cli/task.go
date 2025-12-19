@@ -35,12 +35,13 @@ func runTask(cmd *cobra.Command, args []string) error {
 		instructions = args[1]
 	}
 
-	return executeTask(cmd.OutOrStdout(), cmd.ErrOrStderr(), taskName, instructions)
+	flags := getFlags(cmd)
+	return executeTask(cmd.OutOrStdout(), cmd.ErrOrStderr(), flags, taskName, instructions)
 }
 
 // executeTask handles task execution.
-func executeTask(stdout, stderr io.Writer, taskName, instructions string) error {
-	env, err := prepareExecutionEnv()
+func executeTask(stdout, stderr io.Writer, flags *Flags, taskName, instructions string) error {
+	env, err := prepareExecutionEnv(flags)
 	if err != nil {
 		return err
 	}
@@ -52,7 +53,7 @@ func executeTask(stdout, stderr io.Writer, taskName, instructions string) error 
 	}
 
 	// Get task's role if specified, else use flag
-	roleName := flagRole
+	roleName := flags.Role
 	if roleName == "" {
 		roleName = orchestration.GetTaskRole(env.Cfg.Value, taskName)
 	}
@@ -61,7 +62,7 @@ func executeTask(stdout, stderr io.Writer, taskName, instructions string) error 
 	selection := orchestration.ContextSelection{
 		IncludeRequired: true,
 		IncludeDefaults: false,
-		Tags:            flagContext,
+		Tags:            flags.Context,
 	}
 
 	// Compose contexts and resolve role
@@ -71,26 +72,26 @@ func executeTask(stdout, stderr io.Writer, taskName, instructions string) error 
 	}
 
 	// Print warnings
-	printWarnings(stderr, taskResult.Warnings)
-	printWarnings(stderr, composeResult.Warnings)
+	printWarnings(flags, stderr, taskResult.Warnings)
+	printWarnings(flags, stderr, composeResult.Warnings)
 
 	// Build execution config
 	execConfig := orchestration.ExecuteConfig{
 		Agent:      env.Agent,
-		Model:      flagModel,
+		Model:      flags.Model,
 		Role:       composeResult.Role,
 		Prompt:     composeResult.Prompt,
 		WorkingDir: env.WorkingDir,
-		DryRun:     flagDryRun,
+		DryRun:     flags.DryRun,
 	}
 
-	if flagDryRun {
+	if flags.DryRun {
 		return executeTaskDryRun(stdout, env.Executor, execConfig, composeResult, env.Agent, taskName, instructions)
 	}
 
 	// Print execution info
-	if !flagQuiet {
-		printTaskExecutionInfo(stdout, env.Agent, flagModel, composeResult, taskName, instructions, taskResult)
+	if !flags.Quiet {
+		printTaskExecutionInfo(stdout, env.Agent, flags.Model, composeResult, taskName, instructions, taskResult)
 	}
 
 	// Execute agent (replaces current process)

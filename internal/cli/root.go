@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -22,8 +23,11 @@ var versionTemplate = fmt.Sprintf(`start version %s
 `, cliVersion, repoURL, repoURL)
 
 // NewRootCmd creates a new root command instance with all subcommands attached.
-// This factory function ensures tests get isolated command instances.
+// This factory function ensures tests get isolated command instances with their own Flags.
 func NewRootCmd() *cobra.Command {
+	// Create flags scoped to this command instance
+	flags := &Flags{}
+
 	cmd := &cobra.Command{
 		Use:   "start",
 		Short: "AI agent CLI orchestrator",
@@ -31,17 +35,21 @@ func NewRootCmd() *cobra.Command {
 It manages prompt composition, context injection, and workflow automation.`,
 		Version: cliVersion,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			// Store flags in context for access by all commands
+			ctx := context.WithValue(cmd.Context(), flagsKey{}, flags)
+			cmd.SetContext(ctx)
+
 			// Debug implies verbose
-			if flagDebug {
-				flagVerbose = true
+			if flags.Debug {
+				flags.Verbose = true
 			}
 			// Validate and resolve directory flag
-			if flagDirectory != "" {
-				dir, err := resolveDirectory(flagDirectory)
+			if flags.Directory != "" {
+				dir, err := resolveDirectory(flags.Directory)
 				if err != nil {
 					return err
 				}
-				flagDirectory = dir
+				flags.Directory = dir
 			}
 			return nil
 		},
@@ -50,16 +58,16 @@ It manages prompt composition, context injection, and workflow automation.`,
 	// Custom version template
 	cmd.SetVersionTemplate(versionTemplate)
 
-	// Add persistent flags
-	cmd.PersistentFlags().StringVarP(&flagAgent, "agent", "a", "", "Override agent selection")
-	cmd.PersistentFlags().StringVarP(&flagRole, "role", "r", "", "Override role (system prompt)")
-	cmd.PersistentFlags().StringVarP(&flagModel, "model", "m", "", "Override model selection")
-	cmd.PersistentFlags().StringSliceVarP(&flagContext, "context", "c", nil, "Select contexts by tag")
-	cmd.PersistentFlags().StringVarP(&flagDirectory, "directory", "d", "", "Working directory for context detection")
-	cmd.PersistentFlags().BoolVar(&flagDryRun, "dry-run", false, "Preview execution without launching agent")
-	cmd.PersistentFlags().BoolVarP(&flagQuiet, "quiet", "q", false, "Suppress output")
-	cmd.PersistentFlags().BoolVar(&flagVerbose, "verbose", false, "Detailed output")
-	cmd.PersistentFlags().BoolVar(&flagDebug, "debug", false, "Debug output (implies --verbose)")
+	// Add persistent flags bound to this instance's Flags struct
+	cmd.PersistentFlags().StringVarP(&flags.Agent, "agent", "a", "", "Override agent selection")
+	cmd.PersistentFlags().StringVarP(&flags.Role, "role", "r", "", "Override role (system prompt)")
+	cmd.PersistentFlags().StringVarP(&flags.Model, "model", "m", "", "Override model selection")
+	cmd.PersistentFlags().StringSliceVarP(&flags.Context, "context", "c", nil, "Select contexts by tag")
+	cmd.PersistentFlags().StringVarP(&flags.Directory, "directory", "d", "", "Working directory for context detection")
+	cmd.PersistentFlags().BoolVar(&flags.DryRun, "dry-run", false, "Preview execution without launching agent")
+	cmd.PersistentFlags().BoolVarP(&flags.Quiet, "quiet", "q", false, "Suppress output")
+	cmd.PersistentFlags().BoolVar(&flags.Verbose, "verbose", false, "Detailed output")
+	cmd.PersistentFlags().BoolVar(&flags.Debug, "debug", false, "Debug output (implies --verbose)")
 
 	// Set RunE on root command for `start` execution
 	cmd.RunE = runStart

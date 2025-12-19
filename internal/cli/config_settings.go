@@ -52,6 +52,7 @@ Available settings:
 // executeConfigSettings handles the settings command.
 func executeConfigSettings(cmd *cobra.Command, args []string) error {
 	stdout := cmd.OutOrStdout()
+	flags := getFlags(cmd)
 
 	switch len(args) {
 	case 0:
@@ -65,7 +66,7 @@ func executeConfigSettings(cmd *cobra.Command, args []string) error {
 		return showSetting(stdout, args[0], configLocal)
 	case 2:
 		// Set setting
-		return setSetting(stdout, args[0], args[1], configLocal)
+		return setSetting(stdout, flags, args[0], args[1], configLocal)
 	default:
 		return fmt.Errorf("too many arguments")
 	}
@@ -128,7 +129,7 @@ func showSetting(w io.Writer, key string, localOnly bool) error {
 }
 
 // setSetting sets a setting value.
-func setSetting(w io.Writer, key, value string, localOnly bool) error {
+func setSetting(w io.Writer, flags *Flags, key, value string, localOnly bool) error {
 	// Validate key
 	keyType, valid := validSettingsKeys[key]
 	if !valid {
@@ -175,7 +176,7 @@ func setSetting(w io.Writer, key, value string, localOnly bool) error {
 		return fmt.Errorf("writing settings file: %w", err)
 	}
 
-	if !flagQuiet {
+	if !flags.Quiet {
 		fmt.Fprintf(w, "Set %s to %q\n", key, value)
 	}
 

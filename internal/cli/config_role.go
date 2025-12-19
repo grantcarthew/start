@@ -300,7 +300,8 @@ func runConfigRoleAdd(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("writing roles file: %w", err)
 	}
 
-	if !flagQuiet {
+	flags := getFlags(cmd)
+	if !flags.Quiet {
 		fmt.Fprintf(stdout, "Added role %q to %s config\n", name, scopeName)
 		fmt.Fprintf(stdout, "Config: %s\n", rolePath)
 	}
@@ -583,7 +584,8 @@ func runConfigRoleRemove(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("writing roles file: %w", err)
 	}
 
-	if !flagQuiet {
+	flags := getFlags(cmd)
+	if !flags.Quiet {
 		fmt.Fprintf(stdout, "Removed role %q\n", name)
 	}
 
@@ -661,7 +663,8 @@ func runConfigRoleDefault(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("writing config file: %w", err)
 	}
 
-	if !flagQuiet {
+	flags := getFlags(cmd)
+	if !flags.Quiet {
 		fmt.Fprintf(stdout, "Set default role to %q\n", name)
 	}
 

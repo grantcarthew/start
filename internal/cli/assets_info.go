@@ -34,6 +34,7 @@ including description, module path, tags, and installation status.`,
 func runAssetsInfo(cmd *cobra.Command, args []string) error {
 	query := args[0]
 	ctx := context.Background()
+	flags := getFlags(cmd)
 
 	// Create registry client
 	client, err := registry.NewClient()
@@ -42,7 +43,7 @@ func runAssetsInfo(cmd *cobra.Command, args []string) error {
 	}
 
 	// Fetch index
-	if !flagQuiet {
+	if !flags.Quiet {
 		fmt.Fprintln(cmd.OutOrStdout(), "Fetching index...")
 	}
 	index, err := client.FetchIndex(ctx)
@@ -59,7 +60,7 @@ func runAssetsInfo(cmd *cobra.Command, args []string) error {
 
 	// If multiple matches, show first one with a note
 	selected := results[0]
-	if len(results) > 1 && !flagQuiet {
+	if len(results) > 1 && !flags.Quiet {
 		fmt.Fprintf(cmd.OutOrStdout(), "Showing first of %d matches. Use 'start assets search %s' to see all.\n\n", len(results), query)
 	}
 

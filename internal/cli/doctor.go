@@ -45,7 +45,8 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	reporter := doctor.NewReporter(cmd.OutOrStdout(), flagVerbose, flagQuiet)
+	flags := getFlags(cmd)
+	reporter := doctor.NewReporter(cmd.OutOrStdout(), flags.Verbose, flags.Quiet)
 	reporter.Print(report)
 
 	if report.HasIssues() {

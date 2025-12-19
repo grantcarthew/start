@@ -104,7 +104,8 @@ func runAssetsUpdate(cmd *cobra.Command, args []string) error {
 	}
 
 	// Fetch index for version comparison
-	if !flagQuiet {
+	flags := getFlags(cmd)
+	if !flags.Quiet {
 		fmt.Fprintln(cmd.OutOrStdout(), "Checking for updates...")
 	}
 

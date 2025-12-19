@@ -280,7 +280,8 @@ func runConfigAgentAdd(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("writing agents file: %w", err)
 	}
 
-	if !flagQuiet {
+	flags := getFlags(cmd)
+	if !flags.Quiet {
 		fmt.Fprintf(stdout, "Added agent %q to %s config\n", name, scopeName)
 		fmt.Fprintf(stdout, "Config: %s\n", agentPath)
 	}
@@ -527,7 +528,8 @@ func runConfigAgentRemove(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("writing agents file: %w", err)
 	}
 
-	if !flagQuiet {
+	flags := getFlags(cmd)
+	if !flags.Quiet {
 		fmt.Fprintf(stdout, "Removed agent %q\n", name)
 	}
 
@@ -605,7 +607,8 @@ func runConfigAgentDefault(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("writing config file: %w", err)
 	}
 
-	if !flagQuiet {
+	flags := getFlags(cmd)
+	if !flags.Quiet {
 		fmt.Fprintf(stdout, "Set default agent to %q\n", name)
 	}
 
