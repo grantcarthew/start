@@ -96,20 +96,22 @@ Warn on irrelevant flags:
 
 ## Flag Applicability Matrix
 
-| Flag | start | prompt | task | show | config | init | doctor |
-|------|-------|--------|------|------|--------|------|--------|
-| `--help` | Y | Y | Y | Y | Y | Y | Y |
-| `--version` | Y | Y | Y | Y | Y | Y | Y |
-| `--verbose` | Y | Y | Y | Y | Y | Y | Y |
-| `--debug` | Y | Y | Y | Y | Y | Y | Y |
-| `--quiet` | Y | Y | Y | Y | Y | Y | Y |
-| `--agent` | Y | Y | Y | Y | - | - | - |
-| `--role` | Y | Y | Y | Y | - | - | - |
-| `--model` | Y | Y | Y | Y | - | - | - |
-| `--context` | Y | Y | Y | - | - | - | - |
-| `--directory` | Y | Y | Y | Y | - | - | - |
-| `--dry-run` | Y | Y | Y | - | - | - | - |
-| `--local` | - | - | - | - | Y | Y | - |
+Note: The `init` command was replaced by auto-setup (DR-018). The CLI now uses automatic first-run detection instead of an explicit init command.
+
+| Flag | start | prompt | task | show | config | assets | doctor | completion |
+|------|-------|--------|------|------|--------|--------|--------|------------|
+| `--help` | Y | Y | Y | Y | Y | Y | Y | Y |
+| `--version` | Y | Y | Y | Y | Y | Y | Y | Y |
+| `--verbose` | Y | Y | Y | Y | Y | Y | Y | - |
+| `--debug` | Y | Y | Y | Y | Y | Y | Y | - |
+| `--quiet` | Y | Y | Y | Y | Y | Y | Y | - |
+| `--agent` | Y | Y | Y | Y | - | - | - | - |
+| `--role` | Y | Y | Y | Y | - | - | - | - |
+| `--model` | Y | Y | Y | Y | - | - | - | - |
+| `--context` | Y | Y | Y | - | - | - | - | - |
+| `--directory` | Y | Y | Y | Y | - | - | - | - |
+| `--dry-run` | Y | Y | Y | - | - | - | - | - |
+| `--local` | - | - | - | - | Y | Y | - | - |
 
 Y = applies, - = silently ignored
 
@@ -147,7 +149,7 @@ Directory flag (`--directory`, `-d`):
 Local flag (`--local`, `-l`):
 
 - Targets local config (`./.start/`) instead of global (`~/.config/start/`)
-- Applies to: init, config editing, asset installation
+- Applies to: config editing, asset installation
 
 Quiet flag (`--quiet`, `-q`):
 
