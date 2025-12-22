@@ -15,18 +15,6 @@ import (
 	"golang.org/x/term"
 )
 
-// Context add command flags
-var (
-	contextName        string
-	contextDescription string
-	contextFile        string
-	contextCommand     string
-	contextPrompt      string
-	contextRequired    bool
-	contextDefault     bool
-	contextTags        []string
-)
-
 // addConfigContextCommand adds the context subcommand group to the config command.
 func addConfigContextCommand(parent *cobra.Command) {
 	contextCmd := &cobra.Command{
@@ -65,7 +53,8 @@ Use --local to show only local contexts.`,
 
 // runConfigContextList lists all configured contexts.
 func runConfigContextList(cmd *cobra.Command, _ []string) error {
-	contexts, err := loadContextsForScope(configLocal)
+	local, _ := cmd.Flags().GetBool("local")
+	contexts, err := loadContextsForScope(local)
 	if err != nil {
 		return err
 	}
@@ -130,14 +119,14 @@ Examples:
 		RunE: runConfigContextAdd,
 	}
 
-	addCmd.Flags().StringVar(&contextName, "name", "", "Context name (identifier)")
-	addCmd.Flags().StringVar(&contextDescription, "description", "", "Description")
-	addCmd.Flags().StringVar(&contextFile, "file", "", "Path to context file")
-	addCmd.Flags().StringVar(&contextCommand, "command", "", "Command to generate content")
-	addCmd.Flags().StringVar(&contextPrompt, "prompt", "", "Inline content text")
-	addCmd.Flags().BoolVar(&contextRequired, "required", false, "Always include this context")
-	addCmd.Flags().BoolVar(&contextDefault, "default", false, "Include by default")
-	addCmd.Flags().StringSliceVar(&contextTags, "tag", nil, "Tags")
+	addCmd.Flags().String("name", "", "Context name (identifier)")
+	addCmd.Flags().String("description", "", "Description")
+	addCmd.Flags().String("file", "", "Path to context file")
+	addCmd.Flags().String("command", "", "Command to generate content")
+	addCmd.Flags().String("prompt", "", "Inline content text")
+	addCmd.Flags().Bool("required", false, "Always include this context")
+	addCmd.Flags().Bool("default", false, "Include by default")
+	addCmd.Flags().StringSlice("tag", nil, "Tags")
 
 	parent.AddCommand(addCmd)
 }
@@ -146,6 +135,7 @@ Examples:
 func runConfigContextAdd(cmd *cobra.Command, _ []string) error {
 	stdin := cmd.InOrStdin()
 	stdout := cmd.OutOrStdout()
+	local, _ := cmd.Flags().GetBool("local")
 
 	// Check if interactive
 	isTTY := false
@@ -153,8 +143,8 @@ func runConfigContextAdd(cmd *cobra.Command, _ []string) error {
 		isTTY = term.IsTerminal(int(f.Fd()))
 	}
 
-	// Collect values
-	name := contextName
+	// Get flag values
+	name, _ := cmd.Flags().GetString("name")
 	if name == "" {
 		if !isTTY {
 			return fmt.Errorf("--name is required (run interactively or provide flag)")
@@ -169,7 +159,7 @@ func runConfigContextAdd(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("context name is required")
 	}
 
-	description := contextDescription
+	description, _ := cmd.Flags().GetString("description")
 	if description == "" && isTTY {
 		var err error
 		description, err = promptString(stdout, stdin, "Description (optional)", "")
@@ -179,9 +169,9 @@ func runConfigContextAdd(cmd *cobra.Command, _ []string) error {
 	}
 
 	// Content source
-	file := contextFile
-	command := contextCommand
-	prompt := contextPrompt
+	file, _ := cmd.Flags().GetString("file")
+	command, _ := cmd.Flags().GetString("command")
+	prompt, _ := cmd.Flags().GetString("prompt")
 
 	sourceCount := 0
 	if file != "" {
@@ -252,8 +242,8 @@ func runConfigContextAdd(cmd *cobra.Command, _ []string) error {
 	}
 
 	// Ask about required/default if interactive
-	required := contextRequired
-	isDefault := contextDefault
+	required, _ := cmd.Flags().GetBool("required")
+	isDefault, _ := cmd.Flags().GetBool("default")
 	if isTTY && !required && !isDefault {
 		fmt.Fprint(stdout, "Required (always include)? [y/N] ")
 		reader := bufio.NewReader(stdin)
@@ -276,6 +266,7 @@ func runConfigContextAdd(cmd *cobra.Command, _ []string) error {
 	}
 
 	// Build context struct
+	tags, _ := cmd.Flags().GetStringSlice("tag")
 	ctx := ContextConfig{
 		Name:        name,
 		Description: description,
@@ -284,7 +275,7 @@ func runConfigContextAdd(cmd *cobra.Command, _ []string) error {
 		Prompt:      prompt,
 		Required:    required,
 		Default:     isDefault,
-		Tags:        contextTags,
+		Tags:        tags,
 	}
 
 	// Determine target directory
@@ -295,7 +286,7 @@ func runConfigContextAdd(cmd *cobra.Command, _ []string) error {
 
 	var configDir string
 	var scopeName string
-	if configLocal {
+	if local {
 		configDir = paths.Local
 		scopeName = "local"
 	} else {
@@ -355,8 +346,9 @@ Displays all configuration fields for the specified context.`,
 // runConfigContextInfo shows detailed information about a context.
 func runConfigContextInfo(cmd *cobra.Command, args []string) error {
 	name := args[0]
+	local, _ := cmd.Flags().GetBool("local")
 
-	contexts, err := loadContextsForScope(configLocal)
+	contexts, err := loadContextsForScope(local)
 	if err != nil {
 		return err
 	}
@@ -410,13 +402,14 @@ With a name, provides interactive prompts to modify the context.`,
 
 // runConfigContextEdit edits a context configuration.
 func runConfigContextEdit(cmd *cobra.Command, args []string) error {
+	local, _ := cmd.Flags().GetBool("local")
 	paths, err := config.ResolvePaths("")
 	if err != nil {
 		return fmt.Errorf("resolving config paths: %w", err)
 	}
 
 	var configDir string
-	if configLocal {
+	if local {
 		configDir = paths.Local
 	} else {
 		configDir = paths.Global
@@ -451,7 +444,7 @@ func runConfigContextEdit(cmd *cobra.Command, args []string) error {
 
 	ctx, exists := contexts[name]
 	if !exists {
-		return fmt.Errorf("context %q not found in %s config", name, scopeString(configLocal))
+		return fmt.Errorf("context %q not found in %s config", name, scopeString(local))
 	}
 
 	// Prompt for each field with current value as default
@@ -583,6 +576,7 @@ func runConfigContextRemove(cmd *cobra.Command, args []string) error {
 	name := args[0]
 	stdin := cmd.InOrStdin()
 	stdout := cmd.OutOrStdout()
+	local, _ := cmd.Flags().GetBool("local")
 
 	paths, err := config.ResolvePaths("")
 	if err != nil {
@@ -590,7 +584,7 @@ func runConfigContextRemove(cmd *cobra.Command, args []string) error {
 	}
 
 	var configDir string
-	if configLocal {
+	if local {
 		configDir = paths.Local
 	} else {
 		configDir = paths.Global
@@ -603,7 +597,7 @@ func runConfigContextRemove(cmd *cobra.Command, args []string) error {
 	}
 
 	if _, exists := contexts[name]; !exists {
-		return fmt.Errorf("context %q not found in %s config", name, scopeString(configLocal))
+		return fmt.Errorf("context %q not found in %s config", name, scopeString(local))
 	}
 
 	// Confirm removal
@@ -613,7 +607,7 @@ func runConfigContextRemove(cmd *cobra.Command, args []string) error {
 	}
 
 	if isTTY {
-		fmt.Fprintf(stdout, "Remove context %q from %s config? [y/N] ", name, scopeString(configLocal))
+		fmt.Fprintf(stdout, "Remove context %q from %s config? [y/N] ", name, scopeString(local))
 		reader := bufio.NewReader(stdin)
 		input, err := reader.ReadString('\n')
 		if err != nil {

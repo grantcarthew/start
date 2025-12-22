@@ -10,15 +10,6 @@ const (
 	DefaultAssetRepoURL = "https://github.com/grantcarthew/start-assets"
 )
 
-// Assets command flags
-var (
-	assetsLocal   bool   // --local flag for add command
-	assetsVerbose bool   // --verbose flag for search, info, list
-	assetsDryRun  bool   // --dry-run flag for update
-	assetsForce   bool   // --force flag for update
-	assetsType    string // --type flag for list
-)
-
 // addAssetsCommand adds the assets command group and its subcommands to the parent.
 func addAssetsCommand(parent *cobra.Command) {
 	assetsCmd := &cobra.Command{

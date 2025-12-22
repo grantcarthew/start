@@ -36,8 +36,8 @@ and whether updates are available.`,
 		RunE: runAssetsList,
 	}
 
-	listCmd.Flags().StringVar(&assetsType, "type", "", "Filter by type (agents, roles, tasks, contexts)")
-	listCmd.Flags().BoolVarP(&assetsVerbose, "verbose", "v", false, "Show detailed output")
+	listCmd.Flags().String("type", "", "Filter by type (agents, roles, tasks, contexts)")
+	listCmd.Flags().BoolP("verbose", "v", false, "Show detailed output")
 
 	parent.AddCommand(listCmd)
 }
@@ -74,23 +74,25 @@ func runAssetsList(cmd *cobra.Command, args []string) error {
 	}
 
 	// Filter by type if specified
-	if assetsType != "" {
+	assetType, _ := cmd.Flags().GetString("type")
+	if assetType != "" {
 		var filtered []InstalledAsset
 		for _, a := range installed {
-			if a.Category == assetsType {
+			if a.Category == assetType {
 				filtered = append(filtered, a)
 			}
 		}
 		installed = filtered
 
 		if len(installed) == 0 {
-			fmt.Fprintf(cmd.OutOrStdout(), "No %s installed from registry.\n", assetsType)
+			fmt.Fprintf(cmd.OutOrStdout(), "No %s installed from registry.\n", assetType)
 			return nil
 		}
 	}
 
 	// Check for updates if verbose
-	if assetsVerbose {
+	verbose, _ := cmd.Flags().GetBool("verbose")
+	if verbose {
 		client, err := registry.NewClient()
 		if err == nil {
 			checkForUpdates(ctx, client, installed)
@@ -98,7 +100,7 @@ func runAssetsList(cmd *cobra.Command, args []string) error {
 	}
 
 	// Print results
-	printInstalledAssets(cmd.OutOrStdout(), installed, assetsVerbose)
+	printInstalledAssets(cmd.OutOrStdout(), installed, verbose)
 
 	return nil
 }

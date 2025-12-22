@@ -15,15 +15,6 @@ import (
 	"golang.org/x/term"
 )
 
-// Role add command flags
-var (
-	roleName        string
-	roleDescription string
-	roleFile        string
-	roleCommand     string
-	rolePrompt      string
-	roleTags        []string
-)
 
 // addConfigRoleCommand adds the role subcommand group to the config command.
 func addConfigRoleCommand(parent *cobra.Command) {
@@ -64,7 +55,8 @@ Use --local to show only local roles.`,
 
 // runConfigRoleList lists all configured roles.
 func runConfigRoleList(cmd *cobra.Command, _ []string) error {
-	roles, err := loadRolesForScope(configLocal)
+	local, _ := cmd.Flags().GetBool("local")
+	roles, err := loadRolesForScope(local)
 	if err != nil {
 		return err
 	}
@@ -76,7 +68,7 @@ func runConfigRoleList(cmd *cobra.Command, _ []string) error {
 
 	// Get default role
 	defaultRole := ""
-	if cfg, err := loadConfigForScope(configLocal); err == nil {
+	if cfg, err := loadConfigForScope(local); err == nil {
 		defaultRole = getDefaultRoleFromConfig(cfg)
 	}
 
@@ -130,12 +122,12 @@ Examples:
 		RunE: runConfigRoleAdd,
 	}
 
-	addCmd.Flags().StringVar(&roleName, "name", "", "Role name (identifier)")
-	addCmd.Flags().StringVar(&roleDescription, "description", "", "Description")
-	addCmd.Flags().StringVar(&roleFile, "file", "", "Path to role prompt file")
-	addCmd.Flags().StringVar(&roleCommand, "command", "", "Command to generate prompt")
-	addCmd.Flags().StringVar(&rolePrompt, "prompt", "", "Inline prompt text")
-	addCmd.Flags().StringSliceVar(&roleTags, "tag", nil, "Tags")
+	addCmd.Flags().String("name", "", "Role name (identifier)")
+	addCmd.Flags().String("description", "", "Description")
+	addCmd.Flags().String("file", "", "Path to role prompt file")
+	addCmd.Flags().String("command", "", "Command to generate prompt")
+	addCmd.Flags().String("prompt", "", "Inline prompt text")
+	addCmd.Flags().StringSlice("tag", nil, "Tags")
 
 	parent.AddCommand(addCmd)
 }
@@ -144,6 +136,7 @@ Examples:
 func runConfigRoleAdd(cmd *cobra.Command, _ []string) error {
 	stdin := cmd.InOrStdin()
 	stdout := cmd.OutOrStdout()
+	local, _ := cmd.Flags().GetBool("local")
 
 	// Check if interactive
 	isTTY := false
@@ -151,8 +144,8 @@ func runConfigRoleAdd(cmd *cobra.Command, _ []string) error {
 		isTTY = term.IsTerminal(int(f.Fd()))
 	}
 
-	// Collect values
-	name := roleName
+	// Get flag values
+	name, _ := cmd.Flags().GetString("name")
 	if name == "" {
 		if !isTTY {
 			return fmt.Errorf("--name is required (run interactively or provide flag)")
@@ -167,7 +160,7 @@ func runConfigRoleAdd(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("role name is required")
 	}
 
-	description := roleDescription
+	description, _ := cmd.Flags().GetString("description")
 	if description == "" && isTTY {
 		var err error
 		description, err = promptString(stdout, stdin, "Description (optional)", "")
@@ -177,9 +170,9 @@ func runConfigRoleAdd(cmd *cobra.Command, _ []string) error {
 	}
 
 	// Content source: must have exactly one of file, command, or prompt
-	file := roleFile
-	command := roleCommand
-	prompt := rolePrompt
+	file, _ := cmd.Flags().GetString("file")
+	command, _ := cmd.Flags().GetString("command")
+	prompt, _ := cmd.Flags().GetString("prompt")
 
 	sourceCount := 0
 	if file != "" {
@@ -250,13 +243,14 @@ func runConfigRoleAdd(cmd *cobra.Command, _ []string) error {
 	}
 
 	// Build role struct
+	tags, _ := cmd.Flags().GetStringSlice("tag")
 	role := RoleConfig{
 		Name:        name,
 		Description: description,
 		File:        file,
 		Command:     command,
 		Prompt:      prompt,
-		Tags:        roleTags,
+		Tags:        tags,
 	}
 
 	// Determine target directory
@@ -267,7 +261,7 @@ func runConfigRoleAdd(cmd *cobra.Command, _ []string) error {
 
 	var configDir string
 	var scopeName string
-	if configLocal {
+	if local {
 		configDir = paths.Local
 		scopeName = "local"
 	} else {
@@ -327,8 +321,9 @@ Displays all configuration fields for the specified role.`,
 // runConfigRoleInfo shows detailed information about a role.
 func runConfigRoleInfo(cmd *cobra.Command, args []string) error {
 	name := args[0]
+	local, _ := cmd.Flags().GetBool("local")
 
-	roles, err := loadRolesForScope(configLocal)
+	roles, err := loadRolesForScope(local)
 	if err != nil {
 		return err
 	}
@@ -380,13 +375,14 @@ With a name, provides interactive prompts to modify the role.`,
 
 // runConfigRoleEdit edits a role configuration.
 func runConfigRoleEdit(cmd *cobra.Command, args []string) error {
+	local, _ := cmd.Flags().GetBool("local")
 	paths, err := config.ResolvePaths("")
 	if err != nil {
 		return fmt.Errorf("resolving config paths: %w", err)
 	}
 
 	var configDir string
-	if configLocal {
+	if local {
 		configDir = paths.Local
 	} else {
 		configDir = paths.Global
@@ -421,7 +417,7 @@ func runConfigRoleEdit(cmd *cobra.Command, args []string) error {
 
 	role, exists := roles[name]
 	if !exists {
-		return fmt.Errorf("role %q not found in %s config", name, scopeString(configLocal))
+		return fmt.Errorf("role %q not found in %s config", name, scopeString(local))
 	}
 
 	// Prompt for each field with current value as default
@@ -532,6 +528,7 @@ func runConfigRoleRemove(cmd *cobra.Command, args []string) error {
 	name := args[0]
 	stdin := cmd.InOrStdin()
 	stdout := cmd.OutOrStdout()
+	local, _ := cmd.Flags().GetBool("local")
 
 	paths, err := config.ResolvePaths("")
 	if err != nil {
@@ -539,7 +536,7 @@ func runConfigRoleRemove(cmd *cobra.Command, args []string) error {
 	}
 
 	var configDir string
-	if configLocal {
+	if local {
 		configDir = paths.Local
 	} else {
 		configDir = paths.Global
@@ -552,7 +549,7 @@ func runConfigRoleRemove(cmd *cobra.Command, args []string) error {
 	}
 
 	if _, exists := roles[name]; !exists {
-		return fmt.Errorf("role %q not found in %s config", name, scopeString(configLocal))
+		return fmt.Errorf("role %q not found in %s config", name, scopeString(local))
 	}
 
 	// Confirm removal
@@ -562,7 +559,7 @@ func runConfigRoleRemove(cmd *cobra.Command, args []string) error {
 	}
 
 	if isTTY {
-		fmt.Fprintf(stdout, "Remove role %q from %s config? [y/N] ", name, scopeString(configLocal))
+		fmt.Fprintf(stdout, "Remove role %q from %s config? [y/N] ", name, scopeString(local))
 		reader := bufio.NewReader(stdin)
 		input, err := reader.ReadString('\n')
 		if err != nil {
@@ -611,6 +608,7 @@ With a name, sets that role as the default.`,
 // runConfigRoleDefault sets or shows the default role.
 func runConfigRoleDefault(cmd *cobra.Command, args []string) error {
 	stdout := cmd.OutOrStdout()
+	local, _ := cmd.Flags().GetBool("local")
 
 	paths, err := config.ResolvePaths("")
 	if err != nil {
@@ -618,7 +616,7 @@ func runConfigRoleDefault(cmd *cobra.Command, args []string) error {
 	}
 
 	var configDir string
-	if configLocal {
+	if local {
 		configDir = paths.Local
 	} else {
 		configDir = paths.Global
@@ -626,7 +624,7 @@ func runConfigRoleDefault(cmd *cobra.Command, args []string) error {
 
 	// Show current default
 	if len(args) == 0 {
-		cfg, err := loadConfigForScope(configLocal)
+		cfg, err := loadConfigForScope(local)
 		if err != nil {
 			fmt.Fprintln(stdout, "No default role set.")
 			return nil
@@ -644,7 +642,7 @@ func runConfigRoleDefault(cmd *cobra.Command, args []string) error {
 	name := args[0]
 
 	// Verify role exists
-	roles, err := loadRolesForScope(configLocal)
+	roles, err := loadRolesForScope(local)
 	if err != nil {
 		return err
 	}

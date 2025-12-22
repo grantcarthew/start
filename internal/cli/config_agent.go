@@ -17,17 +17,6 @@ import (
 	"golang.org/x/term"
 )
 
-// Agent add command flags
-var (
-	agentName         string
-	agentBin          string
-	agentCommand      string
-	agentDefaultModel string
-	agentDescription  string
-	agentModels       []string // format: "alias=model-id"
-	agentTags         []string
-)
-
 // addConfigAgentCommand adds the agent subcommand group to the config command.
 func addConfigAgentCommand(parent *cobra.Command) {
 	agentCmd := &cobra.Command{
@@ -67,7 +56,8 @@ Use --local to show only local agents.`,
 
 // runConfigAgentList lists all configured agents.
 func runConfigAgentList(cmd *cobra.Command, _ []string) error {
-	agents, err := loadAgentsForScope(configLocal)
+	local, _ := cmd.Flags().GetBool("local")
+	agents, err := loadAgentsForScope(local)
 	if err != nil {
 		return err
 	}
@@ -79,7 +69,7 @@ func runConfigAgentList(cmd *cobra.Command, _ []string) error {
 
 	// Get default agent
 	defaultAgent := ""
-	if cfg, err := loadConfigForScope(configLocal); err == nil {
+	if cfg, err := loadConfigForScope(local); err == nil {
 		defaultAgent = getDefaultAgentFromConfig(cfg)
 	}
 
@@ -131,13 +121,13 @@ Examples:
 		RunE: runConfigAgentAdd,
 	}
 
-	addCmd.Flags().StringVar(&agentName, "name", "", "Agent name (identifier)")
-	addCmd.Flags().StringVar(&agentBin, "bin", "", "Binary executable name")
-	addCmd.Flags().StringVar(&agentCommand, "command", "", "Command template")
-	addCmd.Flags().StringVar(&agentDefaultModel, "default-model", "", "Default model alias")
-	addCmd.Flags().StringVar(&agentDescription, "description", "", "Description")
-	addCmd.Flags().StringSliceVar(&agentModels, "model", nil, "Model mapping (alias=model-id)")
-	addCmd.Flags().StringSliceVar(&agentTags, "tag", nil, "Tags")
+	addCmd.Flags().String("name", "", "Agent name (identifier)")
+	addCmd.Flags().String("bin", "", "Binary executable name")
+	addCmd.Flags().String("command", "", "Command template")
+	addCmd.Flags().String("default-model", "", "Default model alias")
+	addCmd.Flags().String("description", "", "Description")
+	addCmd.Flags().StringSlice("model", nil, "Model mapping (alias=model-id)")
+	addCmd.Flags().StringSlice("tag", nil, "Tags")
 
 	parent.AddCommand(addCmd)
 }
@@ -146,6 +136,7 @@ Examples:
 func runConfigAgentAdd(cmd *cobra.Command, _ []string) error {
 	stdin := cmd.InOrStdin()
 	stdout := cmd.OutOrStdout()
+	local, _ := cmd.Flags().GetBool("local")
 
 	// Check if interactive
 	isTTY := false
@@ -153,8 +144,8 @@ func runConfigAgentAdd(cmd *cobra.Command, _ []string) error {
 		isTTY = term.IsTerminal(int(f.Fd()))
 	}
 
-	// Collect values, prompting for missing required fields if interactive
-	name := agentName
+	// Get flag values
+	name, _ := cmd.Flags().GetString("name")
 	if name == "" {
 		if !isTTY {
 			return fmt.Errorf("--name is required (run interactively or provide flag)")
@@ -169,7 +160,7 @@ func runConfigAgentAdd(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("agent name is required")
 	}
 
-	bin := agentBin
+	bin, _ := cmd.Flags().GetString("bin")
 	if bin == "" {
 		if !isTTY {
 			return fmt.Errorf("--bin is required (run interactively or provide flag)")
@@ -184,7 +175,7 @@ func runConfigAgentAdd(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("binary is required")
 	}
 
-	command := agentCommand
+	command, _ := cmd.Flags().GetString("command")
 	if command == "" {
 		if !isTTY {
 			return fmt.Errorf("--command is required (run interactively or provide flag)")
@@ -200,7 +191,7 @@ func runConfigAgentAdd(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("command template is required")
 	}
 
-	defaultModel := agentDefaultModel
+	defaultModel, _ := cmd.Flags().GetString("default-model")
 	if defaultModel == "" && isTTY {
 		var err error
 		defaultModel, err = promptString(stdout, stdin, "Default model (optional)", "")
@@ -209,7 +200,7 @@ func runConfigAgentAdd(cmd *cobra.Command, _ []string) error {
 		}
 	}
 
-	description := agentDescription
+	description, _ := cmd.Flags().GetString("description")
 	if description == "" && isTTY {
 		var err error
 		description, err = promptString(stdout, stdin, "Description (optional)", "")
@@ -219,6 +210,8 @@ func runConfigAgentAdd(cmd *cobra.Command, _ []string) error {
 	}
 
 	// Parse models
+	agentModels, _ := cmd.Flags().GetStringSlice("model")
+	agentTags, _ := cmd.Flags().GetStringSlice("tag")
 	models := make(map[string]string)
 	for _, m := range agentModels {
 		parts := strings.SplitN(m, "=", 2)
@@ -247,7 +240,7 @@ func runConfigAgentAdd(cmd *cobra.Command, _ []string) error {
 
 	var configDir string
 	var scopeName string
-	if configLocal {
+	if local {
 		configDir = paths.Local
 		scopeName = "local"
 	} else {
@@ -307,8 +300,9 @@ Displays all configuration fields for the specified agent.`,
 // runConfigAgentInfo shows detailed information about an agent.
 func runConfigAgentInfo(cmd *cobra.Command, args []string) error {
 	name := args[0]
+	local, _ := cmd.Flags().GetBool("local")
 
-	agents, err := loadAgentsForScope(configLocal)
+	agents, err := loadAgentsForScope(local)
 	if err != nil {
 		return err
 	}
@@ -367,13 +361,14 @@ With a name, provides interactive prompts to modify the agent.`,
 
 // runConfigAgentEdit edits an agent configuration.
 func runConfigAgentEdit(cmd *cobra.Command, args []string) error {
+	local, _ := cmd.Flags().GetBool("local")
 	paths, err := config.ResolvePaths("")
 	if err != nil {
 		return fmt.Errorf("resolving config paths: %w", err)
 	}
 
 	var configDir string
-	if configLocal {
+	if local {
 		configDir = paths.Local
 	} else {
 		configDir = paths.Global
@@ -408,7 +403,7 @@ func runConfigAgentEdit(cmd *cobra.Command, args []string) error {
 
 	agent, exists := agents[name]
 	if !exists {
-		return fmt.Errorf("agent %q not found in %s config", name, scopeString(configLocal))
+		return fmt.Errorf("agent %q not found in %s config", name, scopeString(local))
 	}
 
 	// Prompt for each field with current value as default
@@ -476,6 +471,7 @@ func runConfigAgentRemove(cmd *cobra.Command, args []string) error {
 	name := args[0]
 	stdin := cmd.InOrStdin()
 	stdout := cmd.OutOrStdout()
+	local, _ := cmd.Flags().GetBool("local")
 
 	paths, err := config.ResolvePaths("")
 	if err != nil {
@@ -483,7 +479,7 @@ func runConfigAgentRemove(cmd *cobra.Command, args []string) error {
 	}
 
 	var configDir string
-	if configLocal {
+	if local {
 		configDir = paths.Local
 	} else {
 		configDir = paths.Global
@@ -496,7 +492,7 @@ func runConfigAgentRemove(cmd *cobra.Command, args []string) error {
 	}
 
 	if _, exists := agents[name]; !exists {
-		return fmt.Errorf("agent %q not found in %s config", name, scopeString(configLocal))
+		return fmt.Errorf("agent %q not found in %s config", name, scopeString(local))
 	}
 
 	// Confirm removal
@@ -506,7 +502,7 @@ func runConfigAgentRemove(cmd *cobra.Command, args []string) error {
 	}
 
 	if isTTY {
-		fmt.Fprintf(stdout, "Remove agent %q from %s config? [y/N] ", name, scopeString(configLocal))
+		fmt.Fprintf(stdout, "Remove agent %q from %s config? [y/N] ", name, scopeString(local))
 		reader := bufio.NewReader(stdin)
 		input, err := reader.ReadString('\n')
 		if err != nil {
@@ -555,6 +551,7 @@ With a name, sets that agent as the default.`,
 // runConfigAgentDefault sets or shows the default agent.
 func runConfigAgentDefault(cmd *cobra.Command, args []string) error {
 	stdout := cmd.OutOrStdout()
+	local, _ := cmd.Flags().GetBool("local")
 
 	paths, err := config.ResolvePaths("")
 	if err != nil {
@@ -562,7 +559,7 @@ func runConfigAgentDefault(cmd *cobra.Command, args []string) error {
 	}
 
 	var configDir string
-	if configLocal {
+	if local {
 		configDir = paths.Local
 	} else {
 		configDir = paths.Global
@@ -570,7 +567,7 @@ func runConfigAgentDefault(cmd *cobra.Command, args []string) error {
 
 	// Show current default
 	if len(args) == 0 {
-		cfg, err := loadConfigForScope(configLocal)
+		cfg, err := loadConfigForScope(local)
 		if err != nil {
 			fmt.Fprintln(stdout, "No default agent set.")
 			return nil
@@ -588,7 +585,7 @@ func runConfigAgentDefault(cmd *cobra.Command, args []string) error {
 	name := args[0]
 
 	// Verify agent exists
-	agents, err := loadAgentsForScope(configLocal)
+	agents, err := loadAgentsForScope(local)
 	if err != nil {
 		return err
 	}

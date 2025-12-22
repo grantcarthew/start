@@ -15,17 +15,6 @@ import (
 	"golang.org/x/term"
 )
 
-// Task add command flags
-var (
-	taskName        string
-	taskDescription string
-	taskFile        string
-	taskCommand     string
-	taskPrompt      string
-	taskRole        string
-	taskTags        []string
-)
-
 // addConfigTaskCommand adds the task subcommand group to the config command.
 func addConfigTaskCommand(parent *cobra.Command) {
 	taskCmd := &cobra.Command{
@@ -64,7 +53,8 @@ Use --local to show only local tasks.`,
 
 // runConfigTaskList lists all configured tasks.
 func runConfigTaskList(cmd *cobra.Command, _ []string) error {
-	tasks, err := loadTasksForScope(configLocal)
+	local, _ := cmd.Flags().GetBool("local")
+	tasks, err := loadTasksForScope(local)
 	if err != nil {
 		return err
 	}
@@ -115,13 +105,13 @@ Examples:
 		RunE: runConfigTaskAdd,
 	}
 
-	addCmd.Flags().StringVar(&taskName, "name", "", "Task name (identifier)")
-	addCmd.Flags().StringVar(&taskDescription, "description", "", "Description")
-	addCmd.Flags().StringVar(&taskFile, "file", "", "Path to task prompt file")
-	addCmd.Flags().StringVar(&taskCommand, "command", "", "Command to generate prompt")
-	addCmd.Flags().StringVar(&taskPrompt, "prompt", "", "Inline prompt text")
-	addCmd.Flags().StringVar(&taskRole, "role", "", "Role to use for this task")
-	addCmd.Flags().StringSliceVar(&taskTags, "tag", nil, "Tags")
+	addCmd.Flags().String("name", "", "Task name (identifier)")
+	addCmd.Flags().String("description", "", "Description")
+	addCmd.Flags().String("file", "", "Path to task prompt file")
+	addCmd.Flags().String("command", "", "Command to generate prompt")
+	addCmd.Flags().String("prompt", "", "Inline prompt text")
+	addCmd.Flags().String("role", "", "Role to use for this task")
+	addCmd.Flags().StringSlice("tag", nil, "Tags")
 
 	parent.AddCommand(addCmd)
 }
@@ -130,6 +120,7 @@ Examples:
 func runConfigTaskAdd(cmd *cobra.Command, _ []string) error {
 	stdin := cmd.InOrStdin()
 	stdout := cmd.OutOrStdout()
+	local, _ := cmd.Flags().GetBool("local")
 
 	// Check if interactive
 	isTTY := false
@@ -138,7 +129,7 @@ func runConfigTaskAdd(cmd *cobra.Command, _ []string) error {
 	}
 
 	// Collect values
-	name := taskName
+	name, _ := cmd.Flags().GetString("name")
 	if name == "" {
 		if !isTTY {
 			return fmt.Errorf("--name is required (run interactively or provide flag)")
@@ -153,7 +144,7 @@ func runConfigTaskAdd(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("task name is required")
 	}
 
-	description := taskDescription
+	description, _ := cmd.Flags().GetString("description")
 	if description == "" && isTTY {
 		var err error
 		description, err = promptString(stdout, stdin, "Description (optional)", "")
@@ -163,9 +154,9 @@ func runConfigTaskAdd(cmd *cobra.Command, _ []string) error {
 	}
 
 	// Content source
-	file := taskFile
-	command := taskCommand
-	prompt := taskPrompt
+	file, _ := cmd.Flags().GetString("file")
+	command, _ := cmd.Flags().GetString("command")
+	prompt, _ := cmd.Flags().GetString("prompt")
 
 	sourceCount := 0
 	if file != "" {
@@ -236,7 +227,7 @@ func runConfigTaskAdd(cmd *cobra.Command, _ []string) error {
 	}
 
 	// Role (optional)
-	role := taskRole
+	role, _ := cmd.Flags().GetString("role")
 	if role == "" && isTTY {
 		var err error
 		role, err = promptString(stdout, stdin, "Role (optional)", "")
@@ -246,6 +237,7 @@ func runConfigTaskAdd(cmd *cobra.Command, _ []string) error {
 	}
 
 	// Build task struct
+	tags, _ := cmd.Flags().GetStringSlice("tag")
 	task := TaskConfig{
 		Name:        name,
 		Description: description,
@@ -253,7 +245,7 @@ func runConfigTaskAdd(cmd *cobra.Command, _ []string) error {
 		Command:     command,
 		Prompt:      prompt,
 		Role:        role,
-		Tags:        taskTags,
+		Tags:        tags,
 	}
 
 	// Determine target directory
@@ -264,7 +256,7 @@ func runConfigTaskAdd(cmd *cobra.Command, _ []string) error {
 
 	var configDir string
 	var scopeName string
-	if configLocal {
+	if local {
 		configDir = paths.Local
 		scopeName = "local"
 	} else {
@@ -324,8 +316,9 @@ Displays all configuration fields for the specified task.`,
 // runConfigTaskInfo shows detailed information about a task.
 func runConfigTaskInfo(cmd *cobra.Command, args []string) error {
 	name := args[0]
+	local, _ := cmd.Flags().GetBool("local")
 
-	tasks, err := loadTasksForScope(configLocal)
+	tasks, err := loadTasksForScope(local)
 	if err != nil {
 		return err
 	}
@@ -380,13 +373,14 @@ With a name, provides interactive prompts to modify the task.`,
 
 // runConfigTaskEdit edits a task configuration.
 func runConfigTaskEdit(cmd *cobra.Command, args []string) error {
+	local, _ := cmd.Flags().GetBool("local")
 	paths, err := config.ResolvePaths("")
 	if err != nil {
 		return fmt.Errorf("resolving config paths: %w", err)
 	}
 
 	var configDir string
-	if configLocal {
+	if local {
 		configDir = paths.Local
 	} else {
 		configDir = paths.Global
@@ -421,7 +415,7 @@ func runConfigTaskEdit(cmd *cobra.Command, args []string) error {
 
 	task, exists := tasks[name]
 	if !exists {
-		return fmt.Errorf("task %q not found in %s config", name, scopeString(configLocal))
+		return fmt.Errorf("task %q not found in %s config", name, scopeString(local))
 	}
 
 	// Prompt for each field with current value as default
@@ -538,6 +532,7 @@ func runConfigTaskRemove(cmd *cobra.Command, args []string) error {
 	name := args[0]
 	stdin := cmd.InOrStdin()
 	stdout := cmd.OutOrStdout()
+	local, _ := cmd.Flags().GetBool("local")
 
 	paths, err := config.ResolvePaths("")
 	if err != nil {
@@ -545,7 +540,7 @@ func runConfigTaskRemove(cmd *cobra.Command, args []string) error {
 	}
 
 	var configDir string
-	if configLocal {
+	if local {
 		configDir = paths.Local
 	} else {
 		configDir = paths.Global
@@ -558,7 +553,7 @@ func runConfigTaskRemove(cmd *cobra.Command, args []string) error {
 	}
 
 	if _, exists := tasks[name]; !exists {
-		return fmt.Errorf("task %q not found in %s config", name, scopeString(configLocal))
+		return fmt.Errorf("task %q not found in %s config", name, scopeString(local))
 	}
 
 	// Confirm removal
@@ -568,7 +563,7 @@ func runConfigTaskRemove(cmd *cobra.Command, args []string) error {
 	}
 
 	if isTTY {
-		fmt.Fprintf(stdout, "Remove task %q from %s config? [y/N] ", name, scopeString(configLocal))
+		fmt.Fprintf(stdout, "Remove task %q from %s config? [y/N] ", name, scopeString(local))
 		reader := bufio.NewReader(stdin)
 		input, err := reader.ReadString('\n')
 		if err != nil {
