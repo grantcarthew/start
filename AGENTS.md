@@ -12,7 +12,7 @@ Avoid references to the prototype in new documentation. This is a new design.
 
 Projects are stored in the `docs/projects/` directory. Continue by reading the active project.
 
-Active Project: [P-011: CLI Refinements](docs/projects/p-011-cli-refinements.md)
+Active Project: None - see `docs/projects/README.md` for project history
 
 Project Workflow:
 - Active projects are in `docs/projects/`
@@ -148,7 +148,8 @@ The `./Context` directory contains cloned source code and documentation for deve
 - P-008: Configuration Editing (config agent/role/context/task/settings commands)
 - P-009: Doctor Diagnostics (health checks, configuration validation, fix suggestions)
 - P-010: Shell Completion (bash, zsh, fish tab-completion, documentation guides)
+- P-011: CLI Refinements (command naming, exit codes)
 
-**Current:** P-011: CLI Refinements (command naming, exit codes)
+**Current:** None
 
 The prototype validated that this tool solves a real problem. This version will implement it properly.
