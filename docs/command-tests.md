@@ -27,9 +27,8 @@ start task --help
 ## Global Flags
 
 ```bash
-# Verbose output
+# Verbose output (no short form for --verbose)
 start --verbose --dry-run
-start -v --dry-run
 
 # Debug output (implies verbose)
 start --debug --dry-run
@@ -40,8 +39,8 @@ start -q --dry-run
 
 # Custom directory
 start --directory /path/to/project --dry-run
-start -C /path/to/project --dry-run
-start -C . --dry-run
+start -d /path/to/project --dry-run
+start -d . --dry-run
 ```
 
 ## Dry Run Mode
@@ -170,11 +169,10 @@ start doctor -v
 ## Completion
 
 ```bash
-# Generate shell completions
+# Generate shell completions (PowerShell not supported per DR-032)
 start completion bash
 start completion zsh
 start completion fish
-start completion powershell
 
 # Install completions (example for bash)
 start completion bash > ~/.bash_completion.d/start

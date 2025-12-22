@@ -12,7 +12,7 @@ Avoid references to the prototype in new documentation. This is a new design.
 
 Projects are stored in the `docs/projects/` directory. Continue by reading the active project.
 
-Active Project: None - P-010 complete, awaiting next project
+Active Project: [P-011: CLI Refinements](docs/projects/p-011-cli-refinements.md)
 
 Project Workflow:
 - Active projects are in `docs/projects/`
@@ -47,7 +47,7 @@ This eliminates the need for custom asset management, GitHub-based distribution,
 start                           # Start interactive session with default role
 start --role go-expert          # Start with specific role
 start task pre-commit-review    # Run a specific task
-start init                      # Initialize CUE configuration
+start doctor                    # Diagnose installation and configuration
 ```
 
 ## Architecture Principles
@@ -149,6 +149,6 @@ The `./Context` directory contains cloned source code and documentation for deve
 - P-009: Doctor Diagnostics (health checks, configuration validation, fix suggestions)
 - P-010: Shell Completion (bash, zsh, fish tab-completion, documentation guides)
 
-**Current:** None - awaiting next project
+**Current:** P-011: CLI Refinements (command naming, exit codes)
 
 The prototype validated that this tool solves a real problem. This version will implement it properly.
