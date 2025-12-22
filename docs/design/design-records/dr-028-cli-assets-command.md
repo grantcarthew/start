@@ -253,12 +253,7 @@ Global flags that apply:
 
 ## Exit Codes
 
-| Code | Meaning |
-|------|---------|
-| 0 | Success |
-| 1 | Network error or invalid input |
-| 2 | Asset not found |
-| 3 | File system error |
+All commands use Unix minimal exit codes: 0 on success, 1 on any error. Error messages printed to stderr describe the specific failure.
 
 ## Implementation Notes
 
@@ -322,3 +317,7 @@ Single `list` command for both registry and config:
 - Pro: Fewer commands
 - Con: Conflates package status with config content
 - Rejected: Separate concerns (assets list = packages, show = content)
+
+## Updates
+
+- 2025-12-22: Aligned exit codes with unified policy (0 success, 1 failure)

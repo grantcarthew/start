@@ -41,7 +41,7 @@ Each context specifies content via inline text, file reference, or command.`,
 
 	addConfigContextListCommand(contextCmd)
 	addConfigContextAddCommand(contextCmd)
-	addConfigContextShowCommand(contextCmd)
+	addConfigContextInfoCommand(contextCmd)
 	addConfigContextEditCommand(contextCmd)
 	addConfigContextRemoveCommand(contextCmd)
 
@@ -337,23 +337,23 @@ func runConfigContextAdd(cmd *cobra.Command, _ []string) error {
 	return nil
 }
 
-// addConfigContextShowCommand adds the show subcommand.
-func addConfigContextShowCommand(parent *cobra.Command) {
-	showCmd := &cobra.Command{
-		Use:   "show <name>",
+// addConfigContextInfoCommand adds the info subcommand.
+func addConfigContextInfoCommand(parent *cobra.Command) {
+	infoCmd := &cobra.Command{
+		Use:   "info <name>",
 		Short: "Show context details",
 		Long: `Show detailed information about a context.
 
 Displays all configuration fields for the specified context.`,
 		Args: cobra.ExactArgs(1),
-		RunE: runConfigContextShow,
+		RunE: runConfigContextInfo,
 	}
 
-	parent.AddCommand(showCmd)
+	parent.AddCommand(infoCmd)
 }
 
-// runConfigContextShow shows detailed information about a context.
-func runConfigContextShow(cmd *cobra.Command, args []string) error {
+// runConfigContextInfo shows detailed information about a context.
+func runConfigContextInfo(cmd *cobra.Command, args []string) error {
 	name := args[0]
 
 	contexts, err := loadContextsForScope(configLocal)

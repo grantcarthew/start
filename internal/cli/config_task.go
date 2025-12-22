@@ -40,7 +40,7 @@ Each task specifies a prompt and optionally a role to use.`,
 
 	addConfigTaskListCommand(taskCmd)
 	addConfigTaskAddCommand(taskCmd)
-	addConfigTaskShowCommand(taskCmd)
+	addConfigTaskInfoCommand(taskCmd)
 	addConfigTaskEditCommand(taskCmd)
 	addConfigTaskRemoveCommand(taskCmd)
 
@@ -306,23 +306,23 @@ func runConfigTaskAdd(cmd *cobra.Command, _ []string) error {
 	return nil
 }
 
-// addConfigTaskShowCommand adds the show subcommand.
-func addConfigTaskShowCommand(parent *cobra.Command) {
-	showCmd := &cobra.Command{
-		Use:   "show <name>",
+// addConfigTaskInfoCommand adds the info subcommand.
+func addConfigTaskInfoCommand(parent *cobra.Command) {
+	infoCmd := &cobra.Command{
+		Use:   "info <name>",
 		Short: "Show task details",
 		Long: `Show detailed information about a task.
 
 Displays all configuration fields for the specified task.`,
 		Args: cobra.ExactArgs(1),
-		RunE: runConfigTaskShow,
+		RunE: runConfigTaskInfo,
 	}
 
-	parent.AddCommand(showCmd)
+	parent.AddCommand(infoCmd)
 }
 
-// runConfigTaskShow shows detailed information about a task.
-func runConfigTaskShow(cmd *cobra.Command, args []string) error {
+// runConfigTaskInfo shows detailed information about a task.
+func runConfigTaskInfo(cmd *cobra.Command, args []string) error {
 	name := args[0]
 
 	tasks, err := loadTasksForScope(configLocal)

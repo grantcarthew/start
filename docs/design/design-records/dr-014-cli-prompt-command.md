@@ -132,13 +132,7 @@ Executing...
 
 ## Exit Codes
 
-| Code | Meaning |
-|------|---------|
-| 0 | Success (agent launched) |
-| 1 | Configuration error |
-| 2 | Agent/role not found |
-| 3 | File/directory error |
-| 4 | Runtime error |
+All commands use Unix minimal exit codes: 0 on success, 1 on any error. Error messages printed to stderr describe the specific failure.
 
 ## Trade-offs
 
@@ -169,3 +163,7 @@ Require explicit context flags always:
 - Con: Verbose for common case
 - Con: Loses benefit of required contexts
 - Rejected: Required contexts should be automatic
+
+## Updates
+
+- 2025-12-22: Aligned exit codes with unified policy (0 success, 1 failure)

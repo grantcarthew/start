@@ -39,7 +39,7 @@ Each role specifies a prompt via inline text, file reference, or command.`,
 
 	addConfigRoleListCommand(roleCmd)
 	addConfigRoleAddCommand(roleCmd)
-	addConfigRoleShowCommand(roleCmd)
+	addConfigRoleInfoCommand(roleCmd)
 	addConfigRoleEditCommand(roleCmd)
 	addConfigRoleRemoveCommand(roleCmd)
 	addConfigRoleDefaultCommand(roleCmd)
@@ -309,23 +309,23 @@ func runConfigRoleAdd(cmd *cobra.Command, _ []string) error {
 	return nil
 }
 
-// addConfigRoleShowCommand adds the show subcommand.
-func addConfigRoleShowCommand(parent *cobra.Command) {
-	showCmd := &cobra.Command{
-		Use:   "show <name>",
+// addConfigRoleInfoCommand adds the info subcommand.
+func addConfigRoleInfoCommand(parent *cobra.Command) {
+	infoCmd := &cobra.Command{
+		Use:   "info <name>",
 		Short: "Show role details",
 		Long: `Show detailed information about a role.
 
 Displays all configuration fields for the specified role.`,
 		Args: cobra.ExactArgs(1),
-		RunE: runConfigRoleShow,
+		RunE: runConfigRoleInfo,
 	}
 
-	parent.AddCommand(showCmd)
+	parent.AddCommand(infoCmd)
 }
 
-// runConfigRoleShow shows detailed information about a role.
-func runConfigRoleShow(cmd *cobra.Command, args []string) error {
+// runConfigRoleInfo shows detailed information about a role.
+func runConfigRoleInfo(cmd *cobra.Command, args []string) error {
 	name := args[0]
 
 	roles, err := loadRolesForScope(configLocal)

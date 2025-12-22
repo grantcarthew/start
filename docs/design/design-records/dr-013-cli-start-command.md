@@ -147,13 +147,7 @@ Debug mode (`--debug`):
 
 ## Exit Codes
 
-| Code | Meaning |
-|------|---------|
-| 0 | Success (agent launched) |
-| 1 | Configuration error |
-| 2 | Agent/role not found |
-| 3 | File/directory error |
-| 4 | Runtime error (agent failed to execute) |
+All commands use Unix minimal exit codes: 0 on success, 1 on any error. Error messages printed to stderr describe the specific failure.
 
 ## Trade-offs
 
@@ -187,3 +181,7 @@ Interactive context selection:
 - Con: Slows down workflow
 - Con: Not scriptable
 - Rejected: Tags provide non-interactive selection
+
+## Updates
+
+- 2025-12-22: Aligned exit codes with unified policy (0 success, 1 failure)

@@ -45,7 +45,7 @@ Error handling:
 
 - Network failures use retry with exponential backoff (2-3 attempts)
 - Transient failures are common; immediate failure frustrates users
-- After retries exhausted, exit with code 2 and helpful message
+- After retries exhausted, exit with code 1 and helpful message
 
 ## Index Module Structure
 
@@ -119,7 +119,7 @@ If the problem persists, verify registry access:
   cue login
 ```
 
-Exit code 2 per DR-018.
+Exit code 1 (unified exit code policy).
 
 ## Trade-offs
 
@@ -167,3 +167,7 @@ Fail immediately on network error:
 - Pro: Simpler implementation
 - Con: Frustrating for transient failures
 - Rejected: Retry is low cost and improves UX
+
+## Updates
+
+- 2025-12-22: Aligned exit codes with unified policy (0 success, 1 failure)

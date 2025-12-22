@@ -85,45 +85,51 @@ start --dry-run --debug --agent gemini --model flash
 
 ```bash
 # List all agents
-start config agent
+start config agent list
 
-# Show specific agent
-start config agent claude
-start config agent gemini
-start config agent aichat
+# Show specific agent info
+start config agent info claude
+start config agent info gemini
+start config agent info aichat
+
+# Set default agent
+start config agent default claude
 ```
 
 ### Role Configuration
 
 ```bash
 # List all roles
-start config role
+start config role list
 
-# Show specific role
-start config role golang-agent
-start config role golang-assistant
+# Show specific role info
+start config role info golang-agent
+start config role info golang-assistant
+
+# Set default role
+start config role default golang-agent
 ```
 
 ### Context Configuration
 
 ```bash
 # List all contexts
-start config context
+start config context list
 
-# Show specific context
-start config context environment
-start config context project
+# Show specific context info
+start config context info environment
+start config context info project
 ```
 
 ### Task Configuration
 
 ```bash
 # List all tasks
-start config task
+start config task list
 
-# Show specific task
-start config task code-review
-start config task debug
+# Show specific task info
+start config task info code-review
+start config task info debug
 ```
 
 ### Settings

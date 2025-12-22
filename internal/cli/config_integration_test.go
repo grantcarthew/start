@@ -96,25 +96,25 @@ func TestConfigAgent_FullWorkflow(t *testing.T) {
 		}
 	})
 
-	t.Run("show displays agent details", func(t *testing.T) {
+	t.Run("info displays agent details", func(t *testing.T) {
 		resetAgentFlags()
 
 		cmd := NewRootCmd()
 		stdout := &bytes.Buffer{}
 		cmd.SetOut(stdout)
 		cmd.SetErr(&bytes.Buffer{})
-		cmd.SetArgs([]string{"config", "agent", "show", "claude"})
+		cmd.SetArgs([]string{"config", "agent", "info", "claude"})
 
 		if err := cmd.Execute(); err != nil {
-			t.Fatalf("show failed: %v", err)
+			t.Fatalf("info failed: %v", err)
 		}
 
 		output := stdout.String()
 		if !strings.Contains(output, "Agent: claude") {
-			t.Errorf("show output missing agent name: %s", output)
+			t.Errorf("info output missing agent name: %s", output)
 		}
 		if !strings.Contains(output, "Default Model: sonnet") {
-			t.Errorf("show output missing default model: %s", output)
+			t.Errorf("info output missing default model: %s", output)
 		}
 	})
 
@@ -346,25 +346,25 @@ func TestConfigRole_FullWorkflow(t *testing.T) {
 		}
 	})
 
-	t.Run("show role details", func(t *testing.T) {
+	t.Run("info role details", func(t *testing.T) {
 		resetRoleFlags()
 
 		cmd := NewRootCmd()
 		stdout := &bytes.Buffer{}
 		cmd.SetOut(stdout)
 		cmd.SetErr(&bytes.Buffer{})
-		cmd.SetArgs([]string{"config", "role", "show", "reviewer"})
+		cmd.SetArgs([]string{"config", "role", "info", "reviewer"})
 
 		if err := cmd.Execute(); err != nil {
-			t.Fatalf("show failed: %v", err)
+			t.Fatalf("info failed: %v", err)
 		}
 
 		output := stdout.String()
 		if !strings.Contains(output, "Role: reviewer") {
-			t.Errorf("show missing role name: %s", output)
+			t.Errorf("info missing role name: %s", output)
 		}
 		if !strings.Contains(output, "Prompt:") {
-			t.Errorf("show missing prompt: %s", output)
+			t.Errorf("info missing prompt: %s", output)
 		}
 	})
 }
@@ -548,25 +548,25 @@ func TestConfigTask_FullWorkflow(t *testing.T) {
 		}
 	})
 
-	t.Run("show task details", func(t *testing.T) {
+	t.Run("info task details", func(t *testing.T) {
 		resetTaskFlags()
 
 		cmd := NewRootCmd()
 		stdout := &bytes.Buffer{}
 		cmd.SetOut(stdout)
 		cmd.SetErr(&bytes.Buffer{})
-		cmd.SetArgs([]string{"config", "task", "show", "review"})
+		cmd.SetArgs([]string{"config", "task", "info", "review"})
 
 		if err := cmd.Execute(); err != nil {
-			t.Fatalf("show failed: %v", err)
+			t.Fatalf("info failed: %v", err)
 		}
 
 		output := stdout.String()
 		if !strings.Contains(output, "Task: review") {
-			t.Errorf("show missing task name: %s", output)
+			t.Errorf("info missing task name: %s", output)
 		}
 		if !strings.Contains(output, "Role: code-reviewer") {
-			t.Errorf("show missing role: %s", output)
+			t.Errorf("info missing role: %s", output)
 		}
 	})
 }

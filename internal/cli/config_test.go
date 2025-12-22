@@ -93,7 +93,7 @@ func TestConfigAgentList_WithAgents(t *testing.T) {
 	}
 }
 
-func TestConfigAgentShow(t *testing.T) {
+func TestConfigAgentInfo(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", tmpDir)
 
@@ -132,7 +132,7 @@ func TestConfigAgentShow(t *testing.T) {
 	stdout := &bytes.Buffer{}
 	cmd.SetOut(stdout)
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"config", "agent", "show", "claude"})
+	cmd.SetArgs([]string{"config", "agent", "info", "claude"})
 
 	err = cmd.Execute()
 	if err != nil {
@@ -154,7 +154,7 @@ func TestConfigAgentShow(t *testing.T) {
 	}
 }
 
-func TestConfigAgentShow_NotFound(t *testing.T) {
+func TestConfigAgentInfo_NotFound(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", tmpDir)
 
@@ -179,7 +179,7 @@ func TestConfigAgentShow_NotFound(t *testing.T) {
 	cmd := NewRootCmd()
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"config", "agent", "show", "nonexistent"})
+	cmd.SetArgs([]string{"config", "agent", "info", "nonexistent"})
 
 	err = cmd.Execute()
 	if err == nil {

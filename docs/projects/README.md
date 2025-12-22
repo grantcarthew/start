@@ -10,9 +10,7 @@ See [p-writing-guide.md](./p-writing-guide.md) for guidelines on creating and ma
 
 ### Active Projects
 
-| Project | Title | Status | Started |
-|---------|-------|--------|---------|
-| [P-011](./p-011-cli-refinements.md) | CLI Refinements | Proposed | |
+None
 
 ### Completed Projects
 
@@ -28,12 +26,21 @@ See [p-writing-guide.md](./p-writing-guide.md) for guidelines on creating and ma
 | [P-008](./completed/p-008-configuration-editing.md) | Configuration Editing | 2025-12-19 |
 | [P-009](./completed/p-009-doctor-diagnostics.md) | Doctor & Diagnostics | 2025-12-19 |
 | [P-010](./completed/p-010-shell-completion.md) | Shell Completion | 2025-12-19 |
+| [P-011](./completed/p-011-cli-refinements.md) | CLI Refinements | 2025-12-22 |
 
 ---
 
 ## Project Overview
 
 ### Completed
+
+#### P-011: CLI Refinements
+
+Addressed CLI usability issues: resolved naming collision between `config <type> show` and `show <type>` by renaming to `info`, and established unified exit code policy (0 success, 1 failure) across all commands.
+
+**Key Deliverables:** Renamed config subcommands, updated 9 design records with exit code policy
+
+**Dependencies:** All prior projects
 
 #### P-010: Shell Completion
 

@@ -42,7 +42,7 @@ Each agent specifies a binary, command template, and available models.`,
 
 	addConfigAgentListCommand(agentCmd)
 	addConfigAgentAddCommand(agentCmd)
-	addConfigAgentShowCommand(agentCmd)
+	addConfigAgentInfoCommand(agentCmd)
 	addConfigAgentEditCommand(agentCmd)
 	addConfigAgentRemoveCommand(agentCmd)
 	addConfigAgentDefaultCommand(agentCmd)
@@ -289,23 +289,23 @@ func runConfigAgentAdd(cmd *cobra.Command, _ []string) error {
 	return nil
 }
 
-// addConfigAgentShowCommand adds the show subcommand.
-func addConfigAgentShowCommand(parent *cobra.Command) {
-	showCmd := &cobra.Command{
-		Use:   "show <name>",
+// addConfigAgentInfoCommand adds the info subcommand.
+func addConfigAgentInfoCommand(parent *cobra.Command) {
+	infoCmd := &cobra.Command{
+		Use:   "info <name>",
 		Short: "Show agent details",
 		Long: `Show detailed information about an agent.
 
 Displays all configuration fields for the specified agent.`,
 		Args: cobra.ExactArgs(1),
-		RunE: runConfigAgentShow,
+		RunE: runConfigAgentInfo,
 	}
 
-	parent.AddCommand(showCmd)
+	parent.AddCommand(infoCmd)
 }
 
-// runConfigAgentShow shows detailed information about an agent.
-func runConfigAgentShow(cmd *cobra.Command, args []string) error {
+// runConfigAgentInfo shows detailed information about an agent.
+func runConfigAgentInfo(cmd *cobra.Command, args []string) error {
 	name := args[0]
 
 	agents, err := loadAgentsForScope(configLocal)
