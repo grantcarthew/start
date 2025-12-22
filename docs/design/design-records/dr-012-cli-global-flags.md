@@ -190,3 +190,25 @@ Flag value access:
 - Use Cobra's flag binding to struct fields
 - Centralize flag definitions in single location
 - Consistent naming between flag and struct field
+
+## Exit Codes
+
+All commands use Unix minimal exit codes:
+
+| Code | Meaning |
+|------|---------|
+| 0 | Success |
+| 1 | Failure (any error) |
+
+Rationale:
+
+- Simple — scripts check `if start ...; then` without parsing codes
+- Error messages already explain the failure; exit codes duplicating this adds maintenance burden
+- Semantic exit codes (e.g., 64-78 BSD sysexits.h, or custom ranges) rarely get used in practice
+- Avoids code sprawl across commands
+
+All commands return 0 on success, 1 on any error. The error message printed to stderr describes the specific failure.
+
+## Updates
+
+- 2025-12-22: Added Exit Codes section defining unified 0/1 policy

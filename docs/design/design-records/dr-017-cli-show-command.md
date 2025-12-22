@@ -1,7 +1,6 @@
 # DR-017: CLI Show Command
 
 - Date: 2025-12-04
-- Updated: 2025-12-12
 - Status: Accepted
 - Category: CLI
 
@@ -235,12 +234,7 @@ With `--scope local`:
 
 ## Exit Codes
 
-| Code | Meaning |
-|------|---------|
-| 0 | Success |
-| 1 | Configuration error |
-| 2 | Named item not found |
-| 3 | UTD resolution failed |
+All commands use Unix minimal exit codes: 0 on success, 1 on any error. Error messages printed to stderr describe the specific failure.
 
 ## Trade-offs
 
@@ -302,7 +296,7 @@ Rationale: Agents and roles have a "current" concept (first in config or default
 UTD processing:
 
 - Reuse UTD resolution logic from execution path
-- Handle errors gracefully (show error, exit with code 3)
+- Handle errors gracefully (show error, exit with code 1)
 - For contexts with commands, execute and display output
 
 Output formatting:
@@ -310,3 +304,8 @@ Output formatting:
 - Full content written to stdout
 - Separator lines for visual structure
 - List of available items shown when applicable
+
+## Updates
+
+- 2025-12-12: Added --scope flag and resolution behavior
+- 2025-12-22: Aligned exit codes with unified policy (0 success, 1 failure)

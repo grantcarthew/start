@@ -20,10 +20,10 @@ Implement configuration editing commands following the pattern `start config <en
 Command structure:
 
 ```
-start config agent list|add|show|edit|remove|default
-start config role list|add|show|edit|remove|default
-start config context list|add|show|edit|remove
-start config task list|add|show|edit|remove
+start config agent list|add|info|edit|remove|default
+start config role list|add|info|edit|remove|default
+start config context list|add|info|edit|remove
+start config task list|add|info|edit|remove
 ```
 
 File editing strategy:
@@ -135,7 +135,7 @@ Flags only (no prompts):
 |--------|-------------|
 | `list` | Display all items with summary (name, description, source) |
 | `add` | Create new item via prompts/flags, write to file |
-| `show <name>` | Display full details of single item |
+| `info <name>` | Display full details of single item |
 | `edit` | No name: open file in $EDITOR. With name: interactive prompts |
 | `remove <name>` | Delete item with confirmation |
 | `default <name>` | Set/show default (agent and role only) |
@@ -148,7 +148,7 @@ The `--local` flag targets local configuration (`./.start/`) instead of global (
 |--------|-------------------|--------------|
 | `list` | Shows merged view, indicates source | Shows local only |
 | `add` | Prompts for scope | Writes to local |
-| `show` | Shows from merged config | Shows local only |
+| `info` | Shows from merged config | Shows local only |
 | `edit` | Prompts if item in both | Edits local |
 | `remove` | Prompts if item in both | Removes from local |
 | `default` | Writes to global settings.cue | Writes to local settings.cue |
@@ -251,3 +251,7 @@ Add to local config:
 start config context add --local --name project --file PROJECT.md
 # Writes to ./.start/contexts.cue
 ```
+
+## Updates
+
+- 2025-12-22: Renamed `show` subcommand to `info` to avoid collision with `start show` command

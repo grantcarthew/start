@@ -153,12 +153,7 @@ Starting AI agent...
 
 ## Exit Codes
 
-| Code | Meaning |
-|------|---------|
-| 0 | Success (agent launched or configured) |
-| 1 | No agents detected |
-| 2 | Network error (cannot fetch index or package) |
-| 3 | User cancelled selection |
+All commands use Unix minimal exit codes: 0 on success, 1 on any error. Error messages printed to stderr describe the specific failure.
 
 ## Trade-offs
 
@@ -234,3 +229,7 @@ Interactive selection:
 
 - Simple numbered list for TTY
 - Error with list of options for non-TTY
+
+## Updates
+
+- 2025-12-22: Aligned exit codes with unified policy (0 success, 1 failure)

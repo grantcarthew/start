@@ -227,13 +227,7 @@ Executing...
 
 ## Exit Codes
 
-| Code | Meaning |
-|------|---------|
-| 0 | Success (agent launched) |
-| 1 | Configuration error |
-| 2 | Task/agent/role not found |
-| 3 | File/directory error |
-| 4 | Runtime error (command failed, agent failed) |
+All commands use Unix minimal exit codes: 0 on success, 1 on any error. Error messages printed to stderr describe the specific failure.
 
 ## Trade-offs
 
@@ -275,3 +269,7 @@ Tasks bundle role content inline:
 - Con: Cannot share roles across tasks
 - Con: Role updates require task updates
 - Rejected: Dependency model enables reuse
+
+## Updates
+
+- 2025-12-22: Aligned exit codes with unified policy (0 success, 1 failure)
