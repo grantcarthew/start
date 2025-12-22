@@ -51,7 +51,7 @@ Resolution order:
 1. Exact match in local config (`./.start/`)
 2. Exact match in global config (`~/.config/start/`)
 3. Exact match in CUE registry (fetches if found)
-4. Prefix match across all sources
+4. Substring match across all sources
    - Single match: use it
    - Multiple matches: error (non-TTY) or interactive selection (TTY)
 5. Not found: error
@@ -144,7 +144,7 @@ Examples:
 ```bash
 start task code-review
 start task code-review "focus on error handling"
-start task cr "check security"  # prefix match
+start task review "check security"  # substring match
 ```
 
 ## Packaged Tasks
@@ -272,4 +272,5 @@ Tasks bundle role content inline:
 
 ## Updates
 
+- 2025-12-22: Changed task resolution from prefix match to substring match for better UX
 - 2025-12-22: Aligned exit codes with unified policy (0 success, 1 failure)

@@ -37,7 +37,7 @@ Use --local to install to project config (./.start/).`,
 		RunE: runAssetsAdd,
 	}
 
-	addCmd.Flags().BoolVar(&assetsLocal, "local", false, "Install to project config (./.start/)")
+	addCmd.Flags().Bool("local", false, "Install to project config (./.start/)")
 
 	parent.AddCommand(addCmd)
 }
@@ -89,7 +89,8 @@ func runAssetsAdd(cmd *cobra.Command, args []string) error {
 
 	var configDir string
 	var scopeName string
-	if assetsLocal {
+	local, _ := cmd.Flags().GetBool("local")
+	if local {
 		configDir = paths.Local
 		scopeName = "local"
 	} else {

@@ -37,8 +37,8 @@ when modules are re-fetched.`,
 		RunE: runAssetsUpdate,
 	}
 
-	updateCmd.Flags().BoolVar(&assetsDryRun, "dry-run", false, "Preview without applying")
-	updateCmd.Flags().BoolVar(&assetsForce, "force", false, "Re-fetch even if current")
+	updateCmd.Flags().Bool("dry-run", false, "Preview without applying")
+	updateCmd.Flags().Bool("force", false, "Re-fetch even if current")
 
 	parent.AddCommand(updateCmd)
 }
@@ -115,14 +115,16 @@ func runAssetsUpdate(cmd *cobra.Command, args []string) error {
 	}
 
 	// Check each asset for updates
+	dryRun, _ := cmd.Flags().GetBool("dry-run")
+	force, _ := cmd.Flags().GetBool("force")
 	var results []UpdateResult
 	for _, asset := range installed {
-		result := checkAndUpdate(ctx, client, index, asset, assetsDryRun, assetsForce)
+		result := checkAndUpdate(ctx, client, index, asset, dryRun, force)
 		results = append(results, result)
 	}
 
 	// Print results
-	printUpdateResults(cmd.OutOrStdout(), results, assetsDryRun)
+	printUpdateResults(cmd.OutOrStdout(), results, dryRun)
 
 	return nil
 }

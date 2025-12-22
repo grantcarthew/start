@@ -46,8 +46,14 @@ func executeTask(stdout, stderr io.Writer, flags *Flags, taskName, instructions 
 		return err
 	}
 
+	// Resolve task name (exact match or substring match)
+	resolvedName, err := findTask(env.Cfg, taskName)
+	if err != nil {
+		return err
+	}
+
 	// Resolve task
-	taskResult, err := env.Composer.ResolveTask(env.Cfg.Value, taskName, instructions)
+	taskResult, err := env.Composer.ResolveTask(env.Cfg.Value, resolvedName, instructions)
 	if err != nil {
 		return fmt.Errorf("resolving task: %w", err)
 	}
@@ -55,7 +61,7 @@ func executeTask(stdout, stderr io.Writer, flags *Flags, taskName, instructions 
 	// Get task's role if specified, else use flag
 	roleName := flags.Role
 	if roleName == "" {
-		roleName = orchestration.GetTaskRole(env.Cfg.Value, taskName)
+		roleName = orchestration.GetTaskRole(env.Cfg.Value, resolvedName)
 	}
 
 	// Per DR-015: required contexts only for tasks
@@ -86,12 +92,12 @@ func executeTask(stdout, stderr io.Writer, flags *Flags, taskName, instructions 
 	}
 
 	if flags.DryRun {
-		return executeTaskDryRun(stdout, env.Executor, execConfig, composeResult, env.Agent, taskName, instructions)
+		return executeTaskDryRun(stdout, env.Executor, execConfig, composeResult, env.Agent, resolvedName, instructions)
 	}
 
 	// Print execution info
 	if !flags.Quiet {
-		printTaskExecutionInfo(stdout, env.Agent, flags.Model, composeResult, taskName, instructions, taskResult)
+		printTaskExecutionInfo(stdout, env.Agent, flags.Model, composeResult, resolvedName, instructions, taskResult)
 	}
 
 	// Execute agent (replaces current process)
@@ -224,7 +230,7 @@ func findTask(cfg internalcue.LoadResult, name string) (string, error) {
 		return name, nil
 	}
 
-	// Try prefix match
+	// Try substring match
 	var matches []string
 	iter, err := tasks.Fields()
 	if err != nil {
@@ -233,7 +239,7 @@ func findTask(cfg internalcue.LoadResult, name string) (string, error) {
 
 	for iter.Next() {
 		taskName := iter.Selector().Unquoted()
-		if strings.HasPrefix(taskName, name) {
+		if strings.Contains(taskName, name) {
 			matches = append(matches, taskName)
 		}
 	}

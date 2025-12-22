@@ -25,9 +25,6 @@ type ShowResult struct {
 	AllTags          []string // All unique tags across items
 }
 
-// showScope holds the --scope flag value
-var showScope string
-
 // addShowCommand adds the show command and its subcommands to the parent command.
 func addShowCommand(parent *cobra.Command) {
 	showCmd := &cobra.Command{
@@ -73,7 +70,7 @@ func addShowCommand(parent *cobra.Command) {
 	}
 
 	// Add --scope flag to show command
-	showCmd.PersistentFlags().StringVar(&showScope, "scope", "", "Show from specific scope: global or local")
+	showCmd.PersistentFlags().String("scope", "", "Show from specific scope: global or local")
 
 	// Add subcommands
 	showCmd.AddCommand(showRoleCmd)
@@ -92,7 +89,8 @@ func runShowRole(cmd *cobra.Command, args []string) error {
 		name = args[0]
 	}
 
-	result, err := prepareShowRole(name, showScope)
+	scope, _ := cmd.Flags().GetString("scope")
+	result, err := prepareShowRole(name, scope)
 	if err != nil {
 		return err
 	}
@@ -108,7 +106,8 @@ func runShowContext(cmd *cobra.Command, args []string) error {
 		name = args[0]
 	}
 
-	result, err := prepareShowContext(name, showScope)
+	scope, _ := cmd.Flags().GetString("scope")
+	result, err := prepareShowContext(name, scope)
 	if err != nil {
 		return err
 	}
@@ -124,7 +123,8 @@ func runShowAgent(cmd *cobra.Command, args []string) error {
 		name = args[0]
 	}
 
-	result, err := prepareShowAgent(name, showScope)
+	scope, _ := cmd.Flags().GetString("scope")
+	result, err := prepareShowAgent(name, scope)
 	if err != nil {
 		return err
 	}
@@ -140,7 +140,8 @@ func runShowTask(cmd *cobra.Command, args []string) error {
 		name = args[0]
 	}
 
-	result, err := prepareShowTask(name, showScope)
+	scope, _ := cmd.Flags().GetString("scope")
+	result, err := prepareShowTask(name, scope)
 	if err != nil {
 		return err
 	}

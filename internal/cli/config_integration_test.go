@@ -29,20 +29,7 @@ func TestConfigAgent_FullWorkflow(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Reset package-level flags before each test
-	resetAgentFlags := func() {
-		agentName = ""
-		agentBin = ""
-		agentCommand = ""
-		agentDefaultModel = ""
-		agentDescription = ""
-		agentModels = nil
-		agentTags = nil
-		configLocal = false
-	}
-
 	t.Run("add agent via flags", func(t *testing.T) {
-		resetAgentFlags()
 
 		cmd := NewRootCmd()
 		stdout := &bytes.Buffer{}
@@ -75,8 +62,6 @@ func TestConfigAgent_FullWorkflow(t *testing.T) {
 	})
 
 	t.Run("list shows added agent", func(t *testing.T) {
-		resetAgentFlags()
-
 		cmd := NewRootCmd()
 		stdout := &bytes.Buffer{}
 		cmd.SetOut(stdout)
@@ -97,8 +82,6 @@ func TestConfigAgent_FullWorkflow(t *testing.T) {
 	})
 
 	t.Run("info displays agent details", func(t *testing.T) {
-		resetAgentFlags()
-
 		cmd := NewRootCmd()
 		stdout := &bytes.Buffer{}
 		cmd.SetOut(stdout)
@@ -119,8 +102,6 @@ func TestConfigAgent_FullWorkflow(t *testing.T) {
 	})
 
 	t.Run("add second agent", func(t *testing.T) {
-		resetAgentFlags()
-
 		cmd := NewRootCmd()
 		stdout := &bytes.Buffer{}
 		cmd.SetOut(stdout)
@@ -139,8 +120,6 @@ func TestConfigAgent_FullWorkflow(t *testing.T) {
 	})
 
 	t.Run("list shows both agents", func(t *testing.T) {
-		resetAgentFlags()
-
 		cmd := NewRootCmd()
 		stdout := &bytes.Buffer{}
 		cmd.SetOut(stdout)
@@ -161,8 +140,6 @@ func TestConfigAgent_FullWorkflow(t *testing.T) {
 	})
 
 	t.Run("set default agent", func(t *testing.T) {
-		resetAgentFlags()
-
 		cmd := NewRootCmd()
 		stdout := &bytes.Buffer{}
 		cmd.SetOut(stdout)
@@ -185,8 +162,6 @@ func TestConfigAgent_FullWorkflow(t *testing.T) {
 	})
 
 	t.Run("show default agent", func(t *testing.T) {
-		resetAgentFlags()
-
 		cmd := NewRootCmd()
 		stdout := &bytes.Buffer{}
 		cmd.SetOut(stdout)
@@ -204,8 +179,6 @@ func TestConfigAgent_FullWorkflow(t *testing.T) {
 	})
 
 	t.Run("remove agent with confirmation", func(t *testing.T) {
-		resetAgentFlags()
-
 		cmd := NewRootCmd()
 		stdout := &bytes.Buffer{}
 		cmd.SetOut(stdout)
@@ -228,8 +201,6 @@ func TestConfigAgent_FullWorkflow(t *testing.T) {
 	})
 
 	t.Run("add duplicate fails", func(t *testing.T) {
-		resetAgentFlags()
-
 		cmd := NewRootCmd()
 		cmd.SetOut(&bytes.Buffer{})
 		cmd.SetErr(&bytes.Buffer{})
@@ -269,19 +240,7 @@ func TestConfigRole_FullWorkflow(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	resetRoleFlags := func() {
-		roleName = ""
-		roleDescription = ""
-		roleFile = ""
-		roleCommand = ""
-		rolePrompt = ""
-		roleTags = nil
-		configLocal = false
-	}
-
 	t.Run("add role with file", func(t *testing.T) {
-		resetRoleFlags()
-
 		cmd := NewRootCmd()
 		stdout := &bytes.Buffer{}
 		cmd.SetOut(stdout)
@@ -305,8 +264,6 @@ func TestConfigRole_FullWorkflow(t *testing.T) {
 	})
 
 	t.Run("add role with prompt", func(t *testing.T) {
-		resetRoleFlags()
-
 		cmd := NewRootCmd()
 		stdout := &bytes.Buffer{}
 		cmd.SetOut(stdout)
@@ -325,8 +282,6 @@ func TestConfigRole_FullWorkflow(t *testing.T) {
 	})
 
 	t.Run("list shows roles", func(t *testing.T) {
-		resetRoleFlags()
-
 		cmd := NewRootCmd()
 		stdout := &bytes.Buffer{}
 		cmd.SetOut(stdout)
@@ -347,8 +302,6 @@ func TestConfigRole_FullWorkflow(t *testing.T) {
 	})
 
 	t.Run("info role details", func(t *testing.T) {
-		resetRoleFlags()
-
 		cmd := NewRootCmd()
 		stdout := &bytes.Buffer{}
 		cmd.SetOut(stdout)
@@ -387,21 +340,7 @@ func TestConfigContext_FullWorkflow(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	resetContextFlags := func() {
-		contextName = ""
-		contextDescription = ""
-		contextFile = ""
-		contextCommand = ""
-		contextPrompt = ""
-		contextRequired = false
-		contextDefault = false
-		contextTags = nil
-		configLocal = false
-	}
-
 	t.Run("add required context", func(t *testing.T) {
-		resetContextFlags()
-
 		cmd := NewRootCmd()
 		stdout := &bytes.Buffer{}
 		cmd.SetOut(stdout)
@@ -429,8 +368,6 @@ func TestConfigContext_FullWorkflow(t *testing.T) {
 	})
 
 	t.Run("add default context", func(t *testing.T) {
-		resetContextFlags()
-
 		cmd := NewRootCmd()
 		stdout := &bytes.Buffer{}
 		cmd.SetOut(stdout)
@@ -449,8 +386,6 @@ func TestConfigContext_FullWorkflow(t *testing.T) {
 	})
 
 	t.Run("list shows contexts with markers", func(t *testing.T) {
-		resetContextFlags()
-
 		cmd := NewRootCmd()
 		stdout := &bytes.Buffer{}
 		cmd.SetOut(stdout)
@@ -489,20 +424,7 @@ func TestConfigTask_FullWorkflow(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	resetTaskFlags := func() {
-		taskName = ""
-		taskDescription = ""
-		taskFile = ""
-		taskCommand = ""
-		taskPrompt = ""
-		taskRole = ""
-		taskTags = nil
-		configLocal = false
-	}
-
 	t.Run("add task with prompt and role", func(t *testing.T) {
-		resetTaskFlags()
-
 		cmd := NewRootCmd()
 		stdout := &bytes.Buffer{}
 		cmd.SetOut(stdout)
@@ -530,8 +452,6 @@ func TestConfigTask_FullWorkflow(t *testing.T) {
 	})
 
 	t.Run("list shows tasks", func(t *testing.T) {
-		resetTaskFlags()
-
 		cmd := NewRootCmd()
 		stdout := &bytes.Buffer{}
 		cmd.SetOut(stdout)
@@ -549,8 +469,6 @@ func TestConfigTask_FullWorkflow(t *testing.T) {
 	})
 
 	t.Run("info task details", func(t *testing.T) {
-		resetTaskFlags()
-
 		cmd := NewRootCmd()
 		stdout := &bytes.Buffer{}
 		cmd.SetOut(stdout)
@@ -597,20 +515,7 @@ func TestConfigLocal_Isolation(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	resetAgentFlags := func() {
-		agentName = ""
-		agentBin = ""
-		agentCommand = ""
-		agentDefaultModel = ""
-		agentDescription = ""
-		agentModels = nil
-		agentTags = nil
-		configLocal = false
-	}
-
 	t.Run("add global agent", func(t *testing.T) {
-		resetAgentFlags()
-
 		cmd := NewRootCmd()
 		cmd.SetOut(&bytes.Buffer{})
 		cmd.SetErr(&bytes.Buffer{})
@@ -628,8 +533,6 @@ func TestConfigLocal_Isolation(t *testing.T) {
 	})
 
 	t.Run("add local agent", func(t *testing.T) {
-		resetAgentFlags()
-
 		cmd := NewRootCmd()
 		cmd.SetOut(&bytes.Buffer{})
 		cmd.SetErr(&bytes.Buffer{})
@@ -654,8 +557,6 @@ func TestConfigLocal_Isolation(t *testing.T) {
 	})
 
 	t.Run("list shows both in merged view", func(t *testing.T) {
-		resetAgentFlags()
-
 		cmd := NewRootCmd()
 		stdout := &bytes.Buffer{}
 		cmd.SetOut(stdout)
@@ -676,8 +577,6 @@ func TestConfigLocal_Isolation(t *testing.T) {
 	})
 
 	t.Run("list --local shows only local", func(t *testing.T) {
-		resetAgentFlags()
-
 		cmd := NewRootCmd()
 		stdout := &bytes.Buffer{}
 		cmd.SetOut(stdout)

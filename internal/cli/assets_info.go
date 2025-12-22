@@ -25,7 +25,7 @@ including description, module path, tags, and installation status.`,
 		RunE: runAssetsInfo,
 	}
 
-	infoCmd.Flags().BoolVarP(&assetsVerbose, "verbose", "v", false, "Show additional details")
+	infoCmd.Flags().BoolP("verbose", "v", false, "Show additional details")
 
 	parent.AddCommand(infoCmd)
 }
@@ -68,7 +68,8 @@ func runAssetsInfo(cmd *cobra.Command, args []string) error {
 	installed, installedScope := checkIfInstalled(selected)
 
 	// Print detailed info
-	printAssetInfo(cmd.OutOrStdout(), selected, installed, installedScope, assetsVerbose)
+	verbose, _ := cmd.Flags().GetBool("verbose")
+	printAssetInfo(cmd.OutOrStdout(), selected, installed, installedScope, verbose)
 
 	return nil
 }
