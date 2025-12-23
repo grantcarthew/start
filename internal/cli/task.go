@@ -46,10 +46,18 @@ func executeTask(stdout, stderr io.Writer, flags *Flags, taskName, instructions 
 		return err
 	}
 
+	debugf(flags, "task", "Searching for task %q", taskName)
+
 	// Resolve task name (exact match or substring match)
 	resolvedName, err := findTask(env.Cfg, taskName)
 	if err != nil {
 		return err
+	}
+
+	if resolvedName != taskName {
+		debugf(flags, "task", "Resolved to %q (substring match)", resolvedName)
+	} else {
+		debugf(flags, "task", "Resolved to %q (exact match)", resolvedName)
 	}
 
 	// Resolve task
@@ -58,10 +66,27 @@ func executeTask(stdout, stderr io.Writer, flags *Flags, taskName, instructions 
 		return fmt.Errorf("resolving task: %w", err)
 	}
 
+	if taskResult.CommandExecuted {
+		debugf(flags, "task", "UTD source: command (executed)")
+	} else if taskResult.FileRead {
+		debugf(flags, "task", "UTD source: file")
+	} else {
+		debugf(flags, "task", "UTD source: prompt")
+	}
+
+	if instructions != "" {
+		debugf(flags, "task", "Instructions: %s", instructions)
+	}
+
 	// Get task's role if specified, else use flag
 	roleName := flags.Role
 	if roleName == "" {
 		roleName = orchestration.GetTaskRole(env.Cfg.Value, resolvedName)
+		if roleName != "" {
+			debugf(flags, "role", "Selected %q (from task)", roleName)
+		}
+	} else {
+		debugf(flags, "role", "Selected %q (--role flag)", roleName)
 	}
 
 	// Per DR-015: required contexts only for tasks
@@ -71,11 +96,20 @@ func executeTask(stdout, stderr io.Writer, flags *Flags, taskName, instructions 
 		Tags:            flags.Context,
 	}
 
+	debugf(flags, "context", "Selection: required=%t, defaults=%t, tags=%v",
+		selection.IncludeRequired, selection.IncludeDefaults, selection.Tags)
+
 	// Compose contexts and resolve role
 	composeResult, err := env.Composer.ComposeWithRole(env.Cfg.Value, selection, roleName, taskResult.Content, "")
 	if err != nil {
 		return fmt.Errorf("composing prompt: %w", err)
 	}
+
+	for _, ctx := range composeResult.Contexts {
+		debugf(flags, "context", "Including %q", ctx.Name)
+	}
+	debugf(flags, "compose", "Role: %d bytes", len(composeResult.Role))
+	debugf(flags, "compose", "Prompt: %d bytes (%d contexts)", len(composeResult.Prompt), len(composeResult.Contexts))
 
 	// Print warnings
 	printWarnings(flags, stderr, taskResult.Warnings)
@@ -91,7 +125,16 @@ func executeTask(stdout, stderr io.Writer, flags *Flags, taskName, instructions 
 		DryRun:     flags.DryRun,
 	}
 
+	// Build and log final command
+	if flags.Debug {
+		cmdStr, err := env.Executor.BuildCommand(execConfig)
+		if err == nil {
+			debugf(flags, "exec", "Final command: %s", cmdStr)
+		}
+	}
+
 	if flags.DryRun {
+		debugf(flags, "exec", "Dry-run mode, skipping execution")
 		return executeTaskDryRun(stdout, env.Executor, execConfig, composeResult, env.Agent, resolvedName, instructions)
 	}
 
@@ -100,6 +143,7 @@ func executeTask(stdout, stderr io.Writer, flags *Flags, taskName, instructions 
 		printTaskExecutionInfo(stdout, env.Agent, flags.Model, composeResult, resolvedName, instructions, taskResult)
 	}
 
+	debugf(flags, "exec", "Executing agent (process replacement)")
 	// Execute agent (replaces current process)
 	return env.Executor.Execute(execConfig)
 }

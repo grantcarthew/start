@@ -95,6 +95,21 @@ func Execute() error {
 	return NewRootCmd().Execute()
 }
 
+// checkHelpArg checks if the first argument is "help" and shows help if so.
+// Returns true if help was shown, false otherwise.
+// Use this in parent commands that have both RunE and subcommands.
+func checkHelpArg(cmd *cobra.Command, args []string) (bool, error) {
+	if len(args) > 0 && args[0] == "help" {
+		return true, cmd.Help()
+	}
+	return false, nil
+}
+
+// unknownCommandError returns a formatted error for unknown subcommands.
+func unknownCommandError(cmdPath, arg string) error {
+	return fmt.Errorf("unknown command %q for %q\nRun '%s --help' for usage", arg, cmdPath, cmdPath)
+}
+
 // resolveDirectory expands and validates the directory path.
 func resolveDirectory(path string) (string, error) {
 	// Expand tilde

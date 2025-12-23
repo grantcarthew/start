@@ -19,6 +19,7 @@ func addAssetsCommand(parent *cobra.Command) {
 
 Assets are CUE modules that define reusable AI agent configurations.
 Use these commands to discover, install, and update assets.`,
+		RunE: runAssets,
 	}
 
 	// Add subcommands
@@ -31,4 +32,15 @@ Use these commands to discover, install, and update assets.`,
 	addAssetsIndexCommand(assetsCmd)
 
 	parent.AddCommand(assetsCmd)
+}
+
+// runAssets runs list by default, handles help subcommand.
+func runAssets(cmd *cobra.Command, args []string) error {
+	if shown, err := checkHelpArg(cmd, args); shown || err != nil {
+		return err
+	}
+	if len(args) > 0 {
+		return unknownCommandError("start assets", args[0])
+	}
+	return runAssetsList(cmd, args)
 }

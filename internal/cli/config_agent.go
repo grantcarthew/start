@@ -27,6 +27,7 @@ func addConfigAgentCommand(parent *cobra.Command) {
 
 Agents define the AI CLI tools that start can use (e.g., claude, gemini, aider).
 Each agent specifies a binary, command template, and available models.`,
+		RunE: runConfigAgent,
 	}
 
 	addConfigAgentListCommand(agentCmd)
@@ -37,6 +38,17 @@ Each agent specifies a binary, command template, and available models.`,
 	addConfigAgentDefaultCommand(agentCmd)
 
 	parent.AddCommand(agentCmd)
+}
+
+// runConfigAgent runs list by default, handles help subcommand.
+func runConfigAgent(cmd *cobra.Command, args []string) error {
+	if shown, err := checkHelpArg(cmd, args); shown || err != nil {
+		return err
+	}
+	if len(args) > 0 {
+		return unknownCommandError("start config agent", args[0])
+	}
+	return runConfigAgentList(cmd, args)
 }
 
 // addConfigAgentListCommand adds the list subcommand.
