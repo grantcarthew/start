@@ -50,8 +50,17 @@ For each feature:
 1. Read the feature description and test steps
 2. Execute the test commands
 3. Record the result: PASS, FAIL, PARTIAL, or SKIP
-4. If FAIL/PARTIAL: Document the issue, fix it, retest
+4. If FAIL/PARTIAL:
+   - Document the issue in Issues Log
+   - Fix the issue
+   - If fix involves design decisions: update related DR or create new DR
+   - Retest and verify
 5. Mark the feature as tested with brief notes
+
+Design Record Updates:
+- Bug fixes that change documented behaviour → update existing DR
+- New design decisions during fixes → create new DR
+- Reference DRs in Issues Log when applicable
 
 ---
 
@@ -1013,8 +1022,8 @@ Notes:
 
 ## Issues Log
 
-| ID | Feature | Description | Status | Fix |
-|----|---------|-------------|--------|-----|
+| ID | Feature | Description | Status | Fix | DR |
+|----|---------|-------------|--------|-----|-----|
 
 ---
 
