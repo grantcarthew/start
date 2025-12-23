@@ -34,6 +34,9 @@ func NewRootCmd() *cobra.Command {
 		Long: `start is a command-line orchestrator for AI agents built on CUE.
 It manages prompt composition, context injection, and workflow automation.`,
 		Version: cliVersion,
+		// SilenceUsage prevents usage from being printed on RunE errors.
+		// Usage is still shown for flag/argument parsing errors.
+		SilenceUsage: true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			// Store flags in context for access by all commands
 			ctx := context.WithValue(cmd.Context(), flagsKey{}, flags)

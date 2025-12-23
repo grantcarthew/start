@@ -76,8 +76,10 @@ type ValidationError struct {
 	Line     int
 	Column   int
 	Filename string
+	Context  string // Source context snippet around the error
 }
 
+// Error returns a concise error string with file:line:message format.
 func (e *ValidationError) Error() string {
 	if e.Filename != "" {
 		if e.Line > 0 {
@@ -89,4 +91,35 @@ func (e *ValidationError) Error() string {
 		return e.Path + ": " + e.Message
 	}
 	return e.Message
+}
+
+// DetailedError returns a formatted error with source context.
+// This is intended for display to users when they need to fix config errors.
+func (e *ValidationError) DetailedError() string {
+	var result string
+
+	// Header with file path
+	if e.Filename != "" {
+		result = "Configuration error in " + e.Filename + "\n\n"
+	} else {
+		result = "Configuration error\n\n"
+	}
+
+	// Location and message
+	if e.Line > 0 {
+		result += "  Line " + strconv.Itoa(e.Line)
+		if e.Column > 0 {
+			result += ", column " + strconv.Itoa(e.Column)
+		}
+		result += ": " + e.Message + "\n"
+	} else {
+		result += "  " + e.Message + "\n"
+	}
+
+	// Source context if available
+	if e.Context != "" {
+		result += "\n" + e.Context
+	}
+
+	return result
 }

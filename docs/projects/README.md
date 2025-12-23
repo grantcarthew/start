@@ -10,7 +10,11 @@ See [p-writing-guide.md](./p-writing-guide.md) for guidelines on creating and ma
 
 ### Active Projects
 
-None
+| Project | Title | Started |
+|---------|-------|---------|
+| [P-012](./p-012-cli-end-to-end-testing.md) | CLI Core Commands Testing | 2025-12-23 |
+| [P-013](./p-013-cli-configuration-testing.md) | CLI Configuration Testing | - |
+| [P-014](./p-014-cli-supporting-commands-testing.md) | CLI Supporting Commands Testing | - |
 
 ### Completed Projects
 
