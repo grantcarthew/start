@@ -281,6 +281,24 @@ func TestValidateCommandTemplate(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name:    "invalid single-brace prompt",
+			tmpl:    "--print {prompt}",
+			wantErr: true,
+			errMsg:  "template uses {prompt} but Go templates require {{.prompt}}",
+		},
+		{
+			name:    "invalid single-brace role",
+			tmpl:    "--system {role} --prompt {{.prompt}}",
+			wantErr: true,
+			errMsg:  "template uses {role} but Go templates require {{.role}}",
+		},
+		{
+			name:    "invalid single-brace multiple",
+			tmpl:    "{bin} --model {model}",
+			wantErr: true,
+			errMsg:  "template uses {bin} but Go templates require {{.bin}}",
+		},
+		{
 			name:    "invalid single-quoted prompt",
 			tmpl:    "{{.bin}} --prompt '{{.prompt}}'",
 			wantErr: true,
