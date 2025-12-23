@@ -194,9 +194,9 @@ Test:
 
 Expected: Debug output shows required and default contexts included.
 
-Result: ____
+Result: PASS
 
-Notes:
+Notes: Debug shows `required=true, defaults=true, tags=[]`. Warning for missing "project" context file is expected (README.md doesn't exist in cwd).
 
 ---
 
@@ -772,6 +772,7 @@ Notes:
 | 3 | - | Parent commands didn't support `help` subcommand | Fixed | Added checkHelpArg helper, RunE to all parent commands | DR-034 |
 | 4 | - | Unknown subcommands silently ran parent action | Fixed | Added unknownCommandError helper | DR-034 |
 | 5 | 2.1 | Role config used `content` field instead of `prompt` | Fixed | Test config error - changed to `prompt` | - |
+| 6 | 2.3 | `{prompt}` syntax not detected, caused silent bash failure | Fixed | Added singleBracePlaceholderPattern validation in ValidateCommandTemplate | - |
 
 ---
 

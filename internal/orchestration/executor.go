@@ -20,6 +20,10 @@ import (
 // include quotes around any placeholder.
 var quotedPlaceholderPattern = regexp.MustCompile(`['"]{{\.(?:bin|model|role|role_file|prompt|date)}}['"]`)
 
+// singleBracePlaceholderPattern detects placeholders using {name} syntax instead of {{.name}}.
+// This is a common mistake when users expect simple substitution syntax.
+var singleBracePlaceholderPattern = regexp.MustCompile(`\{(bin|model|role|role_file|prompt|date)\}`)
+
 // expandTilde expands a leading ~ to the user's home directory.
 // This is necessary because single-quoted strings in shell don't expand ~.
 func expandTilde(path string) string {
@@ -79,7 +83,20 @@ func NewExecutor(workingDir string) *Executor {
 // ValidateCommandTemplate checks for common template errors.
 // Returns an error if the template contains quoted placeholders like '{{.prompt}}'
 // since escapeForShell already wraps values in single quotes.
+// Also detects {placeholder} syntax which should be {{.placeholder}}.
 func ValidateCommandTemplate(tmpl string) error {
+	// Check for single-brace placeholders like {prompt} instead of {{.prompt}}
+	if match := singleBracePlaceholderPattern.FindStringSubmatch(tmpl); match != nil {
+		placeholder := match[1]
+		return fmt.Errorf(`template uses {%s} but Go templates require {{.%s}}
+
+Update your command template:
+
+  Before: %s
+  After:  %s`, placeholder, placeholder, tmpl, singleBracePlaceholderPattern.ReplaceAllString(tmpl, "{{.$1}}"))
+	}
+
+	// Check for quoted placeholders
 	if match := quotedPlaceholderPattern.FindString(tmpl); match != "" {
 		// Extract the placeholder name from the match
 		placeholder := strings.TrimPrefix(match, "'{{.")
