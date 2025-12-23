@@ -1,8 +1,11 @@
 package cue
 
 import (
+	"bufio"
 	"fmt"
+	"os"
 	"strconv"
+	"strings"
 
 	"cuelang.org/go/cue/errors"
 )
@@ -86,4 +89,93 @@ func ErrorSummary(err error) string {
 	// Multiple errors: show first and count
 	first := FormatError(cueErrs[0]).Error()
 	return first + " (and " + strconv.Itoa(len(cueErrs)-1) + " more errors)"
+}
+
+// FormatErrorWithContext converts a CUE error into a ValidationError with source context.
+// It reads the source file to provide a snippet around the error location.
+func FormatErrorWithContext(err error) *ValidationError {
+	if err == nil {
+		return nil
+	}
+
+	// Get basic formatted error first
+	baseErr := FormatError(err)
+	if baseErr == nil {
+		return nil
+	}
+
+	ve, ok := baseErr.(*ValidationError)
+	if !ok {
+		return &ValidationError{Message: err.Error()}
+	}
+
+	// Add source context if we have file and line info
+	if ve.Filename != "" && ve.Line > 0 {
+		ve.Context = generateSourceContext(ve.Filename, ve.Line, ve.Column)
+	}
+
+	return ve
+}
+
+// generateSourceContext reads a file and generates a context snippet around the given line.
+// It shows 2 lines before and after the error line, with line numbers and a pointer to the column.
+func generateSourceContext(filename string, line, column int) string {
+	file, err := os.Open(filename)
+	if err != nil {
+		return ""
+	}
+	defer file.Close()
+
+	// Read relevant lines
+	const contextLines = 2
+	startLine := line - contextLines
+	if startLine < 1 {
+		startLine = 1
+	}
+	endLine := line + contextLines
+
+	scanner := bufio.NewScanner(file)
+	lineNum := 0
+	var lines []struct {
+		num  int
+		text string
+	}
+
+	for scanner.Scan() {
+		lineNum++
+		if lineNum >= startLine && lineNum <= endLine {
+			lines = append(lines, struct {
+				num  int
+				text string
+			}{lineNum, scanner.Text()})
+		}
+		if lineNum > endLine {
+			break
+		}
+	}
+
+	if len(lines) == 0 {
+		return ""
+	}
+
+	// Find max line number width for alignment
+	maxLineNum := lines[len(lines)-1].num
+	lineNumWidth := len(strconv.Itoa(maxLineNum))
+
+	var sb strings.Builder
+	for _, l := range lines {
+		// Format: "  12 | code here"
+		numStr := strconv.Itoa(l.num)
+		padding := strings.Repeat(" ", lineNumWidth-len(numStr))
+		sb.WriteString("    " + padding + numStr + " | " + l.text + "\n")
+
+		// Add column pointer on the error line
+		if l.num == line && column > 0 {
+			// Create pointer line: "       ^"
+			pointerPadding := strings.Repeat(" ", lineNumWidth+7+column-1) // 7 = "    " + " | "
+			sb.WriteString(pointerPadding + "^\n")
+		}
+	}
+
+	return sb.String()
 }

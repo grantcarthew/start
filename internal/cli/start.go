@@ -334,15 +334,34 @@ func loadMergedConfigWithIO(stdout, stderr io.Writer, stdin io.Reader, workingDi
 		return internalcue.LoadResult{}, fmt.Errorf("resolving config paths: %w", err)
 	}
 
-	// Trigger auto-setup if no config exists
-	if !paths.AnyExists() {
+	// Validate existing configuration
+	validation := config.ValidateConfig(paths)
+
+	// If no valid config exists, trigger auto-setup
+	if !validation.AnyValid() {
+		// Check if there are validation errors (config exists but is invalid)
+		if validation.HasErrors() {
+			// Report the first error with full details
+			if validation.GlobalError != nil {
+				return internalcue.LoadResult{}, fmt.Errorf("%s", validation.GlobalError.DetailedError())
+			}
+			if validation.LocalError != nil {
+				return internalcue.LoadResult{}, fmt.Errorf("%s", validation.LocalError.DetailedError())
+			}
+		}
+
+		// No config at all - trigger auto-setup
 		if err := runAutoSetup(stdout, stderr, stdin); err != nil {
 			return internalcue.LoadResult{}, err
 		}
-		// Re-resolve paths after auto-setup
+		// Re-resolve and validate after auto-setup
 		paths, err = config.ResolvePaths(workingDir)
 		if err != nil {
 			return internalcue.LoadResult{}, fmt.Errorf("resolving config paths: %w", err)
+		}
+		validation = config.ValidateConfig(paths)
+		if !validation.AnyValid() {
+			return internalcue.LoadResult{}, fmt.Errorf("auto-setup did not create valid configuration")
 		}
 	}
 

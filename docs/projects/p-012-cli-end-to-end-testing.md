@@ -1,0 +1,774 @@
+# P-012: CLI Core Commands Testing
+
+- Status: In Progress
+- Started: 2025-12-23
+
+## Overview
+
+End-to-end testing of the `start` CLI core commands from a user's perspective. This project covers first-run experience, the three main execution commands (start, prompt, task), global flags, and error handling.
+
+Part 1 of 3 in CLI testing series:
+- P-012: Core Commands (this project)
+- P-013: Configuration Commands
+- P-014: Supporting Commands (Assets, Doctor, Completion)
+
+## Goals
+
+1. Test first-run and auto-setup flows
+2. Test core execution commands (start, prompt, task)
+3. Test all global flags across applicable commands
+4. Test error scenarios and edge cases
+5. Fix all issues discovered during testing
+
+## Scope
+
+In Scope:
+- Auto-setup flow
+- `start` command (default execution)
+- `start prompt` command
+- `start task` command
+- Global flags (--agent, --role, --context, --model, --directory, --dry-run, --quiet, --verbose, --debug, --version)
+- Error handling and messages
+
+Out of Scope:
+- Configuration commands (P-013)
+- Assets, Doctor, Completion (P-014)
+
+## Success Criteria
+
+- [ ] All features tested and marked complete in checklist below
+- [ ] All discovered issues fixed and verified
+- [ ] No blocking issues remain
+
+## Testing Workflow
+
+For each feature:
+
+1. Read the feature description and test steps
+2. Execute the test commands
+3. Record the result: PASS, FAIL, PARTIAL, or SKIP
+4. If FAIL/PARTIAL: Document the issue, fix it, retest
+5. Mark the feature as tested with brief notes
+
+---
+
+## Feature Checklist
+
+### 1. First-Run Experience
+
+#### 1.1 Auto-Setup (No Config)
+
+Description: When no configuration exists, start should trigger auto-setup.
+
+Test:
+```bash
+rm -rf ~/.config/start && rm -rf ./.start
+./start
+```
+
+Expected: Auto-setup flow triggers, detects AI CLI tools, prompts for selection (if interactive), creates config.
+
+Result: ____
+
+Notes:
+
+---
+
+#### 1.2 Auto-Setup (Empty Directory)
+
+Description: Empty config directory should trigger auto-setup, not error.
+
+Test:
+```bash
+rm -rf ~/.config/start && mkdir ~/.config/start
+./start
+```
+
+Expected: Auto-setup triggers (empty directory treated as no config).
+
+Result: ____
+
+Notes:
+
+---
+
+#### 1.3 Auto-Setup (Non-TTY)
+
+Description: Auto-setup in non-interactive mode with multiple agents.
+
+Test:
+```bash
+rm -rf ~/.config/start
+echo "" | ./start
+```
+
+Expected: Error message about multiple agents, suggests running interactively.
+
+Result: ____
+
+Notes:
+
+---
+
+#### 1.4 Invalid CUE File Error
+
+Description: Invalid CUE syntax should produce clear, actionable error message.
+
+Test:
+```bash
+mkdir -p ~/.config/start
+echo 'agents: { test: { bin: "test" command: "cmd" } }' > ~/.config/start/config.cue
+./start
+```
+
+Expected: Error shows file path, line, column, source context with pointer.
+
+Result: ____
+
+Notes:
+
+---
+
+#### 1.5 Invalid CUE Multi-line Error
+
+Description: Error in multi-line file shows context lines.
+
+Test:
+```bash
+cat > ~/.config/start/config.cue << 'EOF'
+// Config
+agents: {
+    claude: {
+        bin: "claude"
+        command: "--print {role}
+    }
+}
+EOF
+./start
+```
+
+Expected: Shows 2 lines before/after error with line numbers.
+
+Result: ____
+
+Notes:
+
+---
+
+### 2. Start Command (Default)
+
+#### 2.1 Start with Dry-Run
+
+Description: Running `start --dry-run` previews execution without launching agent.
+
+Test:
+```bash
+./start --dry-run
+```
+
+Expected: Shows agent, role, contexts, writes temp files, does not execute.
+
+Result: ____
+
+Notes:
+
+---
+
+#### 2.2 Start Default Contexts
+
+Description: Plain `start` includes required AND default contexts.
+
+Test:
+```bash
+./start --dry-run --debug
+```
+
+Expected: Debug output shows required and default contexts included.
+
+Result: ____
+
+Notes:
+
+---
+
+#### 2.3 Start Execution
+
+Description: Start actually launches the agent.
+
+Test:
+```bash
+./start
+# (will launch agent - verify it starts correctly, then exit)
+```
+
+Expected: Agent launches with composed prompt.
+
+Result: ____
+
+Notes:
+
+---
+
+### 3. Prompt Command
+
+#### 3.1 Prompt with Text
+
+Description: Launch agent with custom prompt.
+
+Test:
+```bash
+./start prompt "Hello world" --dry-run
+```
+
+Expected: Shows prompt content including "Hello world".
+
+Result: ____
+
+Notes:
+
+---
+
+#### 3.2 Prompt Excludes Defaults
+
+Description: Prompt command excludes default contexts (per DR-014).
+
+Test:
+```bash
+./start prompt "test" --dry-run --debug
+```
+
+Expected: Only required contexts, not default contexts.
+
+Result: ____
+
+Notes:
+
+---
+
+#### 3.3 Prompt with Context Tag
+
+Description: Can include tagged contexts with prompt.
+
+Test:
+```bash
+./start prompt "test" -c <tag> --dry-run
+```
+
+Expected: Includes required + tagged contexts.
+
+Result: ____
+
+Notes:
+
+---
+
+#### 3.4 Prompt with Default Pseudo-tag
+
+Description: Can include defaults using -c default.
+
+Test:
+```bash
+./start prompt "test" -c default --dry-run
+```
+
+Expected: Includes required + default contexts.
+
+Result: ____
+
+Notes:
+
+---
+
+### 4. Task Command
+
+#### 4.1 Task Execution
+
+Description: Run a predefined task.
+
+Test:
+```bash
+./start task <task-name> --dry-run
+```
+
+Expected: Task resolves, shows composed prompt.
+
+Result: ____
+
+Notes:
+
+---
+
+#### 4.2 Task with Instructions
+
+Description: Instructions fill {{.instructions}} placeholder.
+
+Test:
+```bash
+./start task <task-name> "focus on error handling" --dry-run
+```
+
+Expected: Instructions appear in composed prompt.
+
+Result: ____
+
+Notes:
+
+---
+
+#### 4.3 Task Substring Match
+
+Description: Task names can be matched by substring (per DR-015).
+
+Test:
+```bash
+# If task "code-review" exists
+./start task review --dry-run
+```
+
+Expected: Matches task containing "review" if unique.
+
+Result: ____
+
+Notes:
+
+---
+
+#### 4.4 Task Ambiguous Match
+
+Description: Multiple substring matches produce error or selection.
+
+Test:
+```bash
+# Create two tasks with similar names
+./start task <ambiguous-prefix> --dry-run
+```
+
+Expected: Error listing matching tasks (non-TTY) or interactive selection (TTY).
+
+Result: ____
+
+Notes:
+
+---
+
+#### 4.5 Task Not Found
+
+Description: Unknown task produces clear error.
+
+Test:
+```bash
+./start task nonexistent-task-xyz
+```
+
+Expected: Error message listing available tasks.
+
+Result: ____
+
+Notes:
+
+---
+
+#### 4.6 Task Context Selection
+
+Description: Tasks include required contexts only by default.
+
+Test:
+```bash
+./start task <task-name> --dry-run --debug
+```
+
+Expected: Only required contexts included.
+
+Result: ____
+
+Notes:
+
+---
+
+### 5. Global Flags
+
+#### 5.1 --agent Flag
+
+Description: Override agent selection.
+
+Test:
+```bash
+./start --agent <agent-name> --dry-run
+./start prompt "test" --agent <agent-name> --dry-run
+./start task <task> --agent <agent-name> --dry-run
+```
+
+Expected: Uses specified agent instead of default.
+
+Result: ____
+
+Notes:
+
+---
+
+#### 5.2 --role Flag
+
+Description: Override role selection.
+
+Test:
+```bash
+./start --role <role-name> --dry-run
+```
+
+Expected: Uses specified role.
+
+Result: ____
+
+Notes:
+
+---
+
+#### 5.3 --model Flag
+
+Description: Override model selection.
+
+Test:
+```bash
+./start --model "custom-model" --dry-run
+```
+
+Expected: Uses specified model (shown in output).
+
+Result: ____
+
+Notes:
+
+---
+
+#### 5.4 --context Flag (Single)
+
+Description: Select contexts by single tag.
+
+Test:
+```bash
+./start --context <tag> --dry-run
+```
+
+Expected: Includes required + tagged contexts.
+
+Result: ____
+
+Notes:
+
+---
+
+#### 5.5 --context Flag (Multiple Comma)
+
+Description: Select multiple context tags with comma.
+
+Test:
+```bash
+./start -c <tag1>,<tag2> --dry-run
+```
+
+Expected: Includes contexts matching either tag.
+
+Result: ____
+
+Notes:
+
+---
+
+#### 5.6 --context Flag (Multiple Flags)
+
+Description: Select multiple context tags with repeated flag.
+
+Test:
+```bash
+./start -c <tag1> -c <tag2> --dry-run
+```
+
+Expected: Includes contexts matching either tag.
+
+Result: ____
+
+Notes:
+
+---
+
+#### 5.7 --context default Pseudo-tag
+
+Description: Combine default contexts with tagged.
+
+Test:
+```bash
+./start -c default,<tag> --dry-run
+```
+
+Expected: Includes required + default + tagged contexts.
+
+Result: ____
+
+Notes:
+
+---
+
+#### 5.8 --context No Match Warning
+
+Description: Warning when tag matches no contexts.
+
+Test:
+```bash
+./start -c nonexistent-tag-xyz --dry-run
+```
+
+Expected: Warning about no matching contexts.
+
+Result: ____
+
+Notes:
+
+---
+
+#### 5.9 --directory Flag
+
+Description: Override working directory.
+
+Test:
+```bash
+./start --directory /tmp --dry-run --debug
+```
+
+Expected: Uses /tmp as working directory for context detection.
+
+Result: ____
+
+Notes:
+
+---
+
+#### 5.10 --dry-run Flag
+
+Description: Preview without executing.
+
+Test:
+```bash
+./start --dry-run
+ls /tmp/start-dry-run-*  # Check temp files created
+```
+
+Expected: Shows preview, creates temp files with role.md, prompt.md, command.txt.
+
+Result: ____
+
+Notes:
+
+---
+
+#### 5.11 --quiet Flag
+
+Description: Suppress output.
+
+Test:
+```bash
+./start --quiet --dry-run
+```
+
+Expected: Minimal or no output (temp files still created).
+
+Result: ____
+
+Notes:
+
+---
+
+#### 5.12 --verbose Flag
+
+Description: Detailed output.
+
+Test:
+```bash
+./start --verbose --dry-run
+```
+
+Expected: Additional detail about context resolution, paths.
+
+Result: ____
+
+Notes:
+
+---
+
+#### 5.13 --debug Flag
+
+Description: Debug output (implies --verbose).
+
+Test:
+```bash
+./start --debug --dry-run
+```
+
+Expected: Debug messages with [DEBUG] prefix.
+
+Result: ____
+
+Notes:
+
+---
+
+#### 5.14 --version Flag
+
+Description: Show version information.
+
+Test:
+```bash
+./start --version
+```
+
+Expected: Shows version, repo URL, issue URL.
+
+Result: ____
+
+Notes:
+
+---
+
+#### 5.15 --help Flag
+
+Description: Show help for all commands.
+
+Test:
+```bash
+./start --help
+./start prompt --help
+./start task --help
+```
+
+Expected: Shows usage, flags, subcommands.
+
+Result: ____
+
+Notes:
+
+---
+
+### 6. Error Handling
+
+#### 6.1 Unknown Command
+
+Description: Unknown command shows helpful error.
+
+Test:
+```bash
+./start unknowncommand
+```
+
+Expected: Error message, no usage spam (SilenceUsage enabled).
+
+Result: ____
+
+Notes:
+
+---
+
+#### 6.2 Invalid Flag
+
+Description: Invalid flag shows error.
+
+Test:
+```bash
+./start --invalid-flag
+```
+
+Expected: Error about unknown flag.
+
+Result: ____
+
+Notes:
+
+---
+
+#### 6.3 Invalid Directory
+
+Description: Invalid directory path shows clear error.
+
+Test:
+```bash
+./start --directory /nonexistent/path --dry-run
+```
+
+Expected: Error about directory not found.
+
+Result: ____
+
+Notes:
+
+---
+
+#### 6.4 Agent Binary Not Found
+
+Description: Missing agent binary handled gracefully.
+
+Test:
+```bash
+# Configure agent with nonexistent binary, then try to run
+./start --agent <agent-with-bad-binary>
+```
+
+Expected: Clear error about missing binary.
+
+Result: ____
+
+Notes:
+
+---
+
+#### 6.5 No Agent Configured
+
+Description: No agent in config shows helpful error.
+
+Test:
+```bash
+# Remove all agents from config
+./start
+```
+
+Expected: Error about no agent configured.
+
+Result: ____
+
+Notes:
+
+---
+
+#### 6.6 Exit Codes
+
+Description: Exit code 0 on success, 1 on any error.
+
+Test:
+```bash
+./start --dry-run; echo "Exit: $?"
+./start --invalid-flag; echo "Exit: $?"
+```
+
+Expected: First returns 0, second returns 1.
+
+Result: ____
+
+Notes:
+
+---
+
+## Issues Log
+
+| ID | Feature | Description | Status | Fix |
+|----|---------|-------------|--------|-----|
+| 1 | 1.2 | Empty directory caused error instead of auto-setup | Fixed | Added ValidateConfig with CUE file checking |
+
+---
+
+## Deliverables
+
+- This project document with completed checklist
+- All issues fixed and verified
+
+---
+
+## Notes
+
+Testing started: 2025-12-23

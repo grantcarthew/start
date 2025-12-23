@@ -12,7 +12,10 @@ Avoid references to the prototype in new documentation. This is a new design.
 
 Projects are stored in the `docs/projects/` directory. Continue by reading the active project.
 
-Active Project: None - see `docs/projects/README.md` for project history
+Active Projects:
+- `docs/projects/p-012-cli-end-to-end-testing.md` (Core Commands)
+- `docs/projects/p-013-cli-configuration-testing.md` (Configuration)
+- `docs/projects/p-014-cli-supporting-commands-testing.md` (Assets, Doctor, Completion)
 
 Project Workflow:
 - Active projects are in `docs/projects/`
@@ -150,6 +153,6 @@ The `./Context` directory contains cloned source code and documentation for deve
 - P-010: Shell Completion (bash, zsh, fish tab-completion, documentation guides)
 - P-011: CLI Refinements (command naming, exit codes)
 
-**Current:** None
+**Current:** P-012/P-013/P-014: CLI End-to-End Testing (Core, Configuration, Supporting Commands)
 
 The prototype validated that this tool solves a real problem. This version will implement it properly.
