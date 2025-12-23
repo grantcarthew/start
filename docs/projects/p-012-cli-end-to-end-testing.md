@@ -77,9 +77,9 @@ rm -rf ~/.config/start && rm -rf ./.start
 
 Expected: Auto-setup flow triggers, detects AI CLI tools, prompts for selection (if interactive), creates config.
 
-Result: ____
+Result: PASS
 
-Notes:
+Notes: Auto-setup triggered, detected aichat/claude/gemini. Non-TTY correctly errors with guidance.
 
 ---
 
@@ -95,9 +95,9 @@ rm -rf ~/.config/start && mkdir ~/.config/start
 
 Expected: Auto-setup triggers (empty directory treated as no config).
 
-Result: ____
+Result: PASS
 
-Notes:
+Notes: Empty directory triggers auto-setup (previously fixed issue #1).
 
 ---
 
@@ -113,9 +113,9 @@ echo "" | ./start
 
 Expected: Error message about multiple agents, suggests running interactively.
 
-Result: ____
+Result: PASS
 
-Notes:
+Notes: Non-TTY correctly errors with "multiple AI CLI tools detected" message.
 
 ---
 
@@ -132,9 +132,9 @@ echo 'agents: { test: { bin: "test" command: "cmd" } }' > ~/.config/start/config
 
 Expected: Error shows file path, line, column, source context with pointer.
 
-Result: ____
+Result: PASS
 
-Notes:
+Notes: Clear error with file path, line 1, column 31, source context with pointer.
 
 ---
 
@@ -158,9 +158,9 @@ EOF
 
 Expected: Shows 2 lines before/after error with line numbers.
 
-Result: ____
+Result: PASS
 
-Notes:
+Notes: Shows context lines before and after error with line numbers.
 
 ---
 
@@ -177,9 +177,9 @@ Test:
 
 Expected: Shows agent, role, contexts, writes temp files, does not execute.
 
-Result: ____
+Result: PASS
 
-Notes:
+Notes: Shows agent, role, contexts, role content, prompt preview, temp file paths.
 
 ---
 
@@ -768,6 +768,10 @@ Notes:
 | ID | Feature | Description | Status | Fix | DR |
 |----|---------|-------------|--------|-----|-----|
 | 1 | 1.2 | Empty directory caused error instead of auto-setup | Fixed | Added ValidateConfig with CUE file checking | - |
+| 2 | - | `start config` showed help instead of listing config | Fixed | Added RunE to list all config | DR-034 |
+| 3 | - | Parent commands didn't support `help` subcommand | Fixed | Added checkHelpArg helper, RunE to all parent commands | DR-034 |
+| 4 | - | Unknown subcommands silently ran parent action | Fixed | Added unknownCommandError helper | DR-034 |
+| 5 | 2.1 | Role config used `content` field instead of `prompt` | Fixed | Test config error - changed to `prompt` | - |
 
 ---
 

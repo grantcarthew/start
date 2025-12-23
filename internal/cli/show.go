@@ -31,6 +31,7 @@ func addShowCommand(parent *cobra.Command) {
 		Use:   "show",
 		Short: "Display resolved configuration content",
 		Long:  `Display resolved configuration content after UTD processing and config merging.`,
+		RunE:  runShow,
 	}
 
 	showRoleCmd := &cobra.Command{
@@ -80,6 +81,62 @@ func addShowCommand(parent *cobra.Command) {
 
 	// Add show to parent
 	parent.AddCommand(showCmd)
+}
+
+// runShow displays all configuration (agents, roles, contexts, tasks).
+func runShow(cmd *cobra.Command, args []string) error {
+	if shown, err := checkHelpArg(cmd, args); shown || err != nil {
+		return err
+	}
+	if len(args) > 0 {
+		return unknownCommandError("start show", args[0])
+	}
+
+	w := cmd.OutOrStdout()
+	scope, _ := cmd.Flags().GetString("scope")
+
+	// Show agents
+	if result, err := prepareShowAgent("", scope); err == nil {
+		fmt.Fprintln(w, "Agents:")
+		for _, name := range result.AllNames {
+			fmt.Fprintf(w, "  %s\n", name)
+		}
+		fmt.Fprintln(w)
+	}
+
+	// Show roles
+	if result, err := prepareShowRole("", scope); err == nil {
+		fmt.Fprintln(w, "Roles:")
+		for _, name := range result.AllNames {
+			fmt.Fprintf(w, "  %s\n", name)
+		}
+		fmt.Fprintln(w)
+	}
+
+	// Show contexts
+	if result, err := prepareShowContext("", scope); err == nil {
+		fmt.Fprintln(w, "Contexts:")
+		for _, name := range result.AllNames {
+			fmt.Fprintf(w, "  %s\n", name)
+		}
+		if len(result.RequiredContexts) > 0 {
+			fmt.Fprintf(w, "  Required: %v\n", result.RequiredContexts)
+		}
+		if len(result.DefaultContexts) > 0 {
+			fmt.Fprintf(w, "  Default: %v\n", result.DefaultContexts)
+		}
+		fmt.Fprintln(w)
+	}
+
+	// Show tasks
+	if result, err := prepareShowTask("", scope); err == nil {
+		fmt.Fprintln(w, "Tasks:")
+		for _, name := range result.AllNames {
+			fmt.Fprintf(w, "  %s\n", name)
+		}
+	}
+
+	return nil
 }
 
 // runShowRole displays resolved role content.

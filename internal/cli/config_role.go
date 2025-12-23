@@ -26,6 +26,7 @@ func addConfigRoleCommand(parent *cobra.Command) {
 
 Roles define the behavior and expertise of AI agents.
 Each role specifies a prompt via inline text, file reference, or command.`,
+		RunE: runConfigRole,
 	}
 
 	addConfigRoleListCommand(roleCmd)
@@ -36,6 +37,17 @@ Each role specifies a prompt via inline text, file reference, or command.`,
 	addConfigRoleDefaultCommand(roleCmd)
 
 	parent.AddCommand(roleCmd)
+}
+
+// runConfigRole runs list by default, handles help subcommand.
+func runConfigRole(cmd *cobra.Command, args []string) error {
+	if shown, err := checkHelpArg(cmd, args); shown || err != nil {
+		return err
+	}
+	if len(args) > 0 {
+		return unknownCommandError("start config role", args[0])
+	}
+	return runConfigRoleList(cmd, args)
 }
 
 // addConfigRoleListCommand adds the list subcommand.

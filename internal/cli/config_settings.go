@@ -51,6 +51,10 @@ Available settings:
 
 // executeConfigSettings handles the settings command.
 func executeConfigSettings(cmd *cobra.Command, args []string) error {
+	if shown, err := checkHelpArg(cmd, args); shown || err != nil {
+		return err
+	}
+
 	stdout := cmd.OutOrStdout()
 	flags := getFlags(cmd)
 	local, _ := cmd.Flags().GetBool("local")

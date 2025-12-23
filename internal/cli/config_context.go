@@ -25,6 +25,7 @@ func addConfigContextCommand(parent *cobra.Command) {
 
 Contexts provide additional information injected into prompts.
 Each context specifies content via inline text, file reference, or command.`,
+		RunE: runConfigContext,
 	}
 
 	addConfigContextListCommand(contextCmd)
@@ -34,6 +35,17 @@ Each context specifies content via inline text, file reference, or command.`,
 	addConfigContextRemoveCommand(contextCmd)
 
 	parent.AddCommand(contextCmd)
+}
+
+// runConfigContext runs list by default, handles help subcommand.
+func runConfigContext(cmd *cobra.Command, args []string) error {
+	if shown, err := checkHelpArg(cmd, args); shown || err != nil {
+		return err
+	}
+	if len(args) > 0 {
+		return unknownCommandError("start config context", args[0])
+	}
+	return runConfigContextList(cmd, args)
 }
 
 // addConfigContextListCommand adds the list subcommand.

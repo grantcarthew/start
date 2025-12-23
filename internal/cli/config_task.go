@@ -25,6 +25,7 @@ func addConfigTaskCommand(parent *cobra.Command) {
 
 Tasks define reusable workflows that can be executed with 'start task <name>'.
 Each task specifies a prompt and optionally a role to use.`,
+		RunE: runConfigTask,
 	}
 
 	addConfigTaskListCommand(taskCmd)
@@ -34,6 +35,17 @@ Each task specifies a prompt and optionally a role to use.`,
 	addConfigTaskRemoveCommand(taskCmd)
 
 	parent.AddCommand(taskCmd)
+}
+
+// runConfigTask runs list by default, handles help subcommand.
+func runConfigTask(cmd *cobra.Command, args []string) error {
+	if shown, err := checkHelpArg(cmd, args); shown || err != nil {
+		return err
+	}
+	if len(args) > 0 {
+		return unknownCommandError("start config task", args[0])
+	}
+	return runConfigTaskList(cmd, args)
 }
 
 // addConfigTaskListCommand adds the list subcommand.
