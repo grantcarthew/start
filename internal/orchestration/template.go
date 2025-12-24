@@ -12,20 +12,8 @@ import (
 )
 
 // TemplateData holds the data available for UTD template substitution.
-type TemplateData struct {
-	// File is the path from the UTD file field.
-	File string
-	// FileContents is the content read from the file.
-	FileContents string
-	// Command is the command string from the UTD command field.
-	Command string
-	// CommandOutput is the stdout from executing the command.
-	CommandOutput string
-	// Date is the current timestamp in RFC3339 format.
-	Date string
-	// Instructions is the user-provided instructions (for tasks).
-	Instructions string
-}
+// Uses lowercase keys to match documented placeholder names (e.g., {{.file}}, {{.instructions}}).
+type TemplateData map[string]string
 
 // UTDFields represents the raw UTD fields extracted from CUE configuration.
 type UTDFields struct {
@@ -143,19 +131,18 @@ func (p *TemplateProcessor) Process(fields UTDFields, instructions string) (Proc
 	}
 
 	// Check if template uses placeholders that require file/command execution
-	needsFileContents := strings.Contains(templateStr, "{{.FileContents}}") ||
-		strings.Contains(templateStr, "{{ .FileContents }}") ||
-		strings.Contains(templateStr, "{{.FileContents}}")
-	needsCommandOutput := strings.Contains(templateStr, "{{.CommandOutput}}") ||
-		strings.Contains(templateStr, "{{ .CommandOutput }}") ||
-		strings.Contains(templateStr, "{{.CommandOutput}}")
+	// Match documented lowercase/snake_case placeholders
+	needsFileContents := strings.Contains(templateStr, "{{.file_contents}}") ||
+		strings.Contains(templateStr, "{{ .file_contents }}")
+	needsCommandOutput := strings.Contains(templateStr, "{{.command_output}}") ||
+		strings.Contains(templateStr, "{{ .command_output }}")
 
-	// Build template data
+	// Build template data with lowercase keys to match documented placeholders
 	data := TemplateData{
-		File:         fields.File,
-		Command:      fields.Command,
-		Date:         time.Now().Format(time.RFC3339),
-		Instructions: instructions,
+		"file":         fields.File,
+		"command":      fields.Command,
+		"date":         time.Now().Format(time.RFC3339),
+		"instructions": instructions,
 	}
 
 	// Lazy evaluation: only read file if needed
@@ -164,7 +151,7 @@ func (p *TemplateProcessor) Process(fields UTDFields, instructions string) (Proc
 		if err != nil {
 			result.Warnings = append(result.Warnings, fmt.Sprintf("could not read file %s: %v", fields.File, err))
 		} else {
-			data.FileContents = content
+			data["file_contents"] = content
 			result.FileRead = true
 		}
 	}
@@ -178,14 +165,17 @@ func (p *TemplateProcessor) Process(fields UTDFields, instructions string) (Proc
 			if err != nil {
 				result.Warnings = append(result.Warnings, fmt.Sprintf("command failed: %v", err))
 			} else {
-				data.CommandOutput = output
+				data["command_output"] = output
 				result.CommandExecuted = true
 			}
 		}
 	}
 
 	// Parse and execute template
-	tmpl, err := template.New("utd").Parse(templateStr)
+	// Use Option("missingkey=zero") to handle unknown placeholders gracefully.
+	// This allows file-only contexts to contain template-like syntax (e.g., in code examples)
+	// without causing errors.
+	tmpl, err := template.New("utd").Option("missingkey=zero").Parse(templateStr)
 	if err != nil {
 		return result, fmt.Errorf("parsing template: %w", err)
 	}

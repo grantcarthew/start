@@ -31,6 +31,7 @@ type Flags struct {
 	Quiet     bool
 	Verbose   bool
 	Debug     bool
+	NoColor   bool
 }
 
 // getFlags retrieves Flags from the command context.
@@ -152,13 +153,12 @@ func executeStart(stdout, stderr io.Writer, flags *Flags, selection orchestratio
 	// Print warnings
 	printWarnings(flags, stderr, result.Warnings)
 
-	// Determine effective model
-	model := flags.Model
-	if model == "" {
-		model = env.Agent.DefaultModel
-		debugf(flags, "agent", "Model: %s (config default)", model)
+	// Determine effective model and its source
+	model, modelSource := resolveModel(flags.Model, env.Agent.DefaultModel)
+	if model != "" {
+		debugf(flags, "agent", "Model: %s (%s)", model, modelSource)
 	} else {
-		debugf(flags, "agent", "Model: %s (--model flag)", model)
+		debugf(flags, "agent", "Model: agent default (none specified)")
 	}
 
 	// Build execution config
@@ -171,27 +171,39 @@ func executeStart(stdout, stderr io.Writer, flags *Flags, selection orchestratio
 		DryRun:     flags.DryRun,
 	}
 
-	// Build and log final command
-	if flags.Debug {
-		cmdStr, err := env.Executor.BuildCommand(execConfig)
-		if err == nil {
-			debugf(flags, "exec", "Final command: %s", cmdStr)
-		}
+	// Build command and validate before proceeding
+	cmdStr, err := env.Executor.BuildCommand(execConfig)
+	if err != nil {
+		return err
 	}
+	debugf(flags, "exec", "Final command: %s", cmdStr)
 
 	if flags.DryRun {
 		debugf(flags, "exec", "Dry-run mode, skipping execution")
-		return executeDryRun(stdout, env.Executor, execConfig, result, env.Agent)
+		return executeDryRun(stdout, env.Executor, execConfig, result, env.Agent, model, modelSource)
 	}
 
 	// Print execution info
 	if !flags.Quiet {
-		printExecutionInfo(stdout, env.Agent, flags.Model, result)
+		printExecutionInfo(stdout, env.Agent, model, modelSource, result)
 	}
 
 	debugf(flags, "exec", "Executing agent (process replacement)")
-	// Execute agent (replaces current process)
-	return env.Executor.Execute(execConfig)
+	// Execute agent (replaces current process) - command already validated
+	return env.Executor.ExecuteCommand(cmdStr, execConfig)
+}
+
+// resolveModel determines the effective model and its source.
+// Returns the model name and source ("--model" or "config").
+// If both are empty, returns empty strings.
+func resolveModel(flagModel, configModel string) (model, source string) {
+	if flagModel != "" {
+		return flagModel, "--model"
+	}
+	if configModel != "" {
+		return configModel, "config"
+	}
+	return "", ""
 }
 
 // printWarnings prints warnings to stderr if not in quiet mode.
@@ -200,12 +212,12 @@ func printWarnings(flags *Flags, stderr io.Writer, warnings []string) {
 		return
 	}
 	for _, w := range warnings {
-		fmt.Fprintf(stderr, "Warning: %s\n", w)
+		PrintWarning(stderr, "%s", w)
 	}
 }
 
 // executeDryRun handles --dry-run mode.
-func executeDryRun(w io.Writer, executor *orchestration.Executor, cfg orchestration.ExecuteConfig, result orchestration.ComposeResult, agent orchestration.Agent) error {
+func executeDryRun(w io.Writer, executor *orchestration.Executor, cfg orchestration.ExecuteConfig, result orchestration.ComposeResult, agent orchestration.Agent, model, modelSource string) error {
 	// Build command string
 	cmdStr, err := executor.BuildCommand(cfg)
 	if err != nil {
@@ -234,28 +246,28 @@ func executeDryRun(w io.Writer, executor *orchestration.Executor, cfg orchestrat
 	}
 
 	// Print summary
-	printDryRunSummary(w, agent, cfg.Model, result, dir)
+	printDryRunSummary(w, agent, model, modelSource, result, dir)
 
 	return nil
 }
 
 // printExecutionInfo prints the execution summary.
-func printExecutionInfo(w io.Writer, agent orchestration.Agent, model string, result orchestration.ComposeResult) {
-	fmt.Fprintln(w, "Starting AI Agent")
-	fmt.Fprintln(w, strings.Repeat("─", 79))
+func printExecutionInfo(w io.Writer, agent orchestration.Agent, model, modelSource string, result orchestration.ComposeResult) {
+	PrintHeader(w, "Starting AI Agent")
+	PrintSeparator(w)
 
-	modelStr := model
-	if modelStr == "" {
-		modelStr = agent.DefaultModel
+	if model != "" {
+		fmt.Fprintf(w, "Agent: %s (model: %s via %s)\n", agent.Name, model, modelSource)
+	} else {
+		fmt.Fprintf(w, "Agent: %s\n", agent.Name)
 	}
-	fmt.Fprintf(w, "Agent: %s (model: %s)\n", agent.Name, modelStr)
 	fmt.Fprintln(w)
 
 	if len(result.Contexts) > 0 {
 		fmt.Fprintln(w, "Context documents:")
 		for _, ctx := range result.Contexts {
-			marker := "✓"
-			fmt.Fprintf(w, "  %s %s\n", marker, ctx.Name)
+			fmt.Fprint(w, "  ")
+			PrintSuccess(w, ctx.Name)
 		}
 		fmt.Fprintln(w)
 	}
@@ -269,15 +281,15 @@ func printExecutionInfo(w io.Writer, agent orchestration.Agent, model string, re
 }
 
 // printDryRunSummary prints the dry-run summary per DR-016.
-func printDryRunSummary(w io.Writer, agent orchestration.Agent, model string, result orchestration.ComposeResult, dir string) {
-	fmt.Fprintln(w, "Dry Run - Agent Not Executed")
-	fmt.Fprintln(w, strings.Repeat("─", 79))
+func printDryRunSummary(w io.Writer, agent orchestration.Agent, model, modelSource string, result orchestration.ComposeResult, dir string) {
+	PrintHeader(w, "Dry Run - Agent Not Executed")
+	PrintSeparator(w)
 
-	modelStr := model
-	if modelStr == "" {
-		modelStr = agent.DefaultModel
+	if model != "" {
+		fmt.Fprintf(w, "Agent: %s (model: %s via %s)\n", agent.Name, model, modelSource)
+	} else {
+		fmt.Fprintf(w, "Agent: %s\n", agent.Name)
 	}
-	fmt.Fprintf(w, "Agent: %s (model: %s)\n", agent.Name, modelStr)
 	fmt.Fprintf(w, "Role: %s\n", result.RoleName)
 
 	var contextNames []string
@@ -287,17 +299,15 @@ func printDryRunSummary(w io.Writer, agent orchestration.Agent, model string, re
 	fmt.Fprintf(w, "Contexts: %s\n", strings.Join(contextNames, ", "))
 	fmt.Fprintln(w)
 
-	// Show 5-line preview of role
+	// Show role preview
 	if result.Role != "" {
-		fmt.Fprintln(w, "Role (5 lines):")
-		printPreviewLines(w, result.Role, 5)
+		printContentPreview(w, "Role", result.Role, 5)
 		fmt.Fprintln(w)
 	}
 
-	// Show 5-line preview of prompt
+	// Show prompt preview
 	if result.Prompt != "" {
-		fmt.Fprintln(w, "Prompt (5 lines):")
-		printPreviewLines(w, result.Prompt, 5)
+		printContentPreview(w, "Prompt", result.Prompt, 5)
 		fmt.Fprintln(w)
 	}
 
@@ -307,18 +317,26 @@ func printDryRunSummary(w io.Writer, agent orchestration.Agent, model string, re
 	fmt.Fprintln(w, "  command.txt")
 }
 
-// printPreviewLines prints up to n lines of text with indentation.
-func printPreviewLines(w io.Writer, text string, n int) {
+// printContentPreview prints content with a header showing line count only when truncated.
+func printContentPreview(w io.Writer, label, text string, maxLines int) {
 	lines := strings.Split(text, "\n")
-	shown := n
+	truncated := len(lines) > maxLines
+
+	if truncated {
+		fmt.Fprintf(w, "%s (%d lines):\n", label, maxLines)
+	} else {
+		fmt.Fprintf(w, "%s:\n", label)
+	}
+
+	shown := maxLines
 	if len(lines) < shown {
 		shown = len(lines)
 	}
 	for i := 0; i < shown; i++ {
 		fmt.Fprintf(w, "  %s\n", lines[i])
 	}
-	if len(lines) > n {
-		fmt.Fprintf(w, "  ... (%d more lines)\n", len(lines)-n)
+	if truncated {
+		fmt.Fprintf(w, "  ... (%d more lines)\n", len(lines)-maxLines)
 	}
 }
 

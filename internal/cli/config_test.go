@@ -1053,7 +1053,7 @@ func TestConfigSettingsSet_RefusesOverwriteNonSettings(t *testing.T) {
 agents: {
 	claude: {
 		bin: "claude"
-		command: "{{.Bin}}"
+		command: "{{.bin}}"
 	}
 }
 `

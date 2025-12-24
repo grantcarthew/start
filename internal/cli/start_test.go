@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -28,7 +29,7 @@ func setupStartTestConfig(t *testing.T) string {
 agents: {
 	echo: {
 		bin: "echo"
-		command: "{{.Bin}} 'Agent executed'"
+		command: "{{.bin}} 'Agent executed'"
 		default_model: "default"
 		models: {
 			default: "echo-model"
@@ -230,7 +231,7 @@ func TestPrintDryRunSummary(t *testing.T) {
 		},
 	}
 
-	printDryRunSummary(buf, agent, "", result, "/tmp/test-dir")
+	printDryRunSummary(buf, agent, "", "", result, "/tmp/test-dir")
 
 	output := buf.String()
 
@@ -252,37 +253,44 @@ func TestPrintDryRunSummary(t *testing.T) {
 	}
 }
 
-func TestPrintPreviewLines(t *testing.T) {
+func TestPrintContentPreview(t *testing.T) {
 	tests := []struct {
-		name    string
-		text    string
-		n       int
-		wantLen int
+		name          string
+		text          string
+		maxLines      int
+		wantTruncated bool
 	}{
 		{
-			name:    "fewer lines than limit",
-			text:    "line1\nline2",
-			n:       5,
-			wantLen: 2,
+			name:          "fewer lines than limit shows no count",
+			text:          "line1\nline2",
+			maxLines:      5,
+			wantTruncated: false,
 		},
 		{
-			name:    "more lines than limit",
-			text:    "line1\nline2\nline3\nline4\nline5\nline6",
-			n:       3,
-			wantLen: 3,
+			name:          "more lines than limit shows count",
+			text:          "line1\nline2\nline3\nline4\nline5\nline6",
+			maxLines:      3,
+			wantTruncated: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			buf := new(bytes.Buffer)
-			printPreviewLines(buf, tt.text, tt.n)
+			printContentPreview(buf, "Test", tt.text, tt.maxLines)
 			output := buf.String()
 
-			lines := strings.Split(strings.TrimSpace(output), "\n")
-			// Account for possible "... (X more lines)" line
-			if len(lines) < tt.wantLen {
-				t.Errorf("Expected at least %d lines, got %d", tt.wantLen, len(lines))
+			if tt.wantTruncated {
+				if !strings.Contains(output, fmt.Sprintf("(%d lines)", tt.maxLines)) {
+					t.Errorf("Expected truncated header with line count, got: %s", output)
+				}
+				if !strings.Contains(output, "... (") {
+					t.Errorf("Expected '... (X more lines)' suffix, got: %s", output)
+				}
+			} else {
+				if strings.Contains(output, "lines)") {
+					t.Errorf("Expected no line count for short content, got: %s", output)
+				}
 			}
 		})
 	}
@@ -371,7 +379,7 @@ func TestFindTask_AmbiguousPrefix(t *testing.T) {
 agents: {
 	echo: {
 		bin: "echo"
-		command: "{{.Bin}} test"
+		command: "{{.bin}} test"
 	}
 }
 
@@ -445,7 +453,7 @@ func TestFindTask_NoTasksDefined(t *testing.T) {
 agents: {
 	echo: {
 		bin: "echo"
-		command: "{{.Bin}} test"
+		command: "{{.bin}} test"
 	}
 }
 

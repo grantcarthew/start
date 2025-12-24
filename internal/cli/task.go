@@ -185,8 +185,8 @@ func executeTaskDryRun(w io.Writer, executor *orchestration.Executor, cfg orches
 
 // printTaskExecutionInfo prints the task execution summary.
 func printTaskExecutionInfo(w io.Writer, agent orchestration.Agent, model string, result orchestration.ComposeResult, taskName, instructions string, taskResult orchestration.ProcessResult) {
-	fmt.Fprintf(w, "Starting Task: %s\n", taskName)
-	fmt.Fprintln(w, strings.Repeat("─", 79))
+	PrintHeader(w, fmt.Sprintf("Starting Task: %s", taskName))
+	PrintSeparator(w)
 
 	modelStr := model
 	if modelStr == "" {
@@ -198,7 +198,8 @@ func printTaskExecutionInfo(w io.Writer, agent orchestration.Agent, model string
 	if len(result.Contexts) > 0 {
 		fmt.Fprintln(w, "Context documents (required only):")
 		for _, ctx := range result.Contexts {
-			fmt.Fprintf(w, "  ✓ %s\n", ctx.Name)
+			fmt.Fprint(w, "  ")
+			PrintSuccess(w, ctx.Name)
 		}
 		fmt.Fprintln(w)
 	}
@@ -221,8 +222,8 @@ func printTaskExecutionInfo(w io.Writer, agent orchestration.Agent, model string
 
 // printTaskDryRunSummary prints the task dry-run summary.
 func printTaskDryRunSummary(w io.Writer, agent orchestration.Agent, model string, result orchestration.ComposeResult, dir, taskName, instructions string) {
-	fmt.Fprintf(w, "Dry Run - Task: %s\n", taskName)
-	fmt.Fprintln(w, strings.Repeat("─", 79))
+	PrintHeader(w, fmt.Sprintf("Dry Run - Task: %s", taskName))
+	PrintSeparator(w)
 
 	modelStr := model
 	if modelStr == "" {
@@ -242,17 +243,15 @@ func printTaskDryRunSummary(w io.Writer, agent orchestration.Agent, model string
 	}
 	fmt.Fprintln(w)
 
-	// Show 5-line preview of role
+	// Show role preview
 	if result.Role != "" {
-		fmt.Fprintln(w, "Role (5 lines):")
-		printPreviewLines(w, result.Role, 5)
+		printContentPreview(w, "Role", result.Role, 5)
 		fmt.Fprintln(w)
 	}
 
-	// Show 5-line preview of prompt
+	// Show prompt preview
 	if result.Prompt != "" {
-		fmt.Fprintln(w, "Prompt (5 lines):")
-		printPreviewLines(w, result.Prompt, 5)
+		printContentPreview(w, "Prompt", result.Prompt, 5)
 		fmt.Fprintln(w)
 	}
 
