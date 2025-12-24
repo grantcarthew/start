@@ -212,9 +212,9 @@ Test:
 
 Expected: Agent launches with composed prompt.
 
-Result: ____
+Result: PASS
 
-Notes:
+Notes: Agent launches correctly. Initial 23-second wait was Claude processing the long AGENTS.md context - not a hang.
 
 ---
 
@@ -231,9 +231,9 @@ Test:
 
 Expected: Shows prompt content including "Hello world".
 
-Result: ____
+Result: PASS
 
-Notes:
+Notes: Shows "Hello World" in prompt. Short content correctly displays without "(5 lines)" label.
 
 ---
 
@@ -248,9 +248,9 @@ Test:
 
 Expected: Only required contexts, not default contexts.
 
-Result: ____
+Result: PASS
 
-Notes:
+Notes: Debug shows `defaults=false` and `0 contexts`. Warning for missing "project" context is expected (required context with missing file).
 
 ---
 
@@ -260,14 +260,14 @@ Description: Can include tagged contexts with prompt.
 
 Test:
 ```bash
-./start prompt "test" -c <tag> --dry-run
+./start prompt "test" -c test --dry-run
 ```
 
 Expected: Includes required + tagged contexts.
 
-Result: ____
+Result: PASS
 
-Notes:
+Notes: Context "testing" (tagged with "test") loaded successfully. Required fix for template placeholder case mismatch (issue #9).
 
 ---
 
@@ -282,9 +282,9 @@ Test:
 
 Expected: Includes required + default contexts.
 
-Result: ____
+Result: PASS
 
-Notes:
+Notes: The `-c default` pseudo-tag includes the "codebase" context (which has `default: true`).
 
 ---
 
@@ -773,6 +773,12 @@ Notes:
 | 4 | - | Unknown subcommands silently ran parent action | Fixed | Added unknownCommandError helper | DR-034 |
 | 5 | 2.1 | Role config used `content` field instead of `prompt` | Fixed | Test config error - changed to `prompt` | - |
 | 6 | 2.3 | `{prompt}` syntax not detected, caused silent bash failure | Fixed | Added singleBracePlaceholderPattern validation in ValidateCommandTemplate | - |
+| 7 | 2.3 | Missing `{{.bin}}` in template caused cryptic bash error | Fixed | Added validateCommandExecutable to check first token is executable | - |
+| 8 | - | Test templates used `{{.Bin}}` (uppercase) instead of `{{.bin}}` | Fixed | Updated all test files to use lowercase | - |
+| 9 | 3.3 | Template placeholders used PascalCase but UTD docs specify snake_case | Fixed | Changed TemplateData from struct to map[string]string with lowercase keys; added `missingkey=zero` option | - |
+| 10 | 2.3 | Model display showed empty "(model: )" when not specified | Fixed | Added resolveModel() to track source; hide model line when empty, show source when set | - |
+| 11 | 2.3 | PrintHeader lacked visual spacing | Fixed | Added blank line before headers in PrintHeader() | - |
+| 12 | 3.1 | Content preview showed "(5 lines)" even for short content | Fixed | Created printContentPreview() that only shows line count when truncated | - |
 
 ---
 
@@ -786,3 +792,11 @@ Notes:
 ## Notes
 
 Testing started: 2025-12-23
+
+2025-12-24: During testing, implemented terminal colors (DR-036) to improve error/warning visibility. Added `--no-color` global flag. Tests 1.1-2.2 complete, test 2.3 blocked by config issue (now fixed).
+
+2025-12-24: Completed tests 2.3 and 3.1-3.4. Fixed 4 issues during testing:
+- Issue #9: Major fix - template placeholder case mismatch (PascalCase vs snake_case)
+- Issue #10: Model display improvements (hide when empty, show source)
+- Issue #11: Added blank line before headers for visual spacing
+- Issue #12: Content preview only shows line count when truncated

@@ -41,6 +41,7 @@ Design Records (DRs) document architectural decisions, algorithms, breaking chan
 | DR-033 | Additional CLI Global Flags | CLI | Accepted | 2025-12-19 |
 | DR-034 | CLI Parent Command Defaults | CLI | Accepted | 2025-12-23 |
 | DR-035 | CLI Debug Logging | CLI | Proposed | 2025-12-23 |
+| DR-036 | CLI Terminal Colors | CLI | Accepted | 2025-12-24 |
 
 ## Process
 

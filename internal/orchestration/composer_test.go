@@ -266,9 +266,9 @@ func TestComposer_ResolveTask(t *testing.T) {
 				prompt: """
 					Review the following:
 
-					{{.CommandOutput}}
+					{{.command_output}}
 
-					Instructions: {{.Instructions}}
+					Instructions: {{.instructions}}
 					"""
 			}
 			"simple": {

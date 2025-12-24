@@ -79,7 +79,7 @@ func TestDoctorCommand_WithConfig(t *testing.T) {
 agents: {
 	echo: {
 		bin: "echo"
-		command: "{{.Bin}} test"
+		command: "{{.bin}} test"
 		default_model: "default"
 	}
 }
@@ -231,7 +231,7 @@ func TestPrepareDoctor_WithValidConfig(t *testing.T) {
 agents: {
 	testAgent: {
 		bin: "echo"
-		command: "{{.Bin}} test"
+		command: "{{.bin}} test"
 	}
 }
 

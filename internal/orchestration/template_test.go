@@ -47,14 +47,14 @@ func TestTemplateProcessor_Process(t *testing.T) {
 		{
 			name: "prompt with date placeholder",
 			fields: UTDFields{
-				Prompt: "Today is {{.Date}}",
+				Prompt: "Today is {{.date}}",
 			},
 			wantContains: "Today is 20", // Partial match for year prefix
 		},
 		{
 			name: "prompt with instructions placeholder",
 			fields: UTDFields{
-				Prompt: "Instructions: {{.Instructions}}",
+				Prompt: "Instructions: {{.instructions}}",
 			},
 			instructions: "focus on error handling",
 			wantContains: "Instructions: focus on error handling",
@@ -62,7 +62,7 @@ func TestTemplateProcessor_Process(t *testing.T) {
 		{
 			name: "prompt with file contents placeholder",
 			fields: UTDFields{
-				Prompt: "File content:\n{{.FileContents}}",
+				Prompt: "File content:\n{{.file_contents}}",
 			},
 			fileContent:  "This is the file content.",
 			wantContains: "File content:\nThis is the file content.",
@@ -70,7 +70,7 @@ func TestTemplateProcessor_Process(t *testing.T) {
 		{
 			name: "prompt with command output placeholder",
 			fields: UTDFields{
-				Prompt:  "Output: {{.CommandOutput}}",
+				Prompt:  "Output: {{.command_output}}",
 				Command: "echo hello",
 			},
 			shellOutput:  "hello\n",
@@ -162,7 +162,7 @@ func TestTemplateProcessor_LazyEvaluation(t *testing.T) {
 		t.Fatalf("writing test file: %v", err)
 	}
 
-	t.Run("file not read when FileContents not used", func(t *testing.T) {
+	t.Run("file not read when file_contents not used", func(t *testing.T) {
 		fields := UTDFields{
 			File:   "/nonexistent/file.md", // Would error if read
 			Prompt: "Simple prompt without file placeholder",
@@ -179,7 +179,7 @@ func TestTemplateProcessor_LazyEvaluation(t *testing.T) {
 		}
 	})
 
-	t.Run("command not executed when CommandOutput not used", func(t *testing.T) {
+	t.Run("command not executed when command_output not used", func(t *testing.T) {
 		runner := &mockShellRunner{output: "output"}
 		fields := UTDFields{
 			Command: "echo hello",
@@ -200,10 +200,10 @@ func TestTemplateProcessor_LazyEvaluation(t *testing.T) {
 		}
 	})
 
-	t.Run("file read when FileContents used", func(t *testing.T) {
+	t.Run("file read when file_contents used", func(t *testing.T) {
 		fields := UTDFields{
 			File:   filePath,
-			Prompt: "Content: {{.FileContents}}",
+			Prompt: "Content: {{.file_contents}}",
 		}
 
 		processor := NewTemplateProcessor(nil, nil, tmpDir)
@@ -220,11 +220,11 @@ func TestTemplateProcessor_LazyEvaluation(t *testing.T) {
 		}
 	})
 
-	t.Run("command executed when CommandOutput used", func(t *testing.T) {
+	t.Run("command executed when command_output used", func(t *testing.T) {
 		runner := &mockShellRunner{output: "hello world"}
 		fields := UTDFields{
 			Command: "echo hello",
-			Prompt:  "Output: {{.CommandOutput}}",
+			Prompt:  "Output: {{.command_output}}",
 		}
 
 		processor := NewTemplateProcessor(nil, runner, tmpDir)

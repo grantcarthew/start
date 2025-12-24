@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"runtime"
 
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 )
 
@@ -37,10 +38,18 @@ It manages prompt composition, context injection, and workflow automation.`,
 		// SilenceUsage prevents usage from being printed on RunE errors.
 		// Usage is still shown for flag/argument parsing errors.
 		SilenceUsage: true,
+		// SilenceErrors prevents Cobra from printing errors - we handle them
+		// ourselves in main.go with colored output.
+		SilenceErrors: true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			// Store flags in context for access by all commands
 			ctx := context.WithValue(cmd.Context(), flagsKey{}, flags)
 			cmd.SetContext(ctx)
+
+			// Apply --no-color flag to disable colors globally
+			if flags.NoColor {
+				color.NoColor = true
+			}
 
 			// Debug implies verbose
 			if flags.Debug {
@@ -71,6 +80,7 @@ It manages prompt composition, context injection, and workflow automation.`,
 	cmd.PersistentFlags().BoolVarP(&flags.Quiet, "quiet", "q", false, "Suppress output")
 	cmd.PersistentFlags().BoolVar(&flags.Verbose, "verbose", false, "Detailed output")
 	cmd.PersistentFlags().BoolVar(&flags.Debug, "debug", false, "Debug output (implies --verbose)")
+	cmd.PersistentFlags().BoolVar(&flags.NoColor, "no-color", false, "Disable colored output")
 
 	// Set RunE on root command for `start` execution
 	cmd.RunE = runStart

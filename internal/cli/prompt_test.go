@@ -48,7 +48,7 @@ func TestPromptCommand_DryRun(t *testing.T) {
 agents: {
 	echo: {
 		bin: "echo"
-		command: "{{.Bin}} test"
+		command: "{{.bin}} test"
 		default_model: "default"
 	}
 }
@@ -132,7 +132,7 @@ func TestPromptCommand_WithText(t *testing.T) {
 agents: {
 	echo: {
 		bin: "echo"
-		command: "{{.Bin}} test"
+		command: "{{.bin}} test"
 		default_model: "default"
 	}
 }
@@ -192,7 +192,7 @@ func TestPromptCommand_NoText(t *testing.T) {
 agents: {
 	echo: {
 		bin: "echo"
-		command: "{{.Bin}} test"
+		command: "{{.bin}} test"
 		default_model: "default"
 	}
 }
@@ -255,7 +255,7 @@ func TestPromptCommand_RequiredContextsOnly(t *testing.T) {
 agents: {
 	echo: {
 		bin: "echo"
-		command: "{{.Bin}} test"
+		command: "{{.bin}} test"
 		default_model: "default"
 	}
 }

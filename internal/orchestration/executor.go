@@ -156,16 +156,59 @@ func (e *Executor) BuildCommand(cfg ExecuteConfig) (string, error) {
 		return "", fmt.Errorf("executing command template: %w", err)
 	}
 
-	return buf.String(), nil
+	cmdStr := buf.String()
+
+	// Validate that the command starts with an executable
+	if err := validateCommandExecutable(cmdStr, cfg.Agent.Command); err != nil {
+		return "", err
+	}
+
+	return cmdStr, nil
 }
 
-// Execute runs the agent command, replacing the current process.
+// validateCommandExecutable checks that the first token of the built command
+// is a valid executable (either in PATH or a direct path).
+func validateCommandExecutable(cmdStr, template string) error {
+	fields := strings.Fields(cmdStr)
+	if len(fields) == 0 {
+		return fmt.Errorf(`command template produced empty command
+
+  Template: %s
+
+Check your agent's 'command' field`, template)
+	}
+
+	// Extract first token and strip surrounding quotes
+	firstToken := fields[0]
+	firstToken = strings.Trim(firstToken, "'\"")
+
+	// Check if it's a valid executable
+	if _, err := exec.LookPath(firstToken); err != nil {
+		return fmt.Errorf(`command template does not start with a valid executable
+
+  Template:   %s
+  Parsed as:  %s
+  Error:      %s
+
+The first element of the command must be an executable binary.
+Example: {{.bin}} --print {{.prompt}}`, template, firstToken, err)
+	}
+
+	return nil
+}
+
+// Execute builds and runs the agent command, replacing the current process.
 func (e *Executor) Execute(cfg ExecuteConfig) error {
 	cmdStr, err := e.BuildCommand(cfg)
 	if err != nil {
 		return err
 	}
+	return e.ExecuteCommand(cmdStr, cfg)
+}
 
+// ExecuteCommand runs a pre-built command string, replacing the current process.
+// Use this when the command has already been built and validated.
+func (e *Executor) ExecuteCommand(cmdStr string, cfg ExecuteConfig) error {
 	// Find shell
 	shell, err := exec.LookPath("bash")
 	if err != nil {
