@@ -12,8 +12,9 @@ Avoid references to the prototype in new documentation. This is a new design.
 
 Projects are stored in the `docs/projects/` directory. Continue by reading the active project.
 
-Active Projects:
-- `docs/projects/p-012-cli-end-to-end-testing.md` (Core Commands)
+Active Project: `docs/projects/p-012-cli-end-to-end-testing.md` (Core Commands Testing)
+
+Other Projects (paused):
 - `docs/projects/p-013-cli-configuration-testing.md` (Configuration)
 - `docs/projects/p-014-cli-supporting-commands-testing.md` (Assets, Doctor, Completion)
 
@@ -152,6 +153,7 @@ The `./Context` directory contains cloned source code and documentation for deve
 - P-009: Doctor Diagnostics (health checks, configuration validation, fix suggestions)
 - P-010: Shell Completion (bash, zsh, fish tab-completion, documentation guides)
 - P-011: CLI Refinements (command naming, exit codes)
+- P-015: Schema Base and Origin Tracking (#Base schema, origin field for registry provenance)
 
 **Current:** P-012/P-013/P-014: CLI End-to-End Testing (Core, Configuration, Supporting Commands)
 

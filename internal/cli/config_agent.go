@@ -102,10 +102,14 @@ func runConfigAgentList(cmd *cobra.Command, _ []string) error {
 		if name == defaultAgent {
 			marker = "* "
 		}
+		source := agent.Source
+		if agent.Origin != "" {
+			source += ", registry"
+		}
 		if agent.Description != "" {
-			fmt.Fprintf(w, "%s%s - %s (%s)\n", marker, name, agent.Description, agent.Source)
+			fmt.Fprintf(w, "%s%s - %s (%s)\n", marker, name, agent.Description, source)
 		} else {
-			fmt.Fprintf(w, "%s%s (%s)\n", marker, name, agent.Source)
+			fmt.Fprintf(w, "%s%s (%s)\n", marker, name, source)
 		}
 	}
 
@@ -634,6 +638,7 @@ type AgentConfig struct {
 	Models       map[string]string
 	Tags         []string
 	Source       string // "global" or "local" - for display only
+	Origin       string // Registry module path when installed from registry
 }
 
 // loadAgentsForScope loads agents from the appropriate scope.
@@ -753,6 +758,11 @@ func loadAgentsFromDir(dir string) (map[string]AgentConfig, error) {
 			}
 		}
 
+		// Load origin (registry provenance)
+		if v := val.LookupPath(cue.ParsePath("origin")); v.Exists() {
+			agent.Origin, _ = v.String()
+		}
+
 		agents[name] = agent
 	}
 
@@ -777,6 +787,11 @@ func writeAgentsFile(path string, agents map[string]AgentConfig) error {
 	for _, name := range names {
 		agent := agents[name]
 		sb.WriteString(fmt.Sprintf("\t%q: {\n", name))
+
+		// Write origin first if present (registry provenance)
+		if agent.Origin != "" {
+			sb.WriteString(fmt.Sprintf("\t\torigin: %q\n", agent.Origin))
+		}
 		sb.WriteString(fmt.Sprintf("\t\tbin:     %q\n", agent.Bin))
 		sb.WriteString(fmt.Sprintf("\t\tcommand: %q\n", agent.Command))
 

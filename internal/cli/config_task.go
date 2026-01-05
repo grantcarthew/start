@@ -89,10 +89,14 @@ func runConfigTaskList(cmd *cobra.Command, _ []string) error {
 
 	for _, name := range names {
 		task := tasks[name]
+		source := task.Source
+		if task.Origin != "" {
+			source += ", registry"
+		}
 		if task.Description != "" {
-			fmt.Fprintf(w, "  %s - %s (%s)\n", name, task.Description, task.Source)
+			fmt.Fprintf(w, "  %s - %s (%s)\n", name, task.Description, source)
 		} else {
-			fmt.Fprintf(w, "  %s (%s)\n", name, task.Source)
+			fmt.Fprintf(w, "  %s (%s)\n", name, source)
 		}
 	}
 
@@ -615,6 +619,7 @@ type TaskConfig struct {
 	Role        string
 	Tags        []string
 	Source      string // "global" or "local" - for display only
+	Origin      string // Registry module path when installed from registry
 }
 
 // loadTasksForScope loads tasks from the appropriate scope.
@@ -721,6 +726,11 @@ func loadTasksFromDir(dir string) (map[string]TaskConfig, error) {
 			}
 		}
 
+		// Load origin (registry provenance)
+		if v := val.LookupPath(cue.ParsePath("origin")); v.Exists() {
+			task.Origin, _ = v.String()
+		}
+
 		tasks[name] = task
 	}
 
@@ -746,6 +756,10 @@ func writeTasksFile(path string, tasks map[string]TaskConfig) error {
 		task := tasks[name]
 		sb.WriteString(fmt.Sprintf("\t%q: {\n", name))
 
+		// Write origin first if present (registry provenance)
+		if task.Origin != "" {
+			sb.WriteString(fmt.Sprintf("\t\torigin: %q\n", task.Origin))
+		}
 		if task.Description != "" {
 			sb.WriteString(fmt.Sprintf("\t\tdescription: %q\n", task.Description))
 		}

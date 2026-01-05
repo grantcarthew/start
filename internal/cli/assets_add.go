@@ -125,7 +125,12 @@ func runAssetsAdd(cmd *cobra.Command, args []string) error {
 	}
 
 	// Extract asset content from fetched module
-	assetContent, err := extractAssetContent(fetchResult.SourceDir, selected, client.Registry())
+	// Strip version from module path for origin field (e.g., "start.cue.works/tasks/code-review@v0.0.1" -> "start.cue.works/tasks/code-review")
+	originPath := modulePath
+	if idx := strings.Index(originPath, "@"); idx != -1 {
+		originPath = originPath[:idx]
+	}
+	assetContent, err := extractAssetContent(fetchResult.SourceDir, selected, client.Registry(), originPath)
 	if err != nil {
 		return fmt.Errorf("extracting asset content: %w", err)
 	}
@@ -220,7 +225,8 @@ func assetTypeToConfigFile(category string) string {
 }
 
 // extractAssetContent loads the asset module and extracts its content as CUE.
-func extractAssetContent(moduleDir string, asset SearchResult, reg interface{}) (string, error) {
+// originPath is the module path (without version) to store in the origin field.
+func extractAssetContent(moduleDir string, asset SearchResult, reg interface{}, originPath string) (string, error) {
 	cctx := cuecontext.New()
 
 	cfg := &load.Config{
@@ -261,13 +267,17 @@ func extractAssetContent(moduleDir string, asset SearchResult, reg interface{}) 
 	}
 
 	// Build a concrete struct with just the fields we need
-	return formatAssetStruct(assetVal, asset.Category)
+	return formatAssetStruct(assetVal, asset.Category, originPath)
 }
 
 // formatAssetStruct formats a CUE value as a concrete struct.
-func formatAssetStruct(v cue.Value, category string) (string, error) {
+// originPath is written as the origin field to track registry provenance.
+func formatAssetStruct(v cue.Value, category, originPath string) (string, error) {
 	var sb strings.Builder
 	sb.WriteString("{\n")
+
+	// Write origin field first (tracks registry provenance)
+	sb.WriteString(fmt.Sprintf("\t\torigin: %q\n", originPath))
 
 	// Define which fields to extract based on category
 	var fields []string
@@ -456,7 +466,6 @@ func writeAssetToConfig(configPath string, asset SearchResult, content, modulePa
 	}
 
 	// Add the asset definition
-	sb.WriteString(fmt.Sprintf("\t// Source: %s\n", modulePath))
 	sb.WriteString(fmt.Sprintf("\t%q: ", assetKey))
 
 	// Indent the content
