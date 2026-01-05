@@ -779,6 +779,7 @@ Notes:
 | 10 | 2.3 | Model display showed empty "(model: )" when not specified | Fixed | Added resolveModel() to track source; hide model line when empty, show source when set | - |
 | 11 | 2.3 | PrintHeader lacked visual spacing | Fixed | Added blank line before headers in PrintHeader() | - |
 | 12 | 3.1 | Content preview showed "(5 lines)" even for short content | Fixed | Created printContentPreview() that only shows line count when truncated | - |
+| 13 | 4.1 | No indication whether asset is from package vs user-defined | Deferred | Requires schema change - see DR-037, P-015 | DR-037 |
 
 ---
 

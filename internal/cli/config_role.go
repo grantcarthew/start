@@ -101,10 +101,14 @@ func runConfigRoleList(cmd *cobra.Command, _ []string) error {
 		if name == defaultRole {
 			marker = "* "
 		}
+		source := role.Source
+		if role.Origin != "" {
+			source += ", registry"
+		}
 		if role.Description != "" {
-			fmt.Fprintf(w, "%s%s - %s (%s)\n", marker, name, role.Description, role.Source)
+			fmt.Fprintf(w, "%s%s - %s (%s)\n", marker, name, role.Description, source)
 		} else {
-			fmt.Fprintf(w, "%s%s (%s)\n", marker, name, role.Source)
+			fmt.Fprintf(w, "%s%s (%s)\n", marker, name, source)
 		}
 	}
 
@@ -690,6 +694,7 @@ type RoleConfig struct {
 	Prompt      string
 	Tags        []string
 	Source      string // "global" or "local" - for display only
+	Origin      string // Registry module path when installed from registry
 }
 
 // loadRolesForScope loads roles from the appropriate scope.
@@ -793,6 +798,11 @@ func loadRolesFromDir(dir string) (map[string]RoleConfig, error) {
 			}
 		}
 
+		// Load origin (registry provenance)
+		if v := val.LookupPath(cue.ParsePath("origin")); v.Exists() {
+			role.Origin, _ = v.String()
+		}
+
 		roles[name] = role
 	}
 
@@ -818,6 +828,10 @@ func writeRolesFile(path string, roles map[string]RoleConfig) error {
 		role := roles[name]
 		sb.WriteString(fmt.Sprintf("\t%q: {\n", name))
 
+		// Write origin first if present (registry provenance)
+		if role.Origin != "" {
+			sb.WriteString(fmt.Sprintf("\t\torigin: %q\n", role.Origin))
+		}
 		if role.Description != "" {
 			sb.WriteString(fmt.Sprintf("\t\tdescription: %q\n", role.Description))
 		}

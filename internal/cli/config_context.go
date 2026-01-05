@@ -100,10 +100,14 @@ func runConfigContextList(cmd *cobra.Command, _ []string) error {
 			markers = "[" + markers + "] "
 		}
 
+		source := ctx.Source
+		if ctx.Origin != "" {
+			source += ", registry"
+		}
 		if ctx.Description != "" {
-			fmt.Fprintf(w, "  %s%s - %s (%s)\n", markers, name, ctx.Description, ctx.Source)
+			fmt.Fprintf(w, "  %s%s - %s (%s)\n", markers, name, ctx.Description, source)
 		} else {
-			fmt.Fprintf(w, "  %s%s (%s)\n", markers, name, ctx.Source)
+			fmt.Fprintf(w, "  %s%s (%s)\n", markers, name, source)
 		}
 	}
 
@@ -660,6 +664,7 @@ type ContextConfig struct {
 	Default     bool
 	Tags        []string
 	Source      string // "global" or "local" - for display only
+	Origin      string // Registry module path when installed from registry
 }
 
 // loadContextsForScope loads contexts from the appropriate scope.
@@ -769,6 +774,11 @@ func loadContextsFromDir(dir string) (map[string]ContextConfig, error) {
 			}
 		}
 
+		// Load origin (registry provenance)
+		if v := val.LookupPath(cue.ParsePath("origin")); v.Exists() {
+			ctx.Origin, _ = v.String()
+		}
+
 		contexts[name] = ctx
 	}
 
@@ -794,6 +804,10 @@ func writeContextsFile(path string, contexts map[string]ContextConfig) error {
 		ctx := contexts[name]
 		sb.WriteString(fmt.Sprintf("\t%q: {\n", name))
 
+		// Write origin first if present (registry provenance)
+		if ctx.Origin != "" {
+			sb.WriteString(fmt.Sprintf("\t\torigin: %q\n", ctx.Origin))
+		}
 		if ctx.Description != "" {
 			sb.WriteString(fmt.Sprintf("\t\tdescription: %q\n", ctx.Description))
 		}
