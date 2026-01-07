@@ -301,9 +301,9 @@ Test:
 
 Expected: Task resolves, shows composed prompt.
 
-Result: ____
+Result: PASS
 
-Notes:
+Notes: Task auto-installs from registry when not found locally (fixed isTaskNotFoundError to handle "no tasks defined" case). Full execution tested with golang/code-review - took 8min due to comprehensive prompt and --print mode waiting for complete response.
 
 ---
 
@@ -780,6 +780,10 @@ Notes:
 | 11 | 2.3 | PrintHeader lacked visual spacing | Fixed | Added blank line before headers in PrintHeader() | - |
 | 12 | 3.1 | Content preview showed "(5 lines)" even for short content | Fixed | Created printContentPreview() that only shows line count when truncated | - |
 | 13 | 4.1 | No indication whether asset is from package vs user-defined | Deferred | Requires schema change - see DR-037, P-015 | DR-037 |
+| 14 | 4.1 | Task not found doesn't auto-fetch from registry per DR-015 step 3 | Fixed | Integrate registry fetch into findTask; also handle "no tasks defined" case in isTaskNotFoundError | DR-015 |
+| 15 | 4.1 | getAssetKey strips prefix causing collisions (golang/code-review → code-review) | Fixed | Preserve full path per DR-003 | DR-003 |
+| 16 | 4.1 | @module/ path prefix not resolved, files not found | Open | Implement path resolution per DR-023 | DR-023 |
+| 17 | 4.1 | "Executing..." message unclear during long agent waits | Fixed | Changed to "Starting <agent> - awaiting response..." | - |
 
 ---
 
@@ -801,3 +805,5 @@ Testing started: 2025-12-23
 - Issue #10: Model display improvements (hide when empty, show source)
 - Issue #11: Added blank line before headers for visual spacing
 - Issue #12: Content preview only shows line count when truncated
+
+2025-01-07: Fixed Issue #14 properly - `isTaskNotFoundError` now handles "no tasks defined" case. Task 4.1 passes. Changed "Executing..." message to "Starting <agent> - awaiting response..." for better UX during long-running agent calls. Noted that --print mode waits for complete response (8min for comprehensive code review task).
