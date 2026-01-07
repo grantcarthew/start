@@ -2,6 +2,8 @@ package orchestration
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"cuelang.org/go/cue"
@@ -292,7 +294,85 @@ func (c *Composer) ResolveTask(cfg cue.Value, name, instructions string) (Proces
 		return ProcessResult{}, fmt.Errorf("invalid UTD: no file, command, or prompt")
 	}
 
+	// Resolve @module/ paths using origin field (per DR-023)
+	if strings.HasPrefix(fields.File, "@module/") {
+		origin := extractOrigin(taskVal)
+		if origin != "" {
+			resolved, err := resolveModulePath(fields.File, origin)
+			if err == nil {
+				fields.File = resolved
+			}
+			// If resolution fails, keep original path (will produce clearer error later)
+		}
+	}
+
 	return c.processor.Process(fields, instructions)
+}
+
+// extractOrigin extracts the origin field from a CUE value.
+func extractOrigin(v cue.Value) string {
+	if origin := v.LookupPath(cue.ParsePath("origin")); origin.Exists() {
+		if s, err := origin.String(); err == nil {
+			return s
+		}
+	}
+	return ""
+}
+
+// resolveModulePath resolves an @module/ path to the CUE cache location.
+// Per DR-023, @module/ paths resolve relative to the cached module directory.
+func resolveModulePath(path, origin string) (string, error) {
+	if !strings.HasPrefix(path, "@module/") {
+		return path, nil
+	}
+
+	// Strip @module/ prefix
+	relativePath := strings.TrimPrefix(path, "@module/")
+
+	// Get CUE cache directory
+	cacheDir, err := getCUECacheDir()
+	if err != nil {
+		return "", fmt.Errorf("getting CUE cache dir: %w", err)
+	}
+
+	// Origin format: "github.com/grantcarthew/start-assets/tasks/golang/code-review"
+	// Module path in cache: cacheDir/mod/extract/github.com/grantcarthew/start-assets/tasks/golang/code-review@v0.x.x/
+	// We need to find the version directory
+	moduleBase := filepath.Join(cacheDir, "mod", "extract", origin)
+
+	// Find version directory (there should be one matching @v*)
+	entries, err := os.ReadDir(filepath.Dir(moduleBase))
+	if err != nil {
+		return "", fmt.Errorf("reading cache directory: %w", err)
+	}
+
+	baseName := filepath.Base(origin)
+	var moduleDir string
+	for _, entry := range entries {
+		if entry.IsDir() && strings.HasPrefix(entry.Name(), baseName+"@v") {
+			moduleDir = filepath.Join(filepath.Dir(moduleBase), entry.Name())
+			break
+		}
+	}
+
+	if moduleDir == "" {
+		return "", fmt.Errorf("module %s not found in cache", origin)
+	}
+
+	return filepath.Join(moduleDir, relativePath), nil
+}
+
+// getCUECacheDir returns the CUE cache directory.
+// Respects CUE_CACHE_DIR environment variable.
+func getCUECacheDir() (string, error) {
+	if dir := os.Getenv("CUE_CACHE_DIR"); dir != "" {
+		return dir, nil
+	}
+	cacheDir, err := os.UserCacheDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(cacheDir, "cue"), nil
 }
 
 // GetTaskRole returns the role specified for a task.

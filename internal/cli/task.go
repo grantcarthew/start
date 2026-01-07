@@ -1,13 +1,16 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"strings"
 
 	"cuelang.org/go/cue"
+	"github.com/grantcarthew/start/internal/config"
 	internalcue "github.com/grantcarthew/start/internal/cue"
 	"github.com/grantcarthew/start/internal/orchestration"
+	"github.com/grantcarthew/start/internal/registry"
 	"github.com/grantcarthew/start/internal/temp"
 	"github.com/spf13/cobra"
 )
@@ -51,7 +54,32 @@ func executeTask(stdout, stderr io.Writer, flags *Flags, taskName, instructions 
 	// Resolve task name (exact match or substring match)
 	resolvedName, err := findTask(env.Cfg, taskName)
 	if err != nil {
-		return err
+		// Per DR-015: if not found locally, try fetching from registry
+		if isTaskNotFoundError(err, taskName) {
+			debugf(flags, "task", "Not found locally, checking registry...")
+			installed, installErr := tryInstallTaskFromRegistry(stdout, stderr, flags, taskName)
+			if installErr != nil {
+				// Registry install failed, return original error
+				debugf(flags, "task", "Registry install failed: %v", installErr)
+				return err
+			}
+			if installed {
+				// Reload config and retry
+				debugf(flags, "task", "Installed from registry, reloading config...")
+				env, err = prepareExecutionEnv(flags)
+				if err != nil {
+					return err
+				}
+				resolvedName, err = findTask(env.Cfg, taskName)
+				if err != nil {
+					return err
+				}
+			} else {
+				return err
+			}
+		} else {
+			return err
+		}
 	}
 
 	if resolvedName != taskName {
@@ -217,7 +245,7 @@ func printTaskExecutionInfo(w io.Writer, agent orchestration.Agent, model string
 	}
 
 	fmt.Fprintln(w)
-	fmt.Fprintln(w, "Executing...")
+	fmt.Fprintf(w, "Starting %s - awaiting response...\n", agent.Name)
 }
 
 // printTaskDryRunSummary prints the task dry-run summary.
@@ -295,4 +323,124 @@ func findTask(cfg internalcue.LoadResult, name string) (string, error) {
 	default:
 		return "", fmt.Errorf("ambiguous task prefix %q matches: %s", name, strings.Join(matches, ", "))
 	}
+}
+
+// isTaskNotFoundError checks if the error is a "task not found" error.
+// This includes both "task X not found" and "no tasks defined".
+func isTaskNotFoundError(err error, name string) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return msg == fmt.Sprintf("task %q not found", name) || msg == "no tasks defined"
+}
+
+// tryInstallTaskFromRegistry searches the registry for an exact task match and installs it.
+// Returns (true, nil) if installed successfully, (false, nil) if not found, (false, error) on failure.
+func tryInstallTaskFromRegistry(stdout, stderr io.Writer, flags *Flags, taskName string) (bool, error) {
+	ctx := context.Background()
+
+	// Create registry client
+	client, err := registry.NewClient()
+	if err != nil {
+		return false, fmt.Errorf("creating registry client: %w", err)
+	}
+
+	// Fetch index
+	if !flags.Quiet {
+		fmt.Fprintln(stdout, "Task not found locally, checking registry...")
+	}
+	index, err := client.FetchIndex(ctx)
+	if err != nil {
+		return false, fmt.Errorf("fetching registry index: %w", err)
+	}
+
+	// Search for exact match in tasks category
+	result := findExactTaskInRegistry(index, taskName)
+	if result == nil {
+		debugf(flags, "task", "No exact match found in registry for %q", taskName)
+		return false, nil
+	}
+
+	if !flags.Quiet {
+		fmt.Fprintf(stdout, "Found in registry: %s/%s\n", result.Category, result.Name)
+		fmt.Fprintln(stdout, "Installing...")
+	}
+
+	// Install the task using the same logic as assets add
+	paths, err := config.ResolvePaths("")
+	if err != nil {
+		return false, fmt.Errorf("resolving config paths: %w", err)
+	}
+
+	// Always install to global config for auto-install
+	configDir := paths.Global
+
+	// Fetch the actual asset module from registry
+	modulePath := result.Entry.Module
+	if !strings.Contains(modulePath, "@") {
+		modulePath += "@v0"
+	}
+
+	// Resolve to canonical version
+	resolvedPath, err := client.ResolveLatestVersion(ctx, modulePath)
+	if err != nil {
+		return false, fmt.Errorf("resolving asset version: %w", err)
+	}
+
+	fetchResult, err := client.Fetch(ctx, resolvedPath)
+	if err != nil {
+		return false, fmt.Errorf("fetching asset module: %w", err)
+	}
+
+	// Extract asset content from fetched module
+	originPath := modulePath
+	if idx := strings.Index(originPath, "@"); idx != -1 {
+		originPath = originPath[:idx]
+	}
+	assetContent, err := extractAssetContent(fetchResult.SourceDir, *result, client.Registry(), originPath)
+	if err != nil {
+		return false, fmt.Errorf("extracting asset content: %w", err)
+	}
+
+	// Determine the config file
+	configFile := assetTypeToConfigFile(result.Category)
+	configPath := configDir + "/" + configFile
+
+	// Write the asset to config
+	if err := writeAssetToConfig(configPath, *result, assetContent, modulePath); err != nil {
+		return false, fmt.Errorf("writing config: %w", err)
+	}
+
+	if !flags.Quiet {
+		fmt.Fprintf(stdout, "Installed %s/%s to global config\n\n", result.Category, result.Name)
+	}
+
+	return true, nil
+}
+
+// findExactTaskInRegistry searches for an exact task match in the registry index.
+// Supports both "name" and "category/name" formats (e.g., "code-review" or "golang/code-review").
+func findExactTaskInRegistry(index *registry.Index, taskName string) *SearchResult {
+	// Check if taskName includes a path prefix (e.g., "golang/code-review")
+	for name, entry := range index.Tasks {
+		// Exact match on full name (e.g., "golang/code-review" matches "golang/code-review")
+		if name == taskName {
+			return &SearchResult{
+				Category: "tasks",
+				Name:     name,
+				Entry:    entry,
+			}
+		}
+		// Also match if the short name matches (e.g., "code-review" matches "golang/code-review")
+		shortName := getAssetKey(name)
+		if shortName == taskName {
+			return &SearchResult{
+				Category: "tasks",
+				Name:     name,
+				Entry:    entry,
+			}
+		}
+	}
+	return nil
 }

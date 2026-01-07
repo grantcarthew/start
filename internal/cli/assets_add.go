@@ -383,12 +383,10 @@ func formatFieldValue(name string, v cue.Value) (string, error) {
 	return sb.String(), nil
 }
 
-// getAssetKey extracts the asset key name from the full path.
-// e.g., "golang/code-review" -> "code-review"
+// getAssetKey returns the asset key name for use in config.
+// Per DR-003, the full category/item path is preserved to avoid collisions.
+// e.g., "golang/code-review" -> "golang/code-review"
 func getAssetKey(name string) string {
-	if idx := strings.LastIndex(name, "/"); idx != -1 {
-		return name[idx+1:]
-	}
 	return name
 }
 
