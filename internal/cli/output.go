@@ -3,9 +3,11 @@ package cli
 import (
 	"fmt"
 	"io"
+	"path/filepath"
 	"strings"
 
 	"github.com/fatih/color"
+	"github.com/grantcarthew/start/internal/orchestration"
 )
 
 // Color definitions per DR-036
@@ -46,4 +48,95 @@ func PrintHeader(w io.Writer, text string) {
 // PrintSeparator prints a separator line in magenta.
 func PrintSeparator(w io.Writer) {
 	colorSeparator.Fprintln(w, strings.Repeat("─", 79))
+}
+
+// PrintContextTable prints contexts in a table format.
+// Shows all contexts (loaded and failed) with status indicator.
+func PrintContextTable(w io.Writer, contexts []orchestration.Context) {
+	if len(contexts) == 0 {
+		return
+	}
+
+	fmt.Fprintln(w, "Context documents:")
+
+	// Calculate column widths
+	nameWidth := 4 // "Name" header
+	flagsWidth := 5 // "Flags" header
+	fileWidth := 4 // "File" header
+
+	type row struct {
+		name   string
+		status string
+		flags  string
+		file   string
+	}
+
+	rows := make([]row, len(contexts))
+	for i, ctx := range contexts {
+		// Status: ✓ for loaded, ○ for failed
+		status := "✓"
+		if ctx.Error != "" {
+			status = "○"
+		}
+
+		// Flags: combine required, default, and tags
+		var flags []string
+		if ctx.Required {
+			flags = append(flags, "required")
+		}
+		if ctx.Default {
+			flags = append(flags, "default")
+		}
+		flags = append(flags, ctx.Tags...)
+		flagStr := strings.Join(flags, ", ")
+		if flagStr == "" {
+			flagStr = "-"
+		}
+
+		// File: show basename, add error info if failed
+		file := ctx.File
+		if file != "" {
+			file = filepath.Base(file)
+		} else {
+			file = "-"
+		}
+		if ctx.Error != "" {
+			file += " (not found)"
+		}
+
+		rows[i] = row{
+			name:   ctx.Name,
+			status: status,
+			flags:  flagStr,
+			file:   file,
+		}
+
+		// Update widths
+		if len(ctx.Name) > nameWidth {
+			nameWidth = len(ctx.Name)
+		}
+		if len(flagStr) > flagsWidth {
+			flagsWidth = len(flagStr)
+		}
+		if len(file) > fileWidth {
+			fileWidth = len(file)
+		}
+	}
+
+	// Print header
+	fmt.Fprintf(w, "  %-*s  %s  %-*s  %s\n",
+		nameWidth, "Name", "Status", flagsWidth, "Flags", "File")
+
+	// Print rows
+	for _, r := range rows {
+		fmt.Fprint(w, "  ")
+		fmt.Fprintf(w, "%-*s  ", nameWidth, r.name)
+		if r.status == "✓" {
+			colorSuccess.Fprintf(w, "%s", r.status)
+		} else {
+			fmt.Fprint(w, r.status)
+		}
+		fmt.Fprintf(w, "       %-*s  %s\n", flagsWidth, r.flags, r.file)
+	}
+	fmt.Fprintln(w)
 }

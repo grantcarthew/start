@@ -226,8 +226,8 @@ func TestPrintDryRunSummary(t *testing.T) {
 		RoleName: "test-role",
 		Prompt:   "Test prompt content",
 		Contexts: []orchestration.Context{
-			{Name: "ctx1"},
-			{Name: "ctx2"},
+			{Name: "ctx1", File: "file1.md", Default: true},
+			{Name: "ctx2", File: "file2.md"},
 		},
 	}
 
@@ -239,7 +239,9 @@ func TestPrintDryRunSummary(t *testing.T) {
 		"Dry Run",
 		"test-agent",
 		"test-role",
-		"ctx1, ctx2",
+		"Context documents:",
+		"ctx1",
+		"ctx2",
 		"/tmp/test-dir",
 		"role.md",
 		"prompt.md",
