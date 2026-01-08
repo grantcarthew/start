@@ -256,21 +256,15 @@ func printExecutionInfo(w io.Writer, agent orchestration.Agent, model, modelSour
 	PrintHeader(w, "Starting AI Agent")
 	PrintSeparator(w)
 
+	fmt.Fprintf(w, "Agent: %s\n", agent.Name)
 	if model != "" {
-		fmt.Fprintf(w, "Agent: %s (model: %s via %s)\n", agent.Name, model, modelSource)
+		fmt.Fprintf(w, "Model: %s (via %s)\n", model, modelSource)
 	} else {
-		fmt.Fprintf(w, "Agent: %s\n", agent.Name)
+		fmt.Fprintf(w, "Model: -\n")
 	}
 	fmt.Fprintln(w)
 
-	if len(result.Contexts) > 0 {
-		fmt.Fprintln(w, "Context documents:")
-		for _, ctx := range result.Contexts {
-			fmt.Fprint(w, "  ")
-			PrintSuccess(w, ctx.Name)
-		}
-		fmt.Fprintln(w)
-	}
+	PrintContextTable(w, result.Contexts)
 
 	if result.RoleName != "" {
 		fmt.Fprintf(w, "Role: %s\n", result.RoleName)
@@ -285,19 +279,16 @@ func printDryRunSummary(w io.Writer, agent orchestration.Agent, model, modelSour
 	PrintHeader(w, "Dry Run - Agent Not Executed")
 	PrintSeparator(w)
 
+	fmt.Fprintf(w, "Agent: %s\n", agent.Name)
 	if model != "" {
-		fmt.Fprintf(w, "Agent: %s (model: %s via %s)\n", agent.Name, model, modelSource)
+		fmt.Fprintf(w, "Model: %s (via %s)\n", model, modelSource)
 	} else {
-		fmt.Fprintf(w, "Agent: %s\n", agent.Name)
+		fmt.Fprintf(w, "Model: -\n")
 	}
 	fmt.Fprintf(w, "Role: %s\n", result.RoleName)
-
-	var contextNames []string
-	for _, ctx := range result.Contexts {
-		contextNames = append(contextNames, ctx.Name)
-	}
-	fmt.Fprintf(w, "Contexts: %s\n", strings.Join(contextNames, ", "))
 	fmt.Fprintln(w)
+
+	PrintContextTable(w, result.Contexts)
 
 	// Show role preview
 	if result.Role != "" {

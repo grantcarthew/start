@@ -28,6 +28,8 @@ type Context struct {
 	Required    bool
 	Default     bool
 	Tags        []string
+	File        string // Source file path (if file-based)
+	Error       string // Error message if resolution failed
 }
 
 // Composer handles prompt composition from CUE configuration.
@@ -73,15 +75,15 @@ func (c *Composer) Compose(cfg cue.Value, selection ContextSelection, customText
 	for _, ctx := range contexts {
 		resolved, err := c.resolveContext(cfg, ctx.Name)
 		if err != nil {
-			// Context errors are warnings, not failures (per DR-007)
-			result.Warnings = append(result.Warnings, fmt.Sprintf("context %q: %v", ctx.Name, err))
-			continue
+			// Store error on context for display (per DR-007, errors are non-fatal)
+			ctx.Error = err.Error()
+		} else {
+			ctx.Content = resolved.Content
+			if resolved.Content != "" {
+				promptParts = append(promptParts, resolved.Content)
+			}
 		}
-		ctx.Content = resolved.Content
 		result.Contexts = append(result.Contexts, ctx)
-		if resolved.Content != "" {
-			promptParts = append(promptParts, resolved.Content)
-		}
 	}
 
 	// Append custom text or task instructions
@@ -162,6 +164,9 @@ func (c *Composer) selectContexts(cfg cue.Value, selection ContextSelection) ([]
 					}
 				}
 			}
+		}
+		if file := ctxVal.LookupPath(cue.ParsePath("file")); file.Exists() {
+			ctx.File, _ = file.String()
 		}
 
 		// Check if context should be included

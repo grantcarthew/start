@@ -220,17 +220,14 @@ func printTaskExecutionInfo(w io.Writer, agent orchestration.Agent, model string
 	if modelStr == "" {
 		modelStr = agent.DefaultModel
 	}
-	fmt.Fprintf(w, "Agent: %s (model: %s)\n", agent.Name, modelStr)
+	if modelStr == "" {
+		modelStr = "-"
+	}
+	fmt.Fprintf(w, "Agent: %s\n", agent.Name)
+	fmt.Fprintf(w, "Model: %s\n", modelStr)
 	fmt.Fprintln(w)
 
-	if len(result.Contexts) > 0 {
-		fmt.Fprintln(w, "Context documents (required only):")
-		for _, ctx := range result.Contexts {
-			fmt.Fprint(w, "  ")
-			PrintSuccess(w, ctx.Name)
-		}
-		fmt.Fprintln(w)
-	}
+	PrintContextTable(w, result.Contexts)
 
 	if result.RoleName != "" {
 		fmt.Fprintf(w, "Role: %s\n", result.RoleName)
@@ -257,19 +254,20 @@ func printTaskDryRunSummary(w io.Writer, agent orchestration.Agent, model string
 	if modelStr == "" {
 		modelStr = agent.DefaultModel
 	}
-	fmt.Fprintf(w, "Agent: %s (model: %s)\n", agent.Name, modelStr)
-	fmt.Fprintf(w, "Role: %s\n", result.RoleName)
-
-	var contextNames []string
-	for _, ctx := range result.Contexts {
-		contextNames = append(contextNames, ctx.Name)
+	if modelStr == "" {
+		modelStr = "-"
 	}
-	fmt.Fprintf(w, "Contexts: %s\n", strings.Join(contextNames, ", "))
+	fmt.Fprintf(w, "Agent: %s\n", agent.Name)
+	fmt.Fprintf(w, "Model: %s\n", modelStr)
+	fmt.Fprintf(w, "Role: %s\n", result.RoleName)
+	fmt.Fprintln(w)
+
+	PrintContextTable(w, result.Contexts)
 
 	if instructions != "" {
 		fmt.Fprintf(w, "Instructions: %s\n", instructions)
+		fmt.Fprintln(w)
 	}
-	fmt.Fprintln(w)
 
 	// Show role preview
 	if result.Role != "" {
