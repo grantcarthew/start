@@ -784,6 +784,7 @@ Notes:
 | 15 | 4.1 | getAssetKey strips prefix causing collisions (golang/code-review → code-review) | Fixed | Preserve full path per DR-003 | DR-003 |
 | 16 | 4.1 | @module/ path prefix not resolved, files not found | Open | Implement path resolution per DR-023 | DR-023 |
 | 17 | 4.1 | "Executing..." message unclear during long agent waits | Fixed | Changed to "Starting <agent> - awaiting response..." | - |
+| 18 | 4.3 | `show task` doesn't support substring matching like `start task` | Fixed | Added substring matching to `prepareShowTask` per DR-015 | DR-015 |
 
 ---
 

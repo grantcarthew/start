@@ -429,16 +429,34 @@ func prepareShowTask(name, scope string) (ShowResult, error) {
 		}, nil
 	}
 
+	// Try exact match first
+	resolvedName := name
 	task := tasks.LookupPath(cue.MakePath(cue.Str(name)))
 	if !task.Exists() {
-		return ShowResult{}, fmt.Errorf("task %q not found", name)
+		// Try substring match (per DR-015)
+		var matches []string
+		for _, taskName := range allNames {
+			if strings.Contains(taskName, name) {
+				matches = append(matches, taskName)
+			}
+		}
+
+		switch len(matches) {
+		case 0:
+			return ShowResult{}, fmt.Errorf("task %q not found", name)
+		case 1:
+			resolvedName = matches[0]
+			task = tasks.LookupPath(cue.MakePath(cue.Str(resolvedName)))
+		default:
+			return ShowResult{}, fmt.Errorf("ambiguous task name %q matches: %s", name, strings.Join(matches, ", "))
+		}
 	}
 
 	content := formatShowContent(task, "task")
 
 	return ShowResult{
 		ItemType: "Task",
-		Name:     name,
+		Name:     resolvedName,
 		Content:  content,
 		AllNames: allNames,
 	}, nil
