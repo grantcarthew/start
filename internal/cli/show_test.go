@@ -418,6 +418,17 @@ func TestPrepareShowTask(t *testing.T) {
 			taskName: "nonexistent",
 			wantErr:  true,
 		},
+		{
+			name:     "substring match",
+			taskName: "rev",
+			wantType: "Task",
+			wantName: "review",
+			wantContent: []string{
+				"Description: Review changes",
+			},
+			wantListOnly: false,
+			wantErr:      false,
+		},
 	}
 
 	for _, tt := range tests {
