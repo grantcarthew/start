@@ -11,8 +11,8 @@ import (
 )
 
 // IndexModulePath is the CUE module path for the start assets index.
-// Must use canonical version format (e.g., @v0.0.1) not major version (@v0).
-const IndexModulePath = "github.com/grantcarthew/start-assets/index@v0.0.1"
+// Uses major version; resolved to latest canonical version at runtime.
+const IndexModulePath = "github.com/grantcarthew/start-assets/index@v0"
 
 // IndexEntry represents an entry in the asset index.
 type IndexEntry struct {
@@ -33,7 +33,13 @@ type Index struct {
 
 // FetchIndex fetches and parses the index from the registry.
 func (c *Client) FetchIndex(ctx context.Context) (*Index, error) {
-	result, err := c.Fetch(ctx, IndexModulePath)
+	// Resolve to latest version
+	resolvedPath, err := c.ResolveLatestVersion(ctx, IndexModulePath)
+	if err != nil {
+		return nil, fmt.Errorf("resolving index version: %w", err)
+	}
+
+	result, err := c.Fetch(ctx, resolvedPath)
 	if err != nil {
 		return nil, fmt.Errorf("fetching index module: %w", err)
 	}
