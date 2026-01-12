@@ -15,7 +15,6 @@ See [p-writing-guide.md](./p-writing-guide.md) for guidelines on creating and ma
 | [P-012](./p-012-cli-end-to-end-testing.md) | CLI Core Commands Testing | 2025-12-23 |
 | [P-013](./p-013-cli-configuration-testing.md) | CLI Configuration Testing | - |
 | [P-014](./p-014-cli-supporting-commands-testing.md) | CLI Supporting Commands Testing | - |
-| [P-015](./p-015-schema-base-origin-tracking.md) | Schema Base and Origin Tracking | - |
 
 ### Completed Projects
 
@@ -32,12 +31,30 @@ See [p-writing-guide.md](./p-writing-guide.md) for guidelines on creating and ma
 | [P-009](./completed/p-009-doctor-diagnostics.md) | Doctor & Diagnostics | 2025-12-19 |
 | [P-010](./completed/p-010-shell-completion.md) | Shell Completion | 2025-12-19 |
 | [P-011](./completed/p-011-cli-refinements.md) | CLI Refinements | 2025-12-22 |
+| [P-015](./completed/p-015-schema-base-origin-tracking.md) | Schema Base and Origin Tracking | 2026-01-05 |
+| [P-016](./completed/p-016-file-placeholder-temp-path.md) | File Placeholder Temp Path | 2026-01-13 |
 
 ---
 
 ## Project Overview
 
 ### Completed
+
+#### P-016: File Placeholder Temp Path
+
+Fixed bug where `{{.file}}` template placeholder returned CUE cache path instead of local `.start/temp/` path. This caused permission issues when AI agents attempted to read files from external cache directories.
+
+**Key Deliverables:** Updated Composer to pre-write temp files, added `@module/` resolution to roles/contexts
+
+**Dependencies:** P-005, P-015
+
+#### P-015: Schema Base and Origin Tracking
+
+Added `#Base` schema with origin field for tracking registry provenance of assets. Enables `@module/` path resolution for file-based UTDs.
+
+**Key Deliverables:** `#Base` schema, origin field, validation script
+
+**Dependencies:** P-001, P-003
 
 #### P-011: CLI Refinements
 

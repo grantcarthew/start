@@ -8,6 +8,7 @@ import (
 
 	"cuelang.org/go/cue"
 	internalcue "github.com/grantcarthew/start/internal/cue"
+	"github.com/grantcarthew/start/internal/temp"
 )
 
 // ContextSelection specifies which contexts to include.
@@ -34,16 +35,40 @@ type Context struct {
 
 // Composer handles prompt composition from CUE configuration.
 type Composer struct {
-	processor  *TemplateProcessor
-	workingDir string
+	processor   *TemplateProcessor
+	tempManager *temp.Manager
+	workingDir  string
 }
 
 // NewComposer creates a new prompt composer.
 func NewComposer(processor *TemplateProcessor, workingDir string) *Composer {
 	return &Composer{
-		processor:  processor,
-		workingDir: workingDir,
+		processor:   processor,
+		tempManager: temp.NewUTDManager(workingDir),
+		workingDir:  workingDir,
 	}
+}
+
+// resolveFileToTemp reads a source file and writes it to .start/temp/.
+// Returns the temp file path, or empty string if no file to resolve.
+// The entityType is "task", "role", or "context".
+// The name is the entity name (e.g., "code-review", "start/create-task").
+func (c *Composer) resolveFileToTemp(entityType, name, filePath string) (string, error) {
+	if filePath == "" {
+		return "", nil
+	}
+
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		return "", fmt.Errorf("reading %s file %s: %w", entityType, filePath, err)
+	}
+
+	tempPath, err := c.tempManager.WriteUTDFile(entityType, name, string(content))
+	if err != nil {
+		return "", fmt.Errorf("writing %s temp file: %w", entityType, err)
+	}
+
+	return tempPath, nil
 }
 
 // ComposeResult contains the result of prompt composition.
@@ -218,7 +243,35 @@ func (c *Composer) resolveContext(cfg cue.Value, name string) (ProcessResult, er
 		return ProcessResult{}, fmt.Errorf("invalid UTD: no file, command, or prompt")
 	}
 
-	return c.processor.Process(fields, "")
+	// Resolve @module/ paths using origin field (per DR-023)
+	if strings.HasPrefix(fields.File, "@module/") {
+		origin := extractOrigin(ctxVal)
+		if origin != "" {
+			resolved, err := resolveModulePath(fields.File, origin)
+			if err == nil {
+				fields.File = resolved
+			}
+		}
+	}
+
+	// Write file to temp BEFORE processing so {{.file}} gets temp path
+	var tempPath string
+	if fields.File != "" {
+		var err error
+		tempPath, err = c.resolveFileToTemp("context", name, fields.File)
+		if err != nil {
+			return ProcessResult{}, err
+		}
+		fields.File = tempPath
+	}
+
+	result, err := c.processor.Process(fields, "")
+	if err != nil {
+		return result, err
+	}
+
+	result.TempFile = tempPath
+	return result, nil
 }
 
 // resolveRole resolves a role through UTD processing.
@@ -231,6 +284,26 @@ func (c *Composer) resolveRole(cfg cue.Value, name string) (string, error) {
 	fields := extractUTDFields(roleVal)
 	if !IsUTDValid(fields) {
 		return "", fmt.Errorf("invalid UTD: no file, command, or prompt")
+	}
+
+	// Resolve @module/ paths using origin field (per DR-023)
+	if strings.HasPrefix(fields.File, "@module/") {
+		origin := extractOrigin(roleVal)
+		if origin != "" {
+			resolved, err := resolveModulePath(fields.File, origin)
+			if err == nil {
+				fields.File = resolved
+			}
+		}
+	}
+
+	// Write file to temp BEFORE processing so {{.file}} gets temp path
+	if fields.File != "" {
+		tempPath, err := c.resolveFileToTemp("role", name, fields.File)
+		if err != nil {
+			return "", err
+		}
+		fields.File = tempPath
 	}
 
 	result, err := c.processor.Process(fields, "")
@@ -311,7 +384,24 @@ func (c *Composer) ResolveTask(cfg cue.Value, name, instructions string) (Proces
 		}
 	}
 
-	return c.processor.Process(fields, instructions)
+	// Write file to temp BEFORE processing so {{.file}} gets temp path
+	var tempPath string
+	if fields.File != "" {
+		var err error
+		tempPath, err = c.resolveFileToTemp("task", name, fields.File)
+		if err != nil {
+			return ProcessResult{}, err
+		}
+		fields.File = tempPath
+	}
+
+	result, err := c.processor.Process(fields, instructions)
+	if err != nil {
+		return result, err
+	}
+
+	result.TempFile = tempPath
+	return result, nil
 }
 
 // extractOrigin extracts the origin field from a CUE value.

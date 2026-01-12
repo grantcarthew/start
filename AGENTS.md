@@ -154,6 +154,7 @@ The `./Context` directory contains cloned source code and documentation for deve
 - P-010: Shell Completion (bash, zsh, fish tab-completion, documentation guides)
 - P-011: CLI Refinements (command naming, exit codes)
 - P-015: Schema Base and Origin Tracking (#Base schema, origin field for registry provenance)
+- P-016: File Placeholder Temp Path ({{.file}} now uses .start/temp/ instead of CUE cache path)
 
 **Current:** P-012/P-013/P-014: CLI End-to-End Testing (Core, Configuration, Supporting Commands)
 

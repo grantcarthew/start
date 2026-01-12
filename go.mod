@@ -4,6 +4,7 @@ go 1.24.0
 
 require (
 	cuelang.org/go v0.15.1
+	github.com/fatih/color v1.18.0
 	github.com/spf13/cobra v1.10.2
 	golang.org/x/term v0.36.0
 )
@@ -12,7 +13,6 @@ require (
 	cuelabs.dev/go/oci/ociregistry v0.0.0-20250722084951-074d06050084 // indirect
 	github.com/cockroachdb/apd/v3 v3.2.1 // indirect
 	github.com/emicklei/proto v1.14.2 // indirect
-	github.com/fatih/color v1.18.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect

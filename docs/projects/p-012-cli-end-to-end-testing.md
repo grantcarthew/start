@@ -782,9 +782,10 @@ Notes:
 | 13 | 4.1 | No indication whether asset is from package vs user-defined | Deferred | Requires schema change - see DR-037, P-015 | DR-037 |
 | 14 | 4.1 | Task not found doesn't auto-fetch from registry per DR-015 step 3 | Fixed | Integrate registry fetch into findTask; also handle "no tasks defined" case in isTaskNotFoundError | DR-015 |
 | 15 | 4.1 | getAssetKey strips prefix causing collisions (golang/code-review → code-review) | Fixed | Preserve full path per DR-003 | DR-003 |
-| 16 | 4.1 | @module/ path prefix not resolved, files not found | Open | Implement path resolution per DR-023 | DR-023 |
+| 16 | 4.1 | @module/ path prefix not resolved, files not found | Fixed | Added @module/ resolution to resolveRole/resolveContext (P-016) | DR-023 |
 | 17 | 4.1 | "Executing..." message unclear during long agent waits | Fixed | Changed to "Starting <agent> - awaiting response..." | - |
 | 18 | 4.3 | `show task` doesn't support substring matching like `start task` | Fixed | Added substring matching to `prepareShowTask` per DR-015 | DR-015 |
+| 19 | 4.1 | {{.file}} placeholder returns CUE cache path instead of local temp | Fixed | Pre-write temp files in Composer before template processing (P-016) | DR-020 |
 
 ---
 
