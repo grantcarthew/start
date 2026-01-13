@@ -135,6 +135,7 @@ Examples:
   start config role add
   start config role add --name go-expert --file ~/.config/start/roles/go-expert.md
   start config role add --name reviewer --prompt "You are a code reviewer..."`,
+		Args: cobra.NoArgs,
 		RunE: runConfigRoleAdd,
 	}
 
@@ -536,6 +537,8 @@ Removes the specified role from the configuration file.`,
 		RunE: runConfigRoleRemove,
 	}
 
+	removeCmd.Flags().BoolP("yes", "y", false, "Skip confirmation prompt")
+
 	parent.AddCommand(removeCmd)
 }
 
@@ -568,23 +571,26 @@ func runConfigRoleRemove(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("role %q not found in %s config", name, scopeString(local))
 	}
 
-	// Confirm removal
-	isTTY := false
-	if f, ok := stdin.(*os.File); ok {
-		isTTY = term.IsTerminal(int(f.Fd()))
-	}
-
-	if isTTY {
-		fmt.Fprintf(stdout, "Remove role %q from %s config? [y/N] ", name, scopeString(local))
-		reader := bufio.NewReader(stdin)
-		input, err := reader.ReadString('\n')
-		if err != nil {
-			return fmt.Errorf("reading input: %w", err)
+	// Confirm removal unless --yes flag is set
+	skipConfirm, _ := cmd.Flags().GetBool("yes")
+	if !skipConfirm {
+		isTTY := false
+		if f, ok := stdin.(*os.File); ok {
+			isTTY = term.IsTerminal(int(f.Fd()))
 		}
-		input = strings.TrimSpace(strings.ToLower(input))
-		if input != "y" && input != "yes" {
-			fmt.Fprintln(stdout, "Cancelled.")
-			return nil
+
+		if isTTY {
+			fmt.Fprintf(stdout, "Remove role %q from %s config? [y/N] ", name, scopeString(local))
+			reader := bufio.NewReader(stdin)
+			input, err := reader.ReadString('\n')
+			if err != nil {
+				return fmt.Errorf("reading input: %w", err)
+			}
+			input = strings.TrimSpace(strings.ToLower(input))
+			if input != "y" && input != "yes" {
+				fmt.Fprintln(stdout, "Cancelled.")
+				return nil
+			}
 		}
 	}
 

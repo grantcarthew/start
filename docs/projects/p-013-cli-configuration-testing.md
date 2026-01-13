@@ -91,7 +91,7 @@ Description: Add a new agent using flags.
 
 Test:
 ```bash
-./start config agent add test-agent --bin echo --command "{role}"
+./start config agent add --name test-agent --bin echo --command "{role}"
 ./start config agent list
 ./start config agent remove test-agent
 ```
@@ -180,7 +180,7 @@ Description: Edit agent using flags (non-interactive).
 
 Test:
 ```bash
-./start config agent add temp --bin temp --command "temp"
+./start config agent add --name temp --bin temp --command "temp"
 ./start config agent edit temp --default-model "new-model"
 ./start config agent info temp
 ./start config agent remove temp
@@ -235,7 +235,7 @@ Description: Remove an agent with confirmation.
 
 Test:
 ```bash
-./start config agent add temp --bin temp --command "temp"
+./start config agent add --name temp --bin temp --command "temp"
 ./start config agent remove temp
 ./start config agent list
 ```
@@ -290,7 +290,7 @@ Description: Add a new role using flags.
 
 Test:
 ```bash
-./start config role add test-role --content "You are a test assistant"
+./start config role add --name test-role --content "You are a test assistant"
 ./start config role list
 ./start config role remove test-role
 ```
@@ -310,7 +310,7 @@ Description: Add role with file reference.
 Test:
 ```bash
 echo "# Test Role" > /tmp/test-role.md
-./start config role add file-role --file /tmp/test-role.md
+./start config role add --name file-role --file /tmp/test-role.md
 ./start config role info file-role
 ./start config role remove file-role
 ```
@@ -346,7 +346,7 @@ Description: Edit existing role.
 
 Test:
 ```bash
-./start config role add temp-role --content "Original"
+./start config role add --name temp-role --content "Original"
 ./start config role edit temp-role --content "Updated"
 ./start config role info temp-role
 ./start config role remove temp-role
@@ -385,7 +385,7 @@ Description: Remove a role.
 
 Test:
 ```bash
-./start config role add temp --content "temp"
+./start config role add --name temp --content "temp"
 ./start config role remove temp
 ```
 
@@ -422,7 +422,7 @@ Description: Add context with file reference.
 
 Test:
 ```bash
-./start config context add test-ctx --file "/tmp/test.md"
+./start config context add --name test-ctx --file "/tmp/test.md"
 ./start config context list
 ./start config context remove test-ctx
 ```
@@ -441,7 +441,7 @@ Description: Add context with command.
 
 Test:
 ```bash
-./start config context add cmd-ctx --command "echo hello"
+./start config context add --name cmd-ctx --command "echo hello"
 ./start config context info cmd-ctx
 ./start config context remove cmd-ctx
 ```
@@ -460,7 +460,7 @@ Description: Add context with selection fields.
 
 Test:
 ```bash
-./start config context add tagged-ctx --file "/tmp/test.md" --tags "test,example" --default
+./start config context add --name tagged-ctx --file "/tmp/test.md" --tags "test,example" --default
 ./start config context info tagged-ctx
 ./start config context remove tagged-ctx
 ```
@@ -496,7 +496,7 @@ Description: Edit existing context.
 
 Test:
 ```bash
-./start config context add temp --file "/tmp/a.md"
+./start config context add --name temp --file "/tmp/a.md"
 ./start config context edit temp --file "/tmp/b.md"
 ./start config context info temp
 ./start config context remove temp
@@ -516,7 +516,7 @@ Description: Remove a context.
 
 Test:
 ```bash
-./start config context add temp --file "/tmp/test.md"
+./start config context add --name temp --file "/tmp/test.md"
 ./start config context remove temp
 ```
 
@@ -553,7 +553,7 @@ Description: Add a new task.
 
 Test:
 ```bash
-./start config task add test-task --prompt "Do something"
+./start config task add --name test-task --prompt "Do something"
 ./start config task list
 ./start config task remove test-task
 ```
@@ -572,7 +572,7 @@ Description: Add task with role reference.
 
 Test:
 ```bash
-./start config task add role-task --prompt "Test" --role <role-name>
+./start config task add --name role-task --prompt "Test" --role <role-name>
 ./start config task info role-task
 ./start config task remove role-task
 ```
@@ -591,7 +591,7 @@ Description: Add task with command for dynamic content.
 
 Test:
 ```bash
-./start config task add cmd-task --command "git status" --prompt "Review: {{.command_output}}"
+./start config task add --name cmd-task --command "git status" --prompt "Review: {{.command_output}}"
 ./start config task info cmd-task
 ./start config task remove cmd-task
 ```
@@ -627,7 +627,7 @@ Description: Edit existing task.
 
 Test:
 ```bash
-./start config task add temp --prompt "Original"
+./start config task add --name temp --prompt "Original"
 ./start config task edit temp --prompt "Updated"
 ./start config task info temp
 ./start config task remove temp
@@ -647,7 +647,7 @@ Description: Remove a task.
 
 Test:
 ```bash
-./start config task add temp --prompt "temp"
+./start config task add --name temp --prompt "temp"
 ./start config task remove temp
 ```
 
@@ -858,7 +858,7 @@ Description: Show from local config only.
 Test:
 ```bash
 mkdir -p ./.start
-./start config agent add local-test --bin local --command "local" --local
+./start config agent add --name local-test --bin local --command "local" --local
 ./start show agent --scope local
 ./start config agent remove local-test --local
 rmdir ./.start 2>/dev/null || rm -rf ./.start
@@ -898,7 +898,7 @@ Description: --local creates .start/ if needed.
 Test:
 ```bash
 rm -rf ./.start
-./start config agent add local-agent --bin local --command "cmd" --local
+./start config agent add --name local-agent --bin local --command "cmd" --local
 ls ./.start/
 ./start config agent remove local-agent --local
 rm -rf ./.start
@@ -918,7 +918,7 @@ Description: Local config doesn't affect global.
 
 Test:
 ```bash
-./start config agent add unique-local --bin local --command "cmd" --local
+./start config agent add --name unique-local --bin local --command "cmd" --local
 ./start config agent list  # Should show both
 ./start show agent --scope global  # Should not show unique-local
 ./start config agent remove unique-local --local
@@ -982,8 +982,8 @@ Description: Local overrides global for same names.
 Test:
 ```bash
 mkdir -p ./.start
-./start config agent add test-merge --bin global --command "global"
-./start config agent add test-merge --bin local --command "local" --local
+./start config agent add --name test-merge --bin global --command "global"
+./start config agent add --name test-merge --bin local --command "local" --local
 ./start show agent test-merge  # Should show local version
 ./start config agent remove test-merge
 ./start config agent remove test-merge --local
@@ -1004,8 +1004,8 @@ Description: Different names from global and local both appear.
 
 Test:
 ```bash
-./start config agent add global-only --bin global --command "cmd"
-./start config agent add local-only --bin local --command "cmd" --local
+./start config agent add --name global-only --bin global --command "cmd"
+./start config agent add --name local-only --bin local --command "cmd" --local
 ./start config agent list  # Should show both
 ./start config agent remove global-only
 ./start config agent remove local-only --local

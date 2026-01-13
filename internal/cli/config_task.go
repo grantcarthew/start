@@ -118,6 +118,7 @@ Examples:
   start config task add
   start config task add --name review --prompt "Review this code for bugs"
   start config task add --name commit --file ~/.config/start/tasks/commit.md --role git-expert`,
+		Args: cobra.NoArgs,
 		RunE: runConfigTaskAdd,
 	}
 
@@ -540,6 +541,8 @@ Removes the specified task from the configuration file.`,
 		RunE: runConfigTaskRemove,
 	}
 
+	removeCmd.Flags().BoolP("yes", "y", false, "Skip confirmation prompt")
+
 	parent.AddCommand(removeCmd)
 }
 
@@ -572,23 +575,26 @@ func runConfigTaskRemove(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("task %q not found in %s config", name, scopeString(local))
 	}
 
-	// Confirm removal
-	isTTY := false
-	if f, ok := stdin.(*os.File); ok {
-		isTTY = term.IsTerminal(int(f.Fd()))
-	}
-
-	if isTTY {
-		fmt.Fprintf(stdout, "Remove task %q from %s config? [y/N] ", name, scopeString(local))
-		reader := bufio.NewReader(stdin)
-		input, err := reader.ReadString('\n')
-		if err != nil {
-			return fmt.Errorf("reading input: %w", err)
+	// Confirm removal unless --yes flag is set
+	skipConfirm, _ := cmd.Flags().GetBool("yes")
+	if !skipConfirm {
+		isTTY := false
+		if f, ok := stdin.(*os.File); ok {
+			isTTY = term.IsTerminal(int(f.Fd()))
 		}
-		input = strings.TrimSpace(strings.ToLower(input))
-		if input != "y" && input != "yes" {
-			fmt.Fprintln(stdout, "Cancelled.")
-			return nil
+
+		if isTTY {
+			fmt.Fprintf(stdout, "Remove task %q from %s config? [y/N] ", name, scopeString(local))
+			reader := bufio.NewReader(stdin)
+			input, err := reader.ReadString('\n')
+			if err != nil {
+				return fmt.Errorf("reading input: %w", err)
+			}
+			input = strings.TrimSpace(strings.ToLower(input))
+			if input != "y" && input != "yes" {
+				fmt.Fprintln(stdout, "Cancelled.")
+				return nil
+			}
 		}
 	}
 

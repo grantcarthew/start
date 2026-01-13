@@ -134,6 +134,7 @@ Examples:
   start config agent add
   start config agent add --name gemini --bin gemini --command 'gemini "{{.prompt}}"'
   start config agent add --local --name project-agent --bin claude --command 'claude "{{.prompt}}"'`,
+		Args: cobra.NoArgs,
 		RunE: runConfigAgentAdd,
 	}
 
@@ -479,6 +480,8 @@ Removes the specified agent from the configuration file.`,
 		RunE: runConfigAgentRemove,
 	}
 
+	removeCmd.Flags().BoolP("yes", "y", false, "Skip confirmation prompt")
+
 	parent.AddCommand(removeCmd)
 }
 
@@ -511,23 +514,26 @@ func runConfigAgentRemove(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("agent %q not found in %s config", name, scopeString(local))
 	}
 
-	// Confirm removal
-	isTTY := false
-	if f, ok := stdin.(*os.File); ok {
-		isTTY = term.IsTerminal(int(f.Fd()))
-	}
-
-	if isTTY {
-		fmt.Fprintf(stdout, "Remove agent %q from %s config? [y/N] ", name, scopeString(local))
-		reader := bufio.NewReader(stdin)
-		input, err := reader.ReadString('\n')
-		if err != nil {
-			return fmt.Errorf("reading input: %w", err)
+	// Confirm removal unless --yes flag is set
+	skipConfirm, _ := cmd.Flags().GetBool("yes")
+	if !skipConfirm {
+		isTTY := false
+		if f, ok := stdin.(*os.File); ok {
+			isTTY = term.IsTerminal(int(f.Fd()))
 		}
-		input = strings.TrimSpace(strings.ToLower(input))
-		if input != "y" && input != "yes" {
-			fmt.Fprintln(stdout, "Cancelled.")
-			return nil
+
+		if isTTY {
+			fmt.Fprintf(stdout, "Remove agent %q from %s config? [y/N] ", name, scopeString(local))
+			reader := bufio.NewReader(stdin)
+			input, err := reader.ReadString('\n')
+			if err != nil {
+				return fmt.Errorf("reading input: %w", err)
+			}
+			input = strings.TrimSpace(strings.ToLower(input))
+			if input != "y" && input != "yes" {
+				fmt.Fprintln(stdout, "Cancelled.")
+				return nil
+			}
 		}
 	}
 

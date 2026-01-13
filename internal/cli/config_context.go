@@ -132,6 +132,7 @@ Examples:
   start config context add
   start config context add --name project --file PROJECT.md --required
   start config context add --local --name readme --file README.md --default`,
+		Args: cobra.NoArgs,
 		RunE: runConfigContextAdd,
 	}
 
@@ -584,6 +585,8 @@ Removes the specified context from the configuration file.`,
 		RunE: runConfigContextRemove,
 	}
 
+	removeCmd.Flags().BoolP("yes", "y", false, "Skip confirmation prompt")
+
 	parent.AddCommand(removeCmd)
 }
 
@@ -616,23 +619,26 @@ func runConfigContextRemove(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("context %q not found in %s config", name, scopeString(local))
 	}
 
-	// Confirm removal
-	isTTY := false
-	if f, ok := stdin.(*os.File); ok {
-		isTTY = term.IsTerminal(int(f.Fd()))
-	}
-
-	if isTTY {
-		fmt.Fprintf(stdout, "Remove context %q from %s config? [y/N] ", name, scopeString(local))
-		reader := bufio.NewReader(stdin)
-		input, err := reader.ReadString('\n')
-		if err != nil {
-			return fmt.Errorf("reading input: %w", err)
+	// Confirm removal unless --yes flag is set
+	skipConfirm, _ := cmd.Flags().GetBool("yes")
+	if !skipConfirm {
+		isTTY := false
+		if f, ok := stdin.(*os.File); ok {
+			isTTY = term.IsTerminal(int(f.Fd()))
 		}
-		input = strings.TrimSpace(strings.ToLower(input))
-		if input != "y" && input != "yes" {
-			fmt.Fprintln(stdout, "Cancelled.")
-			return nil
+
+		if isTTY {
+			fmt.Fprintf(stdout, "Remove context %q from %s config? [y/N] ", name, scopeString(local))
+			reader := bufio.NewReader(stdin)
+			input, err := reader.ReadString('\n')
+			if err != nil {
+				return fmt.Errorf("reading input: %w", err)
+			}
+			input = strings.TrimSpace(strings.ToLower(input))
+			if input != "y" && input != "yes" {
+				fmt.Fprintln(stdout, "Cancelled.")
+				return nil
+			}
 		}
 	}
 
