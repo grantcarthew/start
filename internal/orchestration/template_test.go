@@ -77,7 +77,7 @@ func TestTemplateProcessor_Process(t *testing.T) {
 			wantContains: "Output: hello\n",
 		},
 		{
-			name: "file only - content becomes template",
+			name:   "file only - content becomes template",
 			fields: UTDFields{
 				// File will be set in test
 			},

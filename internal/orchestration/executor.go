@@ -272,7 +272,7 @@ func (e *Executor) ExecuteWithoutReplace(cfg ExecuteConfig) (string, error) {
 // preventing shell command injection. The returned value is already quoted -
 // templates should use {{.prompt}} directly, NOT '{{.prompt}}'.
 //
-// Example: "hello 'world'" becomes "'hello '\"'\"'world'\"'\"''"
+// Example: "hello 'world'" becomes "'hello '\"'\"'world'\"'\"”"
 //
 // Note: Environment variables (e.g., $HOME) are NOT expanded. Use literal values
 // in prompts or the command field for dynamic content.

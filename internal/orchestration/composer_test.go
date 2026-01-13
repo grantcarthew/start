@@ -142,6 +142,86 @@ func TestComposer_Compose(t *testing.T) {
 			wantPrompt: "",
 			wantCtxs:   nil,
 		},
+		{
+			name: "unmatched tag adds warning",
+			config: `
+				contexts: {
+					env: {
+						required: true
+						prompt: "Environment"
+					}
+					security: {
+						tags: ["security"]
+						prompt: "Security context"
+					}
+				}
+			`,
+			selection: ContextSelection{
+				IncludeRequired: true,
+				Tags:            []string{"nonexistent"},
+			},
+			wantPrompt:  "Environment",
+			wantCtxs:    []string{"env"},
+			wantWarning: true,
+		},
+		{
+			name: "multiple unmatched tags add multiple warnings",
+			config: `
+				contexts: {
+					env: {
+						required: true
+						prompt: "Environment"
+					}
+				}
+			`,
+			selection: ContextSelection{
+				IncludeRequired: true,
+				Tags:            []string{"invalid1", "invalid2"},
+			},
+			wantPrompt:  "Environment",
+			wantCtxs:    []string{"env"},
+			wantWarning: true,
+		},
+		{
+			name: "mix of valid and invalid tags warns only for invalid",
+			config: `
+				contexts: {
+					env: {
+						required: true
+						prompt: "Environment"
+					}
+					security: {
+						tags: ["security"]
+						prompt: "Security context"
+					}
+				}
+			`,
+			selection: ContextSelection{
+				IncludeRequired: true,
+				Tags:            []string{"security", "invalidtag"},
+			},
+			wantPrompt:  "Environment\n\nSecurity context",
+			wantCtxs:    []string{"env", "security"},
+			wantWarning: true,
+		},
+		{
+			name: "default pseudo-tag does not warn",
+			config: `
+				contexts: {
+					env: {
+						required: true
+						prompt: "Environment"
+					}
+				}
+			`,
+			selection: ContextSelection{
+				IncludeRequired: true,
+				Tags:            []string{"default"},
+			},
+			wantPrompt:  "Environment",
+			wantCtxs:    []string{"env"},
+			wantWarning: false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -176,6 +256,12 @@ func TestComposer_Compose(t *testing.T) {
 						t.Errorf("Contexts[%d] = %q, want %q", i, gotCtxs[i], name)
 					}
 				}
+			}
+
+			// Check warnings
+			hasWarning := len(result.Warnings) > 0
+			if hasWarning != tt.wantWarning {
+				t.Errorf("Warnings present = %v, want %v (warnings: %v)", hasWarning, tt.wantWarning, result.Warnings)
 			}
 		})
 	}
@@ -512,10 +598,10 @@ func TestComposer_ResolveContext_Errors(t *testing.T) {
 	ctx := cuecontext.New()
 
 	tests := []struct {
-		name       string
-		config     string
+		name        string
+		config      string
 		contextName string
-		wantErr    string
+		wantErr     string
 	}{
 		{
 			name: "context not found",
