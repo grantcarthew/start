@@ -95,6 +95,28 @@ func (c *Composer) Compose(cfg cue.Value, selection ContextSelection, customText
 		return result, fmt.Errorf("selecting contexts: %w", err)
 	}
 
+	// Check for tags that matched no contexts
+	for _, tag := range selection.Tags {
+		if tag == "default" {
+			continue // pseudo-tag, handled separately
+		}
+		matched := false
+		for _, ctx := range contexts {
+			for _, ctxTag := range ctx.Tags {
+				if ctxTag == tag {
+					matched = true
+					break
+				}
+			}
+			if matched {
+				break
+			}
+		}
+		if !matched {
+			result.Warnings = append(result.Warnings, fmt.Sprintf("tag %q matched no contexts", tag))
+		}
+	}
+
 	// Resolve each context through UTD
 	var promptParts []string
 	for _, ctx := range contexts {

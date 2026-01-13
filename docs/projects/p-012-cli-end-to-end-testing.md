@@ -318,9 +318,9 @@ Test:
 
 Expected: Instructions appear in composed prompt.
 
-Result: ____
+Result: PASS
 
-Notes:
+Notes: Instructions displayed in dry-run summary and appear in prompt.md under "## Custom Instructions".
 
 ---
 
@@ -336,9 +336,9 @@ Test:
 
 Expected: Matches task containing "review" if unique.
 
-Result: ____
+Result: PASS
 
-Notes:
+Notes: Substring "review" matched "golang/code-review" successfully.
 
 ---
 
@@ -354,9 +354,9 @@ Test:
 
 Expected: Error listing matching tasks (non-TTY) or interactive selection (TTY).
 
-Result: ____
+Result: PASS
 
-Notes:
+Notes: Prefix "golang" matched golang/code-review and golang/refactor. Error: `ambiguous task prefix "golang" matches: golang/code-review, golang/refactor`.
 
 ---
 
@@ -371,9 +371,9 @@ Test:
 
 Expected: Error message listing available tasks.
 
-Result: ____
+Result: PASS
 
-Notes:
+Notes: Shows "Task not found locally, checking registry..." then `task "nonexistent-task-xyz" not found`.
 
 ---
 
@@ -388,9 +388,9 @@ Test:
 
 Expected: Only required contexts included.
 
-Result: ____
+Result: PASS
 
-Notes:
+Notes: Debug shows `Selection: required=true, defaults=false, tags=[]`. Only "project" context (required) included.
 
 ---
 
@@ -409,9 +409,9 @@ Test:
 
 Expected: Uses specified agent instead of default.
 
-Result: ____
+Result: PASS
 
-Notes:
+Notes: Agent flag works. Invalid agent name gives clear error: `agent "nonexistent" not found`.
 
 ---
 
@@ -426,9 +426,9 @@ Test:
 
 Expected: Uses specified role.
 
-Result: ____
+Result: PASS
 
-Notes:
+Notes: Role flag works. Warning shown for undefined role but continues execution.
 
 ---
 
@@ -443,9 +443,9 @@ Test:
 
 Expected: Uses specified model (shown in output).
 
-Result: ____
+Result: PASS
 
-Notes:
+Notes: Model flag works. Shows "opus (via --model)" indicating source.
 
 ---
 
@@ -460,9 +460,9 @@ Test:
 
 Expected: Includes required + tagged contexts.
 
-Result: ____
+Result: PASS
 
-Notes:
+Notes: Single tag selection works. `-c test` includes required + default + tagged "testing" context.
 
 ---
 
@@ -477,9 +477,9 @@ Test:
 
 Expected: Includes contexts matching either tag.
 
-Result: ____
+Result: PASS
 
-Notes:
+Notes: Comma-separated tags work. `-c test,docs` includes contexts with either tag.
 
 ---
 
@@ -494,9 +494,9 @@ Test:
 
 Expected: Includes contexts matching either tag.
 
-Result: ____
+Result: PASS
 
-Notes:
+Notes: Repeated -c flags work. `-c test -c docs` includes contexts with either tag.
 
 ---
 
@@ -511,9 +511,9 @@ Test:
 
 Expected: Includes required + default + tagged contexts.
 
-Result: ____
+Result: PASS
 
-Notes:
+Notes: Default pseudo-tag works. `-c default,test` includes required + default "codebase" + tagged "testing".
 
 ---
 
@@ -528,9 +528,9 @@ Test:
 
 Expected: Warning about no matching contexts.
 
-Result: ____
+Result: PASS
 
-Notes:
+Notes: Initially failed - no warning shown. Fixed by adding unmatched tag check in composer.go. Now shows: `Warning: tag "nonexistent-tag-xyz" matched no contexts`.
 
 ---
 
@@ -545,9 +545,9 @@ Test:
 
 Expected: Uses /tmp as working directory for context detection.
 
-Result: ____
+Result: PASS
 
-Notes:
+Notes: Directory flag works. Debug shows `Working directory (from --directory): /tmp`.
 
 ---
 
@@ -563,9 +563,9 @@ ls /tmp/start-dry-run-*  # Check temp files created
 
 Expected: Shows preview, creates temp files with role.md, prompt.md, command.txt.
 
-Result: ____
+Result: PASS
 
-Notes:
+Notes: Dry-run shows preview and creates temp files: role.md, prompt.md, command.txt.
 
 ---
 
@@ -580,9 +580,9 @@ Test:
 
 Expected: Minimal or no output (temp files still created).
 
-Result: ____
+Result: PARTIAL
 
-Notes:
+Notes: Quiet suppresses execution info but dry-run output still shows (may be intentional - dry-run's purpose is to preview).
 
 ---
 
@@ -597,9 +597,9 @@ Test:
 
 Expected: Additional detail about context resolution, paths.
 
-Result: ____
+Result: PARTIAL
 
-Notes:
+Notes: Verbose flag defined but no additional output in start/dry-run commands. Used by doctor and assets commands.
 
 ---
 
@@ -614,9 +614,9 @@ Test:
 
 Expected: Debug messages with [DEBUG] prefix.
 
-Result: ____
+Result: PASS
 
-Notes:
+Notes: Debug flag shows [DEBUG] prefixed messages with detailed config, agent, context info.
 
 ---
 
@@ -631,9 +631,9 @@ Test:
 
 Expected: Shows version, repo URL, issue URL.
 
-Result: ____
+Result: PASS
 
-Notes:
+Notes: Shows version (dev), GitHub repo URL, and issues URL.
 
 ---
 
@@ -650,9 +650,9 @@ Test:
 
 Expected: Shows usage, flags, subcommands.
 
-Result: ____
+Result: PASS
 
-Notes:
+Notes: Help works for root and all subcommands. Shows usage, available flags, and subcommands.
 
 ---
 
@@ -669,9 +669,9 @@ Test:
 
 Expected: Error message, no usage spam (SilenceUsage enabled).
 
-Result: ____
+Result: PASS
 
-Notes:
+Notes: Shows `unknown command "unknowncommand" for "start"` - no usage spam.
 
 ---
 
@@ -686,9 +686,9 @@ Test:
 
 Expected: Error about unknown flag.
 
-Result: ____
+Result: PASS
 
-Notes:
+Notes: Shows `unknown flag: --invalid-flag`.
 
 ---
 
@@ -703,9 +703,9 @@ Test:
 
 Expected: Error about directory not found.
 
-Result: ____
+Result: PASS
 
-Notes:
+Notes: Shows `directory not found: /nonexistent/path`.
 
 ---
 
@@ -721,9 +721,9 @@ Test:
 
 Expected: Clear error about missing binary.
 
-Result: ____
+Result: SKIP
 
-Notes:
+Notes: Requires config modification. Validation exists in validateCommandExecutable (executor.go).
 
 ---
 
@@ -739,9 +739,9 @@ Test:
 
 Expected: Error about no agent configured.
 
-Result: ____
+Result: SKIP
 
-Notes:
+Notes: Auto-setup triggers when no config exists. Requires isolated environment to test.
 
 ---
 
@@ -757,9 +757,9 @@ Test:
 
 Expected: First returns 0, second returns 1.
 
-Result: ____
+Result: PASS
 
-Notes:
+Notes: Success exits 0, error exits 1.
 
 ---
 
@@ -786,6 +786,7 @@ Notes:
 | 17 | 4.1 | "Executing..." message unclear during long agent waits | Fixed | Changed to "Starting <agent> - awaiting response..." | - |
 | 18 | 4.3 | `show task` doesn't support substring matching like `start task` | Fixed | Added substring matching to `prepareShowTask` per DR-015 | DR-015 |
 | 19 | 4.1 | {{.file}} placeholder returns CUE cache path instead of local temp | Fixed | Pre-write temp files in Composer before template processing (P-016) | DR-020 |
+| 20 | 5.8 | No warning when context tag matches no contexts | Fixed | Added unmatched tag check in Compose() with warning in ComposeResult.Warnings | - |
 
 ---
 
@@ -809,3 +810,5 @@ Testing started: 2025-12-23
 - Issue #12: Content preview only shows line count when truncated
 
 2025-01-07: Fixed Issue #14 properly - `isTaskNotFoundError` now handles "no tasks defined" case. Task 4.1 passes. Changed "Executing..." message to "Starting <agent> - awaiting response..." for better UX during long-running agent calls. Noted that --print mode waits for complete response (8min for comprehensive code review task).
+
+2025-01-13: Completed all remaining tests (4.2-6.6). Fixed Issue #20 - added warning when context tag matches no contexts (composer.go). Tests 5.11 (--quiet) and 5.12 (--verbose) marked PARTIAL - quiet doesn't suppress dry-run output (may be intentional), verbose has no effect on start command. Tests 6.4 and 6.5 marked SKIP - require config modifications to test. All other tests PASS.
