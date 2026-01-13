@@ -12,10 +12,9 @@ Avoid references to the prototype in new documentation. This is a new design.
 
 Projects are stored in the `docs/projects/` directory. Continue by reading the active project.
 
-Active Project: `docs/projects/p-012-cli-end-to-end-testing.md` (Core Commands Testing)
+Active Project: `docs/projects/p-013-cli-configuration-testing.md` (Configuration Testing)
 
 Other Projects (paused):
-- `docs/projects/p-013-cli-configuration-testing.md` (Configuration)
 - `docs/projects/p-014-cli-supporting-commands-testing.md` (Assets, Doctor, Completion)
 
 Project Workflow:
@@ -155,7 +154,8 @@ The `./Context` directory contains cloned source code and documentation for deve
 - P-011: CLI Refinements (command naming, exit codes)
 - P-015: Schema Base and Origin Tracking (#Base schema, origin field for registry provenance)
 - P-016: File Placeholder Temp Path ({{.file}} now uses .start/temp/ instead of CUE cache path)
+- P-012: CLI Core Commands Testing (start, prompt, task commands, global flags, error handling)
 
-**Current:** P-012/P-013/P-014: CLI End-to-End Testing (Core, Configuration, Supporting Commands)
+**Current:** P-013/P-014: CLI End-to-End Testing (Configuration, Supporting Commands)
 
 The prototype validated that this tool solves a real problem. This version will implement it properly.

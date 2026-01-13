@@ -102,7 +102,7 @@ Note: The `init` command was replaced by auto-setup (DR-018). The CLI now uses a
 |------|-------|--------|------|------|--------|--------|--------|------------|
 | `--help` | Y | Y | Y | Y | Y | Y | Y | Y |
 | `--version` | Y | Y | Y | Y | Y | Y | Y | Y |
-| `--verbose` | Y | Y | Y | Y | Y | Y | Y | - |
+| `--verbose` | - | - | - | - | - | Y | Y | - |
 | `--debug` | Y | Y | Y | Y | Y | Y | Y | - |
 | `--quiet` | Y | Y | Y | Y | Y | Y | Y | - |
 | `--agent` | Y | Y | Y | Y | - | - | - | - |
@@ -159,9 +159,10 @@ Quiet flag (`--quiet`, `-q`):
 
 Verbose flag (`--verbose`):
 
-- Shows detailed operation information
-- Config resolution, file paths, sizes
-- Useful for understanding behavior
+- Shows supplementary metadata (scope, source, tags)
+- Applies to commands with displayable metadata: `assets`, `doctor`
+- No effect on execution commands (`start`, `prompt`, `task`) - use `--debug` for operational detail
+- Useful for understanding where assets came from
 
 Debug flag (`--debug`):
 
@@ -212,3 +213,4 @@ All commands return 0 on success, 1 on any error. The error message printed to s
 ## Updates
 
 - 2025-12-22: Added Exit Codes section defining unified 0/1 policy
+- 2026-01-13: Clarified --verbose flag scope - applies only to assets/doctor commands, not execution commands

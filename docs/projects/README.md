@@ -12,7 +12,6 @@ See [p-writing-guide.md](./p-writing-guide.md) for guidelines on creating and ma
 
 | Project | Title | Started |
 |---------|-------|---------|
-| [P-012](./p-012-cli-end-to-end-testing.md) | CLI Core Commands Testing | 2025-12-23 |
 | [P-013](./p-013-cli-configuration-testing.md) | CLI Configuration Testing | - |
 | [P-014](./p-014-cli-supporting-commands-testing.md) | CLI Supporting Commands Testing | - |
 
@@ -33,12 +32,21 @@ See [p-writing-guide.md](./p-writing-guide.md) for guidelines on creating and ma
 | [P-011](./completed/p-011-cli-refinements.md) | CLI Refinements | 2025-12-22 |
 | [P-015](./completed/p-015-schema-base-origin-tracking.md) | Schema Base and Origin Tracking | 2026-01-05 |
 | [P-016](./completed/p-016-file-placeholder-temp-path.md) | File Placeholder Temp Path | 2026-01-13 |
+| [P-012](./completed/p-012-cli-end-to-end-testing.md) | CLI Core Commands Testing | 2026-01-13 |
 
 ---
 
 ## Project Overview
 
 ### Completed
+
+#### P-012: CLI Core Commands Testing
+
+End-to-end testing of CLI core commands (start, prompt, task) from a user's perspective. Tested first-run experience, global flags, and error handling. Fixed 20 issues discovered during testing.
+
+**Key Deliverables:** Completed test checklist, fixed issues, DR-012 updated for --verbose scope
+
+**Dependencies:** All prior projects
 
 #### P-016: File Placeholder Temp Path
 
