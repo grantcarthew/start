@@ -1,6 +1,7 @@
 package orchestration
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -617,4 +618,218 @@ func TestComposer_ResolveRole_Errors(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestComposer_ResolveTask_TempFile(t *testing.T) {
+	ctx := cuecontext.New()
+	tmpDir := t.TempDir()
+
+	// Create a source file (simulating CUE cache or local file)
+	sourceDir := filepath.Join(tmpDir, "cache")
+	if err := os.MkdirAll(sourceDir, 0755); err != nil {
+		t.Fatalf("creating source dir: %v", err)
+	}
+	sourceFile := filepath.Join(sourceDir, "task.md")
+	if err := os.WriteFile(sourceFile, []byte("Task content here"), 0644); err != nil {
+		t.Fatalf("writing source file: %v", err)
+	}
+
+	config := fmt.Sprintf(`
+		tasks: {
+			"test-task": {
+				file: %q
+				prompt: "Read {{.file}} for instructions."
+			}
+		}
+	`, sourceFile)
+
+	cfg := ctx.CompileString(config)
+	if err := cfg.Err(); err != nil {
+		t.Fatalf("compile config: %v", err)
+	}
+
+	processor := NewTemplateProcessor(nil, nil, tmpDir)
+	composer := NewComposer(processor, tmpDir)
+
+	result, err := composer.ResolveTask(cfg, "test-task", "")
+	if err != nil {
+		t.Fatalf("ResolveTask() error = %v", err)
+	}
+
+	// Verify temp file was created
+	expectedTempPath := filepath.Join(tmpDir, ".start", "temp", "task-test-task.md")
+	if result.TempFile != expectedTempPath {
+		t.Errorf("TempFile = %q, want %q", result.TempFile, expectedTempPath)
+	}
+
+	// Verify temp file exists and has correct content
+	content, err := os.ReadFile(result.TempFile)
+	if err != nil {
+		t.Fatalf("reading temp file: %v", err)
+	}
+	if string(content) != "Task content here" {
+		t.Errorf("temp file content = %q, want %q", string(content), "Task content here")
+	}
+
+	// Verify {{.file}} in prompt was resolved to temp path
+	if !strings.Contains(result.Content, ".start/temp/task-test-task.md") {
+		t.Errorf("Content should contain temp path, got: %s", result.Content)
+	}
+}
+
+func TestComposer_ResolveTask_TempFile_WithSlashInName(t *testing.T) {
+	ctx := cuecontext.New()
+	tmpDir := t.TempDir()
+
+	sourceFile := filepath.Join(tmpDir, "task.md")
+	if err := os.WriteFile(sourceFile, []byte("Nested task content"), 0644); err != nil {
+		t.Fatalf("writing source file: %v", err)
+	}
+
+	config := fmt.Sprintf(`
+		tasks: {
+			"start/create-task": {
+				file: %q
+				prompt: "Read {{.file}} for instructions."
+			}
+		}
+	`, sourceFile)
+
+	cfg := ctx.CompileString(config)
+	if err := cfg.Err(); err != nil {
+		t.Fatalf("compile config: %v", err)
+	}
+
+	processor := NewTemplateProcessor(nil, nil, tmpDir)
+	composer := NewComposer(processor, tmpDir)
+
+	result, err := composer.ResolveTask(cfg, "start/create-task", "")
+	if err != nil {
+		t.Fatalf("ResolveTask() error = %v", err)
+	}
+
+	// Verify filename derivation handles slashes (converted to dashes)
+	expectedTempPath := filepath.Join(tmpDir, ".start", "temp", "task-start-create-task.md")
+	if result.TempFile != expectedTempPath {
+		t.Errorf("TempFile = %q, want %q", result.TempFile, expectedTempPath)
+	}
+}
+
+func TestComposer_ResolveTask_NoFile_NoTempFile(t *testing.T) {
+	ctx := cuecontext.New()
+	tmpDir := t.TempDir()
+
+	config := `
+		tasks: {
+			"prompt-only": {
+				prompt: "This task has no file."
+			}
+		}
+	`
+
+	cfg := ctx.CompileString(config)
+	if err := cfg.Err(); err != nil {
+		t.Fatalf("compile config: %v", err)
+	}
+
+	processor := NewTemplateProcessor(nil, nil, tmpDir)
+	composer := NewComposer(processor, tmpDir)
+
+	result, err := composer.ResolveTask(cfg, "prompt-only", "")
+	if err != nil {
+		t.Fatalf("ResolveTask() error = %v", err)
+	}
+
+	// Verify no temp file for prompt-only tasks
+	if result.TempFile != "" {
+		t.Errorf("TempFile should be empty for prompt-only task, got %q", result.TempFile)
+	}
+}
+
+func TestComposer_ResolveContext_TempFile(t *testing.T) {
+	ctx := cuecontext.New()
+	tmpDir := t.TempDir()
+
+	sourceFile := filepath.Join(tmpDir, "context.md")
+	if err := os.WriteFile(sourceFile, []byte("Context content"), 0644); err != nil {
+		t.Fatalf("writing source file: %v", err)
+	}
+
+	config := fmt.Sprintf(`
+		contexts: {
+			"project-info": {
+				required: true
+				file: %q
+			}
+		}
+	`, sourceFile)
+
+	cfg := ctx.CompileString(config)
+	if err := cfg.Err(); err != nil {
+		t.Fatalf("compile config: %v", err)
+	}
+
+	processor := NewTemplateProcessor(nil, nil, tmpDir)
+	composer := NewComposer(processor, tmpDir)
+
+	result, err := composer.resolveContext(cfg, "project-info")
+	if err != nil {
+		t.Fatalf("resolveContext() error = %v", err)
+	}
+
+	// Verify temp file was created
+	expectedTempPath := filepath.Join(tmpDir, ".start", "temp", "context-project-info.md")
+	if result.TempFile != expectedTempPath {
+		t.Errorf("TempFile = %q, want %q", result.TempFile, expectedTempPath)
+	}
+
+	// Verify content
+	if result.Content != "Context content" {
+		t.Errorf("Content = %q, want %q", result.Content, "Context content")
+	}
+}
+
+func TestComposer_resolveFileToTemp(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Create source file
+	sourceFile := filepath.Join(tmpDir, "source.md")
+	if err := os.WriteFile(sourceFile, []byte("Source content"), 0644); err != nil {
+		t.Fatalf("writing source file: %v", err)
+	}
+
+	processor := NewTemplateProcessor(nil, nil, tmpDir)
+	composer := NewComposer(processor, tmpDir)
+
+	t.Run("creates temp file with correct content", func(t *testing.T) {
+		tempPath, err := composer.resolveFileToTemp("task", "test", sourceFile)
+		if err != nil {
+			t.Fatalf("resolveFileToTemp() error = %v", err)
+		}
+
+		content, err := os.ReadFile(tempPath)
+		if err != nil {
+			t.Fatalf("reading temp file: %v", err)
+		}
+		if string(content) != "Source content" {
+			t.Errorf("content = %q, want %q", string(content), "Source content")
+		}
+	})
+
+	t.Run("returns empty string for empty path", func(t *testing.T) {
+		tempPath, err := composer.resolveFileToTemp("task", "test", "")
+		if err != nil {
+			t.Fatalf("resolveFileToTemp() error = %v", err)
+		}
+		if tempPath != "" {
+			t.Errorf("tempPath = %q, want empty", tempPath)
+		}
+	})
+
+	t.Run("returns error for nonexistent file", func(t *testing.T) {
+		_, err := composer.resolveFileToTemp("task", "test", "/nonexistent/file.md")
+		if err == nil {
+			t.Error("expected error for nonexistent file")
+		}
+	})
 }

@@ -90,6 +90,9 @@ func NewTemplateProcessor(fr FileReader, sr ShellRunner, workingDir string) *Tem
 type ProcessResult struct {
 	// Content is the rendered template output.
 	Content string
+	// TempFile is the path to the temp file created for {{.file}} placeholder.
+	// Only set when the source was file-based and temp file was created.
+	TempFile string
 	// FileRead indicates whether a file was read.
 	FileRead bool
 	// CommandExecuted indicates whether a command was executed.
