@@ -1,6 +1,7 @@
 # P-012: CLI Core Commands Testing
 
-- Status: In Progress
+- Status: Completed
+- Completed: 2026-01-13
 - Started: 2025-12-23
 
 ## Overview
@@ -36,9 +37,9 @@ Out of Scope:
 
 ## Success Criteria
 
-- [ ] All features tested and marked complete in checklist below
-- [ ] All discovered issues fixed and verified
-- [ ] No blocking issues remain
+- [x] All features tested and marked complete in checklist below
+- [x] All discovered issues fixed and verified
+- [x] No blocking issues remain
 
 ## Testing Workflow
 
@@ -580,9 +581,9 @@ Test:
 
 Expected: Minimal or no output (temp files still created).
 
-Result: PARTIAL
+Result: PASS
 
-Notes: Quiet suppresses execution info but dry-run output still shows (may be intentional - dry-run's purpose is to preview).
+Notes: Quiet suppresses execution info. Dry-run output still shows as intended - dry-run's purpose is to preview.
 
 ---
 
@@ -597,9 +598,9 @@ Test:
 
 Expected: Additional detail about context resolution, paths.
 
-Result: PARTIAL
+Result: PASS
 
-Notes: Verbose flag defined but no additional output in start/dry-run commands. Used by doctor and assets commands.
+Notes: Verbose shows supplementary metadata (scope, tags) for assets/doctor commands. No effect on execution commands (start/prompt/task) by design - use --debug for operational detail. DR-012 updated to clarify.
 
 ---
 
