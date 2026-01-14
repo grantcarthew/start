@@ -10,17 +10,17 @@ Avoid references to the prototype in new documentation. This is a new design.
 
 ### Active Project
 
-Projects are stored in the `docs/projects/` directory. Continue by reading the active project.
+Projects are stored in `.ai/projects/`. Continue by reading the active project.
 
-Active Project: `docs/projects/p-017-cli-config-edit-flags.md` (Config Edit Flags)
+Active Project: `.ai/projects/p-017-cli-config-edit-flags.md` (Config Edit Flags)
 
 Other Projects (paused):
-- `docs/projects/p-013-cli-configuration-testing.md` (Configuration Testing - blocked on P-017)
-- `docs/projects/p-014-cli-supporting-commands-testing.md` (Assets, Doctor, Completion)
+- `.ai/projects/p-013-cli-configuration-testing.md` (Configuration Testing - blocked on p-017)
+- `.ai/projects/p-014-cli-supporting-commands-testing.md` (Assets, Doctor, Completion)
 
 Project Workflow:
-- Active projects are in `docs/projects/`
-- When a project is complete, move it to `docs/projects/completed/`
+- Active projects are in `.ai/projects/`
+- When a project is complete, move it to `.ai/projects/completed/`
 - Update this file to point to the next active project
 - Update the Development Status section below
 
@@ -77,11 +77,15 @@ The prototype explored the design space and validated the core concepts. Key arc
 
 ## Documentation
 
-Documentation will be structured as:
+Documentation is structured as:
 
-- `docs/design/` - Design decisions and architecture (Design Records)
+- `.ai/` - AI agent working files (projects, design records, tasks)
+- `.ai/design/` - Design decisions and architecture (Design Records)
+- `.ai/projects/` - Project documents
+- `.ai/tasks/` - Task prompts
+- `docs/` - Human-facing documentation
+- `docs/cli/` - Command reference
 - `docs/cue/` - CUE schema reference and examples
-- `docs/cli/` - Command reference (adapted from prototype)
 
 The prototype's CLI documentation (`../start-prototype/docs/cli/*.md`) provides a starting point for the user interface, though commands will evolve as CUE capabilities are integrated.
 
@@ -89,19 +93,19 @@ The prototype's CLI documentation (`../start-prototype/docs/cli/*.md`) provides 
 
 This project uses Document Driven Development. Design decisions are documented in Design Records (DRs) before implementation.
 
-**Location:** `docs/design/design-records/`
+**Location:** `.ai/design/design-records/`
 
 **Process:**
 
 - Create DRs for architectural decisions, algorithms, breaking changes, API/CLI structure
-- Get next DR number from `docs/design/design-records/README.md`
+- Get next DR number from `.ai/design/design-records/README.md`
 - Follow reconciliation process after 5-10 DRs
 
-Design Records will start fresh at DR-001, as the CUE architecture is fundamentally different from the prototype.
+Design Records will start fresh at dr-001, as the CUE architecture is fundamentally different from the prototype.
 
 ## Testing
 
-When implementing code, ensure it is testable. Read `docs/design/design-records/dr-024-testing-strategy.md` for the testing approach.
+When implementing code, ensure it is testable. Read `.ai/design/design-records/dr-024-testing-strategy.md` for the testing approach.
 
 Key principles:
 
@@ -142,21 +146,21 @@ The `./Context` directory contains cloned source code and documentation for deve
 
 **Completed:**
 
-- P-001: CUE Foundation & Architecture (schemas designed and published)
-- P-002: Concrete Assets Validation (17 modules published to CUE Central Registry)
-- P-003: Registry Distribution (20 modules published, prototype comparison documented)
-- P-004: Minimal CLI Implementation (CUE loading, show command, global flags)
-- P-005: Orchestration Core Engine (template processing, shell execution, composition, CLI commands)
-- P-006: Auto-Setup (registry interaction, agent detection, TTY prompts, config writing)
-- P-007: Package Management (assets commands for browsing/installing registry packages)
-- P-008: Configuration Editing (config agent/role/context/task/settings commands)
-- P-009: Doctor Diagnostics (health checks, configuration validation, fix suggestions)
-- P-010: Shell Completion (bash, zsh, fish tab-completion, documentation guides)
-- P-011: CLI Refinements (command naming, exit codes)
-- P-015: Schema Base and Origin Tracking (#Base schema, origin field for registry provenance)
-- P-016: File Placeholder Temp Path ({{.file}} now uses .start/temp/ instead of CUE cache path)
-- P-012: CLI Core Commands Testing (start, prompt, task commands, global flags, error handling)
+- p-001: CUE Foundation & Architecture (schemas designed and published)
+- p-002: Concrete Assets Validation (17 modules published to CUE Central Registry)
+- p-003: Registry Distribution (20 modules published, prototype comparison documented)
+- p-004: Minimal CLI Implementation (CUE loading, show command, global flags)
+- p-005: Orchestration Core Engine (template processing, shell execution, composition, CLI commands)
+- p-006: Auto-Setup (registry interaction, agent detection, TTY prompts, config writing)
+- p-007: Package Management (assets commands for browsing/installing registry packages)
+- p-008: Configuration Editing (config agent/role/context/task/settings commands)
+- p-009: Doctor Diagnostics (health checks, configuration validation, fix suggestions)
+- p-010: Shell Completion (bash, zsh, fish tab-completion, documentation guides)
+- p-011: CLI Refinements (command naming, exit codes)
+- p-015: Schema Base and Origin Tracking (#Base schema, origin field for registry provenance)
+- p-016: File Placeholder Temp Path ({{.file}} now uses .start/temp/ instead of CUE cache path)
+- p-012: CLI Core Commands Testing (start, prompt, task commands, global flags, error handling)
 
-**Current:** P-013/P-014: CLI End-to-End Testing (Configuration, Supporting Commands)
+**Current:** p-013/p-014: CLI End-to-End Testing (Configuration, Supporting Commands)
 
 The prototype validated that this tool solves a real problem. This version will implement it properly.
