@@ -12,10 +12,9 @@ Avoid references to the prototype in new documentation. This is a new design.
 
 Projects are stored in `.ai/projects/`. Continue by reading the active project.
 
-Active Project: `.ai/projects/p-017-cli-config-edit-flags.md` (Config Edit Flags)
+Active Project: `.ai/projects/p-013-cli-configuration-testing.md` (Configuration Testing)
 
 Other Projects (paused):
-- `.ai/projects/p-013-cli-configuration-testing.md` (Configuration Testing - blocked on p-017)
 - `.ai/projects/p-014-cli-supporting-commands-testing.md` (Assets, Doctor, Completion)
 
 Project Workflow:
@@ -160,6 +159,7 @@ The `./Context` directory contains cloned source code and documentation for deve
 - p-015: Schema Base and Origin Tracking (#Base schema, origin field for registry provenance)
 - p-016: File Placeholder Temp Path ({{.file}} now uses .start/temp/ instead of CUE cache path)
 - p-012: CLI Core Commands Testing (start, prompt, task commands, global flags, error handling)
+- p-017: CLI Config Edit Flags (non-interactive flag-based editing for config edit commands)
 
 **Current:** p-013/p-014: CLI End-to-End Testing (Configuration, Supporting Commands)
 

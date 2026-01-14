@@ -8,6 +8,16 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// anyFlagChanged returns true if any of the named flags were explicitly set.
+func anyFlagChanged(cmd *cobra.Command, names ...string) bool {
+	for _, name := range names {
+		if cmd.Flags().Changed(name) {
+			return true
+		}
+	}
+	return false
+}
+
 // addConfigCommand adds the config command group and its subcommands to the parent.
 func addConfigCommand(parent *cobra.Command) {
 	configCmd := &cobra.Command{
