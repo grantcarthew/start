@@ -12,9 +12,10 @@ Avoid references to the prototype in new documentation. This is a new design.
 
 Projects are stored in the `docs/projects/` directory. Continue by reading the active project.
 
-Active Project: `docs/projects/p-013-cli-configuration-testing.md` (Configuration Testing)
+Active Project: `docs/projects/p-017-cli-config-edit-flags.md` (Config Edit Flags)
 
 Other Projects (paused):
+- `docs/projects/p-013-cli-configuration-testing.md` (Configuration Testing - blocked on P-017)
 - `docs/projects/p-014-cli-supporting-commands-testing.md` (Assets, Doctor, Completion)
 
 Project Workflow:

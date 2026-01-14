@@ -79,9 +79,9 @@ Test:
 
 Expected: Lists agents with names, shows which is default.
 
-Result: ____
+Result: PASS
 
-Notes:
+Notes: Shows agents with * indicator for default, includes (global) source.
 
 ---
 
@@ -98,9 +98,9 @@ Test:
 
 Expected: Agent added, appears in list, then removed.
 
-Result: ____
+Result: PASS
 
-Notes:
+Notes: Agent added successfully, appeared in list, removed with --yes flag.
 
 ---
 
@@ -116,9 +116,9 @@ Test:
 
 Expected: Prompts for required fields (name, bin, command).
 
-Result: ____
+Result: SKIP
 
-Notes:
+Notes: Requires TTY for interactive prompts.
 
 ---
 
@@ -133,9 +133,9 @@ Test:
 
 Expected: Shows all agent fields (bin, command, models, default_model, description).
 
-Result: ____
+Result: PASS
 
-Notes:
+Notes: Shows Source, Bin, Command, Default Model, Description, and Models list.
 
 ---
 
@@ -151,9 +151,9 @@ Test:
 
 Expected: Shows current values, allows changes.
 
-Result: ____
+Result: SKIP
 
-Notes:
+Notes: Requires TTY for interactive prompts.
 
 ---
 
@@ -168,9 +168,9 @@ EDITOR=cat ./start config agent edit
 
 Expected: Opens agents.cue file content.
 
-Result: ____
+Result: PASS
 
-Notes:
+Notes: Opens agents.cue content in $EDITOR with full CUE structure.
 
 ---
 
@@ -188,9 +188,9 @@ Test:
 
 Expected: Agent updated, change visible in info.
 
-Result: ____
+Result: FAIL
 
-Notes:
+Notes: Flag-based editing not implemented. Edit command only supports interactive prompts or $EDITOR mode. Created P-017 to implement this feature.
 
 ---
 
@@ -1024,6 +1024,7 @@ Notes:
 
 | ID | Feature | Description | Status | Fix | DR |
 |----|---------|-------------|--------|-----|-----|
+| 1 | 1.7 | Flag-based editing not implemented for edit commands | Open | P-017 | - |
 
 ---
 
