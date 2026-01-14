@@ -15,6 +15,7 @@ See [p-writing-guide.md](./p-writing-guide.md) for guidelines on creating and ma
 | [p-013](./p-013-cli-configuration-testing.md) | CLI Configuration Testing | - |
 | [p-014](./p-014-cli-supporting-commands-testing.md) | CLI Supporting Commands Testing | - |
 | [p-017](./p-017-cli-config-edit-flags.md) | CLI Config Edit Flags | - |
+| [p-018](./p-018-cli-interactive-edit-completeness.md) | CLI Interactive Edit Completeness | - |
 
 ### Completed Projects
 
