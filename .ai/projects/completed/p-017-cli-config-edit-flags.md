@@ -1,7 +1,8 @@
 # p-017: CLI Config Edit Flags
 
-- Status: In Progress
+- Status: Complete
 - Started: 2026-01-14
+- Completed: 2026-01-14
 
 ## Overview
 
@@ -73,14 +74,14 @@ Out of Scope:
 
 ## Success Criteria
 
-- [ ] `config agent edit <name> --bin <value>` updates agent bin field
-- [ ] `config role edit <name> --prompt <value>` updates role prompt
-- [ ] `config context edit <name> --file <value>` updates context file
-- [ ] `config task edit <name> --prompt <value>` updates task prompt
-- [ ] Multiple flags can be combined in single edit
-- [ ] Flags match those available on `add` commands (excluding `--name`)
-- [ ] Non-TTY without flags errors (existing behavior preserved)
-- [ ] TTY without flags falls back to interactive prompts (existing behavior preserved)
+- [x] `config agent edit <name> --bin <value>` updates agent bin field
+- [x] `config role edit <name> --prompt <value>` updates role prompt
+- [x] `config context edit <name> --file <value>` updates context file
+- [x] `config task edit <name> --prompt <value>` updates task prompt
+- [x] Multiple flags can be combined in single edit
+- [x] Flags match those available on `add` commands (excluding `--name`)
+- [x] Non-TTY without flags errors (existing behavior preserved)
+- [x] TTY without flags falls back to interactive prompts (existing behavior preserved)
 - [ ] p-013 test 1.7 passes after implementation
 
 ## Technical Approach

@@ -382,10 +382,22 @@ func addConfigRoleEditCommand(parent *cobra.Command) {
 		Long: `Edit role configuration.
 
 Without a name, opens the roles.cue file in $EDITOR.
-With a name, provides interactive prompts to modify the role.`,
+With a name and flags, updates only the specified fields.
+With a name and no flags in a terminal, provides interactive prompts.
+
+Examples:
+  start config role edit
+  start config role edit go-expert --description "Go programming expert"
+  start config role edit reviewer --prompt "You are a code reviewer"`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: runConfigRoleEdit,
 	}
+
+	editCmd.Flags().String("description", "", "Description")
+	editCmd.Flags().String("file", "", "Path to role prompt file")
+	editCmd.Flags().String("command", "", "Command to generate prompt")
+	editCmd.Flags().String("prompt", "", "Inline prompt text")
+	editCmd.Flags().StringSlice("tag", nil, "Tags")
 
 	parent.AddCommand(editCmd)
 }
@@ -412,19 +424,10 @@ func runConfigRoleEdit(cmd *cobra.Command, args []string) error {
 		return openInEditor(rolePath)
 	}
 
-	// Named edit: interactive modification
+	// Named edit
 	name := args[0]
 	stdin := cmd.InOrStdin()
 	stdout := cmd.OutOrStdout()
-
-	// Check if interactive
-	isTTY := false
-	if f, ok := stdin.(*os.File); ok {
-		isTTY = term.IsTerminal(int(f.Fd()))
-	}
-	if !isTTY {
-		return fmt.Errorf("interactive editing requires a terminal")
-	}
 
 	// Load existing roles
 	roles, err := loadRolesFromDir(configDir)
@@ -435,6 +438,49 @@ func runConfigRoleEdit(cmd *cobra.Command, args []string) error {
 	role, exists := roles[name]
 	if !exists {
 		return fmt.Errorf("role %q not found in %s config", name, scopeString(local))
+	}
+
+	// Check if any edit flags are provided
+	hasEditFlags := anyFlagChanged(cmd, "description", "file", "command", "prompt", "tag")
+
+	if hasEditFlags {
+		// Non-interactive flag-based update
+		if cmd.Flags().Changed("description") {
+			role.Description, _ = cmd.Flags().GetString("description")
+		}
+		if cmd.Flags().Changed("file") {
+			role.File, _ = cmd.Flags().GetString("file")
+		}
+		if cmd.Flags().Changed("command") {
+			role.Command, _ = cmd.Flags().GetString("command")
+		}
+		if cmd.Flags().Changed("prompt") {
+			role.Prompt, _ = cmd.Flags().GetString("prompt")
+		}
+		if cmd.Flags().Changed("tag") {
+			role.Tags, _ = cmd.Flags().GetStringSlice("tag")
+		}
+
+		roles[name] = role
+
+		if err := writeRolesFile(rolePath, roles); err != nil {
+			return fmt.Errorf("writing roles file: %w", err)
+		}
+
+		flags := getFlags(cmd)
+		if !flags.Quiet {
+			fmt.Fprintf(stdout, "Updated role %q\n", name)
+		}
+		return nil
+	}
+
+	// No flags: require TTY for interactive editing
+	isTTY := false
+	if f, ok := stdin.(*os.File); ok {
+		isTTY = term.IsTerminal(int(f.Fd()))
+	}
+	if !isTTY {
+		return fmt.Errorf("interactive editing requires a terminal")
 	}
 
 	// Prompt for each field with current value as default

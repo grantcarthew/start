@@ -409,10 +409,24 @@ func addConfigContextEditCommand(parent *cobra.Command) {
 		Long: `Edit context configuration.
 
 Without a name, opens the contexts.cue file in $EDITOR.
-With a name, provides interactive prompts to modify the context.`,
+With a name and flags, updates only the specified fields.
+With a name and no flags in a terminal, provides interactive prompts.
+
+Examples:
+  start config context edit
+  start config context edit project --file PROJECT.md
+  start config context edit readme --required=true --default=false`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: runConfigContextEdit,
 	}
+
+	editCmd.Flags().String("description", "", "Description")
+	editCmd.Flags().String("file", "", "Path to context file")
+	editCmd.Flags().String("command", "", "Command to generate content")
+	editCmd.Flags().String("prompt", "", "Inline content text")
+	editCmd.Flags().Bool("required", false, "Always include this context")
+	editCmd.Flags().Bool("default", false, "Include by default")
+	editCmd.Flags().StringSlice("tag", nil, "Tags")
 
 	parent.AddCommand(editCmd)
 }
@@ -439,19 +453,10 @@ func runConfigContextEdit(cmd *cobra.Command, args []string) error {
 		return openInEditor(contextPath)
 	}
 
-	// Named edit: interactive modification
+	// Named edit
 	name := args[0]
 	stdin := cmd.InOrStdin()
 	stdout := cmd.OutOrStdout()
-
-	// Check if interactive
-	isTTY := false
-	if f, ok := stdin.(*os.File); ok {
-		isTTY = term.IsTerminal(int(f.Fd()))
-	}
-	if !isTTY {
-		return fmt.Errorf("interactive editing requires a terminal")
-	}
 
 	// Load existing contexts
 	contexts, err := loadContextsFromDir(configDir)
@@ -462,6 +467,55 @@ func runConfigContextEdit(cmd *cobra.Command, args []string) error {
 	ctx, exists := contexts[name]
 	if !exists {
 		return fmt.Errorf("context %q not found in %s config", name, scopeString(local))
+	}
+
+	// Check if any edit flags are provided
+	hasEditFlags := anyFlagChanged(cmd, "description", "file", "command", "prompt", "required", "default", "tag")
+
+	if hasEditFlags {
+		// Non-interactive flag-based update
+		if cmd.Flags().Changed("description") {
+			ctx.Description, _ = cmd.Flags().GetString("description")
+		}
+		if cmd.Flags().Changed("file") {
+			ctx.File, _ = cmd.Flags().GetString("file")
+		}
+		if cmd.Flags().Changed("command") {
+			ctx.Command, _ = cmd.Flags().GetString("command")
+		}
+		if cmd.Flags().Changed("prompt") {
+			ctx.Prompt, _ = cmd.Flags().GetString("prompt")
+		}
+		if cmd.Flags().Changed("required") {
+			ctx.Required, _ = cmd.Flags().GetBool("required")
+		}
+		if cmd.Flags().Changed("default") {
+			ctx.Default, _ = cmd.Flags().GetBool("default")
+		}
+		if cmd.Flags().Changed("tag") {
+			ctx.Tags, _ = cmd.Flags().GetStringSlice("tag")
+		}
+
+		contexts[name] = ctx
+
+		if err := writeContextsFile(contextPath, contexts); err != nil {
+			return fmt.Errorf("writing contexts file: %w", err)
+		}
+
+		flags := getFlags(cmd)
+		if !flags.Quiet {
+			fmt.Fprintf(stdout, "Updated context %q\n", name)
+		}
+		return nil
+	}
+
+	// No flags: require TTY for interactive editing
+	isTTY := false
+	if f, ok := stdin.(*os.File); ok {
+		isTTY = term.IsTerminal(int(f.Fd()))
+	}
+	if !isTTY {
+		return fmt.Errorf("interactive editing requires a terminal")
 	}
 
 	// Prompt for each field with current value as default
