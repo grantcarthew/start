@@ -243,7 +243,7 @@ func TestPrintSearchResults(t *testing.T) {
 func TestIsAssetRepo(t *testing.T) {
 	t.Run("valid asset repo with agents", func(t *testing.T) {
 		dir := t.TempDir()
-		os.MkdirAll(filepath.Join(dir, "agents"), 0755)
+		_ = os.MkdirAll(filepath.Join(dir, "agents"), 0755)
 
 		if !isAssetRepo(dir) {
 			t.Error("expected isAssetRepo to return true for dir with agents/")
@@ -252,7 +252,7 @@ func TestIsAssetRepo(t *testing.T) {
 
 	t.Run("valid asset repo with roles", func(t *testing.T) {
 		dir := t.TempDir()
-		os.MkdirAll(filepath.Join(dir, "roles"), 0755)
+		_ = os.MkdirAll(filepath.Join(dir, "roles"), 0755)
 
 		if !isAssetRepo(dir) {
 			t.Error("expected isAssetRepo to return true for dir with roles/")
@@ -261,10 +261,10 @@ func TestIsAssetRepo(t *testing.T) {
 
 	t.Run("valid asset repo with multiple dirs", func(t *testing.T) {
 		dir := t.TempDir()
-		os.MkdirAll(filepath.Join(dir, "agents"), 0755)
-		os.MkdirAll(filepath.Join(dir, "roles"), 0755)
-		os.MkdirAll(filepath.Join(dir, "tasks"), 0755)
-		os.MkdirAll(filepath.Join(dir, "contexts"), 0755)
+		_ = os.MkdirAll(filepath.Join(dir, "agents"), 0755)
+		_ = os.MkdirAll(filepath.Join(dir, "roles"), 0755)
+		_ = os.MkdirAll(filepath.Join(dir, "tasks"), 0755)
+		_ = os.MkdirAll(filepath.Join(dir, "contexts"), 0755)
 
 		if !isAssetRepo(dir) {
 			t.Error("expected isAssetRepo to return true for full asset repo")
@@ -273,7 +273,7 @@ func TestIsAssetRepo(t *testing.T) {
 
 	t.Run("not an asset repo", func(t *testing.T) {
 		dir := t.TempDir()
-		os.MkdirAll(filepath.Join(dir, "src"), 0755)
+		_ = os.MkdirAll(filepath.Join(dir, "src"), 0755)
 
 		if isAssetRepo(dir) {
 			t.Error("expected isAssetRepo to return false for non-asset dir")

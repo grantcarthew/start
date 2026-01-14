@@ -11,11 +11,6 @@ import (
 	"github.com/grantcarthew/start/internal/orchestration"
 )
 
-// testFlags returns a Flags struct with default values for testing.
-func testFlags() *Flags {
-	return &Flags{}
-}
-
 // setupStartTestConfig creates a minimal CUE config for start command testing.
 func setupStartTestConfig(t *testing.T) string {
 	t.Helper()
@@ -82,7 +77,7 @@ func TestExecuteStart_DryRun(t *testing.T) {
 	if err != nil {
 		t.Fatalf("getting working dir: %v", err)
 	}
-	defer os.Chdir(origDir)
+	defer func() { _ = os.Chdir(origDir) }()
 	if err := os.Chdir(tmpDir); err != nil {
 		t.Fatalf("changing to temp dir: %v", err)
 	}
@@ -126,7 +121,7 @@ func TestExecuteStart_ContextSelection(t *testing.T) {
 	if err != nil {
 		t.Fatalf("getting working dir: %v", err)
 	}
-	defer os.Chdir(origDir)
+	defer func() { _ = os.Chdir(origDir) }()
 	if err := os.Chdir(tmpDir); err != nil {
 		t.Fatalf("changing to temp dir: %v", err)
 	}
@@ -180,7 +175,7 @@ func TestExecuteTask_DryRun(t *testing.T) {
 	if err != nil {
 		t.Fatalf("getting working dir: %v", err)
 	}
-	defer os.Chdir(origDir)
+	defer func() { _ = os.Chdir(origDir) }()
 	if err := os.Chdir(tmpDir); err != nil {
 		t.Fatalf("changing to temp dir: %v", err)
 	}
@@ -304,7 +299,7 @@ func TestFindTask(t *testing.T) {
 	if err != nil {
 		t.Fatalf("getting working dir: %v", err)
 	}
-	defer os.Chdir(origDir)
+	defer func() { _ = os.Chdir(origDir) }()
 	if err := os.Chdir(tmpDir); err != nil {
 		t.Fatalf("changing to temp dir: %v", err)
 	}
@@ -410,7 +405,7 @@ settings: {
 	if err != nil {
 		t.Fatalf("getting working dir: %v", err)
 	}
-	defer os.Chdir(origDir)
+	defer func() { _ = os.Chdir(origDir) }()
 	if err := os.Chdir(tmpDir); err != nil {
 		t.Fatalf("changing to temp dir: %v", err)
 	}
@@ -472,7 +467,7 @@ settings: {
 	if err != nil {
 		t.Fatalf("getting working dir: %v", err)
 	}
-	defer os.Chdir(origDir)
+	defer func() { _ = os.Chdir(origDir) }()
 	if err := os.Chdir(tmpDir); err != nil {
 		t.Fatalf("changing to temp dir: %v", err)
 	}

@@ -42,7 +42,7 @@ func TestValidateConfig(t *testing.T) {
 			name: "valid global config",
 			setupGlobal: func(dir string) {
 				content := `agents: { test: { bin: "test", command: "{role}" } }`
-				os.WriteFile(filepath.Join(dir, "config.cue"), []byte(content), 0644)
+				_ = os.WriteFile(filepath.Join(dir, "config.cue"), []byte(content), 0644)
 			},
 			setupLocal:     nil,
 			wantGlobalValid: true,
@@ -53,7 +53,7 @@ func TestValidateConfig(t *testing.T) {
 			name: "invalid global config - syntax error",
 			setupGlobal: func(dir string) {
 				content := `agents: { test: { bin: "test" command: "{role}" } }` // missing comma
-				os.WriteFile(filepath.Join(dir, "config.cue"), []byte(content), 0644)
+				_ = os.WriteFile(filepath.Join(dir, "config.cue"), []byte(content), 0644)
 			},
 			setupLocal:     nil,
 			wantGlobalValid: false,
@@ -66,7 +66,7 @@ func TestValidateConfig(t *testing.T) {
 			setupGlobal: nil,
 			setupLocal: func(dir string) {
 				content := `roles: { expert: { content: "You are an expert" } }`
-				os.WriteFile(filepath.Join(dir, "config.cue"), []byte(content), 0644)
+				_ = os.WriteFile(filepath.Join(dir, "config.cue"), []byte(content), 0644)
 			},
 			wantGlobalValid: false,
 			wantLocalValid:  true,
@@ -76,11 +76,11 @@ func TestValidateConfig(t *testing.T) {
 			name: "both valid",
 			setupGlobal: func(dir string) {
 				content := `agents: { test: { bin: "test", command: "{role}" } }`
-				os.WriteFile(filepath.Join(dir, "config.cue"), []byte(content), 0644)
+				_ = os.WriteFile(filepath.Join(dir, "config.cue"), []byte(content), 0644)
 			},
 			setupLocal: func(dir string) {
 				content := `roles: { expert: { content: "You are an expert" } }`
-				os.WriteFile(filepath.Join(dir, "config.cue"), []byte(content), 0644)
+				_ = os.WriteFile(filepath.Join(dir, "config.cue"), []byte(content), 0644)
 			},
 			wantGlobalValid: true,
 			wantLocalValid:  true,
@@ -90,11 +90,11 @@ func TestValidateConfig(t *testing.T) {
 			name: "global valid, local invalid",
 			setupGlobal: func(dir string) {
 				content := `agents: { test: { bin: "test", command: "{role}" } }`
-				os.WriteFile(filepath.Join(dir, "config.cue"), []byte(content), 0644)
+				_ = os.WriteFile(filepath.Join(dir, "config.cue"), []byte(content), 0644)
 			},
 			setupLocal: func(dir string) {
 				content := `roles: { expert: { content: "unclosed string } }`
-				os.WriteFile(filepath.Join(dir, "config.cue"), []byte(content), 0644)
+				_ = os.WriteFile(filepath.Join(dir, "config.cue"), []byte(content), 0644)
 			},
 			wantGlobalValid: true,
 			wantLocalValid:  false,
@@ -112,11 +112,11 @@ func TestValidateConfig(t *testing.T) {
 
 			// Setup directories based on test case
 			if tt.setupGlobal != nil {
-				os.MkdirAll(globalDir, 0755)
+				_ = os.MkdirAll(globalDir, 0755)
 				tt.setupGlobal(globalDir)
 			}
 			if tt.setupLocal != nil {
-				os.MkdirAll(localDir, 0755)
+				_ = os.MkdirAll(localDir, 0755)
 				tt.setupLocal(localDir)
 			}
 
@@ -206,23 +206,23 @@ func TestHasCUEFiles(t *testing.T) {
 		{
 			name: "has cue file",
 			setup: func(dir string) {
-				os.WriteFile(filepath.Join(dir, "config.cue"), []byte("{}"), 0644)
+				_ = os.WriteFile(filepath.Join(dir, "config.cue"), []byte("{}"), 0644)
 			},
 			wantHas: true,
 		},
 		{
 			name: "has other files only",
 			setup: func(dir string) {
-				os.WriteFile(filepath.Join(dir, "readme.md"), []byte("# Readme"), 0644)
-				os.WriteFile(filepath.Join(dir, "config.json"), []byte("{}"), 0644)
+				_ = os.WriteFile(filepath.Join(dir, "readme.md"), []byte("# Readme"), 0644)
+				_ = os.WriteFile(filepath.Join(dir, "config.json"), []byte("{}"), 0644)
 			},
 			wantHas: false,
 		},
 		{
 			name: "has mixed files",
 			setup: func(dir string) {
-				os.WriteFile(filepath.Join(dir, "readme.md"), []byte("# Readme"), 0644)
-				os.WriteFile(filepath.Join(dir, "config.cue"), []byte("{}"), 0644)
+				_ = os.WriteFile(filepath.Join(dir, "readme.md"), []byte("# Readme"), 0644)
+				_ = os.WriteFile(filepath.Join(dir, "config.cue"), []byte("{}"), 0644)
 			},
 			wantHas: true,
 		},

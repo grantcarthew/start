@@ -338,7 +338,7 @@ func writeSettingsFile(path string, settings map[string]string) error {
 	sb.WriteString("// Edit this file to customize your settings\n\n")
 	sb.WriteString("settings: {\n")
 
-	if settings != nil && len(settings) > 0 {
+	if len(settings) > 0 {
 		// Sort keys for consistent output
 		var keys []string
 		for k := range settings {
