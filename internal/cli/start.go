@@ -32,6 +32,7 @@ type Flags struct {
 	Verbose   bool
 	Debug     bool
 	NoColor   bool
+	Local     bool
 }
 
 // getFlags retrieves Flags from the command context.

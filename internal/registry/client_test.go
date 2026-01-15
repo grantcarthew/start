@@ -93,38 +93,38 @@ func TestSourceLocToPath(t *testing.T) {
 // TestFetch_RetryLogic tests the retry behaviour of Fetch.
 func TestFetch_RetryLogic(t *testing.T) {
 	tests := []struct {
-		name          string
-		failCount     int // Number of times to fail before succeeding
-		retries       int
-		wantErr       bool
+		name           string
+		failCount      int // Number of times to fail before succeeding
+		retries        int
+		wantErr        bool
 		wantFetchCalls int
 	}{
 		{
-			name:          "succeeds on first attempt",
-			failCount:     0,
-			retries:       3,
-			wantErr:       false,
+			name:           "succeeds on first attempt",
+			failCount:      0,
+			retries:        3,
+			wantErr:        false,
 			wantFetchCalls: 1,
 		},
 		{
-			name:          "succeeds after one retry",
-			failCount:     1,
-			retries:       3,
-			wantErr:       false,
+			name:           "succeeds after one retry",
+			failCount:      1,
+			retries:        3,
+			wantErr:        false,
 			wantFetchCalls: 2,
 		},
 		{
-			name:          "succeeds after two retries",
-			failCount:     2,
-			retries:       3,
-			wantErr:       false,
+			name:           "succeeds after two retries",
+			failCount:      2,
+			retries:        3,
+			wantErr:        false,
 			wantFetchCalls: 3,
 		},
 		{
-			name:          "fails after all retries exhausted",
-			failCount:     5,
-			retries:       3,
-			wantErr:       true,
+			name:           "fails after all retries exhausted",
+			failCount:      5,
+			retries:        3,
+			wantErr:        true,
 			wantFetchCalls: 3,
 		},
 	}
@@ -241,12 +241,12 @@ func TestFetch_InvalidModulePath(t *testing.T) {
 // TestResolveLatestVersion tests version resolution logic.
 func TestResolveLatestVersion(t *testing.T) {
 	tests := []struct {
-		name           string
-		modulePath     string
-		versions       []string
-		versionsErr    error
-		want           string
-		wantErr        bool
+		name        string
+		modulePath  string
+		versions    []string
+		versionsErr error
+		want        string
+		wantErr     bool
 	}{
 		{
 			name:       "canonical version returned as-is",
@@ -270,10 +270,10 @@ func TestResolveLatestVersion(t *testing.T) {
 			wantErr:    false,
 		},
 		{
-			name:        "no versions found",
-			modulePath:  "github.com/test/module@v0",
-			versions:    []string{},
-			wantErr:     true,
+			name:       "no versions found",
+			modulePath: "github.com/test/module@v0",
+			versions:   []string{},
+			wantErr:    true,
 		},
 		{
 			name:        "versions fetch error",

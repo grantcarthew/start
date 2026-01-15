@@ -68,7 +68,7 @@ Use --local to show only local agents.`,
 
 // runConfigAgentList lists all configured agents.
 func runConfigAgentList(cmd *cobra.Command, _ []string) error {
-	local, _ := cmd.Flags().GetBool("local")
+	local := getFlags(cmd).Local
 	agents, err := loadAgentsForScope(local)
 	if err != nil {
 		return err
@@ -153,13 +153,16 @@ Examples:
 func runConfigAgentAdd(cmd *cobra.Command, _ []string) error {
 	stdin := cmd.InOrStdin()
 	stdout := cmd.OutOrStdout()
-	local, _ := cmd.Flags().GetBool("local")
+	local := getFlags(cmd).Local
 
-	// Check if interactive
+	// Check if interactive - only prompt for optional fields if no flags provided
 	isTTY := false
 	if f, ok := stdin.(*os.File); ok {
 		isTTY = term.IsTerminal(int(f.Fd()))
 	}
+	// If any flags are set, skip prompts for optional fields
+	hasFlags := anyFlagChanged(cmd, "name", "bin", "command", "default-model", "description", "model", "tag")
+	interactive := isTTY && !hasFlags
 
 	// Get flag values
 	name, _ := cmd.Flags().GetString("name")
@@ -178,7 +181,7 @@ func runConfigAgentAdd(cmd *cobra.Command, _ []string) error {
 	}
 
 	bin, _ := cmd.Flags().GetString("bin")
-	if bin == "" && isTTY {
+	if bin == "" && interactive {
 		var err error
 		bin, err = promptString(stdout, stdin, "Binary (optional)", "")
 		if err != nil {
@@ -203,7 +206,7 @@ func runConfigAgentAdd(cmd *cobra.Command, _ []string) error {
 	}
 
 	defaultModel, _ := cmd.Flags().GetString("default-model")
-	if defaultModel == "" && isTTY {
+	if defaultModel == "" && interactive {
 		var err error
 		defaultModel, err = promptString(stdout, stdin, "Default model (optional)", "")
 		if err != nil {
@@ -212,7 +215,7 @@ func runConfigAgentAdd(cmd *cobra.Command, _ []string) error {
 	}
 
 	description, _ := cmd.Flags().GetString("description")
-	if description == "" && isTTY {
+	if description == "" && interactive {
 		var err error
 		description, err = promptString(stdout, stdin, "Description (optional)", "")
 		if err != nil {
@@ -311,7 +314,7 @@ Displays all configuration fields for the specified agent.`,
 // runConfigAgentInfo shows detailed information about an agent.
 func runConfigAgentInfo(cmd *cobra.Command, args []string) error {
 	name := args[0]
-	local, _ := cmd.Flags().GetBool("local")
+	local := getFlags(cmd).Local
 
 	agents, err := loadAgentsForScope(local)
 	if err != nil {
@@ -387,7 +390,7 @@ Examples:
 
 // runConfigAgentEdit edits an agent configuration.
 func runConfigAgentEdit(cmd *cobra.Command, args []string) error {
-	local, _ := cmd.Flags().GetBool("local")
+	local := getFlags(cmd).Local
 	paths, err := config.ResolvePaths("")
 	if err != nil {
 		return fmt.Errorf("resolving config paths: %w", err)
@@ -545,7 +548,7 @@ func runConfigAgentRemove(cmd *cobra.Command, args []string) error {
 	name := args[0]
 	stdin := cmd.InOrStdin()
 	stdout := cmd.OutOrStdout()
-	local, _ := cmd.Flags().GetBool("local")
+	local := getFlags(cmd).Local
 
 	paths, err := config.ResolvePaths("")
 	if err != nil {
@@ -628,7 +631,7 @@ With a name, sets that agent as the default.`,
 // runConfigAgentDefault sets or shows the default agent.
 func runConfigAgentDefault(cmd *cobra.Command, args []string) error {
 	stdout := cmd.OutOrStdout()
-	local, _ := cmd.Flags().GetBool("local")
+	local := getFlags(cmd).Local
 
 	paths, err := config.ResolvePaths("")
 	if err != nil {

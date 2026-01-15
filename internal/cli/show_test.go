@@ -624,4 +624,3 @@ func TestShowCommandIntegration(t *testing.T) {
 		})
 	}
 }
-

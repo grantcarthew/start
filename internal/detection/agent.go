@@ -10,9 +10,9 @@ import (
 
 // DetectedAgent represents an agent that was found in PATH.
 type DetectedAgent struct {
-	Key         string // Index key, e.g., "ai/claude"
-	Entry       registry.IndexEntry
-	BinaryPath  string // Full path to the binary
+	Key        string // Index key, e.g., "ai/claude"
+	Entry      registry.IndexEntry
+	BinaryPath string // Full path to the binary
 }
 
 // DetectAgents checks which agents from the index are installed.

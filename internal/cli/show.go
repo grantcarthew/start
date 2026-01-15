@@ -647,4 +647,3 @@ func printListOnly(w io.Writer, r ShowResult) {
 		}
 	}
 }
-

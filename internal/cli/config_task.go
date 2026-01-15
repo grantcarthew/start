@@ -65,7 +65,7 @@ Use --local to show only local tasks.`,
 
 // runConfigTaskList lists all configured tasks.
 func runConfigTaskList(cmd *cobra.Command, _ []string) error {
-	local, _ := cmd.Flags().GetBool("local")
+	local := getFlags(cmd).Local
 	tasks, err := loadTasksForScope(local)
 	if err != nil {
 		return err
@@ -137,13 +137,16 @@ Examples:
 func runConfigTaskAdd(cmd *cobra.Command, _ []string) error {
 	stdin := cmd.InOrStdin()
 	stdout := cmd.OutOrStdout()
-	local, _ := cmd.Flags().GetBool("local")
+	local := getFlags(cmd).Local
 
-	// Check if interactive
+	// Check if interactive - only prompt for optional fields if no flags provided
 	isTTY := false
 	if f, ok := stdin.(*os.File); ok {
 		isTTY = term.IsTerminal(int(f.Fd()))
 	}
+	// If any flags are set, skip prompts for optional fields
+	hasFlags := anyFlagChanged(cmd, "name", "description", "file", "command", "prompt", "role", "tag")
+	interactive := isTTY && !hasFlags
 
 	// Collect values
 	name, _ := cmd.Flags().GetString("name")
@@ -162,7 +165,7 @@ func runConfigTaskAdd(cmd *cobra.Command, _ []string) error {
 	}
 
 	description, _ := cmd.Flags().GetString("description")
-	if description == "" && isTTY {
+	if description == "" && interactive {
 		var err error
 		description, err = promptString(stdout, stdin, "Description (optional)", "")
 		if err != nil {
@@ -186,7 +189,7 @@ func runConfigTaskAdd(cmd *cobra.Command, _ []string) error {
 		sourceCount++
 	}
 
-	if sourceCount == 0 && isTTY {
+	if sourceCount == 0 && interactive {
 		fmt.Fprintln(stdout, "\nContent source (choose one):")
 		fmt.Fprintln(stdout, "  1. File path")
 		fmt.Fprintln(stdout, "  2. Command")
@@ -245,7 +248,7 @@ func runConfigTaskAdd(cmd *cobra.Command, _ []string) error {
 
 	// Role (optional)
 	role, _ := cmd.Flags().GetString("role")
-	if role == "" && isTTY {
+	if role == "" && interactive {
 		var err error
 		role, err = promptString(stdout, stdin, "Role (optional)", "")
 		if err != nil {
@@ -333,7 +336,7 @@ Displays all configuration fields for the specified task.`,
 // runConfigTaskInfo shows detailed information about a task.
 func runConfigTaskInfo(cmd *cobra.Command, args []string) error {
 	name := args[0]
-	local, _ := cmd.Flags().GetBool("local")
+	local := getFlags(cmd).Local
 
 	tasks, err := loadTasksForScope(local)
 	if err != nil {
@@ -403,7 +406,7 @@ Examples:
 
 // runConfigTaskEdit edits a task configuration.
 func runConfigTaskEdit(cmd *cobra.Command, args []string) error {
-	local, _ := cmd.Flags().GetBool("local")
+	local := getFlags(cmd).Local
 	paths, err := config.ResolvePaths("")
 	if err != nil {
 		return fmt.Errorf("resolving config paths: %w", err)
@@ -601,7 +604,7 @@ func runConfigTaskRemove(cmd *cobra.Command, args []string) error {
 	name := args[0]
 	stdin := cmd.InOrStdin()
 	stdout := cmd.OutOrStdout()
-	local, _ := cmd.Flags().GetBool("local")
+	local := getFlags(cmd).Local
 
 	paths, err := config.ResolvePaths("")
 	if err != nil {

@@ -81,6 +81,7 @@ It manages prompt composition, context injection, and workflow automation.`,
 	cmd.PersistentFlags().BoolVar(&flags.Verbose, "verbose", false, "Detailed output")
 	cmd.PersistentFlags().BoolVar(&flags.Debug, "debug", false, "Debug output (implies --verbose)")
 	cmd.PersistentFlags().BoolVar(&flags.NoColor, "no-color", false, "Disable colored output")
+	cmd.PersistentFlags().BoolVarP(&flags.Local, "local", "l", false, "Target local config (./.start/) instead of global")
 
 	// Set RunE on root command for `start` execution
 	cmd.RunE = runStart
