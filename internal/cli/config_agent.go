@@ -178,18 +178,12 @@ func runConfigAgentAdd(cmd *cobra.Command, _ []string) error {
 	}
 
 	bin, _ := cmd.Flags().GetString("bin")
-	if bin == "" {
-		if !isTTY {
-			return fmt.Errorf("--bin is required (run interactively or provide flag)")
-		}
+	if bin == "" && isTTY {
 		var err error
-		bin, err = promptString(stdout, stdin, "Binary", name)
+		bin, err = promptString(stdout, stdin, "Binary (optional)", "")
 		if err != nil {
 			return err
 		}
-	}
-	if bin == "" {
-		return fmt.Errorf("binary is required")
 	}
 
 	command, _ := cmd.Flags().GetString("command")
@@ -333,7 +327,9 @@ func runConfigAgentInfo(cmd *cobra.Command, args []string) error {
 	fmt.Fprintf(w, "Agent: %s\n", name)
 	fmt.Fprintln(w, strings.Repeat("─", 40))
 	fmt.Fprintf(w, "Source: %s\n", agent.Source)
-	fmt.Fprintf(w, "Bin: %s\n", agent.Bin)
+	if agent.Bin != "" {
+		fmt.Fprintf(w, "Bin: %s\n", agent.Bin)
+	}
 	fmt.Fprintf(w, "Command: %s\n", agent.Command)
 
 	if agent.DefaultModel != "" {
@@ -857,7 +853,9 @@ func writeAgentsFile(path string, agents map[string]AgentConfig) error {
 		if agent.Origin != "" {
 			sb.WriteString(fmt.Sprintf("\t\torigin: %q\n", agent.Origin))
 		}
-		sb.WriteString(fmt.Sprintf("\t\tbin:     %q\n", agent.Bin))
+		if agent.Bin != "" {
+			sb.WriteString(fmt.Sprintf("\t\tbin:     %q\n", agent.Bin))
+		}
 		sb.WriteString(fmt.Sprintf("\t\tcommand: %q\n", agent.Command))
 
 		if agent.DefaultModel != "" {

@@ -390,31 +390,6 @@ func getAssetKey(name string) string {
 	return name
 }
 
-// extractAssetValue finds the asset value in the CUE structure.
-func extractAssetValue(v cue.Value, category, key string) cue.Value {
-	// Try looking under the category map first (e.g., "tasks" -> "code-review")
-	singular := strings.TrimSuffix(category, "s")
-
-	// Try: category.key (e.g., tasks."code-review")
-	path := cue.ParsePath(fmt.Sprintf("%s.%q", category, key))
-	if val := v.LookupPath(path); val.Exists() {
-		return val
-	}
-
-	// Try: singular (e.g., task, role, agent, context)
-	if val := v.LookupPath(cue.ParsePath(singular)); val.Exists() {
-		return val
-	}
-
-	// Try: just the key
-	if val := v.LookupPath(cue.MakePath(cue.Str(key))); val.Exists() {
-		return val
-	}
-
-	// Return the root value as last resort
-	return v
-}
-
 // writeAssetToConfig writes the asset content to the config file.
 func writeAssetToConfig(configPath string, asset SearchResult, content, modulePath string) error {
 	// Read existing content if file exists

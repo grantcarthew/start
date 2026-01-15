@@ -361,7 +361,7 @@ func checkFileField(v cue.Value, name string) *CheckResult {
 			Status:  StatusFail,
 			Label:   name,
 			Message: fmt.Sprintf("%s (not found)", shortenPath(filePath)),
-			Fix:     fmt.Sprintf("Create file or update path"),
+			Fix:     "Create file or update path",
 		}
 	} else if err != nil {
 		return &CheckResult{

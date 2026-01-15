@@ -88,7 +88,7 @@ tasks: {
 	os.Setenv("HOME", dir)
 
 	cleanup := func() {
-		os.Chdir(origDir)
+		_ = os.Chdir(origDir)
 		os.Setenv("HOME", origHome)
 	}
 

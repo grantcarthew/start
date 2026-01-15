@@ -38,7 +38,7 @@ func TestDoctorCommand_NoConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("getting cwd: %v", err)
 	}
-	defer os.Chdir(origDir)
+	defer func() { _ = os.Chdir(origDir) }()
 
 	if err := os.Chdir(tmpDir); err != nil {
 		t.Fatalf("changing to temp dir: %v", err)
@@ -110,7 +110,7 @@ settings: {
 	if err != nil {
 		t.Fatalf("getting cwd: %v", err)
 	}
-	defer os.Chdir(origDir)
+	defer func() { _ = os.Chdir(origDir) }()
 
 	if err := os.Chdir(tmpDir); err != nil {
 		t.Fatalf("changing to temp dir: %v", err)
@@ -152,7 +152,7 @@ func TestDoctorCommand_Verbose(t *testing.T) {
 	if err != nil {
 		t.Fatalf("getting cwd: %v", err)
 	}
-	defer os.Chdir(origDir)
+	defer func() { _ = os.Chdir(origDir) }()
 
 	if err := os.Chdir(tmpDir); err != nil {
 		t.Fatalf("changing to temp dir: %v", err)
@@ -184,7 +184,7 @@ func TestPrepareDoctor(t *testing.T) {
 	if err != nil {
 		t.Fatalf("getting cwd: %v", err)
 	}
-	defer os.Chdir(origDir)
+	defer func() { _ = os.Chdir(origDir) }()
 
 	if err := os.Chdir(tmpDir); err != nil {
 		t.Fatalf("changing to temp dir: %v", err)
@@ -256,7 +256,7 @@ contexts: {
 	if err != nil {
 		t.Fatalf("getting cwd: %v", err)
 	}
-	defer os.Chdir(origDir)
+	defer func() { _ = os.Chdir(origDir) }()
 
 	if err := os.Chdir(tmpDir); err != nil {
 		t.Fatalf("changing to temp dir: %v", err)
