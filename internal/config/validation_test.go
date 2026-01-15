@@ -10,9 +10,9 @@ import (
 
 func TestValidateConfig(t *testing.T) {
 	tests := []struct {
-		name           string
-		setupGlobal    func(dir string) // nil means don't create directory
-		setupLocal     func(dir string) // nil means don't create directory
+		name            string
+		setupGlobal     func(dir string) // nil means don't create directory
+		setupLocal      func(dir string) // nil means don't create directory
 		wantGlobalValid bool
 		wantLocalValid  bool
 		wantGlobalErr   bool
@@ -20,9 +20,9 @@ func TestValidateConfig(t *testing.T) {
 		wantAnyValid    bool
 	}{
 		{
-			name:           "no directories exist",
-			setupGlobal:    nil,
-			setupLocal:     nil,
+			name:            "no directories exist",
+			setupGlobal:     nil,
+			setupLocal:      nil,
 			wantGlobalValid: false,
 			wantLocalValid:  false,
 			wantAnyValid:    false,
@@ -32,7 +32,7 @@ func TestValidateConfig(t *testing.T) {
 			setupGlobal: func(dir string) {
 				// Just create the directory, no files
 			},
-			setupLocal:     nil,
+			setupLocal:      nil,
 			wantGlobalValid: false,
 			wantLocalValid:  false,
 			wantAnyValid:    false,
@@ -44,7 +44,7 @@ func TestValidateConfig(t *testing.T) {
 				content := `agents: { test: { bin: "test", command: "{role}" } }`
 				_ = os.WriteFile(filepath.Join(dir, "config.cue"), []byte(content), 0644)
 			},
-			setupLocal:     nil,
+			setupLocal:      nil,
 			wantGlobalValid: true,
 			wantLocalValid:  false,
 			wantAnyValid:    true,
@@ -55,14 +55,14 @@ func TestValidateConfig(t *testing.T) {
 				content := `agents: { test: { bin: "test" command: "{role}" } }` // missing comma
 				_ = os.WriteFile(filepath.Join(dir, "config.cue"), []byte(content), 0644)
 			},
-			setupLocal:     nil,
+			setupLocal:      nil,
 			wantGlobalValid: false,
 			wantLocalValid:  false,
 			wantGlobalErr:   true,
 			wantAnyValid:    false,
 		},
 		{
-			name: "valid local config",
+			name:        "valid local config",
 			setupGlobal: nil,
 			setupLocal: func(dir string) {
 				content := `roles: { expert: { content: "You are an expert" } }`
@@ -193,10 +193,10 @@ func TestValidationResult_HasErrors(t *testing.T) {
 
 func TestHasCUEFiles(t *testing.T) {
 	tests := []struct {
-		name     string
-		setup    func(dir string)
-		wantHas  bool
-		wantErr  bool
+		name    string
+		setup   func(dir string)
+		wantHas bool
+		wantErr bool
 	}{
 		{
 			name:    "empty directory",

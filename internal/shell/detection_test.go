@@ -27,8 +27,8 @@ func TestIsShellAvailable(t *testing.T) {
 		shell string
 		want  bool
 	}{
-		{"bash", true},  // Usually available
-		{"sh", true},    // Always available on Unix
+		{"bash", true}, // Usually available
+		{"sh", true},   // Always available on Unix
 		{"nonexistent_shell_12345", false},
 	}
 

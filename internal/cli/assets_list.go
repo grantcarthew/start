@@ -15,12 +15,12 @@ import (
 
 // InstalledAsset represents an installed asset with version info.
 type InstalledAsset struct {
-	Category       string // "agents", "roles", "tasks", "contexts"
-	Name           string
-	InstalledVer   string // Current installed version
-	LatestVer      string // Latest available version
-	UpdateAvail    bool   // True if update is available
-	Scope          string // "global" or "local"
+	Category     string // "agents", "roles", "tasks", "contexts"
+	Name         string
+	InstalledVer string // Current installed version
+	LatestVer    string // Latest available version
+	UpdateAvail  bool   // True if update is available
+	Scope        string // "global" or "local"
 }
 
 // addAssetsListCommand adds the list subcommand to the assets command.

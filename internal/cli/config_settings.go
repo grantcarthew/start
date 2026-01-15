@@ -57,7 +57,7 @@ func executeConfigSettings(cmd *cobra.Command, args []string) error {
 
 	stdout := cmd.OutOrStdout()
 	flags := getFlags(cmd)
-	local, _ := cmd.Flags().GetBool("local")
+	local := getFlags(cmd).Local
 
 	switch len(args) {
 	case 0:

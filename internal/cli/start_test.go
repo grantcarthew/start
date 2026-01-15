@@ -311,10 +311,10 @@ func TestFindTask(t *testing.T) {
 	}
 
 	tests := []struct {
-		name      string
-		taskName  string
-		wantMatch string
-		wantErr   bool
+		name        string
+		taskName    string
+		wantMatch   string
+		wantErr     bool
 		errContains string
 	}{
 		{

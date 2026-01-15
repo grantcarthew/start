@@ -13,10 +13,10 @@ import (
 
 // SearchResult holds a matched index entry with its category and name.
 type SearchResult struct {
-	Category    string // "agents", "roles", "tasks", "contexts"
-	Name        string
-	Entry       registry.IndexEntry
-	MatchScore  int // Higher = better match
+	Category   string // "agents", "roles", "tasks", "contexts"
+	Name       string
+	Entry      registry.IndexEntry
+	MatchScore int // Higher = better match
 }
 
 // addAssetsSearchCommand adds the search subcommand to the assets command.

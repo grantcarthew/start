@@ -30,9 +30,6 @@ Use --local to target project-specific configuration.`,
 		RunE: runConfigList,
 	}
 
-	// Add persistent flags to config command (applies to all subcommands)
-	configCmd.PersistentFlags().Bool("local", false, "Target local config (./.start/) instead of global")
-
 	// Add entity subcommand groups
 	addConfigAgentCommand(configCmd)
 	addConfigRoleCommand(configCmd)
@@ -53,7 +50,8 @@ func runConfigList(cmd *cobra.Command, args []string) error {
 	}
 
 	w := cmd.OutOrStdout()
-	local, _ := cmd.Flags().GetBool("local")
+	flags := getFlags(cmd)
+	local := flags.Local
 
 	// Show config paths
 	paths, err := config.ResolvePaths("")

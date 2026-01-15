@@ -12,10 +12,10 @@ import (
 
 // Color definitions per DR-036
 var (
-	colorError   = color.New(color.FgRed)
-	colorWarning = color.New(color.FgYellow)
-	colorSuccess = color.New(color.FgGreen)
-	colorHeader  = color.New(color.FgGreen)
+	colorError     = color.New(color.FgRed)
+	colorWarning   = color.New(color.FgYellow)
+	colorSuccess   = color.New(color.FgGreen)
+	colorHeader    = color.New(color.FgGreen)
 	colorSeparator = color.New(color.FgMagenta)
 )
 
@@ -60,9 +60,9 @@ func PrintContextTable(w io.Writer, contexts []orchestration.Context) {
 	fmt.Fprintln(w, "Context documents:")
 
 	// Calculate column widths
-	nameWidth := 4 // "Name" header
+	nameWidth := 4  // "Name" header
 	flagsWidth := 5 // "Flags" header
-	fileWidth := 4 // "File" header
+	fileWidth := 4  // "File" header
 
 	type row struct {
 		name   string

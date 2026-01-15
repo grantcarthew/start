@@ -78,23 +78,23 @@ func TestDetectAgents_CommonBinaries(t *testing.T) {
 
 func TestIsBinaryAvailable(t *testing.T) {
 	tests := []struct {
-		name     string
-		bin      string
+		name      string
+		bin       string
 		wantAvail bool
 	}{
 		{
-			name:     "bash should exist",
-			bin:      "bash",
+			name:      "bash should exist",
+			bin:       "bash",
 			wantAvail: true,
 		},
 		{
-			name:     "nonexistent binary",
-			bin:      "this-binary-definitely-does-not-exist-12345",
+			name:      "nonexistent binary",
+			bin:       "this-binary-definitely-does-not-exist-12345",
 			wantAvail: false,
 		},
 		{
-			name:     "empty string",
-			bin:      "",
+			name:      "empty string",
+			bin:       "",
 			wantAvail: false,
 		},
 	}
