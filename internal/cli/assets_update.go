@@ -157,13 +157,20 @@ func checkAndUpdate(ctx context.Context, client *registry.Client, index *registr
 	}
 
 	// Re-fetch the module to get latest version
-	// CUE's @v0 major version automatically resolves to latest
+	// First resolve @v0 to canonical version (e.g., @v0.0.1)
 	modulePath := entry.Module
 	if !strings.Contains(modulePath, "@") {
 		modulePath += "@v0"
 	}
 
-	_, err := client.Fetch(ctx, modulePath)
+	// Resolve to canonical version before fetching
+	resolvedPath, err := client.ResolveLatestVersion(ctx, modulePath)
+	if err != nil {
+		result.Error = err
+		return result
+	}
+
+	_, err = client.Fetch(ctx, resolvedPath)
 	if err != nil {
 		result.Error = err
 		return result

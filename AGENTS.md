@@ -12,7 +12,7 @@ Avoid references to the prototype in new documentation. This is a new design.
 
 Projects are stored in `.ai/projects/`. Continue by reading the active project.
 
-Active Project: `.ai/projects/p-014-cli-supporting-commands-testing.md` (Assets, Doctor, Completion)
+Active Project: None
 
 Other Projects (paused):
 - None
@@ -161,7 +161,8 @@ The `./Context` directory contains cloned source code and documentation for deve
 - p-012: CLI Core Commands Testing (start, prompt, task commands, global flags, error handling)
 - p-017: CLI Config Edit Flags (non-interactive flag-based editing for config edit commands)
 - p-013: CLI Configuration Commands Testing (config commands, show commands, merging, --local flag)
+- p-014: CLI Supporting Commands Testing (assets, doctor, completion commands)
 
-**Current:** p-014: CLI End-to-End Testing (Supporting Commands: Assets, Doctor, Completion)
+**Current:** None - CLI testing series complete
 
 The prototype validated that this tool solves a real problem. This version will implement it properly.
