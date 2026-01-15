@@ -8,6 +8,7 @@ import (
 )
 
 func TestRunner_Run(t *testing.T) {
+	t.Parallel()
 	runner := NewRunner()
 
 	tests := []struct {
@@ -62,6 +63,7 @@ func TestRunner_Run(t *testing.T) {
 }
 
 func TestRunner_RunWithResult(t *testing.T) {
+	t.Parallel()
 	runner := NewRunner()
 
 	t.Run("captures stdout and stderr", func(t *testing.T) {
@@ -121,6 +123,7 @@ func TestRunner_RunWithResult(t *testing.T) {
 }
 
 func TestRunner_Timeout(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("skipping timeout test in short mode")
 	}
@@ -152,6 +155,7 @@ func TestRunner_Timeout(t *testing.T) {
 }
 
 func TestParseShellCommand(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		input    string
 		wantBin  string

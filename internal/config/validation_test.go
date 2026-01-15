@@ -9,6 +9,7 @@ import (
 )
 
 func TestValidateConfig(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name            string
 		setupGlobal     func(dir string) // nil means don't create directory
@@ -152,6 +153,7 @@ func TestValidateConfig(t *testing.T) {
 }
 
 func TestValidationResult_HasErrors(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name       string
 		result     ValidationResult
@@ -192,6 +194,7 @@ func TestValidationResult_HasErrors(t *testing.T) {
 }
 
 func TestHasCUEFiles(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name    string
 		setup   func(dir string)

@@ -13,6 +13,7 @@ import (
 
 // TestSearchIndex tests the searchIndex function.
 func TestSearchIndex(t *testing.T) {
+	t.Parallel()
 	index := &registry.Index{
 		Agents: map[string]registry.IndexEntry{
 			"ai/claude": {
@@ -105,6 +106,7 @@ func TestSearchIndex(t *testing.T) {
 
 // TestMatchScore tests the matchScore function.
 func TestMatchScore(t *testing.T) {
+	t.Parallel()
 	entry := registry.IndexEntry{
 		Module:      "github.com/test/roles/golang/assistant@v0",
 		Description: "Go programming expert for code assistance",
@@ -162,6 +164,7 @@ func TestMatchScore(t *testing.T) {
 
 // TestCategoryOrder tests the categoryOrder function.
 func TestCategoryOrder(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		category string
 		want     int
@@ -185,6 +188,7 @@ func TestCategoryOrder(t *testing.T) {
 
 // TestPrintSearchResults tests the printSearchResults function.
 func TestPrintSearchResults(t *testing.T) {
+	t.Parallel()
 	results := []SearchResult{
 		{
 			Category: "agents",
@@ -241,6 +245,7 @@ func TestPrintSearchResults(t *testing.T) {
 
 // TestIsAssetRepo tests the isAssetRepo function.
 func TestIsAssetRepo(t *testing.T) {
+	t.Parallel()
 	t.Run("valid asset repo with agents", func(t *testing.T) {
 		dir := t.TempDir()
 		_ = os.MkdirAll(filepath.Join(dir, "agents"), 0755)
@@ -291,6 +296,7 @@ func TestIsAssetRepo(t *testing.T) {
 
 // TestAssetTypeToConfigFile tests the assetTypeToConfigFile function.
 func TestAssetTypeToConfigFile(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		category string
 		want     string
@@ -314,6 +320,7 @@ func TestAssetTypeToConfigFile(t *testing.T) {
 
 // TestGenerateAssetCUE tests the generateAssetCUE function.
 func TestGenerateAssetCUE(t *testing.T) {
+	t.Parallel()
 	asset := SearchResult{
 		Category: "roles",
 		Name:     "golang/assistant",
@@ -363,6 +370,7 @@ func TestGenerateAssetCUE(t *testing.T) {
 
 // TestGenerateIndexCUE tests the generateIndexCUE function.
 func TestGenerateIndexCUE(t *testing.T) {
+	t.Parallel()
 	index := &ScannedIndex{
 		Agents: []ScannedAsset{
 			{
@@ -419,6 +427,7 @@ func TestGenerateIndexCUE(t *testing.T) {
 
 // TestAssetsCommandExists tests that the assets command is registered.
 func TestAssetsCommandExists(t *testing.T) {
+	t.Parallel()
 	cmd := NewRootCmd()
 
 	// Find assets command
@@ -452,6 +461,7 @@ func TestAssetsCommandExists(t *testing.T) {
 
 // TestAssetsSearchValidation tests search command argument validation.
 func TestAssetsSearchValidation(t *testing.T) {
+	t.Parallel()
 	// We can't easily test the full search without network,
 	// but we can test the query length validation
 	tests := []struct {

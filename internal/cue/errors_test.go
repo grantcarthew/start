@@ -8,6 +8,7 @@ import (
 )
 
 func TestFormatError(t *testing.T) {
+	t.Parallel()
 	t.Run("nil error returns nil", func(t *testing.T) {
 		err := FormatError(nil)
 		if err != nil {
@@ -59,6 +60,7 @@ func TestFormatError(t *testing.T) {
 }
 
 func TestFormatErrors(t *testing.T) {
+	t.Parallel()
 	t.Run("nil error returns nil", func(t *testing.T) {
 		errs := FormatErrors(nil)
 		if errs != nil {
@@ -94,6 +96,7 @@ func TestFormatErrors(t *testing.T) {
 }
 
 func TestErrorSummary(t *testing.T) {
+	t.Parallel()
 	t.Run("empty string for nil error", func(t *testing.T) {
 		summary := ErrorSummary(nil)
 		if summary != "" {
@@ -139,6 +142,7 @@ func TestErrorSummary(t *testing.T) {
 }
 
 func TestValidationError_ErrorFormat(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		err      *ValidationError

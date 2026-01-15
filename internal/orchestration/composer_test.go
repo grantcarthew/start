@@ -12,6 +12,7 @@ import (
 )
 
 func TestComposer_Compose(t *testing.T) {
+	t.Parallel()
 	ctx := cuecontext.New()
 
 	tests := []struct {
@@ -268,6 +269,7 @@ func TestComposer_Compose(t *testing.T) {
 }
 
 func TestComposer_ComposeWithRole(t *testing.T) {
+	t.Parallel()
 	ctx := cuecontext.New()
 
 	config := `
@@ -342,6 +344,7 @@ func TestComposer_ComposeWithRole(t *testing.T) {
 }
 
 func TestComposer_ResolveTask(t *testing.T) {
+	t.Parallel()
 	ctx := cuecontext.New()
 
 	tmpDir := t.TempDir()
@@ -407,6 +410,7 @@ func TestComposer_ResolveTask(t *testing.T) {
 }
 
 func TestComposer_ContextWithFile(t *testing.T) {
+	t.Parallel()
 	ctx := cuecontext.New()
 
 	tmpDir := t.TempDir()
@@ -443,6 +447,7 @@ func TestComposer_ContextWithFile(t *testing.T) {
 }
 
 func TestGetTaskRole(t *testing.T) {
+	t.Parallel()
 	ctx := cuecontext.New()
 
 	config := `
@@ -485,6 +490,7 @@ func TestGetTaskRole(t *testing.T) {
 }
 
 func TestExtractUTDFields(t *testing.T) {
+	t.Parallel()
 	ctx := cuecontext.New()
 
 	config := `
@@ -523,6 +529,7 @@ func TestExtractUTDFields(t *testing.T) {
 }
 
 func TestGetDefaultRole(t *testing.T) {
+	t.Parallel()
 	ctx := cuecontext.New()
 
 	tests := []struct {
@@ -595,6 +602,7 @@ func TestGetDefaultRole(t *testing.T) {
 }
 
 func TestComposer_ResolveContext_Errors(t *testing.T) {
+	t.Parallel()
 	ctx := cuecontext.New()
 
 	tests := []struct {
@@ -651,6 +659,7 @@ func TestComposer_ResolveContext_Errors(t *testing.T) {
 }
 
 func TestComposer_ResolveRole_Errors(t *testing.T) {
+	t.Parallel()
 	ctx := cuecontext.New()
 
 	tests := []struct {
@@ -707,6 +716,7 @@ func TestComposer_ResolveRole_Errors(t *testing.T) {
 }
 
 func TestComposer_ResolveTask_TempFile(t *testing.T) {
+	t.Parallel()
 	ctx := cuecontext.New()
 	tmpDir := t.TempDir()
 
@@ -764,6 +774,7 @@ func TestComposer_ResolveTask_TempFile(t *testing.T) {
 }
 
 func TestComposer_ResolveTask_TempFile_WithSlashInName(t *testing.T) {
+	t.Parallel()
 	ctx := cuecontext.New()
 	tmpDir := t.TempDir()
 
@@ -802,6 +813,7 @@ func TestComposer_ResolveTask_TempFile_WithSlashInName(t *testing.T) {
 }
 
 func TestComposer_ResolveTask_NoFile_NoTempFile(t *testing.T) {
+	t.Parallel()
 	ctx := cuecontext.New()
 	tmpDir := t.TempDir()
 
@@ -833,6 +845,7 @@ func TestComposer_ResolveTask_NoFile_NoTempFile(t *testing.T) {
 }
 
 func TestComposer_ResolveContext_TempFile(t *testing.T) {
+	t.Parallel()
 	ctx := cuecontext.New()
 	tmpDir := t.TempDir()
 
@@ -876,6 +889,7 @@ func TestComposer_ResolveContext_TempFile(t *testing.T) {
 }
 
 func TestComposer_resolveFileToTemp(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 
 	// Create source file

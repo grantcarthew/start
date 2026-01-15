@@ -8,6 +8,7 @@ import (
 )
 
 func TestNewValidator(t *testing.T) {
+	t.Parallel()
 	v := NewValidator()
 	if v == nil {
 		t.Fatal("NewValidator() returned nil")
@@ -15,6 +16,7 @@ func TestNewValidator(t *testing.T) {
 }
 
 func TestValidator_Validate(t *testing.T) {
+	t.Parallel()
 	ctx := cuecontext.New()
 
 	t.Run("valid concrete value", func(t *testing.T) {
@@ -85,6 +87,7 @@ func TestValidator_Validate(t *testing.T) {
 }
 
 func TestValidator_ValidatePath(t *testing.T) {
+	t.Parallel()
 	ctx := cuecontext.New()
 
 	t.Run("existing path", func(t *testing.T) {
@@ -137,6 +140,7 @@ func TestValidator_ValidatePath(t *testing.T) {
 }
 
 func TestValidator_Exists(t *testing.T) {
+	t.Parallel()
 	ctx := cuecontext.New()
 
 	value := ctx.CompileString(`
@@ -174,6 +178,7 @@ func TestValidator_Exists(t *testing.T) {
 }
 
 func TestValidationError_Error(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name   string
 		err    *ValidationError

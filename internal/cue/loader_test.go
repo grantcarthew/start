@@ -9,6 +9,7 @@ import (
 )
 
 func TestNewLoader(t *testing.T) {
+	t.Parallel()
 	l := NewLoader()
 	if l == nil {
 		t.Fatal("NewLoader() returned nil")
@@ -19,6 +20,7 @@ func TestNewLoader(t *testing.T) {
 }
 
 func TestLoader_Load(t *testing.T) {
+	t.Parallel()
 	t.Run("single directory with valid CUE", func(t *testing.T) {
 		dir := t.TempDir()
 		writeCUEFile(t, dir, "settings.cue", `
@@ -244,6 +246,7 @@ func TestLoader_Load(t *testing.T) {
 }
 
 func TestLoader_LoadSingle(t *testing.T) {
+	t.Parallel()
 	t.Run("valid directory", func(t *testing.T) {
 		dir := t.TempDir()
 		writeCUEFile(t, dir, "settings.cue", `value: 123`)
@@ -305,6 +308,7 @@ func TestLoader_LoadSingle(t *testing.T) {
 }
 
 func TestLoader_Context(t *testing.T) {
+	t.Parallel()
 	l := NewLoader()
 	ctx := l.Context()
 	if ctx == nil {
@@ -319,6 +323,7 @@ func TestLoader_Context(t *testing.T) {
 }
 
 func TestHasCUEFiles(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name  string
 		files map[string]string
@@ -377,6 +382,7 @@ func TestHasCUEFiles(t *testing.T) {
 }
 
 func TestLoader_MergeWithTestdataFixtures(t *testing.T) {
+	t.Parallel()
 	// This test uses the actual testdata/merge fixtures to verify merge behaviour
 	// Skip if fixtures don't exist (allows test to run in isolation)
 	globalDir := "../../test/testdata/merge/global"
@@ -481,6 +487,7 @@ func TestLoader_MergeWithTestdataFixtures(t *testing.T) {
 }
 
 func TestLoader_MergeSemantics(t *testing.T) {
+	t.Parallel()
 	t.Run("collections merge additively by item name", func(t *testing.T) {
 		globalDir := t.TempDir()
 		localDir := t.TempDir()
@@ -704,6 +711,7 @@ func TestLoader_MergeSemantics(t *testing.T) {
 }
 
 func TestLoader_LoadWithPackage(t *testing.T) {
+	t.Parallel()
 	t.Run("loads file with package declaration", func(t *testing.T) {
 		dir := t.TempDir()
 		writeCUEFile(t, dir, "settings.cue", `

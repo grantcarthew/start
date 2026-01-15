@@ -27,6 +27,7 @@ func (m *mockShellRunner) Run(command, workingDir, shell string, timeout int) (s
 }
 
 func TestTemplateProcessor_Process(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name         string
 		fields       UTDFields
@@ -154,6 +155,7 @@ func TestTemplateProcessor_Process(t *testing.T) {
 }
 
 func TestTemplateProcessor_LazyEvaluation(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 
 	// Create a test file
@@ -243,6 +245,7 @@ func TestTemplateProcessor_LazyEvaluation(t *testing.T) {
 }
 
 func TestDefaultFileReader_Read(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	reader := &DefaultFileReader{}
 
@@ -293,6 +296,7 @@ func TestDefaultFileReader_Read(t *testing.T) {
 }
 
 func TestIsUTDValid(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name   string
 		fields UTDFields
