@@ -73,7 +73,7 @@ func runConfigRoleList(cmd *cobra.Command, _ []string) error {
 	}
 
 	if len(roles) == 0 {
-		fmt.Fprintln(cmd.OutOrStdout(), "No roles configured.")
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "No roles configured.")
 		return nil
 	}
 
@@ -84,8 +84,8 @@ func runConfigRoleList(cmd *cobra.Command, _ []string) error {
 	}
 
 	w := cmd.OutOrStdout()
-	fmt.Fprintln(w, "Roles:")
-	fmt.Fprintln(w)
+	_, _ = fmt.Fprintln(w, "Roles:")
+	_, _ = fmt.Fprintln(w)
 
 	// Sort role names for consistent output
 	var names []string
@@ -105,15 +105,15 @@ func runConfigRoleList(cmd *cobra.Command, _ []string) error {
 			source += ", registry"
 		}
 		if role.Description != "" {
-			fmt.Fprintf(w, "%s%s - %s (%s)\n", marker, name, role.Description, source)
+			_, _ = fmt.Fprintf(w, "%s%s - %s (%s)\n", marker, name, role.Description, source)
 		} else {
-			fmt.Fprintf(w, "%s%s (%s)\n", marker, name, source)
+			_, _ = fmt.Fprintf(w, "%s%s (%s)\n", marker, name, source)
 		}
 	}
 
 	if defaultRole != "" {
-		fmt.Fprintln(w)
-		fmt.Fprintf(w, "* = default role\n")
+		_, _ = fmt.Fprintln(w)
+		_, _ = fmt.Fprintf(w, "* = default role\n")
 	}
 
 	return nil
@@ -205,11 +205,11 @@ func runConfigRoleAdd(cmd *cobra.Command, _ []string) error {
 	}
 
 	if sourceCount == 0 && interactive {
-		fmt.Fprintln(stdout, "\nContent source (choose one):")
-		fmt.Fprintln(stdout, "  1. File path")
-		fmt.Fprintln(stdout, "  2. Command")
-		fmt.Fprintln(stdout, "  3. Inline prompt")
-		fmt.Fprint(stdout, "Choice [1]: ")
+		_, _ = fmt.Fprintln(stdout, "\nContent source (choose one):")
+		_, _ = fmt.Fprintln(stdout, "  1. File path")
+		_, _ = fmt.Fprintln(stdout, "  2. Command")
+		_, _ = fmt.Fprintln(stdout, "  3. Inline prompt")
+		_, _ = fmt.Fprint(stdout, "Choice [1]: ")
 
 		reader := bufio.NewReader(stdin)
 		choice, err := reader.ReadString('\n')
@@ -315,8 +315,8 @@ func runConfigRoleAdd(cmd *cobra.Command, _ []string) error {
 
 	flags := getFlags(cmd)
 	if !flags.Quiet {
-		fmt.Fprintf(stdout, "Added role %q to %s config\n", name, scopeName)
-		fmt.Fprintf(stdout, "Config: %s\n", rolePath)
+		_, _ = fmt.Fprintf(stdout, "Added role %q to %s config\n", name, scopeName)
+		_, _ = fmt.Fprintf(stdout, "Config: %s\n", rolePath)
 	}
 
 	return nil
@@ -353,24 +353,24 @@ func runConfigRoleInfo(cmd *cobra.Command, args []string) error {
 	}
 
 	w := cmd.OutOrStdout()
-	fmt.Fprintf(w, "Role: %s\n", name)
-	fmt.Fprintln(w, strings.Repeat("─", 40))
-	fmt.Fprintf(w, "Source: %s\n", role.Source)
+	_, _ = fmt.Fprintf(w, "Role: %s\n", name)
+	_, _ = fmt.Fprintln(w, strings.Repeat("─", 40))
+	_, _ = fmt.Fprintf(w, "Source: %s\n", role.Source)
 
 	if role.Description != "" {
-		fmt.Fprintf(w, "Description: %s\n", role.Description)
+		_, _ = fmt.Fprintf(w, "Description: %s\n", role.Description)
 	}
 	if role.File != "" {
-		fmt.Fprintf(w, "File: %s\n", role.File)
+		_, _ = fmt.Fprintf(w, "File: %s\n", role.File)
 	}
 	if role.Command != "" {
-		fmt.Fprintf(w, "Command: %s\n", role.Command)
+		_, _ = fmt.Fprintf(w, "Command: %s\n", role.Command)
 	}
 	if role.Prompt != "" {
-		fmt.Fprintf(w, "Prompt: %s\n", truncatePrompt(role.Prompt, 100))
+		_, _ = fmt.Fprintf(w, "Prompt: %s\n", truncatePrompt(role.Prompt, 100))
 	}
 	if len(role.Tags) > 0 {
-		fmt.Fprintf(w, "Tags: %s\n", strings.Join(role.Tags, ", "))
+		_, _ = fmt.Fprintf(w, "Tags: %s\n", strings.Join(role.Tags, ", "))
 	}
 
 	return nil
@@ -471,7 +471,7 @@ func runConfigRoleEdit(cmd *cobra.Command, args []string) error {
 
 		flags := getFlags(cmd)
 		if !flags.Quiet {
-			fmt.Fprintf(stdout, "Updated role %q\n", name)
+			_, _ = fmt.Fprintf(stdout, "Updated role %q\n", name)
 		}
 		return nil
 	}
@@ -486,7 +486,7 @@ func runConfigRoleEdit(cmd *cobra.Command, args []string) error {
 	}
 
 	// Prompt for each field with current value as default
-	fmt.Fprintf(stdout, "Editing role %q (press Enter to keep current value)\n\n", name)
+	_, _ = fmt.Fprintf(stdout, "Editing role %q (press Enter to keep current value)\n\n", name)
 
 	newDescription, err := promptString(stdout, stdin, "Description", role.Description)
 	if err != nil {
@@ -494,18 +494,18 @@ func runConfigRoleEdit(cmd *cobra.Command, args []string) error {
 	}
 
 	// For content source, show current and allow change
-	fmt.Fprintln(stdout, "\nCurrent content source:")
+	_, _ = fmt.Fprintln(stdout, "\nCurrent content source:")
 	if role.File != "" {
-		fmt.Fprintf(stdout, "  File: %s\n", role.File)
+		_, _ = fmt.Fprintf(stdout, "  File: %s\n", role.File)
 	}
 	if role.Command != "" {
-		fmt.Fprintf(stdout, "  Command: %s\n", role.Command)
+		_, _ = fmt.Fprintf(stdout, "  Command: %s\n", role.Command)
 	}
 	if role.Prompt != "" {
-		fmt.Fprintf(stdout, "  Prompt: %s\n", truncatePrompt(role.Prompt, 50))
+		_, _ = fmt.Fprintf(stdout, "  Prompt: %s\n", truncatePrompt(role.Prompt, 50))
 	}
 
-	fmt.Fprint(stdout, "Keep current? [Y/n] ")
+	_, _ = fmt.Fprint(stdout, "Keep current? [Y/n] ")
 	reader := bufio.NewReader(stdin)
 	input, err := reader.ReadString('\n')
 	if err != nil {
@@ -523,11 +523,11 @@ func runConfigRoleEdit(cmd *cobra.Command, args []string) error {
 		newCommand = ""
 		newPrompt = ""
 
-		fmt.Fprintln(stdout, "\nNew content source:")
-		fmt.Fprintln(stdout, "  1. File path")
-		fmt.Fprintln(stdout, "  2. Command")
-		fmt.Fprintln(stdout, "  3. Inline prompt")
-		fmt.Fprint(stdout, "Choice [1]: ")
+		_, _ = fmt.Fprintln(stdout, "\nNew content source:")
+		_, _ = fmt.Fprintln(stdout, "  1. File path")
+		_, _ = fmt.Fprintln(stdout, "  2. Command")
+		_, _ = fmt.Fprintln(stdout, "  3. Inline prompt")
+		_, _ = fmt.Fprint(stdout, "Choice [1]: ")
 
 		choice, err := reader.ReadString('\n')
 		if err != nil {
@@ -569,7 +569,7 @@ func runConfigRoleEdit(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("writing roles file: %w", err)
 	}
 
-	fmt.Fprintf(stdout, "\nUpdated role %q\n", name)
+	_, _ = fmt.Fprintf(stdout, "\nUpdated role %q\n", name)
 	return nil
 }
 
@@ -628,7 +628,7 @@ func runConfigRoleRemove(cmd *cobra.Command, args []string) error {
 		}
 
 		if isTTY {
-			fmt.Fprintf(stdout, "Remove role %q from %s config? [y/N] ", name, scopeString(local))
+			_, _ = fmt.Fprintf(stdout, "Remove role %q from %s config? [y/N] ", name, scopeString(local))
 			reader := bufio.NewReader(stdin)
 			input, err := reader.ReadString('\n')
 			if err != nil {
@@ -636,7 +636,7 @@ func runConfigRoleRemove(cmd *cobra.Command, args []string) error {
 			}
 			input = strings.TrimSpace(strings.ToLower(input))
 			if input != "y" && input != "yes" {
-				fmt.Fprintln(stdout, "Cancelled.")
+				_, _ = fmt.Fprintln(stdout, "Cancelled.")
 				return nil
 			}
 		}
@@ -653,7 +653,7 @@ func runConfigRoleRemove(cmd *cobra.Command, args []string) error {
 
 	flags := getFlags(cmd)
 	if !flags.Quiet {
-		fmt.Fprintf(stdout, "Removed role %q\n", name)
+		_, _ = fmt.Fprintf(stdout, "Removed role %q\n", name)
 	}
 
 	return nil
@@ -696,14 +696,14 @@ func runConfigRoleDefault(cmd *cobra.Command, args []string) error {
 	if len(args) == 0 {
 		cfg, err := loadConfigForScope(local)
 		if err != nil {
-			fmt.Fprintln(stdout, "No default role set.")
+			_, _ = fmt.Fprintln(stdout, "No default role set.")
 			return nil
 		}
 		defaultRole := getDefaultRoleFromConfig(cfg)
 		if defaultRole == "" {
-			fmt.Fprintln(stdout, "No default role set.")
+			_, _ = fmt.Fprintln(stdout, "No default role set.")
 		} else {
-			fmt.Fprintf(stdout, "Default role: %s\n", defaultRole)
+			_, _ = fmt.Fprintf(stdout, "Default role: %s\n", defaultRole)
 		}
 		return nil
 	}
@@ -733,7 +733,7 @@ func runConfigRoleDefault(cmd *cobra.Command, args []string) error {
 
 	flags := getFlags(cmd)
 	if !flags.Quiet {
-		fmt.Fprintf(stdout, "Set default role to %q\n", name)
+		_, _ = fmt.Fprintf(stdout, "Set default role to %q\n", name)
 	}
 
 	return nil

@@ -85,11 +85,11 @@ tasks: {
 
 	// Also set temp HOME for global scope isolation
 	origHome := os.Getenv("HOME")
-	os.Setenv("HOME", dir)
+	_ = os.Setenv("HOME", dir)
 
 	cleanup := func() {
 		_ = os.Chdir(origDir)
-		os.Setenv("HOME", origHome)
+		_ = os.Setenv("HOME", origHome)
 	}
 
 	return dir, cleanup

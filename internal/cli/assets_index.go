@@ -288,7 +288,7 @@ func generateIndexCUE(index *ScannedIndex) string {
 
 // writeIndexCategory writes a category to the index.
 func writeIndexCategory(sb *strings.Builder, name string, assets []ScannedAsset, includeBin bool) {
-	sb.WriteString(fmt.Sprintf("%s: {\n", name))
+	_, _ = fmt.Fprintf(sb, "%s: {\n", name)
 
 	for _, asset := range assets {
 		// Use quoted key for paths with slashes
@@ -297,11 +297,11 @@ func writeIndexCategory(sb *strings.Builder, name string, assets []ScannedAsset,
 			key = fmt.Sprintf("%q", key)
 		}
 
-		sb.WriteString(fmt.Sprintf("\t%s: {\n", key))
-		sb.WriteString(fmt.Sprintf("\t\tmodule: %q\n", asset.Module))
+		_, _ = fmt.Fprintf(sb, "\t%s: {\n", key)
+		_, _ = fmt.Fprintf(sb, "\t\tmodule: %q\n", asset.Module)
 
 		if asset.Description != "" {
-			sb.WriteString(fmt.Sprintf("\t\tdescription: %q\n", asset.Description))
+			_, _ = fmt.Fprintf(sb, "\t\tdescription: %q\n", asset.Description)
 		}
 
 		if len(asset.Tags) > 0 {
@@ -310,13 +310,13 @@ func writeIndexCategory(sb *strings.Builder, name string, assets []ScannedAsset,
 				if i > 0 {
 					sb.WriteString(", ")
 				}
-				sb.WriteString(fmt.Sprintf("%q", tag))
+				_, _ = fmt.Fprintf(sb, "%q", tag)
 			}
 			sb.WriteString("]\n")
 		}
 
 		if includeBin && asset.Bin != "" {
-			sb.WriteString(fmt.Sprintf("\t\tbin: %q\n", asset.Bin))
+			_, _ = fmt.Fprintf(sb, "\t\tbin: %q\n", asset.Bin)
 		}
 
 		sb.WriteString("\t}\n")
@@ -329,10 +329,10 @@ func writeIndexCategory(sb *strings.Builder, name string, assets []ScannedAsset,
 func printIndexSummary(w io.Writer, index *ScannedIndex, path string) {
 	total := len(index.Agents) + len(index.Roles) + len(index.Tasks) + len(index.Contexts)
 
-	fmt.Fprintf(w, "Generated index: %s\n\n", path)
-	fmt.Fprintf(w, "Assets indexed: %d\n", total)
-	fmt.Fprintf(w, "  Agents:   %d\n", len(index.Agents))
-	fmt.Fprintf(w, "  Roles:    %d\n", len(index.Roles))
-	fmt.Fprintf(w, "  Tasks:    %d\n", len(index.Tasks))
-	fmt.Fprintf(w, "  Contexts: %d\n", len(index.Contexts))
+	_, _ = fmt.Fprintf(w, "Generated index: %s\n\n", path)
+	_, _ = fmt.Fprintf(w, "Assets indexed: %d\n", total)
+	_, _ = fmt.Fprintf(w, "  Agents:   %d\n", len(index.Agents))
+	_, _ = fmt.Fprintf(w, "  Roles:    %d\n", len(index.Roles))
+	_, _ = fmt.Fprintf(w, "  Tasks:    %d\n", len(index.Tasks))
+	_, _ = fmt.Fprintf(w, "  Contexts: %d\n", len(index.Contexts))
 }

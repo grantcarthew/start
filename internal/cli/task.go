@@ -223,26 +223,26 @@ func printTaskExecutionInfo(w io.Writer, agent orchestration.Agent, model string
 	if modelStr == "" {
 		modelStr = "-"
 	}
-	fmt.Fprintf(w, "Agent: %s\n", agent.Name)
-	fmt.Fprintf(w, "Model: %s\n", modelStr)
-	fmt.Fprintln(w)
+	_, _ = fmt.Fprintf(w, "Agent: %s\n", agent.Name)
+	_, _ = fmt.Fprintf(w, "Model: %s\n", modelStr)
+	_, _ = fmt.Fprintln(w)
 
 	PrintContextTable(w, result.Contexts)
 
 	if result.RoleName != "" {
-		fmt.Fprintf(w, "Role: %s\n", result.RoleName)
+		_, _ = fmt.Fprintf(w, "Role: %s\n", result.RoleName)
 	}
 
 	if taskResult.CommandExecuted {
-		fmt.Fprintln(w, "Command: executed")
+		_, _ = fmt.Fprintln(w, "Command: executed")
 	}
 
 	if instructions != "" {
-		fmt.Fprintf(w, "Instructions: %s\n", instructions)
+		_, _ = fmt.Fprintf(w, "Instructions: %s\n", instructions)
 	}
 
-	fmt.Fprintln(w)
-	fmt.Fprintf(w, "Starting %s - awaiting response...\n", agent.Name)
+	_, _ = fmt.Fprintln(w)
+	_, _ = fmt.Fprintf(w, "Starting %s - awaiting response...\n", agent.Name)
 }
 
 // printTaskDryRunSummary prints the task dry-run summary.
@@ -257,34 +257,34 @@ func printTaskDryRunSummary(w io.Writer, agent orchestration.Agent, model string
 	if modelStr == "" {
 		modelStr = "-"
 	}
-	fmt.Fprintf(w, "Agent: %s\n", agent.Name)
-	fmt.Fprintf(w, "Model: %s\n", modelStr)
-	fmt.Fprintf(w, "Role: %s\n", result.RoleName)
-	fmt.Fprintln(w)
+	_, _ = fmt.Fprintf(w, "Agent: %s\n", agent.Name)
+	_, _ = fmt.Fprintf(w, "Model: %s\n", modelStr)
+	_, _ = fmt.Fprintf(w, "Role: %s\n", result.RoleName)
+	_, _ = fmt.Fprintln(w)
 
 	PrintContextTable(w, result.Contexts)
 
 	if instructions != "" {
-		fmt.Fprintf(w, "Instructions: %s\n", instructions)
-		fmt.Fprintln(w)
+		_, _ = fmt.Fprintf(w, "Instructions: %s\n", instructions)
+		_, _ = fmt.Fprintln(w)
 	}
 
 	// Show role preview
 	if result.Role != "" {
 		printContentPreview(w, "Role", result.Role, 5)
-		fmt.Fprintln(w)
+		_, _ = fmt.Fprintln(w)
 	}
 
 	// Show prompt preview
 	if result.Prompt != "" {
 		printContentPreview(w, "Prompt", result.Prompt, 5)
-		fmt.Fprintln(w)
+		_, _ = fmt.Fprintln(w)
 	}
 
-	fmt.Fprintf(w, "Files: %s/\n", dir)
-	fmt.Fprintln(w, "  role.md")
-	fmt.Fprintln(w, "  prompt.md")
-	fmt.Fprintln(w, "  command.txt")
+	_, _ = fmt.Fprintf(w, "Files: %s/\n", dir)
+	_, _ = fmt.Fprintln(w, "  role.md")
+	_, _ = fmt.Fprintln(w, "  prompt.md")
+	_, _ = fmt.Fprintln(w, "  command.txt")
 }
 
 // findTask attempts to find a task by exact name or prefix match.
@@ -346,7 +346,7 @@ func tryInstallTaskFromRegistry(stdout, stderr io.Writer, flags *Flags, taskName
 
 	// Fetch index
 	if !flags.Quiet {
-		fmt.Fprintln(stdout, "Task not found locally, checking registry...")
+		_, _ = fmt.Fprintln(stdout, "Task not found locally, checking registry...")
 	}
 	index, err := client.FetchIndex(ctx)
 	if err != nil {
@@ -361,8 +361,8 @@ func tryInstallTaskFromRegistry(stdout, stderr io.Writer, flags *Flags, taskName
 	}
 
 	if !flags.Quiet {
-		fmt.Fprintf(stdout, "Found in registry: %s/%s\n", result.Category, result.Name)
-		fmt.Fprintln(stdout, "Installing...")
+		_, _ = fmt.Fprintf(stdout, "Found in registry: %s/%s\n", result.Category, result.Name)
+		_, _ = fmt.Fprintln(stdout, "Installing...")
 	}
 
 	// Install the task using the same logic as assets add
@@ -411,7 +411,7 @@ func tryInstallTaskFromRegistry(stdout, stderr io.Writer, flags *Flags, taskName
 	}
 
 	if !flags.Quiet {
-		fmt.Fprintf(stdout, "Installed %s/%s to global config\n\n", result.Category, result.Name)
+		_, _ = fmt.Fprintf(stdout, "Installed %s/%s to global config\n\n", result.Category, result.Name)
 	}
 
 	return true, nil

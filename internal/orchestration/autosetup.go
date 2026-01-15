@@ -61,7 +61,7 @@ func (a *AutoSetup) Run(ctx context.Context) (*AutoSetupResult, error) {
 	}
 
 	// Fetch index
-	fmt.Fprintln(a.stdout, "Fetching agent index...")
+	_, _ = fmt.Fprintln(a.stdout, "Fetching agent index...")
 	index, err := client.FetchIndex(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("fetching index: %w", err)
@@ -82,7 +82,7 @@ func (a *AutoSetup) Run(ctx context.Context) (*AutoSetupResult, error) {
 	var selected detection.DetectedAgent
 	if len(detected) == 1 {
 		selected = detected[0]
-		fmt.Fprintf(a.stdout, "Detected: %s\n", selected.Entry.Bin)
+		_, _ = fmt.Fprintf(a.stdout, "Detected: %s\n", selected.Entry.Bin)
 	} else {
 		selected, err = a.promptSelection(detected)
 		if err != nil {
@@ -91,7 +91,7 @@ func (a *AutoSetup) Run(ctx context.Context) (*AutoSetupResult, error) {
 	}
 
 	// Resolve to canonical version and fetch agent module
-	fmt.Fprintln(a.stdout, "Fetching configuration...")
+	_, _ = fmt.Fprintln(a.stdout, "Fetching configuration...")
 	resolvedPath, err := client.ResolveLatestVersion(ctx, selected.Entry.Module)
 	if err != nil {
 		return nil, fmt.Errorf("resolving agent version: %w", err)
@@ -114,7 +114,7 @@ func (a *AutoSetup) Run(ctx context.Context) (*AutoSetupResult, error) {
 		return nil, fmt.Errorf("writing config: %w", err)
 	}
 
-	fmt.Fprintf(a.stdout, "Configuration saved to %s\n", configPath)
+	_, _ = fmt.Fprintf(a.stdout, "Configuration saved to %s\n", configPath)
 
 	return &AutoSetupResult{
 		Agent:      agent,
@@ -170,19 +170,19 @@ func (a *AutoSetup) promptSelection(detected []detection.DetectedAgent) (detecti
 		)
 	}
 
-	fmt.Fprintln(a.stdout, "Multiple AI CLI tools detected:")
-	fmt.Fprintln(a.stdout)
+	_, _ = fmt.Fprintln(a.stdout, "Multiple AI CLI tools detected:")
+	_, _ = fmt.Fprintln(a.stdout)
 
 	for i, d := range detected {
 		if d.Entry.Description != "" {
-			fmt.Fprintf(a.stdout, "  %d. %s - %s\n", i+1, d.Entry.Bin, d.Entry.Description)
+			_, _ = fmt.Fprintf(a.stdout, "  %d. %s - %s\n", i+1, d.Entry.Bin, d.Entry.Description)
 		} else {
-			fmt.Fprintf(a.stdout, "  %d. %s\n", i+1, d.Entry.Bin)
+			_, _ = fmt.Fprintf(a.stdout, "  %d. %s\n", i+1, d.Entry.Bin)
 		}
 	}
 
-	fmt.Fprintln(a.stdout)
-	fmt.Fprint(a.stdout, "Select agent: ")
+	_, _ = fmt.Fprintln(a.stdout)
+	_, _ = fmt.Fprint(a.stdout, "Select agent: ")
 
 	reader := bufio.NewReader(a.stdin)
 	input, err := reader.ReadString('\n')

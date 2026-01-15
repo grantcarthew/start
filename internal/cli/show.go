@@ -97,42 +97,42 @@ func runShow(cmd *cobra.Command, args []string) error {
 
 	// Show agents
 	if result, err := prepareShowAgent("", scope); err == nil {
-		fmt.Fprintln(w, "Agents:")
+		_, _ = fmt.Fprintln(w, "Agents:")
 		for _, name := range result.AllNames {
-			fmt.Fprintf(w, "  %s\n", name)
+			_, _ = fmt.Fprintf(w, "  %s\n", name)
 		}
-		fmt.Fprintln(w)
+		_, _ = fmt.Fprintln(w)
 	}
 
 	// Show roles
 	if result, err := prepareShowRole("", scope); err == nil {
-		fmt.Fprintln(w, "Roles:")
+		_, _ = fmt.Fprintln(w, "Roles:")
 		for _, name := range result.AllNames {
-			fmt.Fprintf(w, "  %s\n", name)
+			_, _ = fmt.Fprintf(w, "  %s\n", name)
 		}
-		fmt.Fprintln(w)
+		_, _ = fmt.Fprintln(w)
 	}
 
 	// Show contexts
 	if result, err := prepareShowContext("", scope); err == nil {
-		fmt.Fprintln(w, "Contexts:")
+		_, _ = fmt.Fprintln(w, "Contexts:")
 		for _, name := range result.AllNames {
-			fmt.Fprintf(w, "  %s\n", name)
+			_, _ = fmt.Fprintf(w, "  %s\n", name)
 		}
 		if len(result.RequiredContexts) > 0 {
-			fmt.Fprintf(w, "  Required: %v\n", result.RequiredContexts)
+			_, _ = fmt.Fprintf(w, "  Required: %v\n", result.RequiredContexts)
 		}
 		if len(result.DefaultContexts) > 0 {
-			fmt.Fprintf(w, "  Default: %v\n", result.DefaultContexts)
+			_, _ = fmt.Fprintf(w, "  Default: %v\n", result.DefaultContexts)
 		}
-		fmt.Fprintln(w)
+		_, _ = fmt.Fprintln(w)
 	}
 
 	// Show tasks
 	if result, err := prepareShowTask("", scope); err == nil {
-		fmt.Fprintln(w, "Tasks:")
+		_, _ = fmt.Fprintln(w, "Tasks:")
 		for _, name := range result.AllNames {
-			fmt.Fprintf(w, "  %s\n", name)
+			_, _ = fmt.Fprintf(w, "  %s\n", name)
 		}
 	}
 
@@ -607,24 +607,24 @@ func printPreview(w io.Writer, r ShowResult) {
 
 	// Show list of all items if available (for agent/role)
 	if len(r.AllNames) > 0 {
-		fmt.Fprintf(w, "%ss: %s\n", r.ItemType, strings.Join(r.AllNames, ", "))
-		fmt.Fprintln(w)
+		_, _ = fmt.Fprintf(w, "%ss: %s\n", r.ItemType, strings.Join(r.AllNames, ", "))
+		_, _ = fmt.Fprintln(w)
 	}
 
 	// Show which item and why
 	if r.ShowReason != "" {
-		fmt.Fprintf(w, "Showing: %s (%s)\n", r.Name, r.ShowReason)
+		_, _ = fmt.Fprintf(w, "Showing: %s (%s)\n", r.Name, r.ShowReason)
 	} else {
-		fmt.Fprintf(w, "%s: %s\n", r.ItemType, r.Name)
+		_, _ = fmt.Fprintf(w, "%s: %s\n", r.ItemType, r.Name)
 	}
-	fmt.Fprintln(w, strings.Repeat("─", 79))
+	_, _ = fmt.Fprintln(w, strings.Repeat("─", 79))
 
 	// Show full content
-	fmt.Fprint(w, r.Content)
+	_, _ = fmt.Fprint(w, r.Content)
 	if !strings.HasSuffix(r.Content, "\n") {
-		fmt.Fprintln(w)
+		_, _ = fmt.Fprintln(w)
 	}
-	fmt.Fprintln(w, strings.Repeat("─", 79))
+	_, _ = fmt.Fprintln(w, strings.Repeat("─", 79))
 }
 
 // printListOnly prints a list-only result without content preview.
@@ -632,18 +632,18 @@ func printListOnly(w io.Writer, r ShowResult) {
 	// Pluralize item type for header
 	plural := r.ItemType + "s"
 
-	fmt.Fprintf(w, "%s: %s\n", plural, strings.Join(r.AllNames, ", "))
+	_, _ = fmt.Fprintf(w, "%s: %s\n", plural, strings.Join(r.AllNames, ", "))
 
 	// Context-specific fields
 	if r.ItemType == "Context" {
 		if len(r.DefaultContexts) > 0 {
-			fmt.Fprintf(w, "\nDefault: %s\n", strings.Join(r.DefaultContexts, ", "))
+			_, _ = fmt.Fprintf(w, "\nDefault: %s\n", strings.Join(r.DefaultContexts, ", "))
 		}
 		if len(r.RequiredContexts) > 0 {
-			fmt.Fprintf(w, "Required: %s\n", strings.Join(r.RequiredContexts, ", "))
+			_, _ = fmt.Fprintf(w, "Required: %s\n", strings.Join(r.RequiredContexts, ", "))
 		}
 		if len(r.AllTags) > 0 {
-			fmt.Fprintf(w, "\nTags: %s\n", strings.Join(r.AllTags, ", "))
+			_, _ = fmt.Fprintf(w, "\nTags: %s\n", strings.Join(r.AllTags, ", "))
 		}
 	}
 }

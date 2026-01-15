@@ -72,13 +72,13 @@ func runConfigTaskList(cmd *cobra.Command, _ []string) error {
 	}
 
 	if len(tasks) == 0 {
-		fmt.Fprintln(cmd.OutOrStdout(), "No tasks configured.")
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "No tasks configured.")
 		return nil
 	}
 
 	w := cmd.OutOrStdout()
-	fmt.Fprintln(w, "Tasks:")
-	fmt.Fprintln(w)
+	_, _ = fmt.Fprintln(w, "Tasks:")
+	_, _ = fmt.Fprintln(w)
 
 	// Sort task names for consistent output
 	var names []string
@@ -94,9 +94,9 @@ func runConfigTaskList(cmd *cobra.Command, _ []string) error {
 			source += ", registry"
 		}
 		if task.Description != "" {
-			fmt.Fprintf(w, "  %s - %s (%s)\n", name, task.Description, source)
+			_, _ = fmt.Fprintf(w, "  %s - %s (%s)\n", name, task.Description, source)
 		} else {
-			fmt.Fprintf(w, "  %s (%s)\n", name, source)
+			_, _ = fmt.Fprintf(w, "  %s (%s)\n", name, source)
 		}
 	}
 
@@ -190,11 +190,11 @@ func runConfigTaskAdd(cmd *cobra.Command, _ []string) error {
 	}
 
 	if sourceCount == 0 && interactive {
-		fmt.Fprintln(stdout, "\nContent source (choose one):")
-		fmt.Fprintln(stdout, "  1. File path")
-		fmt.Fprintln(stdout, "  2. Command")
-		fmt.Fprintln(stdout, "  3. Inline prompt")
-		fmt.Fprint(stdout, "Choice [3]: ")
+		_, _ = fmt.Fprintln(stdout, "\nContent source (choose one):")
+		_, _ = fmt.Fprintln(stdout, "  1. File path")
+		_, _ = fmt.Fprintln(stdout, "  2. Command")
+		_, _ = fmt.Fprintln(stdout, "  3. Inline prompt")
+		_, _ = fmt.Fprint(stdout, "Choice [3]: ")
 
 		reader := bufio.NewReader(stdin)
 		choice, err := reader.ReadString('\n')
@@ -311,8 +311,8 @@ func runConfigTaskAdd(cmd *cobra.Command, _ []string) error {
 
 	flags := getFlags(cmd)
 	if !flags.Quiet {
-		fmt.Fprintf(stdout, "Added task %q to %s config\n", name, scopeName)
-		fmt.Fprintf(stdout, "Config: %s\n", taskPath)
+		_, _ = fmt.Fprintf(stdout, "Added task %q to %s config\n", name, scopeName)
+		_, _ = fmt.Fprintf(stdout, "Config: %s\n", taskPath)
 	}
 
 	return nil
@@ -349,27 +349,27 @@ func runConfigTaskInfo(cmd *cobra.Command, args []string) error {
 	}
 
 	w := cmd.OutOrStdout()
-	fmt.Fprintf(w, "Task: %s\n", name)
-	fmt.Fprintln(w, strings.Repeat("─", 40))
-	fmt.Fprintf(w, "Source: %s\n", task.Source)
+	_, _ = fmt.Fprintf(w, "Task: %s\n", name)
+	_, _ = fmt.Fprintln(w, strings.Repeat("─", 40))
+	_, _ = fmt.Fprintf(w, "Source: %s\n", task.Source)
 
 	if task.Description != "" {
-		fmt.Fprintf(w, "Description: %s\n", task.Description)
+		_, _ = fmt.Fprintf(w, "Description: %s\n", task.Description)
 	}
 	if task.File != "" {
-		fmt.Fprintf(w, "File: %s\n", task.File)
+		_, _ = fmt.Fprintf(w, "File: %s\n", task.File)
 	}
 	if task.Command != "" {
-		fmt.Fprintf(w, "Command: %s\n", task.Command)
+		_, _ = fmt.Fprintf(w, "Command: %s\n", task.Command)
 	}
 	if task.Prompt != "" {
-		fmt.Fprintf(w, "Prompt: %s\n", truncatePrompt(task.Prompt, 100))
+		_, _ = fmt.Fprintf(w, "Prompt: %s\n", truncatePrompt(task.Prompt, 100))
 	}
 	if task.Role != "" {
-		fmt.Fprintf(w, "Role: %s\n", task.Role)
+		_, _ = fmt.Fprintf(w, "Role: %s\n", task.Role)
 	}
 	if len(task.Tags) > 0 {
-		fmt.Fprintf(w, "Tags: %s\n", strings.Join(task.Tags, ", "))
+		_, _ = fmt.Fprintf(w, "Tags: %s\n", strings.Join(task.Tags, ", "))
 	}
 
 	return nil
@@ -474,7 +474,7 @@ func runConfigTaskEdit(cmd *cobra.Command, args []string) error {
 
 		flags := getFlags(cmd)
 		if !flags.Quiet {
-			fmt.Fprintf(stdout, "Updated task %q\n", name)
+			_, _ = fmt.Fprintf(stdout, "Updated task %q\n", name)
 		}
 		return nil
 	}
@@ -489,7 +489,7 @@ func runConfigTaskEdit(cmd *cobra.Command, args []string) error {
 	}
 
 	// Prompt for each field with current value as default
-	fmt.Fprintf(stdout, "Editing task %q (press Enter to keep current value)\n\n", name)
+	_, _ = fmt.Fprintf(stdout, "Editing task %q (press Enter to keep current value)\n\n", name)
 
 	newDescription, err := promptString(stdout, stdin, "Description", task.Description)
 	if err != nil {
@@ -497,18 +497,18 @@ func runConfigTaskEdit(cmd *cobra.Command, args []string) error {
 	}
 
 	// For content source, show current and allow change
-	fmt.Fprintln(stdout, "\nCurrent content source:")
+	_, _ = fmt.Fprintln(stdout, "\nCurrent content source:")
 	if task.File != "" {
-		fmt.Fprintf(stdout, "  File: %s\n", task.File)
+		_, _ = fmt.Fprintf(stdout, "  File: %s\n", task.File)
 	}
 	if task.Command != "" {
-		fmt.Fprintf(stdout, "  Command: %s\n", task.Command)
+		_, _ = fmt.Fprintf(stdout, "  Command: %s\n", task.Command)
 	}
 	if task.Prompt != "" {
-		fmt.Fprintf(stdout, "  Prompt: %s\n", truncatePrompt(task.Prompt, 50))
+		_, _ = fmt.Fprintf(stdout, "  Prompt: %s\n", truncatePrompt(task.Prompt, 50))
 	}
 
-	fmt.Fprint(stdout, "Keep current? [Y/n] ")
+	_, _ = fmt.Fprint(stdout, "Keep current? [Y/n] ")
 	reader := bufio.NewReader(stdin)
 	input, err := reader.ReadString('\n')
 	if err != nil {
@@ -525,11 +525,11 @@ func runConfigTaskEdit(cmd *cobra.Command, args []string) error {
 		newCommand = ""
 		newPrompt = ""
 
-		fmt.Fprintln(stdout, "\nNew content source:")
-		fmt.Fprintln(stdout, "  1. File path")
-		fmt.Fprintln(stdout, "  2. Command")
-		fmt.Fprintln(stdout, "  3. Inline prompt")
-		fmt.Fprint(stdout, "Choice [3]: ")
+		_, _ = fmt.Fprintln(stdout, "\nNew content source:")
+		_, _ = fmt.Fprintln(stdout, "  1. File path")
+		_, _ = fmt.Fprintln(stdout, "  2. Command")
+		_, _ = fmt.Fprintln(stdout, "  3. Inline prompt")
+		_, _ = fmt.Fprint(stdout, "Choice [3]: ")
 
 		choice, err := reader.ReadString('\n')
 		if err != nil {
@@ -578,7 +578,7 @@ func runConfigTaskEdit(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("writing tasks file: %w", err)
 	}
 
-	fmt.Fprintf(stdout, "\nUpdated task %q\n", name)
+	_, _ = fmt.Fprintf(stdout, "\nUpdated task %q\n", name)
 	return nil
 }
 
@@ -637,7 +637,7 @@ func runConfigTaskRemove(cmd *cobra.Command, args []string) error {
 		}
 
 		if isTTY {
-			fmt.Fprintf(stdout, "Remove task %q from %s config? [y/N] ", name, scopeString(local))
+			_, _ = fmt.Fprintf(stdout, "Remove task %q from %s config? [y/N] ", name, scopeString(local))
 			reader := bufio.NewReader(stdin)
 			input, err := reader.ReadString('\n')
 			if err != nil {
@@ -645,7 +645,7 @@ func runConfigTaskRemove(cmd *cobra.Command, args []string) error {
 			}
 			input = strings.TrimSpace(strings.ToLower(input))
 			if input != "y" && input != "yes" {
-				fmt.Fprintln(stdout, "Cancelled.")
+				_, _ = fmt.Fprintln(stdout, "Cancelled.")
 				return nil
 			}
 		}
@@ -662,7 +662,7 @@ func runConfigTaskRemove(cmd *cobra.Command, args []string) error {
 
 	flags := getFlags(cmd)
 	if !flags.Quiet {
-		fmt.Fprintf(stdout, "Removed task %q\n", name)
+		_, _ = fmt.Fprintf(stdout, "Removed task %q\n", name)
 	}
 
 	return nil

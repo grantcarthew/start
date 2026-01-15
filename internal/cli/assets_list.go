@@ -53,7 +53,7 @@ func runAssetsList(cmd *cobra.Command, args []string) error {
 	}
 
 	if !paths.AnyExists() {
-		fmt.Fprintln(cmd.OutOrStdout(), "No configuration found. Run 'start' to set up.")
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "No configuration found. Run 'start' to set up.")
 		return nil
 	}
 
@@ -69,7 +69,7 @@ func runAssetsList(cmd *cobra.Command, args []string) error {
 	installed := collectInstalledAssets(cfg.Value, paths)
 
 	if len(installed) == 0 {
-		fmt.Fprintln(cmd.OutOrStdout(), "No assets installed from registry.")
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "No assets installed from registry.")
 		return nil
 	}
 
@@ -85,7 +85,7 @@ func runAssetsList(cmd *cobra.Command, args []string) error {
 		installed = filtered
 
 		if len(installed) == 0 {
-			fmt.Fprintf(cmd.OutOrStdout(), "No %s installed from registry.\n", assetType)
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "No %s installed from registry.\n", assetType)
 			return nil
 		}
 	}
@@ -193,8 +193,8 @@ func findInIndex(index *registry.Index, category, name string) *registry.IndexEn
 
 // printInstalledAssets prints the list of installed assets.
 func printInstalledAssets(w io.Writer, installed []InstalledAsset, verbose bool) {
-	fmt.Fprintln(w, "Installed assets:")
-	fmt.Fprintln(w)
+	_, _ = fmt.Fprintln(w, "Installed assets:")
+	_, _ = fmt.Fprintln(w)
 
 	// Group by category
 	grouped := make(map[string][]InstalledAsset)
@@ -209,22 +209,22 @@ func printInstalledAssets(w io.Writer, installed []InstalledAsset, verbose bool)
 			continue
 		}
 
-		fmt.Fprintf(w, "%s/\n", cat)
+		_, _ = fmt.Fprintf(w, "%s/\n", cat)
 		for _, a := range assets {
 			if verbose && a.LatestVer != "" {
 				if a.UpdateAvail {
-					fmt.Fprintf(w, "  %-25s %s (update available: %s)\n", a.Name, a.InstalledVer, a.LatestVer)
+					_, _ = fmt.Fprintf(w, "  %-25s %s (update available: %s)\n", a.Name, a.InstalledVer, a.LatestVer)
 				} else {
-					fmt.Fprintf(w, "  %-25s %s (latest)\n", a.Name, a.LatestVer)
+					_, _ = fmt.Fprintf(w, "  %-25s %s (latest)\n", a.Name, a.LatestVer)
 				}
 			} else {
 				scopeIndicator := ""
 				if verbose {
 					scopeIndicator = fmt.Sprintf(" [%s]", a.Scope)
 				}
-				fmt.Fprintf(w, "  %s%s\n", a.Name, scopeIndicator)
+				_, _ = fmt.Fprintf(w, "  %s%s\n", a.Name, scopeIndicator)
 			}
 		}
-		fmt.Fprintln(w)
+		_, _ = fmt.Fprintln(w)
 	}
 }

@@ -72,13 +72,13 @@ func runConfigContextList(cmd *cobra.Command, _ []string) error {
 	}
 
 	if len(contexts) == 0 {
-		fmt.Fprintln(cmd.OutOrStdout(), "No contexts configured.")
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "No contexts configured.")
 		return nil
 	}
 
 	w := cmd.OutOrStdout()
-	fmt.Fprintln(w, "Contexts:")
-	fmt.Fprintln(w)
+	_, _ = fmt.Fprintln(w, "Contexts:")
+	_, _ = fmt.Fprintln(w)
 
 	// Sort context names for consistent output
 	var names []string
@@ -105,14 +105,14 @@ func runConfigContextList(cmd *cobra.Command, _ []string) error {
 			source += ", registry"
 		}
 		if ctx.Description != "" {
-			fmt.Fprintf(w, "  %s%s - %s (%s)\n", markers, name, ctx.Description, source)
+			_, _ = fmt.Fprintf(w, "  %s%s - %s (%s)\n", markers, name, ctx.Description, source)
 		} else {
-			fmt.Fprintf(w, "  %s%s (%s)\n", markers, name, source)
+			_, _ = fmt.Fprintf(w, "  %s%s (%s)\n", markers, name, source)
 		}
 	}
 
-	fmt.Fprintln(w)
-	fmt.Fprintln(w, "R = required, D = default")
+	_, _ = fmt.Fprintln(w)
+	_, _ = fmt.Fprintln(w, "R = required, D = default")
 
 	return nil
 }
@@ -205,11 +205,11 @@ func runConfigContextAdd(cmd *cobra.Command, _ []string) error {
 	}
 
 	if sourceCount == 0 && interactive {
-		fmt.Fprintln(stdout, "\nContent source (choose one):")
-		fmt.Fprintln(stdout, "  1. File path")
-		fmt.Fprintln(stdout, "  2. Command")
-		fmt.Fprintln(stdout, "  3. Inline content")
-		fmt.Fprint(stdout, "Choice [1]: ")
+		_, _ = fmt.Fprintln(stdout, "\nContent source (choose one):")
+		_, _ = fmt.Fprintln(stdout, "  1. File path")
+		_, _ = fmt.Fprintln(stdout, "  2. Command")
+		_, _ = fmt.Fprintln(stdout, "  3. Inline content")
+		_, _ = fmt.Fprint(stdout, "Choice [1]: ")
 
 		reader := bufio.NewReader(stdin)
 		choice, err := reader.ReadString('\n')
@@ -265,7 +265,7 @@ func runConfigContextAdd(cmd *cobra.Command, _ []string) error {
 	required, _ := cmd.Flags().GetBool("required")
 	isDefault, _ := cmd.Flags().GetBool("default")
 	if isTTY && !required && !isDefault {
-		fmt.Fprint(stdout, "Required (always include)? [y/N] ")
+		_, _ = fmt.Fprint(stdout, "Required (always include)? [y/N] ")
 		reader := bufio.NewReader(stdin)
 		input, err := reader.ReadString('\n')
 		if err != nil {
@@ -275,7 +275,7 @@ func runConfigContextAdd(cmd *cobra.Command, _ []string) error {
 		required = input == "y" || input == "yes"
 
 		if !required {
-			fmt.Fprint(stdout, "Default (include by default)? [y/N] ")
+			_, _ = fmt.Fprint(stdout, "Default (include by default)? [y/N] ")
 			input, err := reader.ReadString('\n')
 			if err != nil {
 				return fmt.Errorf("reading input: %w", err)
@@ -341,8 +341,8 @@ func runConfigContextAdd(cmd *cobra.Command, _ []string) error {
 
 	flags := getFlags(cmd)
 	if !flags.Quiet {
-		fmt.Fprintf(stdout, "Added context %q to %s config\n", name, scopeName)
-		fmt.Fprintf(stdout, "Config: %s\n", contextPath)
+		_, _ = fmt.Fprintf(stdout, "Added context %q to %s config\n", name, scopeName)
+		_, _ = fmt.Fprintf(stdout, "Config: %s\n", contextPath)
 	}
 
 	return nil
@@ -379,26 +379,26 @@ func runConfigContextInfo(cmd *cobra.Command, args []string) error {
 	}
 
 	w := cmd.OutOrStdout()
-	fmt.Fprintf(w, "Context: %s\n", name)
-	fmt.Fprintln(w, strings.Repeat("─", 40))
-	fmt.Fprintf(w, "Source: %s\n", ctx.Source)
+	_, _ = fmt.Fprintf(w, "Context: %s\n", name)
+	_, _ = fmt.Fprintln(w, strings.Repeat("─", 40))
+	_, _ = fmt.Fprintf(w, "Source: %s\n", ctx.Source)
 
 	if ctx.Description != "" {
-		fmt.Fprintf(w, "Description: %s\n", ctx.Description)
+		_, _ = fmt.Fprintf(w, "Description: %s\n", ctx.Description)
 	}
 	if ctx.File != "" {
-		fmt.Fprintf(w, "File: %s\n", ctx.File)
+		_, _ = fmt.Fprintf(w, "File: %s\n", ctx.File)
 	}
 	if ctx.Command != "" {
-		fmt.Fprintf(w, "Command: %s\n", ctx.Command)
+		_, _ = fmt.Fprintf(w, "Command: %s\n", ctx.Command)
 	}
 	if ctx.Prompt != "" {
-		fmt.Fprintf(w, "Prompt: %s\n", truncatePrompt(ctx.Prompt, 100))
+		_, _ = fmt.Fprintf(w, "Prompt: %s\n", truncatePrompt(ctx.Prompt, 100))
 	}
-	fmt.Fprintf(w, "Required: %t\n", ctx.Required)
-	fmt.Fprintf(w, "Default: %t\n", ctx.Default)
+	_, _ = fmt.Fprintf(w, "Required: %t\n", ctx.Required)
+	_, _ = fmt.Fprintf(w, "Default: %t\n", ctx.Default)
 	if len(ctx.Tags) > 0 {
-		fmt.Fprintf(w, "Tags: %s\n", strings.Join(ctx.Tags, ", "))
+		_, _ = fmt.Fprintf(w, "Tags: %s\n", strings.Join(ctx.Tags, ", "))
 	}
 
 	return nil
@@ -507,7 +507,7 @@ func runConfigContextEdit(cmd *cobra.Command, args []string) error {
 
 		flags := getFlags(cmd)
 		if !flags.Quiet {
-			fmt.Fprintf(stdout, "Updated context %q\n", name)
+			_, _ = fmt.Fprintf(stdout, "Updated context %q\n", name)
 		}
 		return nil
 	}
@@ -522,7 +522,7 @@ func runConfigContextEdit(cmd *cobra.Command, args []string) error {
 	}
 
 	// Prompt for each field with current value as default
-	fmt.Fprintf(stdout, "Editing context %q (press Enter to keep current value)\n\n", name)
+	_, _ = fmt.Fprintf(stdout, "Editing context %q (press Enter to keep current value)\n\n", name)
 
 	newDescription, err := promptString(stdout, stdin, "Description", ctx.Description)
 	if err != nil {
@@ -530,18 +530,18 @@ func runConfigContextEdit(cmd *cobra.Command, args []string) error {
 	}
 
 	// For content source, show current and allow change
-	fmt.Fprintln(stdout, "\nCurrent content source:")
+	_, _ = fmt.Fprintln(stdout, "\nCurrent content source:")
 	if ctx.File != "" {
-		fmt.Fprintf(stdout, "  File: %s\n", ctx.File)
+		_, _ = fmt.Fprintf(stdout, "  File: %s\n", ctx.File)
 	}
 	if ctx.Command != "" {
-		fmt.Fprintf(stdout, "  Command: %s\n", ctx.Command)
+		_, _ = fmt.Fprintf(stdout, "  Command: %s\n", ctx.Command)
 	}
 	if ctx.Prompt != "" {
-		fmt.Fprintf(stdout, "  Prompt: %s\n", truncatePrompt(ctx.Prompt, 50))
+		_, _ = fmt.Fprintf(stdout, "  Prompt: %s\n", truncatePrompt(ctx.Prompt, 50))
 	}
 
-	fmt.Fprint(stdout, "Keep current? [Y/n] ")
+	_, _ = fmt.Fprint(stdout, "Keep current? [Y/n] ")
 	reader := bufio.NewReader(stdin)
 	input, err := reader.ReadString('\n')
 	if err != nil {
@@ -558,11 +558,11 @@ func runConfigContextEdit(cmd *cobra.Command, args []string) error {
 		newCommand = ""
 		newPrompt = ""
 
-		fmt.Fprintln(stdout, "\nNew content source:")
-		fmt.Fprintln(stdout, "  1. File path")
-		fmt.Fprintln(stdout, "  2. Command")
-		fmt.Fprintln(stdout, "  3. Inline content")
-		fmt.Fprint(stdout, "Choice [1]: ")
+		_, _ = fmt.Fprintln(stdout, "\nNew content source:")
+		_, _ = fmt.Fprintln(stdout, "  1. File path")
+		_, _ = fmt.Fprintln(stdout, "  2. Command")
+		_, _ = fmt.Fprintln(stdout, "  3. Inline content")
+		_, _ = fmt.Fprint(stdout, "Choice [1]: ")
 
 		choice, err := reader.ReadString('\n')
 		if err != nil {
@@ -593,7 +593,7 @@ func runConfigContextEdit(cmd *cobra.Command, args []string) error {
 	}
 
 	// Required/default flags
-	fmt.Fprintf(stdout, "\nRequired (currently %t)? [y/N] ", ctx.Required)
+	_, _ = fmt.Fprintf(stdout, "\nRequired (currently %t)? [y/N] ", ctx.Required)
 	input, err = reader.ReadString('\n')
 	if err != nil {
 		return fmt.Errorf("reading input: %w", err)
@@ -603,7 +603,7 @@ func runConfigContextEdit(cmd *cobra.Command, args []string) error {
 
 	newDefault := ctx.Default
 	if !newRequired {
-		fmt.Fprintf(stdout, "Default (currently %t)? [y/N] ", ctx.Default)
+		_, _ = fmt.Fprintf(stdout, "Default (currently %t)? [y/N] ", ctx.Default)
 		input, err = reader.ReadString('\n')
 		if err != nil {
 			return fmt.Errorf("reading input: %w", err)
@@ -626,7 +626,7 @@ func runConfigContextEdit(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("writing contexts file: %w", err)
 	}
 
-	fmt.Fprintf(stdout, "\nUpdated context %q\n", name)
+	_, _ = fmt.Fprintf(stdout, "\nUpdated context %q\n", name)
 	return nil
 }
 
@@ -685,7 +685,7 @@ func runConfigContextRemove(cmd *cobra.Command, args []string) error {
 		}
 
 		if isTTY {
-			fmt.Fprintf(stdout, "Remove context %q from %s config? [y/N] ", name, scopeString(local))
+			_, _ = fmt.Fprintf(stdout, "Remove context %q from %s config? [y/N] ", name, scopeString(local))
 			reader := bufio.NewReader(stdin)
 			input, err := reader.ReadString('\n')
 			if err != nil {
@@ -693,7 +693,7 @@ func runConfigContextRemove(cmd *cobra.Command, args []string) error {
 			}
 			input = strings.TrimSpace(strings.ToLower(input))
 			if input != "y" && input != "yes" {
-				fmt.Fprintln(stdout, "Cancelled.")
+				_, _ = fmt.Fprintln(stdout, "Cancelled.")
 				return nil
 			}
 		}
@@ -710,7 +710,7 @@ func runConfigContextRemove(cmd *cobra.Command, args []string) error {
 
 	flags := getFlags(cmd)
 	if !flags.Quiet {
-		fmt.Fprintf(stdout, "Removed context %q\n", name)
+		_, _ = fmt.Fprintf(stdout, "Removed context %q\n", name)
 	}
 
 	return nil

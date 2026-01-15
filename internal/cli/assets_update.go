@@ -59,7 +59,7 @@ func runAssetsUpdate(cmd *cobra.Command, args []string) error {
 	}
 
 	if !paths.AnyExists() {
-		fmt.Fprintln(cmd.OutOrStdout(), "No configuration found. Run 'start' to set up.")
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "No configuration found. Run 'start' to set up.")
 		return nil
 	}
 
@@ -75,7 +75,7 @@ func runAssetsUpdate(cmd *cobra.Command, args []string) error {
 	installed := collectInstalledAssets(cfg.Value, paths)
 
 	if len(installed) == 0 {
-		fmt.Fprintln(cmd.OutOrStdout(), "No assets installed from registry.")
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "No assets installed from registry.")
 		return nil
 	}
 
@@ -92,7 +92,7 @@ func runAssetsUpdate(cmd *cobra.Command, args []string) error {
 		installed = filtered
 
 		if len(installed) == 0 {
-			fmt.Fprintf(cmd.OutOrStdout(), "No installed assets matching %q\n", query)
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "No installed assets matching %q\n", query)
 			return nil
 		}
 	}
@@ -106,7 +106,7 @@ func runAssetsUpdate(cmd *cobra.Command, args []string) error {
 	// Fetch index for version comparison
 	flags := getFlags(cmd)
 	if !flags.Quiet {
-		fmt.Fprintln(cmd.OutOrStdout(), "Checking for updates...")
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "Checking for updates...")
 	}
 
 	index, err := client.FetchIndex(ctx)
@@ -183,9 +183,9 @@ func checkAndUpdate(ctx context.Context, client *registry.Client, index *registr
 // printUpdateResults prints the results of the update operation.
 func printUpdateResults(w io.Writer, results []UpdateResult, dryRun bool) {
 	if dryRun {
-		fmt.Fprintln(w, "\nDry run - no changes applied:")
+		_, _ = fmt.Fprintln(w, "\nDry run - no changes applied:")
 	} else {
-		fmt.Fprintln(w)
+		_, _ = fmt.Fprintln(w)
 	}
 
 	var updated, current, failed int
@@ -193,27 +193,27 @@ func printUpdateResults(w io.Writer, results []UpdateResult, dryRun bool) {
 	for _, r := range results {
 		prefix := "  "
 		if r.Error != nil {
-			fmt.Fprintf(w, "%sFailed %s/%s: %v\n", prefix, r.Asset.Category, r.Asset.Name, r.Error)
+			_, _ = fmt.Fprintf(w, "%sFailed %s/%s: %v\n", prefix, r.Asset.Category, r.Asset.Name, r.Error)
 			failed++
 		} else if r.Updated {
 			if r.OldVersion != "" && r.NewVersion != "" {
-				fmt.Fprintf(w, "%sUpdated %s/%-20s %s -> %s\n", prefix, r.Asset.Category, r.Asset.Name, r.OldVersion, r.NewVersion)
+				_, _ = fmt.Fprintf(w, "%sUpdated %s/%-20s %s -> %s\n", prefix, r.Asset.Category, r.Asset.Name, r.OldVersion, r.NewVersion)
 			} else if r.NewVersion != "" {
-				fmt.Fprintf(w, "%sUpdated %s/%-20s -> %s\n", prefix, r.Asset.Category, r.Asset.Name, r.NewVersion)
+				_, _ = fmt.Fprintf(w, "%sUpdated %s/%-20s -> %s\n", prefix, r.Asset.Category, r.Asset.Name, r.NewVersion)
 			} else {
-				fmt.Fprintf(w, "%sUpdated %s/%s\n", prefix, r.Asset.Category, r.Asset.Name)
+				_, _ = fmt.Fprintf(w, "%sUpdated %s/%s\n", prefix, r.Asset.Category, r.Asset.Name)
 			}
 			updated++
 		} else {
-			fmt.Fprintf(w, "%sCurrent %s/%s\n", prefix, r.Asset.Category, r.Asset.Name)
+			_, _ = fmt.Fprintf(w, "%sCurrent %s/%s\n", prefix, r.Asset.Category, r.Asset.Name)
 			current++
 		}
 	}
 
-	fmt.Fprintln(w)
-	fmt.Fprintf(w, "Updated: %d, Current: %d", updated, current)
+	_, _ = fmt.Fprintln(w)
+	_, _ = fmt.Fprintf(w, "Updated: %d, Current: %d", updated, current)
 	if failed > 0 {
-		fmt.Fprintf(w, ", Failed: %d", failed)
+		_, _ = fmt.Fprintf(w, ", Failed: %d", failed)
 	}
-	fmt.Fprintln(w)
+	_, _ = fmt.Fprintln(w)
 }

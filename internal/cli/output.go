@@ -21,33 +21,33 @@ var (
 
 // PrintError prints an error message in red.
 func PrintError(w io.Writer, format string, args ...interface{}) {
-	colorError.Fprintf(w, "Error: ")
-	fmt.Fprintf(w, format, args...)
-	fmt.Fprintln(w)
+	_, _ = colorError.Fprintf(w, "Error: ")
+	_, _ = fmt.Fprintf(w, format, args...)
+	_, _ = fmt.Fprintln(w)
 }
 
 // PrintWarning prints a warning message in yellow.
 func PrintWarning(w io.Writer, format string, args ...interface{}) {
-	colorWarning.Fprintf(w, "Warning: ")
-	fmt.Fprintf(w, format, args...)
-	fmt.Fprintln(w)
+	_, _ = colorWarning.Fprintf(w, "Warning: ")
+	_, _ = fmt.Fprintf(w, format, args...)
+	_, _ = fmt.Fprintln(w)
 }
 
 // PrintSuccess prints a success marker (checkmark) in green.
 func PrintSuccess(w io.Writer, text string) {
-	colorSuccess.Fprintf(w, "✓")
-	fmt.Fprintf(w, " %s\n", text)
+	_, _ = colorSuccess.Fprintf(w, "✓")
+	_, _ = fmt.Fprintf(w, " %s\n", text)
 }
 
 // PrintHeader prints a header/title in green with a leading blank line.
 func PrintHeader(w io.Writer, text string) {
-	fmt.Fprintln(w)
-	colorHeader.Fprintln(w, text)
+	_, _ = fmt.Fprintln(w)
+	_, _ = colorHeader.Fprintln(w, text)
 }
 
 // PrintSeparator prints a separator line in magenta.
 func PrintSeparator(w io.Writer) {
-	colorSeparator.Fprintln(w, strings.Repeat("─", 79))
+	_, _ = colorSeparator.Fprintln(w, strings.Repeat("─", 79))
 }
 
 // PrintContextTable prints contexts in a table format.
@@ -57,7 +57,7 @@ func PrintContextTable(w io.Writer, contexts []orchestration.Context) {
 		return
 	}
 
-	fmt.Fprintln(w, "Context documents:")
+	_, _ = fmt.Fprintln(w, "Context documents:")
 
 	// Calculate column widths
 	nameWidth := 4  // "Name" header
@@ -124,19 +124,19 @@ func PrintContextTable(w io.Writer, contexts []orchestration.Context) {
 	}
 
 	// Print header
-	fmt.Fprintf(w, "  %-*s  %s  %-*s  %s\n",
+	_, _ = fmt.Fprintf(w, "  %-*s  %s  %-*s  %s\n",
 		nameWidth, "Name", "Status", flagsWidth, "Flags", "File")
 
 	// Print rows
 	for _, r := range rows {
-		fmt.Fprint(w, "  ")
-		fmt.Fprintf(w, "%-*s  ", nameWidth, r.name)
+		_, _ = fmt.Fprint(w, "  ")
+		_, _ = fmt.Fprintf(w, "%-*s  ", nameWidth, r.name)
 		if r.status == "✓" {
-			colorSuccess.Fprintf(w, "%s", r.status)
+			_, _ = colorSuccess.Fprintf(w, "%s", r.status)
 		} else {
-			fmt.Fprint(w, r.status)
+			_, _ = fmt.Fprint(w, r.status)
 		}
-		fmt.Fprintf(w, "       %-*s  %s\n", flagsWidth, r.flags, r.file)
+		_, _ = fmt.Fprintf(w, "       %-*s  %s\n", flagsWidth, r.flags, r.file)
 	}
-	fmt.Fprintln(w)
+	_, _ = fmt.Fprintln(w)
 }

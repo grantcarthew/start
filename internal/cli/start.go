@@ -48,7 +48,7 @@ func getFlags(cmd *cobra.Command) *Flags {
 // Format: [DEBUG] <category>: <message>
 func debugf(flags *Flags, category, format string, args ...interface{}) {
 	if flags.Debug {
-		fmt.Fprintf(os.Stderr, "[DEBUG] %s: "+format+"\n", append([]interface{}{category}, args...)...)
+		_, _ = fmt.Fprintf(os.Stderr, "[DEBUG] %s: "+format+"\n", append([]interface{}{category}, args...)...)
 	}
 }
 
@@ -257,22 +257,22 @@ func printExecutionInfo(w io.Writer, agent orchestration.Agent, model, modelSour
 	PrintHeader(w, "Starting AI Agent")
 	PrintSeparator(w)
 
-	fmt.Fprintf(w, "Agent: %s\n", agent.Name)
+	_, _ = fmt.Fprintf(w, "Agent: %s\n", agent.Name)
 	if model != "" {
-		fmt.Fprintf(w, "Model: %s (via %s)\n", model, modelSource)
+		_, _ = fmt.Fprintf(w, "Model: %s (via %s)\n", model, modelSource)
 	} else {
-		fmt.Fprintf(w, "Model: -\n")
+		_, _ = fmt.Fprintf(w, "Model: -\n")
 	}
-	fmt.Fprintln(w)
+	_, _ = fmt.Fprintln(w)
 
 	PrintContextTable(w, result.Contexts)
 
 	if result.RoleName != "" {
-		fmt.Fprintf(w, "Role: %s\n", result.RoleName)
-		fmt.Fprintln(w)
+		_, _ = fmt.Fprintf(w, "Role: %s\n", result.RoleName)
+		_, _ = fmt.Fprintln(w)
 	}
 
-	fmt.Fprintf(w, "Starting %s - awaiting response...\n", agent.Name)
+	_, _ = fmt.Fprintf(w, "Starting %s - awaiting response...\n", agent.Name)
 }
 
 // printDryRunSummary prints the dry-run summary per DR-016.
@@ -280,33 +280,33 @@ func printDryRunSummary(w io.Writer, agent orchestration.Agent, model, modelSour
 	PrintHeader(w, "Dry Run - Agent Not Executed")
 	PrintSeparator(w)
 
-	fmt.Fprintf(w, "Agent: %s\n", agent.Name)
+	_, _ = fmt.Fprintf(w, "Agent: %s\n", agent.Name)
 	if model != "" {
-		fmt.Fprintf(w, "Model: %s (via %s)\n", model, modelSource)
+		_, _ = fmt.Fprintf(w, "Model: %s (via %s)\n", model, modelSource)
 	} else {
-		fmt.Fprintf(w, "Model: -\n")
+		_, _ = fmt.Fprintf(w, "Model: -\n")
 	}
-	fmt.Fprintf(w, "Role: %s\n", result.RoleName)
-	fmt.Fprintln(w)
+	_, _ = fmt.Fprintf(w, "Role: %s\n", result.RoleName)
+	_, _ = fmt.Fprintln(w)
 
 	PrintContextTable(w, result.Contexts)
 
 	// Show role preview
 	if result.Role != "" {
 		printContentPreview(w, "Role", result.Role, 5)
-		fmt.Fprintln(w)
+		_, _ = fmt.Fprintln(w)
 	}
 
 	// Show prompt preview
 	if result.Prompt != "" {
 		printContentPreview(w, "Prompt", result.Prompt, 5)
-		fmt.Fprintln(w)
+		_, _ = fmt.Fprintln(w)
 	}
 
-	fmt.Fprintf(w, "Files: %s/\n", dir)
-	fmt.Fprintln(w, "  role.md")
-	fmt.Fprintln(w, "  prompt.md")
-	fmt.Fprintln(w, "  command.txt")
+	_, _ = fmt.Fprintf(w, "Files: %s/\n", dir)
+	_, _ = fmt.Fprintln(w, "  role.md")
+	_, _ = fmt.Fprintln(w, "  prompt.md")
+	_, _ = fmt.Fprintln(w, "  command.txt")
 }
 
 // printContentPreview prints content with a header showing line count only when truncated.
@@ -315,9 +315,9 @@ func printContentPreview(w io.Writer, label, text string, maxLines int) {
 	truncated := len(lines) > maxLines
 
 	if truncated {
-		fmt.Fprintf(w, "%s (%d lines):\n", label, maxLines)
+		_, _ = fmt.Fprintf(w, "%s (%d lines):\n", label, maxLines)
 	} else {
-		fmt.Fprintf(w, "%s:\n", label)
+		_, _ = fmt.Fprintf(w, "%s:\n", label)
 	}
 
 	shown := maxLines
@@ -325,10 +325,10 @@ func printContentPreview(w io.Writer, label, text string, maxLines int) {
 		shown = len(lines)
 	}
 	for i := 0; i < shown; i++ {
-		fmt.Fprintf(w, "  %s\n", lines[i])
+		_, _ = fmt.Fprintf(w, "  %s\n", lines[i])
 	}
 	if truncated {
-		fmt.Fprintf(w, "  ... (%d more lines)\n", len(lines)-maxLines)
+		_, _ = fmt.Fprintf(w, "  ... (%d more lines)\n", len(lines)-maxLines)
 	}
 }
 
@@ -435,6 +435,6 @@ func runAutoSetup(stdout, stderr io.Writer, stdin io.Reader) error {
 		return fmt.Errorf("auto-setup failed: %w", err)
 	}
 
-	fmt.Fprintln(stdout)
+	_, _ = fmt.Fprintln(stdout)
 	return nil
 }

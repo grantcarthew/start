@@ -54,7 +54,7 @@ func runAssetsAdd(cmd *cobra.Command, args []string) error {
 
 	// Fetch index
 	if !flags.Quiet {
-		fmt.Fprintln(cmd.OutOrStdout(), "Fetching index...")
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "Fetching index...")
 	}
 	index, err := client.FetchIndex(ctx)
 	if err != nil {
@@ -103,7 +103,7 @@ func runAssetsAdd(cmd *cobra.Command, args []string) error {
 
 	// Fetch the actual asset module from registry
 	if !flags.Quiet {
-		fmt.Fprintln(cmd.OutOrStdout(), "Fetching asset...")
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "Fetching asset...")
 	}
 
 	modulePath := selected.Entry.Module
@@ -143,8 +143,8 @@ func runAssetsAdd(cmd *cobra.Command, args []string) error {
 	}
 
 	if !flags.Quiet {
-		fmt.Fprintf(cmd.OutOrStdout(), "\nInstalled %s/%s to %s config\n", selected.Category, selected.Name, scopeName)
-		fmt.Fprintf(cmd.OutOrStdout(), "Config: %s\n", configPath)
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "\nInstalled %s/%s to %s config\n", selected.Category, selected.Name, scopeName)
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Config: %s\n", configPath)
 	}
 
 	return nil
@@ -169,14 +169,14 @@ func promptAssetSelection(w io.Writer, r io.Reader, results []SearchResult) (Sea
 		)
 	}
 
-	fmt.Fprintf(w, "Found %d matches:\n\n", len(results))
+	_, _ = fmt.Fprintf(w, "Found %d matches:\n\n", len(results))
 
 	for i, res := range results {
-		fmt.Fprintf(w, "  %d. %s/%s - %s\n", i+1, res.Category, res.Name, res.Entry.Description)
+		_, _ = fmt.Fprintf(w, "  %d. %s/%s - %s\n", i+1, res.Category, res.Name, res.Entry.Description)
 	}
 
-	fmt.Fprintln(w)
-	fmt.Fprint(w, "Select asset (number or name): ")
+	_, _ = fmt.Fprintln(w)
+	_, _ = fmt.Fprint(w, "Select asset (number or name): ")
 
 	reader := bufio.NewReader(r)
 	input, err := reader.ReadString('\n')

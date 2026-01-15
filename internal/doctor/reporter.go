@@ -40,18 +40,18 @@ func (r *Reporter) Print(report Report) {
 
 // printHeader prints the doctor header.
 func (r *Reporter) printHeader() {
-	fmt.Fprintln(r.w, "start doctor")
-	fmt.Fprintln(r.w, strings.Repeat("═", 59))
-	fmt.Fprintln(r.w)
+	_, _ = fmt.Fprintln(r.w, "start doctor")
+	_, _ = fmt.Fprintln(r.w, strings.Repeat("═", 59))
+	_, _ = fmt.Fprintln(r.w)
 }
 
 // printSection prints a single section.
 func (r *Reporter) printSection(section SectionResult) {
 	// Section header
 	if section.Summary != "" {
-		fmt.Fprintf(r.w, "%s (%s)\n", section.Name, section.Summary)
+		_, _ = fmt.Fprintf(r.w, "%s (%s)\n", section.Name, section.Summary)
 	} else {
-		fmt.Fprintln(r.w, section.Name)
+		_, _ = fmt.Fprintln(r.w, section.Name)
 	}
 
 	// Section results
@@ -59,7 +59,7 @@ func (r *Reporter) printSection(section SectionResult) {
 		r.printResult(result, section.NoIcons)
 	}
 
-	fmt.Fprintln(r.w)
+	_, _ = fmt.Fprintln(r.w)
 }
 
 // printResult prints a single check result.
@@ -68,9 +68,9 @@ func (r *Reporter) printResult(result CheckResult, noIcons bool) {
 	if noIcons {
 		// No icons - used for info-only sections like Version, Repository
 		if result.Message == "" {
-			fmt.Fprintf(r.w, "  %s\n", result.Label)
+			_, _ = fmt.Fprintf(r.w, "  %s\n", result.Label)
 		} else {
-			fmt.Fprintf(r.w, "  %-10s %s\n", result.Label+":", result.Message)
+			_, _ = fmt.Fprintf(r.w, "  %-10s %s\n", result.Label+":", result.Message)
 		}
 		return
 	}
@@ -79,35 +79,35 @@ func (r *Reporter) printResult(result CheckResult, noIcons bool) {
 
 	// Format based on content
 	if result.Message == "" {
-		fmt.Fprintf(r.w, "  %s %s\n", symbol, result.Label)
+		_, _ = fmt.Fprintf(r.w, "  %s %s\n", symbol, result.Label)
 	} else {
-		fmt.Fprintf(r.w, "  %s %s - %s\n", symbol, result.Label, result.Message)
+		_, _ = fmt.Fprintf(r.w, "  %s %s - %s\n", symbol, result.Label, result.Message)
 	}
 
 	// Print fix suggestion if present and there's an issue
 	if result.Fix != "" && (result.Status == StatusFail || result.Status == StatusWarn) {
-		fmt.Fprintf(r.w, "    Fix: %s\n", result.Fix)
+		_, _ = fmt.Fprintf(r.w, "    Fix: %s\n", result.Fix)
 	}
 
 	// Print details in verbose mode
 	if r.verbose && len(result.Details) > 0 {
 		for _, detail := range result.Details {
-			fmt.Fprintf(r.w, "    %s\n", detail)
+			_, _ = fmt.Fprintf(r.w, "    %s\n", detail)
 		}
 	}
 }
 
 // printSummary prints the summary section.
 func (r *Reporter) printSummary(report Report) {
-	fmt.Fprintln(r.w, "Summary")
-	fmt.Fprintln(r.w, strings.Repeat("─", 59))
+	_, _ = fmt.Fprintln(r.w, "Summary")
+	_, _ = fmt.Fprintln(r.w, strings.Repeat("─", 59))
 
 	errors := report.ErrorCount()
 	warnings := report.WarnCount()
 
 	if errors == 0 && warnings == 0 {
-		fmt.Fprintln(r.w, "  No issues found")
-		fmt.Fprintln(r.w)
+		_, _ = fmt.Fprintln(r.w, "  No issues found")
+		_, _ = fmt.Fprintln(r.w)
 		return
 	}
 
@@ -125,22 +125,22 @@ func (r *Reporter) printSummary(report Report) {
 			parts[len(parts)-1] += "s"
 		}
 	}
-	fmt.Fprintf(r.w, "  %s found\n", strings.Join(parts, ", "))
-	fmt.Fprintln(r.w)
+	_, _ = fmt.Fprintf(r.w, "  %s found\n", strings.Join(parts, ", "))
+	_, _ = fmt.Fprintln(r.w)
 
 	// List issues
 	issues := report.Issues()
 	if len(issues) > 0 {
-		fmt.Fprintln(r.w, "Issues:")
+		_, _ = fmt.Fprintln(r.w, "Issues:")
 		for _, issue := range issues {
 			symbol := issue.Status.Symbol()
 			if issue.Message != "" {
-				fmt.Fprintf(r.w, "  %s %s: %s\n", symbol, issue.Label, issue.Message)
+				_, _ = fmt.Fprintf(r.w, "  %s %s: %s\n", symbol, issue.Label, issue.Message)
 			} else {
-				fmt.Fprintf(r.w, "  %s %s\n", symbol, issue.Label)
+				_, _ = fmt.Fprintf(r.w, "  %s %s\n", symbol, issue.Label)
 			}
 		}
-		fmt.Fprintln(r.w)
+		_, _ = fmt.Fprintln(r.w)
 	}
 
 	// List recommendations (fixes)
@@ -151,11 +151,11 @@ func (r *Reporter) printSummary(report Report) {
 		}
 	}
 	if len(recommendations) > 0 {
-		fmt.Fprintln(r.w, "Recommendations:")
+		_, _ = fmt.Fprintln(r.w, "Recommendations:")
 		for i, rec := range recommendations {
-			fmt.Fprintf(r.w, "  %d. %s\n", i+1, rec)
+			_, _ = fmt.Fprintf(r.w, "  %d. %s\n", i+1, rec)
 		}
-		fmt.Fprintln(r.w)
+		_, _ = fmt.Fprintln(r.w)
 	}
 }
 
@@ -169,9 +169,9 @@ func (r *Reporter) printQuiet(report Report) {
 		}
 
 		if issue.Message != "" {
-			fmt.Fprintf(r.w, "%s: %s: %s\n", prefix, issue.Label, issue.Message)
+			_, _ = fmt.Fprintf(r.w, "%s: %s: %s\n", prefix, issue.Label, issue.Message)
 		} else {
-			fmt.Fprintf(r.w, "%s: %s\n", prefix, issue.Label)
+			_, _ = fmt.Fprintf(r.w, "%s: %s\n", prefix, issue.Label)
 		}
 	}
 }

@@ -11,8 +11,8 @@ import (
 func main() {
 	if err := cli.Execute(); err != nil {
 		red := color.New(color.FgRed)
-		red.Fprint(os.Stderr, "Error: ")
-		fmt.Fprintln(os.Stderr, err)
+		_, _ = red.Fprint(os.Stderr, "Error: ")
+		_, _ = fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }

@@ -283,7 +283,7 @@ func TestDefaultFileReader_Read(t *testing.T) {
 		if err := os.WriteFile(testFile, []byte("home content"), 0644); err != nil {
 			t.Skip("could not write test file in home directory")
 		}
-		defer os.Remove(testFile)
+		defer func() { _ = os.Remove(testFile) }()
 
 		content, err := reader.Read("~/.start-test-file")
 		if err != nil {

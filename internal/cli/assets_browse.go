@@ -27,7 +27,7 @@ func runAssetsBrowse(cmd *cobra.Command, args []string) error {
 	flags := getFlags(cmd)
 
 	if !flags.Quiet {
-		fmt.Fprintf(cmd.OutOrStdout(), "Opening %s\n", url)
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Opening %s\n", url)
 	}
 
 	return openBrowser(url)

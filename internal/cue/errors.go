@@ -124,7 +124,7 @@ func generateSourceContext(filename string, line, column int) string {
 	if err != nil {
 		return ""
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	// Read relevant lines
 	const contextLines = 2
