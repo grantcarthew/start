@@ -14,6 +14,7 @@ func TestExecute_NoConfig(t *testing.T) {
 }
 
 func TestExecute_Help(t *testing.T) {
+	t.Parallel()
 	buf := new(bytes.Buffer)
 	cmd := NewRootCmd()
 	cmd.SetOut(buf)
@@ -35,6 +36,7 @@ func TestExecute_Help(t *testing.T) {
 }
 
 func TestExecute_Version(t *testing.T) {
+	t.Parallel()
 	buf := new(bytes.Buffer)
 	cmd := NewRootCmd()
 	cmd.SetOut(buf)
@@ -65,6 +67,7 @@ func TestExecute_Version(t *testing.T) {
 }
 
 func TestResolveDirectory(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name    string
 		path    string
@@ -106,6 +109,7 @@ func TestResolveDirectory(t *testing.T) {
 }
 
 func TestDebugImpliesVerbose(t *testing.T) {
+	t.Parallel()
 	// Each NewRootCmd() creates its own Flags - no reset needed
 	cmd := NewRootCmd()
 	cmd.SetArgs([]string{"--debug", "--help"})

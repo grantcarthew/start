@@ -9,6 +9,7 @@ import (
 )
 
 func TestCheckIntro(t *testing.T) {
+	t.Parallel()
 	section := CheckIntro()
 
 	if section.Name != "Repository" {
@@ -29,6 +30,7 @@ func TestCheckIntro(t *testing.T) {
 }
 
 func TestCheckVersion(t *testing.T) {
+	t.Parallel()
 	info := BuildInfo{
 		Version:   "v1.0.0",
 		Commit:    "abc123",
@@ -56,6 +58,7 @@ func TestCheckVersion(t *testing.T) {
 }
 
 func TestCheckConfiguration_NoConfig(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	paths := config.Paths{
 		Global:       filepath.Join(tmpDir, "global"),
@@ -87,6 +90,7 @@ func TestCheckConfiguration_NoConfig(t *testing.T) {
 }
 
 func TestCheckConfiguration_ValidConfig(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	globalDir := filepath.Join(tmpDir, "global")
 	if err := os.MkdirAll(globalDir, 0755); err != nil {
@@ -121,6 +125,7 @@ func TestCheckConfiguration_ValidConfig(t *testing.T) {
 }
 
 func TestCheckConfiguration_InvalidConfig(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	globalDir := filepath.Join(tmpDir, "global")
 	if err := os.MkdirAll(globalDir, 0755); err != nil {
@@ -155,6 +160,7 @@ func TestCheckConfiguration_InvalidConfig(t *testing.T) {
 }
 
 func TestCheckEnvironment(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	globalDir := filepath.Join(tmpDir, "global")
 	if err := os.MkdirAll(globalDir, 0755); err != nil {
@@ -192,6 +198,7 @@ func TestCheckEnvironment(t *testing.T) {
 }
 
 func TestExpandPath(t *testing.T) {
+	t.Parallel()
 	home, err := os.UserHomeDir()
 	if err != nil {
 		t.Skip("Cannot get home directory")
@@ -216,6 +223,7 @@ func TestExpandPath(t *testing.T) {
 }
 
 func TestShortenPath(t *testing.T) {
+	t.Parallel()
 	home, err := os.UserHomeDir()
 	if err != nil {
 		t.Skip("Cannot get home directory")

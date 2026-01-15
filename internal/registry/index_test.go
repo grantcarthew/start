@@ -7,6 +7,7 @@ import (
 )
 
 func TestLoadIndex_ValidIndex(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 
 	// Create a valid index CUE file
@@ -98,6 +99,7 @@ contexts: {
 }
 
 func TestLoadIndex_EmptyCategories(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 
 	// Index with only agents
@@ -135,6 +137,7 @@ agents: {
 }
 
 func TestLoadIndex_InvalidCUE(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 
 	// Invalid CUE syntax
@@ -157,6 +160,7 @@ agents: {
 }
 
 func TestLoadIndex_NonexistentDir(t *testing.T) {
+	t.Parallel()
 	_, err := LoadIndex("/nonexistent/directory/12345", nil)
 	if err == nil {
 		t.Error("expected error for nonexistent directory, got nil")
@@ -164,6 +168,7 @@ func TestLoadIndex_NonexistentDir(t *testing.T) {
 }
 
 func TestLoadIndex_EmptyDir(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 
 	_, err := LoadIndex(tmpDir, nil)
@@ -173,6 +178,7 @@ func TestLoadIndex_EmptyDir(t *testing.T) {
 }
 
 func TestDecodeIndex_AllCategories(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 
 	// Create an index with all categories populated
@@ -254,6 +260,7 @@ contexts: {
 }
 
 func TestDecodeIndex_MinimalEntry(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 
 	// Create an index with minimal entries (only required fields)
@@ -296,6 +303,7 @@ agents: {
 }
 
 func TestDecodeIndex_InvalidEntryType(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 
 	// Create an index with invalid entry type (string instead of struct)
@@ -317,6 +325,7 @@ agents: {
 }
 
 func TestDecodeIndex_WrongPackageName(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 
 	// Create CUE file with wrong package name
@@ -341,6 +350,7 @@ agents: {
 }
 
 func TestDecodeIndex_MultipleFiles(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 
 	// Create multiple CUE files that should be merged

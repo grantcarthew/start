@@ -6,6 +6,7 @@ import (
 )
 
 func TestDetectShell(t *testing.T) {
+	t.Parallel()
 	shell, err := DetectShell()
 	if err != nil {
 		t.Fatalf("DetectShell() error = %v", err)
@@ -23,6 +24,7 @@ func TestDetectShell(t *testing.T) {
 }
 
 func TestIsShellAvailable(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		shell string
 		want  bool

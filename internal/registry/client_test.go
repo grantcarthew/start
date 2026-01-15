@@ -52,6 +52,7 @@ func (m *mockOSRootFS) Open(name string) (fs.File, error) {
 
 // TestSourceLocToPath tests the sourceLocToPath function.
 func TestSourceLocToPath(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name    string
 		loc     module.SourceLoc
@@ -92,6 +93,7 @@ func TestSourceLocToPath(t *testing.T) {
 
 // TestFetch_RetryLogic tests the retry behaviour of Fetch.
 func TestFetch_RetryLogic(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name           string
 		failCount      int // Number of times to fail before succeeding
@@ -171,6 +173,7 @@ func TestFetch_RetryLogic(t *testing.T) {
 
 // TestFetch_ContextCancellation tests that Fetch respects context cancellation.
 func TestFetch_ContextCancellation(t *testing.T) {
+	t.Parallel()
 	mock := &mockRegistry{
 		fetchFunc: func(ctx context.Context, mv module.Version) (module.SourceLoc, error) {
 			return module.SourceLoc{}, errors.New("always fail")
@@ -200,6 +203,7 @@ func TestFetch_ContextCancellation(t *testing.T) {
 
 // TestFetch_InvalidModulePath tests Fetch with invalid module paths.
 func TestFetch_InvalidModulePath(t *testing.T) {
+	t.Parallel()
 	client := &Client{
 		registry: &mockRegistry{},
 		retries:  3,
@@ -240,6 +244,7 @@ func TestFetch_InvalidModulePath(t *testing.T) {
 
 // TestResolveLatestVersion tests version resolution logic.
 func TestResolveLatestVersion(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name        string
 		modulePath  string
@@ -322,6 +327,7 @@ func TestResolveLatestVersion(t *testing.T) {
 
 // TestIsCanonicalVersion tests the canonical version detection logic.
 func TestIsCanonicalVersion(t *testing.T) {
+	t.Parallel()
 	// This tests the inline logic in ResolveLatestVersion by checking
 	// whether it makes a network call (non-canonical) or returns immediately (canonical).
 	tests := []struct {

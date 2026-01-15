@@ -9,6 +9,7 @@ import (
 )
 
 func TestExecutor_BuildCommand(t *testing.T) {
+	t.Parallel()
 	executor := NewExecutor("")
 
 	tests := []struct {
@@ -129,6 +130,7 @@ func TestExecutor_BuildCommand(t *testing.T) {
 }
 
 func TestEscapeForShell(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name  string
 		input string
@@ -151,6 +153,7 @@ func TestEscapeForShell(t *testing.T) {
 }
 
 func TestEscapeForShell_NoEnvExpansion(t *testing.T) {
+	t.Parallel()
 	// Environment variables should NOT be expanded (they're safely quoted).
 	// Single quotes prevent shell expansion of $VAR, $(cmd), and `cmd`.
 	tests := []struct {
@@ -206,6 +209,7 @@ func TestEscapeForShell_NoEnvExpansion(t *testing.T) {
 }
 
 func TestExpandTilde(t *testing.T) {
+	t.Parallel()
 	home, err := os.UserHomeDir()
 	if err != nil {
 		t.Skipf("cannot get home directory: %v", err)
@@ -264,6 +268,7 @@ func TestExpandTilde(t *testing.T) {
 }
 
 func TestValidateCommandTemplate(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name    string
 		tmpl    string
@@ -361,6 +366,7 @@ func TestValidateCommandTemplate(t *testing.T) {
 }
 
 func TestExtractAgent(t *testing.T) {
+	t.Parallel()
 	ctx := cuecontext.New()
 
 	config := `
@@ -418,6 +424,7 @@ func TestExtractAgent(t *testing.T) {
 }
 
 func TestGetDefaultAgent(t *testing.T) {
+	t.Parallel()
 	ctx := cuecontext.New()
 
 	t.Run("from settings", func(t *testing.T) {
@@ -474,6 +481,7 @@ func TestGetDefaultAgent(t *testing.T) {
 }
 
 func TestGenerateDryRunCommand(t *testing.T) {
+	t.Parallel()
 	agent := Agent{
 		Name: "claude",
 	}
@@ -500,6 +508,7 @@ func TestGenerateDryRunCommand(t *testing.T) {
 }
 
 func TestExecutor_ExecuteWithoutReplace(t *testing.T) {
+	t.Parallel()
 	executor := NewExecutor("")
 
 	t.Run("simple echo command", func(t *testing.T) {

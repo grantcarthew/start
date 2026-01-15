@@ -43,12 +43,12 @@ func DetectAgents(index *registry.Index) []DetectedAgent {
 			}
 
 			mu.Lock()
+			defer mu.Unlock()
 			detected = append(detected, DetectedAgent{
 				Key:        k,
 				Entry:      e,
 				BinaryPath: path,
 			})
-			mu.Unlock()
 		}(key, entry)
 	}
 

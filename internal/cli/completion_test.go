@@ -7,6 +7,7 @@ import (
 )
 
 func TestCompletionBash(t *testing.T) {
+	t.Parallel()
 	cmd := NewRootCmd()
 	buf := new(bytes.Buffer)
 	cmd.SetOut(buf)
@@ -27,6 +28,7 @@ func TestCompletionBash(t *testing.T) {
 }
 
 func TestCompletionZsh(t *testing.T) {
+	t.Parallel()
 	cmd := NewRootCmd()
 	buf := new(bytes.Buffer)
 	cmd.SetOut(buf)
@@ -47,6 +49,7 @@ func TestCompletionZsh(t *testing.T) {
 }
 
 func TestCompletionFish(t *testing.T) {
+	t.Parallel()
 	cmd := NewRootCmd()
 	buf := new(bytes.Buffer)
 	cmd.SetOut(buf)
@@ -67,6 +70,7 @@ func TestCompletionFish(t *testing.T) {
 }
 
 func TestCompletionHelp(t *testing.T) {
+	t.Parallel()
 	cmd := NewRootCmd()
 	buf := new(bytes.Buffer)
 	cmd.SetOut(buf)
@@ -90,6 +94,7 @@ func TestCompletionHelp(t *testing.T) {
 }
 
 func TestCompletionNoArgs(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name string
 		args []string

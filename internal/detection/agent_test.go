@@ -7,6 +7,7 @@ import (
 )
 
 func TestDetectAgents_EmptyIndex(t *testing.T) {
+	t.Parallel()
 	detected := DetectAgents(nil)
 	if len(detected) != 0 {
 		t.Errorf("expected empty slice for nil index, got %d agents", len(detected))
@@ -19,6 +20,7 @@ func TestDetectAgents_EmptyIndex(t *testing.T) {
 }
 
 func TestDetectAgents_NoBinField(t *testing.T) {
+	t.Parallel()
 	index := &registry.Index{
 		Agents: map[string]registry.IndexEntry{
 			"ai/test": {
@@ -36,6 +38,7 @@ func TestDetectAgents_NoBinField(t *testing.T) {
 }
 
 func TestDetectAgents_CommonBinaries(t *testing.T) {
+	t.Parallel()
 	// Test with binaries that are likely to exist on most systems
 	index := &registry.Index{
 		Agents: map[string]registry.IndexEntry{
@@ -77,6 +80,7 @@ func TestDetectAgents_CommonBinaries(t *testing.T) {
 }
 
 func TestIsBinaryAvailable(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name      string
 		bin       string
@@ -113,6 +117,7 @@ func TestIsBinaryAvailable(t *testing.T) {
 }
 
 func TestDetectAgents_ParallelExecution(t *testing.T) {
+	t.Parallel()
 	// Test that parallel detection works correctly with multiple agents
 	index := &registry.Index{
 		Agents: map[string]registry.IndexEntry{

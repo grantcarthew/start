@@ -7,6 +7,7 @@ import (
 )
 
 func TestStatus_String(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		status Status
 		want   string
@@ -28,6 +29,7 @@ func TestStatus_String(t *testing.T) {
 }
 
 func TestStatus_Symbol(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		status Status
 		want   string
@@ -49,6 +51,7 @@ func TestStatus_Symbol(t *testing.T) {
 }
 
 func TestReport_HasIssues(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		sections []SectionResult
@@ -100,6 +103,7 @@ func TestReport_HasIssues(t *testing.T) {
 }
 
 func TestReport_ErrorCount(t *testing.T) {
+	t.Parallel()
 	r := Report{
 		Sections: []SectionResult{
 			{Results: []CheckResult{
@@ -120,6 +124,7 @@ func TestReport_ErrorCount(t *testing.T) {
 }
 
 func TestReport_WarnCount(t *testing.T) {
+	t.Parallel()
 	r := Report{
 		Sections: []SectionResult{
 			{Results: []CheckResult{
@@ -140,6 +145,7 @@ func TestReport_WarnCount(t *testing.T) {
 }
 
 func TestReport_Issues(t *testing.T) {
+	t.Parallel()
 	r := Report{
 		Sections: []SectionResult{
 			{Results: []CheckResult{
@@ -165,6 +171,7 @@ func TestReport_Issues(t *testing.T) {
 }
 
 func TestDefaultBuildInfo(t *testing.T) {
+	t.Parallel()
 	info := DefaultBuildInfo()
 
 	if info.Version != "dev" {
@@ -182,6 +189,7 @@ func TestDefaultBuildInfo(t *testing.T) {
 }
 
 func TestReporter_Print_Quiet_NoIssues(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 	reporter := NewReporter(&buf, false, true) // quiet mode
 
@@ -199,6 +207,7 @@ func TestReporter_Print_Quiet_NoIssues(t *testing.T) {
 }
 
 func TestReporter_Print_Quiet_WithIssues(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 	reporter := NewReporter(&buf, false, true) // quiet mode
 
@@ -223,6 +232,7 @@ func TestReporter_Print_Quiet_WithIssues(t *testing.T) {
 }
 
 func TestReporter_Print_Normal(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 	reporter := NewReporter(&buf, false, false)
 
@@ -263,6 +273,7 @@ func TestReporter_Print_Normal(t *testing.T) {
 }
 
 func TestReporter_Print_NoIcons(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 	reporter := NewReporter(&buf, false, false)
 

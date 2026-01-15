@@ -8,6 +8,7 @@ import (
 )
 
 func TestManager_DryRunDir(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	m := &Manager{BaseDir: tmpDir}
 
@@ -62,6 +63,7 @@ func TestManager_DryRunDir(t *testing.T) {
 }
 
 func TestManager_WriteDryRunFiles(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	m := &Manager{BaseDir: tmpDir}
 
@@ -100,6 +102,7 @@ func TestManager_WriteDryRunFiles(t *testing.T) {
 }
 
 func TestManager_WriteUTDFile(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	m := NewUTDManager(tmpDir)
 
@@ -154,6 +157,7 @@ func TestManager_WriteUTDFile(t *testing.T) {
 }
 
 func TestDeriveFileName(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		entityType string
 		name       string
@@ -179,6 +183,7 @@ func TestDeriveFileName(t *testing.T) {
 }
 
 func TestManager_Clean(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	m := NewUTDManager(tmpDir)
 
@@ -217,6 +222,7 @@ func TestManager_Clean(t *testing.T) {
 }
 
 func TestManager_Clean_NonexistentDir(t *testing.T) {
+	t.Parallel()
 	m := &Manager{BaseDir: "/nonexistent/path/12345"}
 
 	// Should not error for nonexistent directory
@@ -226,6 +232,7 @@ func TestManager_Clean_NonexistentDir(t *testing.T) {
 }
 
 func TestCheckGitignore(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 
 	t.Run("returns false when no gitignore", func(t *testing.T) {
