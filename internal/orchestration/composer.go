@@ -265,8 +265,13 @@ func (c *Composer) resolveContext(cfg cue.Value, name string) (ProcessResult, er
 		return ProcessResult{}, fmt.Errorf("invalid UTD: no file, command, or prompt")
 	}
 
+	// Track if this is a module file - these need temp path in {{.file}}
+	// because the original CUE cache path is inaccessible to AI agents.
+	// Local files keep their original value for semantic clarity.
+	isModuleFile := strings.HasPrefix(fields.File, "@module/")
+
 	// Resolve @module/ paths using origin field (per DR-023)
-	if strings.HasPrefix(fields.File, "@module/") {
+	if isModuleFile {
 		origin := extractOrigin(ctxVal)
 		if origin != "" {
 			resolved, err := resolveModulePath(fields.File, origin)
@@ -276,7 +281,7 @@ func (c *Composer) resolveContext(cfg cue.Value, name string) (ProcessResult, er
 		}
 	}
 
-	// Write file to temp BEFORE processing so {{.file}} gets temp path
+	// Write file to temp for agent access
 	var tempPath string
 	if fields.File != "" {
 		var err error
@@ -284,7 +289,11 @@ func (c *Composer) resolveContext(cfg cue.Value, name string) (ProcessResult, er
 		if err != nil {
 			return ProcessResult{}, err
 		}
-		fields.File = tempPath
+		// Only replace fields.File with temp path for @module/ files.
+		// Local files keep original value for {{.file}} placeholder.
+		if isModuleFile {
+			fields.File = tempPath
+		}
 	}
 
 	result, err := c.processor.Process(fields, "")
@@ -308,8 +317,13 @@ func (c *Composer) resolveRole(cfg cue.Value, name string) (string, error) {
 		return "", fmt.Errorf("invalid UTD: no file, command, or prompt")
 	}
 
+	// Track if this is a module file - these need temp path in {{.file}}
+	// because the original CUE cache path is inaccessible to AI agents.
+	// Local files keep their original value for semantic clarity.
+	isModuleFile := strings.HasPrefix(fields.File, "@module/")
+
 	// Resolve @module/ paths using origin field (per DR-023)
-	if strings.HasPrefix(fields.File, "@module/") {
+	if isModuleFile {
 		origin := extractOrigin(roleVal)
 		if origin != "" {
 			resolved, err := resolveModulePath(fields.File, origin)
@@ -319,13 +333,17 @@ func (c *Composer) resolveRole(cfg cue.Value, name string) (string, error) {
 		}
 	}
 
-	// Write file to temp BEFORE processing so {{.file}} gets temp path
+	// Write file to temp for agent access
 	if fields.File != "" {
 		tempPath, err := c.resolveFileToTemp("role", name, fields.File)
 		if err != nil {
 			return "", err
 		}
-		fields.File = tempPath
+		// Only replace fields.File with temp path for @module/ files.
+		// Local files keep original value for {{.file}} placeholder.
+		if isModuleFile {
+			fields.File = tempPath
+		}
 	}
 
 	result, err := c.processor.Process(fields, "")
@@ -394,8 +412,13 @@ func (c *Composer) ResolveTask(cfg cue.Value, name, instructions string) (Proces
 		return ProcessResult{}, fmt.Errorf("invalid UTD: no file, command, or prompt")
 	}
 
+	// Track if this is a module file - these need temp path in {{.file}}
+	// because the original CUE cache path is inaccessible to AI agents.
+	// Local files keep their original value for semantic clarity.
+	isModuleFile := strings.HasPrefix(fields.File, "@module/")
+
 	// Resolve @module/ paths using origin field (per DR-023)
-	if strings.HasPrefix(fields.File, "@module/") {
+	if isModuleFile {
 		origin := extractOrigin(taskVal)
 		if origin != "" {
 			resolved, err := resolveModulePath(fields.File, origin)
@@ -406,7 +429,7 @@ func (c *Composer) ResolveTask(cfg cue.Value, name, instructions string) (Proces
 		}
 	}
 
-	// Write file to temp BEFORE processing so {{.file}} gets temp path
+	// Write file to temp for agent access
 	var tempPath string
 	if fields.File != "" {
 		var err error
@@ -414,7 +437,11 @@ func (c *Composer) ResolveTask(cfg cue.Value, name, instructions string) (Proces
 		if err != nil {
 			return ProcessResult{}, err
 		}
-		fields.File = tempPath
+		// Only replace fields.File with temp path for @module/ files.
+		// Local files keep original value for {{.file}} placeholder.
+		if isModuleFile {
+			fields.File = tempPath
+		}
 	}
 
 	result, err := c.processor.Process(fields, instructions)

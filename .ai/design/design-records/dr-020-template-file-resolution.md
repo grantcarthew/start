@@ -109,12 +109,19 @@ UTD placeholders (in content files):
 
 | Placeholder | Value |
 |-------------|-------|
-| `{{.file}}` | Path to resolved temp file |
+| `{{.file}}` | Original file path for local files; temp path for `@module/` files |
 | `{{.file_contents}}` | Resolved file contents |
 | `{{.command}}` | Command string |
 | `{{.command_output}}` | Command execution output |
 | `{{.date}}` | Current timestamp (ISO 8601) |
 | `{{.instructions}}` | User CLI arguments (tasks only) |
+
+**Note on `{{.file}}` behavior:**
+
+- **Local files** (`file: "AGENTS.md"`): `{{.file}}` returns the original path for semantic clarity in prompts
+- **Module files** (`file: "@module/task.md"`): `{{.file}}` returns the temp path because the CUE cache is inaccessible to AI agents
+
+This ensures prompts like "Read {{.file}} for context" produce meaningful output ("Read AGENTS.md") for local files while still providing accessible paths for module files.
 
 Agent command placeholders:
 
