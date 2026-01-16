@@ -43,6 +43,7 @@ Design Records (DRs) document architectural decisions, algorithms, breaking chan
 | dr-035 | CLI Debug Logging | CLI | Proposed | 2025-12-23 |
 | dr-036 | CLI Terminal Colors | CLI | Accepted | 2025-12-24 |
 | dr-037 | Base Schema for Common Asset Fields | CUE | Proposed | 2026-01-05 |
+| dr-038 | CLI File Path Inputs | CLI | Accepted | 2026-01-16 |
 
 ## Process
 
