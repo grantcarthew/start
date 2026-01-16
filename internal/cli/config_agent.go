@@ -54,8 +54,9 @@ func runConfigAgent(cmd *cobra.Command, args []string) error {
 // addConfigAgentListCommand adds the list subcommand.
 func addConfigAgentListCommand(parent *cobra.Command) {
 	listCmd := &cobra.Command{
-		Use:   "list",
-		Short: "List all agents",
+		Use:     "list",
+		Aliases: []string{"ls"},
+		Short:   "List all agents",
 		Long: `List all configured agents.
 
 Shows agents from both global and local configuration.
@@ -529,8 +530,9 @@ func runConfigAgentEdit(cmd *cobra.Command, args []string) error {
 // addConfigAgentRemoveCommand adds the remove subcommand.
 func addConfigAgentRemoveCommand(parent *cobra.Command) {
 	removeCmd := &cobra.Command{
-		Use:   "remove <name>",
-		Short: "Remove an agent",
+		Use:     "remove <name>",
+		Aliases: []string{"rm", "delete"},
+		Short:   "Remove an agent",
 		Long: `Remove an agent configuration.
 
 Removes the specified agent from the configuration file.`,

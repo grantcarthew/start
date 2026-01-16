@@ -51,8 +51,9 @@ func runConfigTask(cmd *cobra.Command, args []string) error {
 // addConfigTaskListCommand adds the list subcommand.
 func addConfigTaskListCommand(parent *cobra.Command) {
 	listCmd := &cobra.Command{
-		Use:   "list",
-		Short: "List all tasks",
+		Use:     "list",
+		Aliases: []string{"ls"},
+		Short:   "List all tasks",
 		Long: `List all configured tasks.
 
 Shows tasks from both global and local configuration.
@@ -585,8 +586,9 @@ func runConfigTaskEdit(cmd *cobra.Command, args []string) error {
 // addConfigTaskRemoveCommand adds the remove subcommand.
 func addConfigTaskRemoveCommand(parent *cobra.Command) {
 	removeCmd := &cobra.Command{
-		Use:   "remove <name>",
-		Short: "Remove a task",
+		Use:     "remove <name>",
+		Aliases: []string{"rm", "delete"},
+		Short:   "Remove a task",
 		Long: `Remove a task configuration.
 
 Removes the specified task from the configuration file.`,

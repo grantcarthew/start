@@ -13,8 +13,9 @@ const (
 // addAssetsCommand adds the assets command group and its subcommands to the parent.
 func addAssetsCommand(parent *cobra.Command) {
 	assetsCmd := &cobra.Command{
-		Use:   "assets",
-		Short: "Manage assets from the CUE registry",
+		Use:     "assets",
+		Aliases: []string{"asset"},
+		Short:   "Manage assets from the CUE registry",
 		Long: `Manage assets (roles, tasks, contexts, agents) from the CUE Central Registry.
 
 Assets are CUE modules that define reusable AI agent configurations.

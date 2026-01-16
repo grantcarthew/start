@@ -22,8 +22,9 @@ type SearchResult struct {
 // addAssetsSearchCommand adds the search subcommand to the assets command.
 func addAssetsSearchCommand(parent *cobra.Command) {
 	searchCmd := &cobra.Command{
-		Use:   "search <query>",
-		Short: "Search registry for assets",
+		Use:     "search <query>",
+		Aliases: []string{"find"},
+		Short:   "Search registry for assets",
 		Long: `Search the asset registry index by keyword.
 
 Searches asset names, descriptions, and tags. Query must be at least 3 characters.

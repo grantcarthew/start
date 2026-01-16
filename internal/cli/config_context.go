@@ -51,8 +51,9 @@ func runConfigContext(cmd *cobra.Command, args []string) error {
 // addConfigContextListCommand adds the list subcommand.
 func addConfigContextListCommand(parent *cobra.Command) {
 	listCmd := &cobra.Command{
-		Use:   "list",
-		Short: "List all contexts",
+		Use:     "list",
+		Aliases: []string{"ls"},
+		Short:   "List all contexts",
 		Long: `List all configured contexts.
 
 Shows contexts from both global and local configuration.
@@ -633,8 +634,9 @@ func runConfigContextEdit(cmd *cobra.Command, args []string) error {
 // addConfigContextRemoveCommand adds the remove subcommand.
 func addConfigContextRemoveCommand(parent *cobra.Command) {
 	removeCmd := &cobra.Command{
-		Use:   "remove <name>",
-		Short: "Remove a context",
+		Use:     "remove <name>",
+		Aliases: []string{"rm", "delete"},
+		Short:   "Remove a context",
 		Long: `Remove a context configuration.
 
 Removes the specified context from the configuration file.`,

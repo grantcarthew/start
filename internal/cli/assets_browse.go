@@ -11,11 +11,12 @@ import (
 // addAssetsBrowseCommand adds the browse subcommand to the assets command.
 func addAssetsBrowseCommand(parent *cobra.Command) {
 	browseCmd := &cobra.Command{
-		Use:   "browse",
-		Short: "Open asset repository in browser",
-		Long:  `Open the GitHub asset repository in your default web browser for visual exploration.`,
-		Args:  cobra.NoArgs,
-		RunE:  runAssetsBrowse,
+		Use:     "browse",
+		Aliases: []string{"open"},
+		Short:   "Open asset repository in browser",
+		Long:    `Open the GitHub asset repository in your default web browser for visual exploration.`,
+		Args:    cobra.NoArgs,
+		RunE:    runAssetsBrowse,
 	}
 
 	parent.AddCommand(browseCmd)

@@ -7,8 +7,9 @@ import (
 // addCompletionCommand adds the completion command to the parent command.
 func addCompletionCommand(parent *cobra.Command) {
 	completionCmd := &cobra.Command{
-		Use:   "completion",
-		Short: "Generate shell completion scripts",
+		Use:     "completion",
+		Aliases: []string{"completions"},
+		Short:   "Generate shell completion scripts",
 		Long: `Generate shell completion scripts for bash, zsh, or fish.
 
 Shell completion enables tab-completion for commands, subcommands, and flags.
