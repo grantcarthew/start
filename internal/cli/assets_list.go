@@ -26,8 +26,9 @@ type InstalledAsset struct {
 // addAssetsListCommand adds the list subcommand to the assets command.
 func addAssetsListCommand(parent *cobra.Command) {
 	listCmd := &cobra.Command{
-		Use:   "list",
-		Short: "List installed assets",
+		Use:     "list",
+		Aliases: []string{"ls"},
+		Short:   "List installed assets",
 		Long: `List installed registry assets with update status.
 
 Shows all assets installed via the registry with their current version

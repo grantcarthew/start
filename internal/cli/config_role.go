@@ -52,8 +52,9 @@ func runConfigRole(cmd *cobra.Command, args []string) error {
 // addConfigRoleListCommand adds the list subcommand.
 func addConfigRoleListCommand(parent *cobra.Command) {
 	listCmd := &cobra.Command{
-		Use:   "list",
-		Short: "List all roles",
+		Use:     "list",
+		Aliases: []string{"ls"},
+		Short:   "List all roles",
 		Long: `List all configured roles.
 
 Shows roles from both global and local configuration.
@@ -576,8 +577,9 @@ func runConfigRoleEdit(cmd *cobra.Command, args []string) error {
 // addConfigRoleRemoveCommand adds the remove subcommand.
 func addConfigRoleRemoveCommand(parent *cobra.Command) {
 	removeCmd := &cobra.Command{
-		Use:   "remove <name>",
-		Short: "Remove a role",
+		Use:     "remove <name>",
+		Aliases: []string{"rm", "delete"},
+		Short:   "Remove a role",
 		Long: `Remove a role configuration.
 
 Removes the specified role from the configuration file.`,
