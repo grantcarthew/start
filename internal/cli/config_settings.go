@@ -83,14 +83,14 @@ func listSettings(w io.Writer, localOnly bool) error {
 	if err != nil {
 		// No settings is fine, just show empty
 		if strings.Contains(err.Error(), "no config found") {
-			fmt.Fprintln(w, "No settings configured")
+			_, _ = fmt.Fprintln(w, "No settings configured")
 			return nil
 		}
 		return err
 	}
 
 	if len(settings) == 0 {
-		fmt.Fprintln(w, "No settings configured")
+		_, _ = fmt.Fprintln(w, "No settings configured")
 		return nil
 	}
 
@@ -102,7 +102,7 @@ func listSettings(w io.Writer, localOnly bool) error {
 	sort.Strings(keys)
 
 	for _, k := range keys {
-		fmt.Fprintf(w, "%s: %s\n", k, settings[k])
+		_, _ = fmt.Fprintf(w, "%s: %s\n", k, settings[k])
 	}
 
 	return nil
@@ -118,16 +118,16 @@ func showSetting(w io.Writer, key string, localOnly bool) error {
 	settings, err := loadSettingsForScope(localOnly)
 	if err != nil {
 		if strings.Contains(err.Error(), "no config found") {
-			fmt.Fprintf(w, "%s: (not set)\n", key)
+			_, _ = fmt.Fprintf(w, "%s: (not set)\n", key)
 			return nil
 		}
 		return err
 	}
 
 	if val, exists := settings[key]; exists {
-		fmt.Fprintf(w, "%s: %s\n", key, val)
+		_, _ = fmt.Fprintf(w, "%s: %s\n", key, val)
 	} else {
-		fmt.Fprintf(w, "%s: (not set)\n", key)
+		_, _ = fmt.Fprintf(w, "%s: (not set)\n", key)
 	}
 
 	return nil
@@ -182,7 +182,7 @@ func setSetting(w io.Writer, flags *Flags, key, value string, localOnly bool) er
 	}
 
 	if !flags.Quiet {
-		fmt.Fprintf(w, "Set %s to %q\n", key, value)
+		_, _ = fmt.Fprintf(w, "Set %s to %q\n", key, value)
 	}
 
 	return nil

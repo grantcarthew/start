@@ -1,0 +1,542 @@
+# start - Release Process
+
+> **Purpose**: Repeatable process for releasing new versions of start
+> **Audience**: AI agents and maintainers performing releases
+> **Last Updated**: 2026-01-16
+
+This document provides step-by-step instructions for releasing start. Execute each step in order.
+
+---
+
+## Prerequisites
+
+Verify before starting:
+
+- Write access to `grantcarthew/start` repository
+- Write access to `grantcarthew/homebrew-tap` repository
+- Go 1.25.5+ installed
+- Git configured with proper credentials
+- GitHub CLI (`gh`) installed and authenticated
+- All planned features/fixes merged to main branch
+
+---
+
+## Release Process
+
+**Steps**:
+
+1. Pre-release review
+2. Run pre-release validation
+3. Determine version number
+4. Update CHANGELOG.md
+5. Commit changes
+6. Create and push git tag
+7. Create GitHub Release
+8. Update Homebrew tap
+9. Verify installation
+10. Clean up
+
+**Estimated Time**: 25-35 minutes
+
+---
+
+## Step 1: Pre-Release Review
+
+Perform a brief holistic review of the codebase before release. This is a quick glance to identify obvious issues, not a full code review.
+
+**Review the following:**
+
+1. **Active project status** - Check `AGENTS.md` for the active project. Verify it is complete and ready for release, or confirm no active project blocks the release.
+
+2. **Recent changes** - Review commits since the last release tag. Look for:
+   - Incomplete work (TODO, FIXME, XXX comments in changed files)
+   - Obvious errors or missing error handling
+   - Changes that lack corresponding tests
+
+3. **Documentation currency** - Quick check that:
+   - `README.md` reflects current functionality
+   - Command help text matches implementation (`start --help`)
+   - `AGENTS.md` is accurate
+
+4. **Code cleanliness** - Scan `internal/` for:
+   - Dead code or commented-out blocks
+   - Debug statements (fmt.Println, log.Println not part of normal output)
+   - Hardcoded values that should be configurable
+
+**Commands to assist review:**
+
+```bash
+# Find TODOs/FIXMEs in Go files
+rg -i "TODO|FIXME|XXX" --type go
+
+# Show commits since last release
+PREV_VERSION=$(git tag -l | tail -1)
+git log ${PREV_VERSION}..HEAD --oneline
+
+# List recently modified Go files
+git diff --name-only ${PREV_VERSION}..HEAD -- "*.go"
+```
+
+**Decision:** Report **GO** if no blocking issues found, or **NO-GO** with specific concerns that must be addressed before release.
+
+---
+
+## Step 2: Pre-Release Validation
+
+Run validation checks:
+
+```bash
+# Ensure on main branch with latest changes
+git checkout main
+git pull origin main
+
+# Check formatting (should produce no output)
+gofmt -l .
+
+# Run linters
+go vet ./...
+golangci-lint run
+staticcheck ./...
+ineffassign ./...
+govulncheck ./...
+
+# Check cyclomatic complexity (functions over 15)
+gocyclo -over 15 .
+
+# Verify all tests pass
+go test -v ./...
+
+# Verify build works
+go build -o start ./cmd/start
+./start --version
+./start doctor  # Quick functionality test
+rm start
+
+# Verify clean working directory
+git status
+```
+
+**Expected results**:
+
+- `gofmt -l .` produces no output (all files formatted)
+- `go vet ./...` reports no issues
+- `golangci-lint run` reports no errors (warnings acceptable)
+- `staticcheck ./...` reports no issues
+- `ineffassign ./...` reports no issues
+- `govulncheck ./...` reports no vulnerabilities
+- `gocyclo -over 15 .` reports no functions (or acceptable exceptions)
+- All tests pass
+- Build completes without errors
+- `./start --version` shows current version
+- `./start doctor` runs without errors
+- `git status` shows clean working tree
+
+**Linter installation** (if not already installed):
+
+```bash
+# golangci-lint (comprehensive linter)
+brew install golangci-lint
+# or: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+
+# Individual linters
+go install honnef.co/go/tools/cmd/staticcheck@latest
+go install github.com/fzipp/gocyclo/cmd/gocyclo@latest
+go install github.com/gordonklaus/ineffassign@latest
+go install golang.org/x/vuln/cmd/govulncheck@latest
+```
+
+**If any validation fails, stop and fix issues before proceeding.**
+
+---
+
+## Step 3: Determine Version Number
+
+Set the version number using [Semantic Versioning](https://semver.org/):
+
+- **MAJOR**: Breaking API changes (1.0.0 → 2.0.0)
+- **MINOR**: New features, backward compatible (1.0.0 → 1.1.0)
+- **PATCH**: Bug fixes only (1.0.0 → 1.0.1)
+
+```bash
+# Check current version
+git tag -l | tail -1
+
+# Set new version (example: v0.0.1)
+export VERSION="0.0.1"
+echo "Releasing version: v${VERSION}"
+```
+
+---
+
+## Step 4: Update CHANGELOG.md
+
+Review changes since last release and update CHANGELOG.md:
+
+```bash
+# Show changes since previous version (or all commits if first release)
+PREV_VERSION=$(git tag -l | tail -1)
+if [ -z "$PREV_VERSION" ]; then
+  echo "First release - showing all commits:"
+  git log --oneline
+else
+  echo "Changes since ${PREV_VERSION}:"
+  git log ${PREV_VERSION}..HEAD --oneline
+fi
+
+# Review the changes and categorize them
+# Then edit CHANGELOG.md manually
+```
+
+Update CHANGELOG.md by adding a new version section with:
+
+- **Added**: New features
+- **Changed**: Changes to existing functionality
+- **Fixed**: Bug fixes
+- **Deprecated**: Features marked for removal
+- **Removed**: Removed features
+- **Security**: Security fixes
+
+Example format:
+
+```markdown
+## [0.0.1] - 2026-01-16
+
+### Added
+
+- Initial release with core orchestration functionality
+- CUE-based configuration with schema validation
+- Agent, role, context, and task management
+- Registry integration for package distribution
+- `start` command for interactive AI sessions
+- `start prompt` command for prompt generation
+- `start task` command for task execution
+- `start show` commands for configuration inspection
+- `start config` commands for configuration editing
+- `start assets` commands for package management
+- `start doctor` command for diagnostics
+- `start completion` for shell completions
+- Auto-setup with agent detection and TTY prompts
+
+[Unreleased]: https://github.com/grantcarthew/start/compare/v0.0.1...HEAD
+[0.0.1]: https://github.com/grantcarthew/start/releases/tag/v0.0.1
+```
+
+---
+
+## Step 5: Commit Changes
+
+Commit the CHANGELOG:
+
+```bash
+# Stage and commit changes
+git add CHANGELOG.md
+git commit -m "chore: prepare for v${VERSION} release"
+git push origin main
+```
+
+---
+
+## Step 6: Create and Push Git Tag
+
+Create an annotated git tag:
+
+```bash
+# Get previous version and review changes
+PREV_VERSION=$(git tag -l | tail -1)
+if [ -z "$PREV_VERSION" ]; then
+  git log --oneline | head -10
+else
+  git log ${PREV_VERSION}..HEAD --oneline
+fi
+
+# Create one-line summary from the changes above
+# Examples: "Initial release", "Add task composition"
+SUMMARY="Your one-line summary here"
+
+# Create and push annotated tag
+git tag -a "v${VERSION}" -m "Release v${VERSION} - ${SUMMARY}"
+git push origin "v${VERSION}"
+
+# Verify tag exists
+git tag -l -n9 "v${VERSION}"
+```
+
+---
+
+## Step 7: Create GitHub Release
+
+Create the GitHub Release with release notes:
+
+```bash
+# Wait for tarball to be generated (usually immediate)
+sleep 5
+
+# Get tarball SHA256 for Homebrew (will use in Step 8)
+TARBALL_URL="https://github.com/grantcarthew/start/archive/refs/tags/v${VERSION}.tar.gz"
+# macOS:
+TARBALL_SHA256=$(curl -sL "$TARBALL_URL" | shasum -a 256 | cut -d' ' -f1)
+# Linux:
+# TARBALL_SHA256=$(curl -sL "$TARBALL_URL" | sha256sum | cut -d' ' -f1)
+echo "Tarball SHA256: $TARBALL_SHA256"
+
+# Create GitHub Release using gh CLI
+PREV_VERSION=$(git tag -l | grep -v "v${VERSION}" | tail -1)
+if [ -z "$PREV_VERSION" ]; then
+  # First release
+  NOTES=$(git log --pretty=format:"- %s" --reverse | head -20)
+else
+  NOTES=$(git log ${PREV_VERSION}..v${VERSION} --pretty=format:"- %s" --reverse)
+fi
+
+gh release create "v${VERSION}" \
+  --title "Release v${VERSION}" \
+  --notes "$(cat <<EOF
+## Changes
+
+${NOTES}
+
+See [CHANGELOG.md](https://github.com/grantcarthew/start/blob/main/CHANGELOG.md) for details.
+EOF
+)"
+
+# Verify release was created
+gh release view "v${VERSION}"
+```
+
+**Note**: GitHub automatically attaches source archives (tar.gz, zip) to releases. Homebrew builds from the tar.gz archive.
+
+---
+
+## Step 8: Update Homebrew Tap
+
+Update the Homebrew formula with the new version:
+
+```bash
+# Navigate to homebrew-tap directory
+cd ~/Projects/homebrew-tap
+git pull origin main
+
+# Display tarball info from Step 7
+echo "Tarball URL: $TARBALL_URL"
+echo "Tarball SHA256: $TARBALL_SHA256"
+
+# Edit Formula/start.rb and update:
+# 1. url line: Update version in URL
+# 2. sha256 line: Update with TARBALL_SHA256
+# 3. ldflags: Update version in "-X github.com/grantcarthew/start/internal/cli.cliVersion=X.X.X"
+# 4. test: Update expected version in assert_match
+
+# After editing, commit and push
+git add Formula/start.rb
+git commit -m "start: update to ${VERSION}"
+git push origin main
+
+# Return to start directory
+cd -
+```
+
+**Formula example** (Formula/start.rb):
+
+```ruby
+class Start < Formula
+  desc "AI agent CLI orchestrator built on CUE"
+  homepage "https://github.com/grantcarthew/start"
+  url "https://github.com/grantcarthew/start/archive/refs/tags/v0.0.1.tar.gz"
+  sha256 "abc123..."  # Use TARBALL_SHA256 value
+  license "MIT"
+
+  depends_on "go" => :build
+
+  def install
+    ldflags = "-s -w -X github.com/grantcarthew/start/internal/cli.cliVersion=#{version}"
+    system "go", "build", *std_go_args(ldflags: ldflags), "./cmd/start"
+  end
+
+  test do
+    assert_match "0.0.1", shell_output("#{bin}/start --version")
+  end
+end
+```
+
+---
+
+## Step 9: Verify Installation
+
+Test the Homebrew installation:
+
+```bash
+# Update and reinstall
+brew update
+brew reinstall grantcarthew/tap/start
+
+# Verify version
+start --version  # Should show new version
+
+# Test basic functionality
+start doctor
+```
+
+**Expected results**:
+
+- `start --version` displays new version
+- `start doctor` runs without errors
+- No errors during installation
+
+**If installation fails**, debug with:
+
+```bash
+brew audit --strict grantcarthew/tap/start
+brew install --verbose grantcarthew/tap/start
+```
+
+---
+
+## Step 10: Clean Up
+
+Complete the release:
+
+```bash
+# Verify release is live
+gh release view "v${VERSION}"
+
+# Check Homebrew tap was updated
+cd ~/Projects/homebrew-tap
+git log -1
+cd -
+
+# Verify clean state
+git status
+```
+
+**Release is complete!**
+
+Monitor for issues:
+
+- Watch GitHub issues for bug reports
+- Monitor Homebrew installation feedback
+- Be ready to release a patch if critical issues arise
+
+---
+
+## Rollback Procedure
+
+If critical issues are discovered after release:
+
+**Option 1: Patch Release** (Recommended)
+
+```bash
+# Fix the issue, then release patch version (e.g., v0.0.2)
+# Follow the standard release process
+```
+
+**Option 2: Delete Release** (Last resort - use only for critical security issues)
+
+```bash
+# Delete GitHub release
+gh release delete "v${VERSION}" --yes
+
+# Delete tags
+git push origin --delete "v${VERSION}"
+git tag -d "v${VERSION}"
+
+# Revert Homebrew tap
+cd ~/Projects/homebrew-tap
+git revert HEAD
+git push origin main
+cd -
+```
+
+---
+
+## Quick Reference
+
+One-command release workflow:
+
+```bash
+# Set version
+export VERSION="0.0.1"
+
+# Get previous version for change summary
+PREV_VERSION=$(git tag -l | tail -1)
+
+# 1. Pre-release review (see Step 1 for details)
+rg -i "TODO|FIXME|XXX" --type go  # Should be empty or acceptable
+
+# 2. Validation
+go test -v ./...
+golangci-lint run
+staticcheck ./...
+govulncheck ./...
+git status  # Should be clean
+
+# 3. Update CHANGELOG.md manually, then commit
+git add CHANGELOG.md
+git commit -m "chore: prepare for v${VERSION} release"
+git push origin main
+
+# 4. Create tag with summary
+SUMMARY="Your summary here"
+git tag -a "v${VERSION}" -m "Release v${VERSION} - ${SUMMARY}"
+git push origin "v${VERSION}"
+
+# 5. Create GitHub Release
+gh release create "v${VERSION}" --title "Release v${VERSION}" \
+  --notes "$(git log ${PREV_VERSION}..v${VERSION} --pretty=format:'- %s' 2>/dev/null || git log --pretty=format:'- %s' | head -20)"
+
+# 6. Get tarball SHA256 (macOS)
+TARBALL_SHA256=$(curl -sL "https://github.com/grantcarthew/start/archive/refs/tags/v${VERSION}.tar.gz" | shasum -a 256 | cut -d' ' -f1)
+echo "SHA256: $TARBALL_SHA256"
+
+# 7. Update Homebrew (edit Formula/start.rb with VERSION and SHA256)
+cd ~/Projects/homebrew-tap
+# Edit Formula/start.rb
+git add Formula/start.rb
+git commit -m "start: update to ${VERSION}"
+git push origin main
+cd -
+
+# 8. Test
+brew update && brew reinstall grantcarthew/tap/start
+start --version
+```
+
+---
+
+## Troubleshooting
+
+**Tests failing**
+
+- Run: `go test -v ./...` to see detailed output
+- Fix all failures before proceeding
+- Never release with failing tests
+
+**Tarball not available**
+
+- Wait 1-2 minutes after pushing tag
+- Verify tag exists: `git ls-remote --tags origin | grep v${VERSION}`
+- Check: <https://github.com/grantcarthew/start/tags>
+
+**Homebrew formula issues**
+
+- Audit: `brew audit --strict grantcarthew/tap/start`
+- Common: Incorrect SHA256, wrong URL format, Ruby syntax
+- Fix and push updated formula
+
+**Installation fails**
+
+- Verbose output: `brew install --verbose grantcarthew/tap/start`
+- View formula: `brew cat grantcarthew/tap/start`
+- Verify tarball: `curl -I https://github.com/grantcarthew/start/archive/refs/tags/v${VERSION}.tar.gz`
+
+---
+
+## Related Documents
+
+- `AGENTS.md` - Repository context for AI agents
+- `CHANGELOG.md` - Version history
+- `.ai/design/design-records/` - Design decisions and rationale
+- `README.md` - User-facing documentation
+
+---
+
+**End of Release Process**

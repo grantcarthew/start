@@ -69,7 +69,7 @@ func TestResolvePaths(t *testing.T) {
 		if err := os.Mkdir(localDir, 0o755); err != nil {
 			t.Fatalf("Failed to create local config dir: %v", err)
 		}
-		defer os.RemoveAll(localDir)
+		defer func() { _ = os.RemoveAll(localDir) }()
 
 		p, err := ResolvePaths(workDir)
 		if err != nil {
@@ -95,8 +95,8 @@ func TestResolvePaths_XDGConfigHome(t *testing.T) {
 
 	// Set XDG_CONFIG_HOME
 	oldXDG := os.Getenv("XDG_CONFIG_HOME")
-	os.Setenv("XDG_CONFIG_HOME", xdgDir)
-	defer os.Setenv("XDG_CONFIG_HOME", oldXDG)
+	_ = os.Setenv("XDG_CONFIG_HOME", xdgDir)
+	defer func() { _ = os.Setenv("XDG_CONFIG_HOME", oldXDG) }()
 
 	workDir := t.TempDir()
 	p, err := ResolvePaths(workDir)

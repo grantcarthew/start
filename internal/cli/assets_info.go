@@ -44,7 +44,7 @@ func runAssetsInfo(cmd *cobra.Command, args []string) error {
 
 	// Fetch index
 	if !flags.Quiet {
-		fmt.Fprintln(cmd.OutOrStdout(), "Fetching index...")
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "Fetching index...")
 	}
 	index, err := client.FetchIndex(ctx)
 	if err != nil {
@@ -61,7 +61,7 @@ func runAssetsInfo(cmd *cobra.Command, args []string) error {
 	// If multiple matches, show first one with a note
 	selected := results[0]
 	if len(results) > 1 && !flags.Quiet {
-		fmt.Fprintf(cmd.OutOrStdout(), "Showing first of %d matches. Use 'start assets search %s' to see all.\n\n", len(results), query)
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Showing first of %d matches. Use 'start assets search %s' to see all.\n\n", len(results), query)
 	}
 
 	// Check installation status
@@ -106,38 +106,38 @@ func checkIfInstalled(asset SearchResult) (bool, string) {
 
 // printAssetInfo prints detailed information about an asset.
 func printAssetInfo(w io.Writer, asset SearchResult, installed bool, scope string, verbose bool) {
-	fmt.Fprintf(w, "Asset: %s/%s\n", asset.Category, asset.Name)
-	fmt.Fprintln(w, strings.Repeat("─", 60))
+	_, _ = fmt.Fprintf(w, "Asset: %s/%s\n", asset.Category, asset.Name)
+	_, _ = fmt.Fprintln(w, strings.Repeat("─", 60))
 
-	fmt.Fprintf(w, "Type: %s\n", asset.Category)
-	fmt.Fprintf(w, "Module: %s\n", asset.Entry.Module)
-	fmt.Fprintln(w)
+	_, _ = fmt.Fprintf(w, "Type: %s\n", asset.Category)
+	_, _ = fmt.Fprintf(w, "Module: %s\n", asset.Entry.Module)
+	_, _ = fmt.Fprintln(w)
 
 	if asset.Entry.Description != "" {
-		fmt.Fprintln(w, "Description:")
-		fmt.Fprintf(w, "  %s\n", asset.Entry.Description)
-		fmt.Fprintln(w)
+		_, _ = fmt.Fprintln(w, "Description:")
+		_, _ = fmt.Fprintf(w, "  %s\n", asset.Entry.Description)
+		_, _ = fmt.Fprintln(w)
 	}
 
 	if len(asset.Entry.Tags) > 0 {
-		fmt.Fprintf(w, "Tags: %s\n", strings.Join(asset.Entry.Tags, ", "))
-		fmt.Fprintln(w)
+		_, _ = fmt.Fprintf(w, "Tags: %s\n", strings.Join(asset.Entry.Tags, ", "))
+		_, _ = fmt.Fprintln(w)
 	}
 
-	fmt.Fprintln(w, "Status:")
+	_, _ = fmt.Fprintln(w, "Status:")
 	if installed {
-		fmt.Fprintf(w, "  Installed: Yes (%s)\n", scope)
+		_, _ = fmt.Fprintf(w, "  Installed: Yes (%s)\n", scope)
 	} else {
-		fmt.Fprintln(w, "  Installed: No")
+		_, _ = fmt.Fprintln(w, "  Installed: No")
 	}
 
 	if asset.Entry.Version != "" {
-		fmt.Fprintf(w, "  Version: %s\n", asset.Entry.Version)
+		_, _ = fmt.Fprintf(w, "  Version: %s\n", asset.Entry.Version)
 	}
 
-	fmt.Fprintln(w)
+	_, _ = fmt.Fprintln(w)
 
 	if !installed {
-		fmt.Fprintf(w, "Use 'start assets add %s' to install.\n", asset.Name)
+		_, _ = fmt.Fprintf(w, "Use 'start assets add %s' to install.\n", asset.Name)
 	}
 }

@@ -75,7 +75,7 @@ func runConfigAgentList(cmd *cobra.Command, _ []string) error {
 	}
 
 	if len(agents) == 0 {
-		fmt.Fprintln(cmd.OutOrStdout(), "No agents configured.")
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "No agents configured.")
 		return nil
 	}
 
@@ -86,8 +86,8 @@ func runConfigAgentList(cmd *cobra.Command, _ []string) error {
 	}
 
 	w := cmd.OutOrStdout()
-	fmt.Fprintln(w, "Agents:")
-	fmt.Fprintln(w)
+	_, _ = fmt.Fprintln(w, "Agents:")
+	_, _ = fmt.Fprintln(w)
 
 	// Sort agent names for consistent output
 	var names []string
@@ -107,15 +107,15 @@ func runConfigAgentList(cmd *cobra.Command, _ []string) error {
 			source += ", registry"
 		}
 		if agent.Description != "" {
-			fmt.Fprintf(w, "%s%s - %s (%s)\n", marker, name, agent.Description, source)
+			_, _ = fmt.Fprintf(w, "%s%s - %s (%s)\n", marker, name, agent.Description, source)
 		} else {
-			fmt.Fprintf(w, "%s%s (%s)\n", marker, name, source)
+			_, _ = fmt.Fprintf(w, "%s%s (%s)\n", marker, name, source)
 		}
 	}
 
 	if defaultAgent != "" {
-		fmt.Fprintln(w)
-		fmt.Fprintf(w, "* = default agent\n")
+		_, _ = fmt.Fprintln(w)
+		_, _ = fmt.Fprintf(w, "* = default agent\n")
 	}
 
 	return nil
@@ -289,8 +289,8 @@ func runConfigAgentAdd(cmd *cobra.Command, _ []string) error {
 
 	flags := getFlags(cmd)
 	if !flags.Quiet {
-		fmt.Fprintf(stdout, "Added agent %q to %s config\n", name, scopeName)
-		fmt.Fprintf(stdout, "Config: %s\n", agentPath)
+		_, _ = fmt.Fprintf(stdout, "Added agent %q to %s config\n", name, scopeName)
+		_, _ = fmt.Fprintf(stdout, "Config: %s\n", agentPath)
 	}
 
 	return nil
@@ -327,32 +327,32 @@ func runConfigAgentInfo(cmd *cobra.Command, args []string) error {
 	}
 
 	w := cmd.OutOrStdout()
-	fmt.Fprintf(w, "Agent: %s\n", name)
-	fmt.Fprintln(w, strings.Repeat("─", 40))
-	fmt.Fprintf(w, "Source: %s\n", agent.Source)
+	_, _ = fmt.Fprintf(w, "Agent: %s\n", name)
+	_, _ = fmt.Fprintln(w, strings.Repeat("─", 40))
+	_, _ = fmt.Fprintf(w, "Source: %s\n", agent.Source)
 	if agent.Bin != "" {
-		fmt.Fprintf(w, "Bin: %s\n", agent.Bin)
+		_, _ = fmt.Fprintf(w, "Bin: %s\n", agent.Bin)
 	}
-	fmt.Fprintf(w, "Command: %s\n", agent.Command)
+	_, _ = fmt.Fprintf(w, "Command: %s\n", agent.Command)
 
 	if agent.DefaultModel != "" {
-		fmt.Fprintf(w, "Default Model: %s\n", agent.DefaultModel)
+		_, _ = fmt.Fprintf(w, "Default Model: %s\n", agent.DefaultModel)
 	}
 	if agent.Description != "" {
-		fmt.Fprintf(w, "Description: %s\n", agent.Description)
+		_, _ = fmt.Fprintf(w, "Description: %s\n", agent.Description)
 	}
 	if len(agent.Tags) > 0 {
-		fmt.Fprintf(w, "Tags: %s\n", strings.Join(agent.Tags, ", "))
+		_, _ = fmt.Fprintf(w, "Tags: %s\n", strings.Join(agent.Tags, ", "))
 	}
 	if len(agent.Models) > 0 {
-		fmt.Fprintln(w, "Models:")
+		_, _ = fmt.Fprintln(w, "Models:")
 		var aliases []string
 		for alias := range agent.Models {
 			aliases = append(aliases, alias)
 		}
 		sort.Strings(aliases)
 		for _, alias := range aliases {
-			fmt.Fprintf(w, "  %s: %s\n", alias, agent.Models[alias])
+			_, _ = fmt.Fprintf(w, "  %s: %s\n", alias, agent.Models[alias])
 		}
 	}
 
@@ -467,7 +467,7 @@ func runConfigAgentEdit(cmd *cobra.Command, args []string) error {
 
 		flags := getFlags(cmd)
 		if !flags.Quiet {
-			fmt.Fprintf(stdout, "Updated agent %q\n", name)
+			_, _ = fmt.Fprintf(stdout, "Updated agent %q\n", name)
 		}
 		return nil
 	}
@@ -482,7 +482,7 @@ func runConfigAgentEdit(cmd *cobra.Command, args []string) error {
 	}
 
 	// Prompt for each field with current value as default
-	fmt.Fprintf(stdout, "Editing agent %q (press Enter to keep current value)\n\n", name)
+	_, _ = fmt.Fprintf(stdout, "Editing agent %q (press Enter to keep current value)\n\n", name)
 
 	newBin, err := promptString(stdout, stdin, "Binary", agent.Bin)
 	if err != nil {
@@ -522,7 +522,7 @@ func runConfigAgentEdit(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("writing agents file: %w", err)
 	}
 
-	fmt.Fprintf(stdout, "\nUpdated agent %q\n", name)
+	_, _ = fmt.Fprintf(stdout, "\nUpdated agent %q\n", name)
 	return nil
 }
 
@@ -581,7 +581,7 @@ func runConfigAgentRemove(cmd *cobra.Command, args []string) error {
 		}
 
 		if isTTY {
-			fmt.Fprintf(stdout, "Remove agent %q from %s config? [y/N] ", name, scopeString(local))
+			_, _ = fmt.Fprintf(stdout, "Remove agent %q from %s config? [y/N] ", name, scopeString(local))
 			reader := bufio.NewReader(stdin)
 			input, err := reader.ReadString('\n')
 			if err != nil {
@@ -589,7 +589,7 @@ func runConfigAgentRemove(cmd *cobra.Command, args []string) error {
 			}
 			input = strings.TrimSpace(strings.ToLower(input))
 			if input != "y" && input != "yes" {
-				fmt.Fprintln(stdout, "Cancelled.")
+				_, _ = fmt.Fprintln(stdout, "Cancelled.")
 				return nil
 			}
 		}
@@ -606,7 +606,7 @@ func runConfigAgentRemove(cmd *cobra.Command, args []string) error {
 
 	flags := getFlags(cmd)
 	if !flags.Quiet {
-		fmt.Fprintf(stdout, "Removed agent %q\n", name)
+		_, _ = fmt.Fprintf(stdout, "Removed agent %q\n", name)
 	}
 
 	return nil
@@ -649,14 +649,14 @@ func runConfigAgentDefault(cmd *cobra.Command, args []string) error {
 	if len(args) == 0 {
 		cfg, err := loadConfigForScope(local)
 		if err != nil {
-			fmt.Fprintln(stdout, "No default agent set.")
+			_, _ = fmt.Fprintln(stdout, "No default agent set.")
 			return nil
 		}
 		defaultAgent := getDefaultAgentFromConfig(cfg)
 		if defaultAgent == "" {
-			fmt.Fprintln(stdout, "No default agent set.")
+			_, _ = fmt.Fprintln(stdout, "No default agent set.")
 		} else {
-			fmt.Fprintf(stdout, "Default agent: %s\n", defaultAgent)
+			_, _ = fmt.Fprintf(stdout, "Default agent: %s\n", defaultAgent)
 		}
 		return nil
 	}
@@ -686,7 +686,7 @@ func runConfigAgentDefault(cmd *cobra.Command, args []string) error {
 
 	flags := getFlags(cmd)
 	if !flags.Quiet {
-		fmt.Fprintf(stdout, "Set default agent to %q\n", name)
+		_, _ = fmt.Fprintf(stdout, "Set default agent to %q\n", name)
 	}
 
 	return nil
@@ -974,9 +974,9 @@ func writeDefaultAgentSetting(path string, agentName string) error {
 // promptString prompts for a string value with a default.
 func promptString(w io.Writer, r io.Reader, label, defaultVal string) (string, error) {
 	if defaultVal != "" {
-		fmt.Fprintf(w, "%s [%s]: ", label, defaultVal)
+		_, _ = fmt.Fprintf(w, "%s [%s]: ", label, defaultVal)
 	} else {
-		fmt.Fprintf(w, "%s: ", label)
+		_, _ = fmt.Fprintf(w, "%s: ", label)
 	}
 
 	reader := bufio.NewReader(r)

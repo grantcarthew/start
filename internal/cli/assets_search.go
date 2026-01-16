@@ -62,7 +62,7 @@ func runAssetsSearch(cmd *cobra.Command, args []string) error {
 	results := searchIndex(index, query)
 
 	if len(results) == 0 {
-		fmt.Fprintf(cmd.OutOrStdout(), "No matches found for %q\n", query)
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "No matches found for %q\n", query)
 		return nil
 	}
 
@@ -170,7 +170,7 @@ func categoryOrder(category string) int {
 
 // printSearchResults prints search results grouped by category.
 func printSearchResults(w io.Writer, results []SearchResult, verbose bool) {
-	fmt.Fprintf(w, "Found %d matches:\n\n", len(results))
+	_, _ = fmt.Fprintf(w, "Found %d matches:\n\n", len(results))
 
 	// Group by category for display
 	grouped := make(map[string][]SearchResult)
@@ -186,18 +186,18 @@ func printSearchResults(w io.Writer, results []SearchResult, verbose bool) {
 			continue
 		}
 
-		fmt.Fprintf(w, "%s/\n", cat)
+		_, _ = fmt.Fprintf(w, "%s/\n", cat)
 		for _, r := range catResults {
 			if verbose {
-				fmt.Fprintf(w, "  %-25s %s\n", r.Name, r.Entry.Description)
-				fmt.Fprintf(w, "    Module: %s\n", r.Entry.Module)
+				_, _ = fmt.Fprintf(w, "  %-25s %s\n", r.Name, r.Entry.Description)
+				_, _ = fmt.Fprintf(w, "    Module: %s\n", r.Entry.Module)
 				if len(r.Entry.Tags) > 0 {
-					fmt.Fprintf(w, "    Tags: %s\n", strings.Join(r.Entry.Tags, ", "))
+					_, _ = fmt.Fprintf(w, "    Tags: %s\n", strings.Join(r.Entry.Tags, ", "))
 				}
 			} else {
-				fmt.Fprintf(w, "  %-25s %s\n", r.Name, r.Entry.Description)
+				_, _ = fmt.Fprintf(w, "  %-25s %s\n", r.Name, r.Entry.Description)
 			}
 		}
-		fmt.Fprintln(w)
+		_, _ = fmt.Fprintln(w)
 	}
 }
