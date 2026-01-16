@@ -141,6 +141,22 @@ The `./Context` directory contains cloned source code and documentation for deve
   - Use for: CLI implementation patterns, command structure, flag handling, shell completions
   - See: `Context/cobra/INDEX.csv` for detailed catalog
 
+## Start Assets Repository
+
+The `./start-assets/` directory contains the cloned [start-assets](https://github.com/grantcarthew/start-assets) repository for local development and testing. This directory is git-ignored.
+
+Use for: Developing and testing new assets, schemas, and registry content before publishing.
+
+```
+start-assets/
+├── agents/          # Agent definitions (claude, gemini, aichat)
+├── contexts/        # Context definitions (agents, environment, project)
+├── index/           # Registry index module
+├── roles/           # Role definitions (golang, start-assets)
+├── schemas/         # CUE schema definitions for all asset types
+└── tasks/           # Task definitions (golang, start)
+```
+
 ## Development Status
 
 **Completed:**
