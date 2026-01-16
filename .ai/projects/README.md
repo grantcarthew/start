@@ -16,6 +16,7 @@ See [p-writing-guide.md](./p-writing-guide.md) for guidelines on creating and ma
 | [p-014](./p-014-cli-supporting-commands-testing.md) | CLI Supporting Commands Testing | - |
 | [p-017](./p-017-cli-config-edit-flags.md) | CLI Config Edit Flags | - |
 | [p-018](./p-018-cli-interactive-edit-completeness.md) | CLI Interactive Edit Completeness | - |
+| [p-019](./p-019-cli-file-path-inputs.md) | CLI File Path Inputs | - |
 
 ### Completed Projects
 

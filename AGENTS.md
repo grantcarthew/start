@@ -12,7 +12,7 @@ Avoid references to the prototype in new documentation. This is a new design.
 
 Projects are stored in `.ai/projects/`. Continue by reading the active project.
 
-Active Project: None
+Active Project: [p-019-cli-file-path-inputs.md](.ai/projects/p-019-cli-file-path-inputs.md)
 
 Other Projects (paused):
 - None
