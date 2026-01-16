@@ -22,6 +22,7 @@ func addTaskCommand(parent *cobra.Command) {
 		Short: "Run a predefined task",
 		Long: `Run a predefined task with optional instructions.
 
+The name can be a config task name or a file path (starting with ./, /, or ~).
 Tasks are reusable workflows defined in configuration.
 Instructions are passed to the task template via the {{.Instructions}} placeholder.`,
 		Args: cobra.RangeArgs(1, 2),
@@ -51,47 +52,74 @@ func executeTask(stdout, stderr io.Writer, flags *Flags, taskName, instructions 
 
 	debugf(flags, "task", "Searching for task %q", taskName)
 
-	// Resolve task name (exact match or substring match)
-	resolvedName, err := findTask(env.Cfg, taskName)
-	if err != nil {
-		// Per DR-015: if not found locally, try fetching from registry
-		if isTaskNotFoundError(err, taskName) {
-			debugf(flags, "task", "Not found locally, checking registry...")
-			installed, installErr := tryInstallTaskFromRegistry(stdout, stderr, flags, taskName)
-			if installErr != nil {
-				// Registry install failed, return original error
-				debugf(flags, "task", "Registry install failed: %v", installErr)
-				return err
-			}
-			if installed {
-				// Reload config and retry
-				debugf(flags, "task", "Installed from registry, reloading config...")
-				env, err = prepareExecutionEnv(flags)
-				if err != nil {
+	// Check if taskName is a file path (per DR-038)
+	var taskResult orchestration.ProcessResult
+	var resolvedName string
+	roleName := flags.Role
+	if orchestration.IsFilePath(taskName) {
+		debugf(flags, "task", "Detected file path, reading file")
+		content, err := orchestration.ReadFilePath(taskName)
+		if err != nil {
+			return fmt.Errorf("reading task file %q: %w", taskName, err)
+		}
+		// Process through template processor for {{.instructions}} support
+		taskResult, err = env.Composer.ProcessContent(content, instructions)
+		if err != nil {
+			return fmt.Errorf("processing task file: %w", err)
+		}
+		taskResult.FileRead = true
+		resolvedName = taskName // Display file path as task name
+	} else {
+		// Resolve task name (exact match or substring match)
+		resolvedName, err = findTask(env.Cfg, taskName)
+		if err != nil {
+			// Per DR-015: if not found locally, try fetching from registry
+			if isTaskNotFoundError(err, taskName) {
+				debugf(flags, "task", "Not found locally, checking registry...")
+				installed, installErr := tryInstallTaskFromRegistry(stdout, stderr, flags, taskName)
+				if installErr != nil {
+					// Registry install failed, return original error
+					debugf(flags, "task", "Registry install failed: %v", installErr)
 					return err
 				}
-				resolvedName, err = findTask(env.Cfg, taskName)
-				if err != nil {
+				if installed {
+					// Reload config and retry
+					debugf(flags, "task", "Installed from registry, reloading config...")
+					env, err = prepareExecutionEnv(flags)
+					if err != nil {
+						return err
+					}
+					resolvedName, err = findTask(env.Cfg, taskName)
+					if err != nil {
+						return err
+					}
+				} else {
 					return err
 				}
 			} else {
 				return err
 			}
-		} else {
-			return err
 		}
-	}
 
-	if resolvedName != taskName {
-		debugf(flags, "task", "Resolved to %q (substring match)", resolvedName)
-	} else {
-		debugf(flags, "task", "Resolved to %q (exact match)", resolvedName)
-	}
+		if resolvedName != taskName {
+			debugf(flags, "task", "Resolved to %q (substring match)", resolvedName)
+		} else {
+			debugf(flags, "task", "Resolved to %q (exact match)", resolvedName)
+		}
 
-	// Resolve task
-	taskResult, err := env.Composer.ResolveTask(env.Cfg.Value, resolvedName, instructions)
-	if err != nil {
-		return fmt.Errorf("resolving task: %w", err)
+		// Resolve task from config
+		taskResult, err = env.Composer.ResolveTask(env.Cfg.Value, resolvedName, instructions)
+		if err != nil {
+			return fmt.Errorf("resolving task: %w", err)
+		}
+
+		// Get task's role if not specified via flag
+		if roleName == "" {
+			roleName = orchestration.GetTaskRole(env.Cfg.Value, resolvedName)
+			if roleName != "" {
+				debugf(flags, "role", "Selected %q (from task)", roleName)
+			}
+		}
 	}
 
 	if taskResult.CommandExecuted {
@@ -106,15 +134,9 @@ func executeTask(stdout, stderr io.Writer, flags *Flags, taskName, instructions 
 		debugf(flags, "task", "Instructions: %s", instructions)
 	}
 
-	// Get task's role if specified, else use flag
-	roleName := flags.Role
-	if roleName == "" {
-		roleName = orchestration.GetTaskRole(env.Cfg.Value, resolvedName)
-		if roleName != "" {
-			debugf(flags, "role", "Selected %q (from task)", roleName)
-		}
-	} else {
-		debugf(flags, "role", "Selected %q (--role flag)", roleName)
+	// Log role source if specified via flag
+	if flags.Role != "" {
+		debugf(flags, "role", "Selected %q (--role flag)", flags.Role)
 	}
 
 	// Per DR-015: required contexts only for tasks

@@ -72,9 +72,9 @@ It manages prompt composition, context injection, and workflow automation.`,
 
 	// Add persistent flags bound to this instance's Flags struct
 	cmd.PersistentFlags().StringVarP(&flags.Agent, "agent", "a", "", "Override agent selection")
-	cmd.PersistentFlags().StringVarP(&flags.Role, "role", "r", "", "Override role (system prompt)")
+	cmd.PersistentFlags().StringVarP(&flags.Role, "role", "r", "", "Override role (config name or file path)")
 	cmd.PersistentFlags().StringVarP(&flags.Model, "model", "m", "", "Override model selection")
-	cmd.PersistentFlags().StringSliceVarP(&flags.Context, "context", "c", nil, "Select contexts by tag")
+	cmd.PersistentFlags().StringSliceVarP(&flags.Context, "context", "c", nil, "Select contexts (tags or file paths)")
 	cmd.PersistentFlags().StringVarP(&flags.Directory, "directory", "d", "", "Working directory for context detection")
 	cmd.PersistentFlags().BoolVar(&flags.DryRun, "dry-run", false, "Preview execution without launching agent")
 	cmd.PersistentFlags().BoolVarP(&flags.Quiet, "quiet", "q", false, "Suppress output")
