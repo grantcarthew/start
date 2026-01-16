@@ -767,9 +767,11 @@ func TestComposer_ResolveTask_TempFile(t *testing.T) {
 		t.Errorf("temp file content = %q, want %q", string(content), "Task content here")
 	}
 
-	// Verify {{.file}} in prompt was resolved to temp path
-	if !strings.Contains(result.Content, ".start/temp/task-test-task.md") {
-		t.Errorf("Content should contain temp path, got: %s", result.Content)
+	// Verify {{.file}} in prompt contains original file path (not temp path)
+	// Local files preserve their original value for semantic clarity.
+	// Only @module/ files get temp path in {{.file}}.
+	if !strings.Contains(result.Content, sourceFile) {
+		t.Errorf("Content should contain original file path %q, got: %s", sourceFile, result.Content)
 	}
 }
 

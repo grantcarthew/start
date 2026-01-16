@@ -159,7 +159,7 @@ Prompt: "File: {{ file }}, Date: {{ date }}"
 
 Provide these fields to Go's template engine:
 
-- File path (path to resolved temp file in `.start/temp/`)
+- File path (original path for local files; temp path for `@module/` files)
 - File contents (resolved template content, empty string if not read)
 - Command string (always available as string)
 - Command output (empty string if not executed)
@@ -309,6 +309,7 @@ Warning: {{.file_contents}} requested but file not found, using empty string
 ## Updates
 
 - 2025-12-08: Clarified that `{{.file}}` returns resolved temp file path, `{{.file_contents}}` returns resolved content. All content files are template-processed and written to `.start/temp/`.
+- 2026-01-16: Corrected `{{.file}}` behavior: returns original path for local files, temp path only for `@module/` files. This preserves semantic clarity in prompts while ensuring module files remain accessible to AI agents.
 
 ## See Also
 
