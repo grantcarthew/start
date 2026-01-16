@@ -508,6 +508,11 @@ func formatShowContent(v cue.Value, itemType string) string {
 				sb.WriteString(fmt.Sprintf("Command: %s\n", s))
 			}
 		}
+		if dm := v.LookupPath(cue.ParsePath("default_model")); dm.Exists() {
+			if s, err := dm.String(); err == nil {
+				sb.WriteString(fmt.Sprintf("Default Model: %s\n", s))
+			}
+		}
 		if models := v.LookupPath(cue.ParsePath("models")); models.Exists() {
 			sb.WriteString("\nModels:\n")
 			iter, err := models.Fields()
