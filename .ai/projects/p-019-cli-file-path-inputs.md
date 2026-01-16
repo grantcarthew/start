@@ -1,8 +1,8 @@
 # P-019: CLI File Path Inputs
 
-- Status: Pending
-- Started: -
-- Completed: -
+- Status: Complete
+- Started: 2026-01-16
+- Completed: 2026-01-16
 
 ## Overview
 
@@ -38,16 +38,16 @@ Out of Scope:
 
 ## Success Criteria
 
-- [ ] `start --role ./path/to/role.md` reads file and uses as role content
-- [ ] `start --context ./path/to/ctx.md` reads file and uses as context
-- [ ] `start --context ./a.md,config-name,./b.md` works with mixed inputs in order
-- [ ] `start task ./path/to/task.md` reads file and uses as task prompt
-- [ ] `start prompt ./path/to/prompt.md` reads file and uses as prompt text
-- [ ] Missing files show appropriate error/warning (○ status for contexts)
-- [ ] File paths display as-is in output (e.g., `Role: ./my-role.md`)
-- [ ] Help text documents file path support
-- [ ] CLI docs include file path examples
-- [ ] All new code has test coverage
+- [x] `start --role ./path/to/role.md` reads file and uses as role content
+- [x] `start --context ./path/to/ctx.md` reads file and uses as context
+- [x] `start --context ./a.md,config-name,./b.md` works with mixed inputs in order
+- [x] `start task ./path/to/task.md` reads file and uses as task prompt
+- [x] `start prompt ./path/to/prompt.md` reads file and uses as prompt text
+- [x] Missing files show appropriate error/warning (○ status for contexts)
+- [x] File paths display as-is in output (e.g., `Role: ./my-role.md`)
+- [x] Help text documents file path support
+- [x] CLI docs include file path examples
+- [x] All new code has test coverage
 
 ## Deliverables
 
@@ -62,9 +62,9 @@ Code:
 
 Documentation:
 
-- Updated `docs/cli/start.md`
-- Updated `docs/cli/task.md`
-- Updated `docs/cli/prompt.md`
+- Create `docs/cli/start.md` (does not exist)
+- Create `docs/cli/task.md` (does not exist)
+- Create `docs/cli/prompt.md` (does not exist)
 
 ## Technical Approach
 
@@ -92,9 +92,61 @@ Documentation:
    - If file path, read file content and use as customText
    - Existing inline text behavior unchanged
 
+## Current State
+
+Key code locations and patterns:
+
+**Tilde expansion reference:**
+- `internal/cli/root.go:125-155` - `resolveDirectory()` implements tilde expansion for `--directory` flag
+- Pattern: Check if path starts with `~`, expand using `os.UserHomeDir()`, convert to absolute path
+
+**Role resolution:**
+- `internal/cli/start.go:142` - `flags.Role` passed to `ComposeWithRole()`
+- `internal/orchestration/composer.go:146-169` - `ComposeWithRole()` calls `resolveRole()` for config lookup
+- `internal/orchestration/composer.go:309-355` - `resolveRole()` looks up role in CUE config, extracts UTD fields
+
+**Context handling:**
+- `internal/cli/root.go:77` - `flags.Context` is `[]string` (comma-separated via `StringSliceVarP`)
+- `internal/orchestration/composer.go:171-254` - `selectContexts()` iterates CUE config contexts with tag filtering
+- `internal/orchestration/composer.go:256-306` - `resolveContext()` resolves individual context through UTD
+
+**Task resolution:**
+- `internal/cli/task.go:34-43` - `runTask()` extracts task name from args
+- `internal/cli/task.go:46-177` - `executeTask()` calls `findTask()` then `ResolveTask()`
+- `internal/cli/task.go:291-324` - `findTask()` does exact/substring matching in CUE config
+- `internal/orchestration/composer.go:404-454` - `ResolveTask()` looks up task in config, processes UTD
+
+**Prompt handling:**
+- `internal/cli/prompt.go:24-39` - `runPrompt()` passes args[0] as customText to `executeStart()`
+
+**Documentation:**
+- `docs/cli/start.md` - Does not exist yet (needs creation)
+- `docs/cli/task.md` - Does not exist yet (needs creation)
+- `docs/cli/prompt.md` - Does not exist yet (needs creation)
+- `docs/cli/cli-writing-guide.md` - Exists as reference for documentation style
+
+**Test patterns:**
+- `internal/orchestration/composer_test.go` - Table-driven tests, uses `t.TempDir()` for file tests
+- `internal/cli/start_test.go` - Integration tests using `setupStartTestConfig()` helper
+
 ## Dependencies
 
 - DR-038: CLI File Path Inputs (design specification)
+
+## Review Notes
+
+**Implementation readiness confirmed.** Analysis of codebase shows:
+
+- Tilde expansion pattern exists in `resolveDirectory()` - reusable for file path handling
+- Error handling patterns are clear: role errors → warnings, task errors → fatal, context errors → ○ status
+- Test patterns established: table-driven tests, `t.TempDir()`, `setupStartTestConfig()` helper
+- File reading is straightforward - no temp file management needed (that pattern is for `@module/` paths only)
+
+**No blocking decisions required.** DR-038 has specified:
+
+- Detection rule: `./`, `/`, `~` prefixes only (relative paths like `foo/bar.md` without prefix treated as config names)
+- Display: file paths shown as-is in output
+- Missing files: contexts show ○ status; roles/tasks follow existing error patterns
 
 ## Testing Strategy
 

@@ -487,3 +487,310 @@ settings: {
 		t.Errorf("error = %q, want containing 'no tasks defined'", err.Error())
 	}
 }
+
+// File path integration tests (DR-038)
+
+func TestExecuteStart_FilePathRole(t *testing.T) {
+	tmpDir := setupStartTestConfig(t)
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getting working dir: %v", err)
+	}
+	defer func() { _ = os.Chdir(origDir) }()
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("changing to temp dir: %v", err)
+	}
+
+	// Create a role file
+	roleContent := "You are a file-based role for testing."
+	roleFile := filepath.Join(tmpDir, "test-role.md")
+	if err := os.WriteFile(roleFile, []byte(roleContent), 0644); err != nil {
+		t.Fatalf("writing role file: %v", err)
+	}
+
+	flags := &Flags{
+		DryRun: true,
+		Role:   "./test-role.md",
+	}
+
+	selection := orchestration.ContextSelection{
+		IncludeRequired: true,
+		IncludeDefaults: true,
+	}
+
+	stdout := new(bytes.Buffer)
+	stderr := new(bytes.Buffer)
+
+	err = executeStart(stdout, stderr, flags, selection, "")
+	if err != nil {
+		t.Fatalf("executeStart() error = %v", err)
+	}
+
+	output := stdout.String()
+
+	// Should show file path as role name
+	if !strings.Contains(output, "./test-role.md") {
+		t.Errorf("Expected file path in role output, got:\n%s", output)
+	}
+
+	// Should include the role content
+	if !strings.Contains(output, "file-based role") {
+		t.Errorf("Expected role content in output, got:\n%s", output)
+	}
+}
+
+func TestExecuteStart_FilePathContext(t *testing.T) {
+	tmpDir := setupStartTestConfig(t)
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getting working dir: %v", err)
+	}
+	defer func() { _ = os.Chdir(origDir) }()
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("changing to temp dir: %v", err)
+	}
+
+	// Create a context file
+	ctxContent := "File-based context content for testing."
+	ctxFile := filepath.Join(tmpDir, "test-context.md")
+	if err := os.WriteFile(ctxFile, []byte(ctxContent), 0644); err != nil {
+		t.Fatalf("writing context file: %v", err)
+	}
+
+	flags := &Flags{
+		DryRun:  true,
+		Context: []string{"./test-context.md"},
+	}
+
+	selection := orchestration.ContextSelection{
+		IncludeRequired: true,
+		Tags:            flags.Context,
+	}
+
+	stdout := new(bytes.Buffer)
+	stderr := new(bytes.Buffer)
+
+	err = executeStart(stdout, stderr, flags, selection, "")
+	if err != nil {
+		t.Fatalf("executeStart() error = %v", err)
+	}
+
+	output := stdout.String()
+
+	// Should show file path as context name
+	if !strings.Contains(output, "./test-context.md") {
+		t.Errorf("Expected file path in context output, got:\n%s", output)
+	}
+}
+
+func TestExecuteStart_MixedContextOrder(t *testing.T) {
+	tmpDir := setupStartTestConfig(t)
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getting working dir: %v", err)
+	}
+	defer func() { _ = os.Chdir(origDir) }()
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("changing to temp dir: %v", err)
+	}
+
+	// Create context files
+	if err := os.WriteFile(filepath.Join(tmpDir, "first.md"), []byte("First file context"), 0644); err != nil {
+		t.Fatalf("writing first.md: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(tmpDir, "last.md"), []byte("Last file context"), 0644); err != nil {
+		t.Fatalf("writing last.md: %v", err)
+	}
+
+	// Mixed order: file, config tag (default), file
+	flags := &Flags{
+		DryRun:  true,
+		Context: []string{"./first.md", "default", "./last.md"},
+	}
+
+	selection := orchestration.ContextSelection{
+		IncludeRequired: true,
+		Tags:            flags.Context,
+	}
+
+	stdout := new(bytes.Buffer)
+	stderr := new(bytes.Buffer)
+
+	err = executeStart(stdout, stderr, flags, selection, "")
+	if err != nil {
+		t.Fatalf("executeStart() error = %v", err)
+	}
+
+	output := stdout.String()
+
+	// Verify order is preserved: first.md should appear before project (default), which should appear before last.md
+	firstIdx := strings.Index(output, "./first.md")
+	projectIdx := strings.Index(output, "project")
+	lastIdx := strings.Index(output, "./last.md")
+
+	if firstIdx == -1 {
+		t.Error("Expected ./first.md in output")
+	}
+	if projectIdx == -1 {
+		t.Error("Expected project (default context) in output")
+	}
+	if lastIdx == -1 {
+		t.Error("Expected ./last.md in output")
+	}
+
+	if firstIdx != -1 && projectIdx != -1 && lastIdx != -1 {
+		if firstIdx >= projectIdx || projectIdx >= lastIdx {
+			t.Errorf("Context order not preserved: first.md(%d) < project(%d) < last.md(%d)",
+				firstIdx, projectIdx, lastIdx)
+		}
+	}
+}
+
+func TestExecuteTask_FilePathTask(t *testing.T) {
+	tmpDir := setupStartTestConfig(t)
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getting working dir: %v", err)
+	}
+	defer func() { _ = os.Chdir(origDir) }()
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("changing to temp dir: %v", err)
+	}
+
+	// Create a task file
+	taskContent := "File-based task prompt for testing."
+	taskFile := filepath.Join(tmpDir, "test-task.md")
+	if err := os.WriteFile(taskFile, []byte(taskContent), 0644); err != nil {
+		t.Fatalf("writing task file: %v", err)
+	}
+
+	flags := &Flags{DryRun: true}
+
+	stdout := new(bytes.Buffer)
+	stderr := new(bytes.Buffer)
+
+	err = executeTask(stdout, stderr, flags, "./test-task.md", "")
+	if err != nil {
+		t.Fatalf("executeTask() error = %v", err)
+	}
+
+	output := stdout.String()
+
+	// Should show file path as task name
+	if !strings.Contains(output, "./test-task.md") {
+		t.Errorf("Expected file path in task output, got:\n%s", output)
+	}
+
+	// Should include task content
+	if !strings.Contains(output, "File-based task prompt") {
+		t.Errorf("Expected task content in output, got:\n%s", output)
+	}
+}
+
+func TestExecuteTask_FilePathWithInstructions(t *testing.T) {
+	tmpDir := setupStartTestConfig(t)
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getting working dir: %v", err)
+	}
+	defer func() { _ = os.Chdir(origDir) }()
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("changing to temp dir: %v", err)
+	}
+
+	// Create a task file with instructions placeholder
+	taskContent := "Review this code.\nInstructions: {{.instructions}}"
+	taskFile := filepath.Join(tmpDir, "review-task.md")
+	if err := os.WriteFile(taskFile, []byte(taskContent), 0644); err != nil {
+		t.Fatalf("writing task file: %v", err)
+	}
+
+	flags := &Flags{DryRun: true}
+
+	stdout := new(bytes.Buffer)
+	stderr := new(bytes.Buffer)
+
+	err = executeTask(stdout, stderr, flags, "./review-task.md", "focus on security")
+	if err != nil {
+		t.Fatalf("executeTask() error = %v", err)
+	}
+
+	output := stdout.String()
+
+	// Should have substituted instructions
+	if !strings.Contains(output, "focus on security") {
+		t.Errorf("Expected instructions to be substituted, got:\n%s", output)
+	}
+
+	// Should NOT contain the placeholder
+	if strings.Contains(output, "{{.instructions}}") {
+		t.Errorf("Template placeholder was not substituted, got:\n%s", output)
+	}
+}
+
+func TestExecuteTask_FilePathMissing(t *testing.T) {
+	tmpDir := setupStartTestConfig(t)
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getting working dir: %v", err)
+	}
+	defer func() { _ = os.Chdir(origDir) }()
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("changing to temp dir: %v", err)
+	}
+
+	flags := &Flags{DryRun: true}
+
+	stdout := new(bytes.Buffer)
+	stderr := new(bytes.Buffer)
+
+	err = executeTask(stdout, stderr, flags, "./nonexistent.md", "")
+
+	if err == nil {
+		t.Error("Expected error for missing file")
+		return
+	}
+
+	// Should include file path in error
+	if !strings.Contains(err.Error(), "./nonexistent.md") {
+		t.Errorf("Error should contain file path: %v", err)
+	}
+}
+
+func TestExecuteStart_FilePathContextMissing(t *testing.T) {
+	tmpDir := setupStartTestConfig(t)
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getting working dir: %v", err)
+	}
+	defer func() { _ = os.Chdir(origDir) }()
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("changing to temp dir: %v", err)
+	}
+
+	flags := &Flags{
+		DryRun:  true,
+		Context: []string{"./missing-context.md"},
+	}
+
+	selection := orchestration.ContextSelection{
+		IncludeRequired: true,
+		Tags:            flags.Context,
+	}
+
+	stdout := new(bytes.Buffer)
+	stderr := new(bytes.Buffer)
+
+	// Missing context files should not cause fatal error (per DR-038: show ○ status)
+	err = executeStart(stdout, stderr, flags, selection, "")
+	if err != nil {
+		t.Fatalf("executeStart() should not fail for missing context file: %v", err)
+	}
+
+	output := stdout.String()
+
+	// Should show the missing context with error indicator
+	if !strings.Contains(output, "./missing-context.md") {
+		t.Errorf("Expected missing file path in output, got:\n%s", output)
+	}
+}

@@ -88,41 +88,18 @@ type ComposeResult struct {
 // Compose builds the final prompt from configuration.
 func (c *Composer) Compose(cfg cue.Value, selection ContextSelection, customText, instructions string) (ComposeResult, error) {
 	var result ComposeResult
-
-	// Get contexts in definition order
-	contexts, err := c.selectContexts(cfg, selection)
-	if err != nil {
-		return result, fmt.Errorf("selecting contexts: %w", err)
-	}
-
-	// Check for tags that matched no contexts
-	for _, tag := range selection.Tags {
-		if tag == "default" {
-			continue // pseudo-tag, handled separately
-		}
-		matched := false
-		for _, ctx := range contexts {
-			for _, ctxTag := range ctx.Tags {
-				if ctxTag == tag {
-					matched = true
-					break
-				}
-			}
-			if matched {
-				break
-			}
-		}
-		if !matched {
-			result.Warnings = append(result.Warnings, fmt.Sprintf("tag %q matched no contexts", tag))
-		}
-	}
-
-	// Resolve each context through UTD
 	var promptParts []string
-	for _, ctx := range contexts {
+	addedContexts := make(map[string]bool)
+
+	// Helper to resolve and add a config context
+	addConfigContext := func(ctx Context) {
+		if addedContexts[ctx.Name] {
+			return
+		}
+		addedContexts[ctx.Name] = true
+
 		resolved, err := c.resolveContext(cfg, ctx.Name)
 		if err != nil {
-			// Store error on context for display (per DR-007, errors are non-fatal)
 			ctx.Error = err.Error()
 		} else {
 			ctx.Content = resolved.Content
@@ -131,6 +108,68 @@ func (c *Composer) Compose(cfg cue.Value, selection ContextSelection, customText
 			}
 		}
 		result.Contexts = append(result.Contexts, ctx)
+	}
+
+	// First: add required contexts (config definition order)
+	if selection.IncludeRequired {
+		requiredSelection := ContextSelection{IncludeRequired: true}
+		contexts, err := c.selectContexts(cfg, requiredSelection)
+		if err != nil {
+			return result, fmt.Errorf("selecting contexts: %w", err)
+		}
+		for _, ctx := range contexts {
+			addConfigContext(ctx)
+		}
+	}
+
+	// Second: add default contexts if IncludeDefaults and no explicit tags
+	if selection.IncludeDefaults && len(selection.Tags) == 0 {
+		defaultSelection := ContextSelection{IncludeDefaults: true}
+		contexts, err := c.selectContexts(cfg, defaultSelection)
+		if err != nil {
+			return result, fmt.Errorf("selecting contexts: %w", err)
+		}
+		for _, ctx := range contexts {
+			addConfigContext(ctx)
+		}
+	}
+
+	// Third: process user tags in order (per DR-038, order is preserved)
+	for _, tag := range selection.Tags {
+		if IsFilePath(tag) {
+			// File path - create context directly
+			ctx := Context{
+				Name: tag,
+				File: tag,
+			}
+			content, err := ReadFilePath(tag)
+			if err != nil {
+				ctx.Error = err.Error()
+			} else {
+				ctx.Content = content
+				if content != "" {
+					promptParts = append(promptParts, content)
+				}
+			}
+			result.Contexts = append(result.Contexts, ctx)
+		} else if tag == "default" {
+			// "default" pseudo-tag - add default contexts (config order)
+			defaultSelection := ContextSelection{IncludeDefaults: true}
+			contexts, _ := c.selectContexts(cfg, defaultSelection)
+			for _, ctx := range contexts {
+				addConfigContext(ctx)
+			}
+		} else {
+			// Config tag - find matching contexts (config order within this tag)
+			tagSelection := ContextSelection{Tags: []string{tag}}
+			contexts, _ := c.selectContexts(cfg, tagSelection)
+			if len(contexts) == 0 {
+				result.Warnings = append(result.Warnings, fmt.Sprintf("tag %q matched no contexts", tag))
+			}
+			for _, ctx := range contexts {
+				addConfigContext(ctx)
+			}
+		}
 	}
 
 	// Append custom text or task instructions
@@ -156,10 +195,19 @@ func (c *Composer) ComposeWithRole(cfg cue.Value, selection ContextSelection, ro
 	result.RoleName = roleName
 
 	if roleName != "" {
-		roleContent, err := c.resolveRole(cfg, roleName)
-		if err != nil {
+		var roleContent string
+		var roleErr error
+
+		// Check if roleName is a file path (per DR-038)
+		if IsFilePath(roleName) {
+			roleContent, roleErr = ReadFilePath(roleName)
+		} else {
+			roleContent, roleErr = c.resolveRole(cfg, roleName)
+		}
+
+		if roleErr != nil {
 			// Role errors are warnings (per DR-007)
-			result.Warnings = append(result.Warnings, fmt.Sprintf("role %q: %v", roleName, err))
+			result.Warnings = append(result.Warnings, fmt.Sprintf("role %q: %v", roleName, roleErr))
 		} else {
 			result.Role = roleContent
 		}
@@ -451,6 +499,16 @@ func (c *Composer) ResolveTask(cfg cue.Value, name, instructions string) (Proces
 
 	result.TempFile = tempPath
 	return result, nil
+}
+
+// ProcessContent processes raw content through template substitution.
+// This is used for file-based tasks where the content is read directly
+// but still needs template processing for placeholders like {{.instructions}}.
+func (c *Composer) ProcessContent(content, instructions string) (ProcessResult, error) {
+	fields := UTDFields{
+		Prompt: content, // Use prompt field so content is treated as template
+	}
+	return c.processor.Process(fields, instructions)
 }
 
 // extractOrigin extracts the origin field from a CUE value.
