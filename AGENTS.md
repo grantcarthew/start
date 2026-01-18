@@ -12,7 +12,7 @@ Avoid references to the prototype in new documentation. This is a new design.
 
 Projects are stored in `.ai/projects/`. Continue by reading the active project.
 
-Active Project: [p-019-cli-file-path-inputs.md](.ai/projects/p-019-cli-file-path-inputs.md)
+Active Project: [p-018-cli-interactive-edit-completeness.md](.ai/projects/p-018-cli-interactive-edit-completeness.md)
 
 Other Projects (paused):
 - None
@@ -178,7 +178,8 @@ start-assets/
 - p-017: CLI Config Edit Flags (non-interactive flag-based editing for config edit commands)
 - p-013: CLI Configuration Commands Testing (config commands, show commands, merging, --local flag)
 - p-014: CLI Supporting Commands Testing (assets, doctor, completion commands)
+- p-019: CLI File Path Inputs (file path support for --role, --context, task, and prompt commands)
 
-**Current:** None - CLI testing series complete
+**Current:** p-018 - CLI Interactive Edit Completeness
 
 The prototype validated that this tool solves a real problem. This version will implement it properly.

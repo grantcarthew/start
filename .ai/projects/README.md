@@ -12,11 +12,7 @@ See [p-writing-guide.md](./p-writing-guide.md) for guidelines on creating and ma
 
 | Project | Title | Started |
 |---------|-------|---------|
-| [p-013](./p-013-cli-configuration-testing.md) | CLI Configuration Testing | - |
-| [p-014](./p-014-cli-supporting-commands-testing.md) | CLI Supporting Commands Testing | - |
-| [p-017](./p-017-cli-config-edit-flags.md) | CLI Config Edit Flags | - |
 | [p-018](./p-018-cli-interactive-edit-completeness.md) | CLI Interactive Edit Completeness | - |
-| [p-019](./p-019-cli-file-path-inputs.md) | CLI File Path Inputs | - |
 
 ### Completed Projects
 
@@ -36,6 +32,10 @@ See [p-writing-guide.md](./p-writing-guide.md) for guidelines on creating and ma
 | [p-015](./completed/p-015-schema-base-origin-tracking.md) | Schema Base and Origin Tracking | 2026-01-05 |
 | [p-016](./completed/p-016-file-placeholder-temp-path.md) | File Placeholder Temp Path | 2026-01-13 |
 | [p-012](./completed/p-012-cli-end-to-end-testing.md) | CLI Core Commands Testing | 2026-01-13 |
+| [p-013](./completed/p-013-cli-configuration-testing.md) | CLI Configuration Testing | 2026-01-15 |
+| [p-014](./completed/p-014-cli-supporting-commands-testing.md) | CLI Supporting Commands Testing | 2026-01-15 |
+| [p-017](./completed/p-017-cli-config-edit-flags.md) | CLI Config Edit Flags | 2026-01-16 |
+| [p-019](./completed/p-019-cli-file-path-inputs.md) | CLI File Path Inputs | 2026-01-16 |
 
 ---
 
