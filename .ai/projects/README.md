@@ -10,9 +10,7 @@ See [p-writing-guide.md](./p-writing-guide.md) for guidelines on creating and ma
 
 ### Active Projects
 
-| Project | Title | Started |
-|---------|-------|---------|
-| [p-018](./p-018-cli-interactive-edit-completeness.md) | CLI Interactive Edit Completeness | - |
+None - all projects complete.
 
 ### Completed Projects
 
@@ -36,12 +34,21 @@ See [p-writing-guide.md](./p-writing-guide.md) for guidelines on creating and ma
 | [p-014](./completed/p-014-cli-supporting-commands-testing.md) | CLI Supporting Commands Testing | 2026-01-15 |
 | [p-017](./completed/p-017-cli-config-edit-flags.md) | CLI Config Edit Flags | 2026-01-16 |
 | [p-019](./completed/p-019-cli-file-path-inputs.md) | CLI File Path Inputs | 2026-01-16 |
+| [p-018](./completed/p-018-cli-interactive-edit-completeness.md) | CLI Interactive Edit Completeness | 2025-01-19 |
 
 ---
 
 ## Project Overview
 
 ### Completed
+
+#### p-018: CLI Interactive Edit Completeness
+
+Enhanced interactive edit mode for `config <type> edit <name>` commands to support editing all fields (models, tags) that were previously only available via add commands.
+
+**Key Deliverables:** `promptTags` and `promptModels` helper functions, updated edit commands for agent/role/context/task, 14 unit tests
+
+**Dependencies:** p-008
 
 #### p-012: CLI Core Commands Testing
 

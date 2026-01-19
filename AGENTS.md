@@ -12,7 +12,7 @@ Avoid references to the prototype in new documentation. This is a new design.
 
 Projects are stored in `.ai/projects/`. Continue by reading the active project.
 
-Active Project: [p-018-cli-interactive-edit-completeness.md](.ai/projects/p-018-cli-interactive-edit-completeness.md)
+Active Project: None - all projects complete.
 
 Other Projects (paused):
 - None
@@ -179,7 +179,8 @@ start-assets/
 - p-013: CLI Configuration Commands Testing (config commands, show commands, merging, --local flag)
 - p-014: CLI Supporting Commands Testing (assets, doctor, completion commands)
 - p-019: CLI File Path Inputs (file path support for --role, --context, task, and prompt commands)
+- p-018: CLI Interactive Edit Completeness (models and tags editing in interactive mode)
 
-**Current:** p-018 - CLI Interactive Edit Completeness
+**Current:** None - all projects complete
 
 The prototype validated that this tool solves a real problem. This version will implement it properly.

@@ -1095,3 +1095,248 @@ agents: {
 		t.Error("original file content should be preserved")
 	}
 }
+
+// Tests for prompt helper functions
+
+func TestPromptTags_KeepCurrent(t *testing.T) {
+	current := []string{"tag1", "tag2"}
+	stdout := &bytes.Buffer{}
+	stdin := strings.NewReader("\n") // Just press Enter
+
+	result, err := promptTags(stdout, stdin, current)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(result) != 2 || result[0] != "tag1" || result[1] != "tag2" {
+		t.Errorf("expected current tags to be preserved, got: %v", result)
+	}
+
+	output := stdout.String()
+	if !strings.Contains(output, "tag1, tag2") {
+		t.Errorf("expected current tags in output, got: %s", output)
+	}
+}
+
+func TestPromptTags_Clear(t *testing.T) {
+	current := []string{"tag1", "tag2"}
+	stdout := &bytes.Buffer{}
+	stdin := strings.NewReader("-\n")
+
+	result, err := promptTags(stdout, stdin, current)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(result) != 0 {
+		t.Errorf("expected empty tags after clear, got: %v", result)
+	}
+}
+
+func TestPromptTags_Replace(t *testing.T) {
+	current := []string{"old1", "old2"}
+	stdout := &bytes.Buffer{}
+	stdin := strings.NewReader("new1, new2, new3\n")
+
+	result, err := promptTags(stdout, stdin, current)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(result) != 3 || result[0] != "new1" || result[1] != "new2" || result[2] != "new3" {
+		t.Errorf("expected new tags, got: %v", result)
+	}
+}
+
+func TestPromptTags_Empty(t *testing.T) {
+	var current []string
+	stdout := &bytes.Buffer{}
+	stdin := strings.NewReader("first, second\n")
+
+	result, err := promptTags(stdout, stdin, current)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(result) != 2 || result[0] != "first" || result[1] != "second" {
+		t.Errorf("expected new tags, got: %v", result)
+	}
+
+	output := stdout.String()
+	if !strings.Contains(output, "(none)") {
+		t.Errorf("expected '(none)' for empty current tags, got: %s", output)
+	}
+}
+
+func TestPromptModels_Keep(t *testing.T) {
+	current := map[string]string{"fast": "gpt-4", "smart": "gpt-4-turbo"}
+	stdout := &bytes.Buffer{}
+	stdin := strings.NewReader("k\n")
+
+	result, err := promptModels(stdout, stdin, current)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(result) != 2 || result["fast"] != "gpt-4" || result["smart"] != "gpt-4-turbo" {
+		t.Errorf("expected current models preserved, got: %v", result)
+	}
+}
+
+func TestPromptModels_KeepDefault(t *testing.T) {
+	current := map[string]string{"fast": "gpt-4"}
+	stdout := &bytes.Buffer{}
+	stdin := strings.NewReader("\n") // Just Enter defaults to keep
+
+	result, err := promptModels(stdout, stdin, current)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(result) != 1 || result["fast"] != "gpt-4" {
+		t.Errorf("expected current models preserved, got: %v", result)
+	}
+}
+
+func TestPromptModels_Clear(t *testing.T) {
+	current := map[string]string{"fast": "gpt-4", "smart": "gpt-4-turbo"}
+	stdout := &bytes.Buffer{}
+	stdin := strings.NewReader("c\n")
+
+	result, err := promptModels(stdout, stdin, current)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(result) != 0 {
+		t.Errorf("expected empty models after clear, got: %v", result)
+	}
+}
+
+func TestPromptModels_Edit_KeepExisting(t *testing.T) {
+	current := map[string]string{"fast": "gpt-4"}
+	stdout := &bytes.Buffer{}
+	// Edit mode, keep fast, don't add new
+	stdin := strings.NewReader("e\n\n\n")
+
+	result, err := promptModels(stdout, stdin, current)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(result) != 1 || result["fast"] != "gpt-4" {
+		t.Errorf("expected model kept, got: %v", result)
+	}
+}
+
+func TestPromptModels_Edit_UpdateExisting(t *testing.T) {
+	current := map[string]string{"fast": "gpt-4"}
+	stdout := &bytes.Buffer{}
+	// Edit mode, update fast to gpt-4-turbo, don't add new
+	stdin := strings.NewReader("e\ngpt-4-turbo\n\n")
+
+	result, err := promptModels(stdout, stdin, current)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(result) != 1 || result["fast"] != "gpt-4-turbo" {
+		t.Errorf("expected model updated, got: %v", result)
+	}
+}
+
+func TestPromptModels_Edit_DeleteExisting(t *testing.T) {
+	current := map[string]string{"fast": "gpt-4", "slow": "gpt-3"}
+	stdout := &bytes.Buffer{}
+	// Edit mode, keep fast, delete slow, don't add new
+	stdin := strings.NewReader("e\n\n-\n\n")
+
+	result, err := promptModels(stdout, stdin, current)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(result) != 1 || result["fast"] != "gpt-4" {
+		t.Errorf("expected only fast model kept, got: %v", result)
+	}
+	if _, exists := result["slow"]; exists {
+		t.Errorf("expected slow model deleted, got: %v", result)
+	}
+}
+
+func TestPromptModels_Edit_AddNew(t *testing.T) {
+	current := map[string]string{"fast": "gpt-4"}
+	stdout := &bytes.Buffer{}
+	// Edit mode, keep fast, add new model
+	stdin := strings.NewReader("e\n\nreasoning=o1\n\n")
+
+	result, err := promptModels(stdout, stdin, current)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(result) != 2 {
+		t.Errorf("expected 2 models, got: %v", result)
+	}
+	if result["fast"] != "gpt-4" {
+		t.Errorf("expected fast model preserved, got: %v", result)
+	}
+	if result["reasoning"] != "o1" {
+		t.Errorf("expected reasoning model added, got: %v", result)
+	}
+}
+
+func TestPromptModels_Empty(t *testing.T) {
+	var current map[string]string
+	stdout := &bytes.Buffer{}
+	stdin := strings.NewReader("e\nnew=model-id\n\n")
+
+	result, err := promptModels(stdout, stdin, current)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(result) != 1 || result["new"] != "model-id" {
+		t.Errorf("expected new model added, got: %v", result)
+	}
+
+	output := stdout.String()
+	if !strings.Contains(output, "(none)") {
+		t.Errorf("expected '(none)' for empty current models, got: %s", output)
+	}
+}
+
+func TestPromptModels_InvalidChoice(t *testing.T) {
+	current := map[string]string{"fast": "gpt-4"}
+	stdout := &bytes.Buffer{}
+	stdin := strings.NewReader("x\n")
+
+	_, err := promptModels(stdout, stdin, current)
+	if err == nil {
+		t.Fatal("expected error for invalid choice")
+	}
+	if !strings.Contains(err.Error(), "invalid choice") {
+		t.Errorf("expected 'invalid choice' error, got: %v", err)
+	}
+}
+
+func TestPromptModels_Edit_InvalidFormat(t *testing.T) {
+	var current map[string]string
+	stdout := &bytes.Buffer{}
+	// Try invalid format, then valid, then finish
+	stdin := strings.NewReader("e\ninvalid-no-equals\nvalid=model\n\n")
+
+	result, err := promptModels(stdout, stdin, current)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := stdout.String()
+	if !strings.Contains(output, "Invalid format") {
+		t.Errorf("expected invalid format message, got: %s", output)
+	}
+
+	if len(result) != 1 || result["valid"] != "model" {
+		t.Errorf("expected valid model added despite earlier invalid input, got: %v", result)
+	}
+}

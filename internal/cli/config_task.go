@@ -566,12 +566,20 @@ func runConfigTaskEdit(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	// Prompt for tags
+	_, _ = fmt.Fprintln(stdout)
+	newTags, err := promptTags(stdout, stdin, task.Tags)
+	if err != nil {
+		return err
+	}
+
 	// Update task
 	task.Description = newDescription
 	task.File = newFile
 	task.Command = newCommand
 	task.Prompt = newPrompt
 	task.Role = newRole
+	task.Tags = newTags
 	tasks[name] = task
 
 	// Write updated file

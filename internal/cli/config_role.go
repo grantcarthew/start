@@ -558,11 +558,19 @@ func runConfigRoleEdit(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	// Prompt for tags
+	_, _ = fmt.Fprintln(stdout)
+	newTags, err := promptTags(stdout, stdin, role.Tags)
+	if err != nil {
+		return err
+	}
+
 	// Update role
 	role.Description = newDescription
 	role.File = newFile
 	role.Command = newCommand
 	role.Prompt = newPrompt
+	role.Tags = newTags
 	roles[name] = role
 
 	// Write updated file

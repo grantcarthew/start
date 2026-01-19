@@ -613,6 +613,13 @@ func runConfigContextEdit(cmd *cobra.Command, args []string) error {
 		newDefault = input == "y" || input == "yes"
 	}
 
+	// Prompt for tags
+	_, _ = fmt.Fprintln(stdout)
+	newTags, err := promptTags(stdout, stdin, ctx.Tags)
+	if err != nil {
+		return err
+	}
+
 	// Update context
 	ctx.Description = newDescription
 	ctx.File = newFile
@@ -620,6 +627,7 @@ func runConfigContextEdit(cmd *cobra.Command, args []string) error {
 	ctx.Prompt = newPrompt
 	ctx.Required = newRequired
 	ctx.Default = newDefault
+	ctx.Tags = newTags
 	contexts[name] = ctx
 
 	// Write updated file
