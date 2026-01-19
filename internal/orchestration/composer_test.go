@@ -718,14 +718,15 @@ func TestComposer_ResolveRole_Errors(t *testing.T) {
 func TestComposer_ResolveTask_TempFile(t *testing.T) {
 	t.Parallel()
 	ctx := cuecontext.New()
-	tmpDir := t.TempDir()
 
-	// Create a source file (simulating CUE cache or local file)
-	sourceDir := filepath.Join(tmpDir, "cache")
-	if err := os.MkdirAll(sourceDir, 0755); err != nil {
-		t.Fatalf("creating source dir: %v", err)
-	}
-	sourceFile := filepath.Join(sourceDir, "task.md")
+	// Create two separate temp directories:
+	// - workingDir: the project working directory
+	// - externalDir: simulates CUE cache (outside working directory)
+	workingDir := t.TempDir()
+	externalDir := t.TempDir()
+
+	// Create a source file in the external directory (simulating CUE cache)
+	sourceFile := filepath.Join(externalDir, "task.md")
 	if err := os.WriteFile(sourceFile, []byte("Task content here"), 0644); err != nil {
 		t.Fatalf("writing source file: %v", err)
 	}
@@ -744,16 +745,16 @@ func TestComposer_ResolveTask_TempFile(t *testing.T) {
 		t.Fatalf("compile config: %v", err)
 	}
 
-	processor := NewTemplateProcessor(nil, nil, tmpDir)
-	composer := NewComposer(processor, tmpDir)
+	processor := NewTemplateProcessor(nil, nil, workingDir)
+	composer := NewComposer(processor, workingDir)
 
 	result, err := composer.ResolveTask(cfg, "test-task", "")
 	if err != nil {
 		t.Fatalf("ResolveTask() error = %v", err)
 	}
 
-	// Verify temp file was created
-	expectedTempPath := filepath.Join(tmpDir, ".start", "temp", "task-test-task.md")
+	// Verify temp file was created (because source is outside working directory)
+	expectedTempPath := filepath.Join(workingDir, ".start", "temp", "task-test-task.md")
 	if result.TempFile != expectedTempPath {
 		t.Errorf("TempFile = %q, want %q", result.TempFile, expectedTempPath)
 	}
@@ -767,20 +768,25 @@ func TestComposer_ResolveTask_TempFile(t *testing.T) {
 		t.Errorf("temp file content = %q, want %q", string(content), "Task content here")
 	}
 
-	// Verify {{.file}} in prompt contains original file path (not temp path)
-	// Local files preserve their original value for semantic clarity.
-	// Only @module/ files get temp path in {{.file}}.
-	if !strings.Contains(result.Content, sourceFile) {
-		t.Errorf("Content should contain original file path %q, got: %s", sourceFile, result.Content)
+	// Verify {{.file}} in prompt contains temp file path (for external files).
+	// External files (outside working directory) use temp path because the
+	// original location may be inaccessible to AI agents (e.g., CUE cache).
+	if !strings.Contains(result.Content, expectedTempPath) {
+		t.Errorf("Content should contain temp file path %q, got: %s", expectedTempPath, result.Content)
 	}
 }
 
 func TestComposer_ResolveTask_TempFile_WithSlashInName(t *testing.T) {
 	t.Parallel()
 	ctx := cuecontext.New()
-	tmpDir := t.TempDir()
 
-	sourceFile := filepath.Join(tmpDir, "task.md")
+	// Create two separate temp directories:
+	// - workingDir: the project working directory
+	// - externalDir: simulates CUE cache (outside working directory)
+	workingDir := t.TempDir()
+	externalDir := t.TempDir()
+
+	sourceFile := filepath.Join(externalDir, "task.md")
 	if err := os.WriteFile(sourceFile, []byte("Nested task content"), 0644); err != nil {
 		t.Fatalf("writing source file: %v", err)
 	}
@@ -799,8 +805,8 @@ func TestComposer_ResolveTask_TempFile_WithSlashInName(t *testing.T) {
 		t.Fatalf("compile config: %v", err)
 	}
 
-	processor := NewTemplateProcessor(nil, nil, tmpDir)
-	composer := NewComposer(processor, tmpDir)
+	processor := NewTemplateProcessor(nil, nil, workingDir)
+	composer := NewComposer(processor, workingDir)
 
 	result, err := composer.ResolveTask(cfg, "start/create-task", "")
 	if err != nil {
@@ -808,7 +814,7 @@ func TestComposer_ResolveTask_TempFile_WithSlashInName(t *testing.T) {
 	}
 
 	// Verify filename derivation handles slashes (converted to dashes)
-	expectedTempPath := filepath.Join(tmpDir, ".start", "temp", "task-start-create-task.md")
+	expectedTempPath := filepath.Join(workingDir, ".start", "temp", "task-start-create-task.md")
 	if result.TempFile != expectedTempPath {
 		t.Errorf("TempFile = %q, want %q", result.TempFile, expectedTempPath)
 	}
@@ -849,9 +855,14 @@ func TestComposer_ResolveTask_NoFile_NoTempFile(t *testing.T) {
 func TestComposer_ResolveContext_TempFile(t *testing.T) {
 	t.Parallel()
 	ctx := cuecontext.New()
-	tmpDir := t.TempDir()
 
-	sourceFile := filepath.Join(tmpDir, "context.md")
+	// Create two separate temp directories:
+	// - workingDir: the project working directory
+	// - externalDir: simulates CUE cache (outside working directory)
+	workingDir := t.TempDir()
+	externalDir := t.TempDir()
+
+	sourceFile := filepath.Join(externalDir, "context.md")
 	if err := os.WriteFile(sourceFile, []byte("Context content"), 0644); err != nil {
 		t.Fatalf("writing source file: %v", err)
 	}
@@ -870,16 +881,16 @@ func TestComposer_ResolveContext_TempFile(t *testing.T) {
 		t.Fatalf("compile config: %v", err)
 	}
 
-	processor := NewTemplateProcessor(nil, nil, tmpDir)
-	composer := NewComposer(processor, tmpDir)
+	processor := NewTemplateProcessor(nil, nil, workingDir)
+	composer := NewComposer(processor, workingDir)
 
 	result, err := composer.resolveContext(cfg, "project-info")
 	if err != nil {
 		t.Fatalf("resolveContext() error = %v", err)
 	}
 
-	// Verify temp file was created
-	expectedTempPath := filepath.Join(tmpDir, ".start", "temp", "context-project-info.md")
+	// Verify temp file was created (because source is outside working directory)
+	expectedTempPath := filepath.Join(workingDir, ".start", "temp", "context-project-info.md")
 	if result.TempFile != expectedTempPath {
 		t.Errorf("TempFile = %q, want %q", result.TempFile, expectedTempPath)
 	}
@@ -887,6 +898,56 @@ func TestComposer_ResolveContext_TempFile(t *testing.T) {
 	// Verify content
 	if result.Content != "Context content" {
 		t.Errorf("Content = %q, want %q", result.Content, "Context content")
+	}
+}
+
+func TestComposer_LocalFile_NoTempFile(t *testing.T) {
+	t.Parallel()
+	ctx := cuecontext.New()
+	workingDir := t.TempDir()
+
+	// Create a local file within the working directory
+	sourceFile := filepath.Join(workingDir, "AGENTS.md")
+	if err := os.WriteFile(sourceFile, []byte("Local file content"), 0644); err != nil {
+		t.Fatalf("writing source file: %v", err)
+	}
+
+	config := fmt.Sprintf(`
+		contexts: {
+			"agents": {
+				required: true
+				file: %q
+			}
+		}
+	`, sourceFile)
+
+	cfg := ctx.CompileString(config)
+	if err := cfg.Err(); err != nil {
+		t.Fatalf("compile config: %v", err)
+	}
+
+	processor := NewTemplateProcessor(nil, nil, workingDir)
+	composer := NewComposer(processor, workingDir)
+
+	result, err := composer.resolveContext(cfg, "agents")
+	if err != nil {
+		t.Fatalf("resolveContext() error = %v", err)
+	}
+
+	// Verify NO temp file was created (local files don't need temp copies)
+	if result.TempFile != "" {
+		t.Errorf("TempFile should be empty for local file, got %q", result.TempFile)
+	}
+
+	// Verify temp directory was not created
+	tempDir := filepath.Join(workingDir, ".start", "temp")
+	if _, err := os.Stat(tempDir); !os.IsNotExist(err) {
+		t.Errorf("temp directory should not exist for local files, but found: %s", tempDir)
+	}
+
+	// Verify content was still read correctly
+	if result.Content != "Local file content" {
+		t.Errorf("Content = %q, want %q", result.Content, "Local file content")
 	}
 }
 
@@ -934,4 +995,82 @@ func TestComposer_resolveFileToTemp(t *testing.T) {
 			t.Error("expected error for nonexistent file")
 		}
 	})
+}
+
+func TestComposer_isLocalFile(t *testing.T) {
+	t.Parallel()
+	workingDir := "/home/user/project"
+	processor := NewTemplateProcessor(nil, nil, workingDir)
+	composer := NewComposer(processor, workingDir)
+
+	tests := []struct {
+		name     string
+		filePath string
+		want     bool
+	}{
+		{
+			name:     "empty path",
+			filePath: "",
+			want:     false,
+		},
+		{
+			name:     "relative path - simple",
+			filePath: "AGENTS.md",
+			want:     true,
+		},
+		{
+			name:     "relative path - with dot prefix",
+			filePath: "./AGENTS.md",
+			want:     true,
+		},
+		{
+			name:     "relative path - subdirectory",
+			filePath: "docs/guide.md",
+			want:     true,
+		},
+		{
+			name:     "relative path - with dot prefix subdirectory",
+			filePath: "./docs/guide.md",
+			want:     true,
+		},
+		{
+			name:     "absolute path - child of working dir",
+			filePath: "/home/user/project/docs/guide.md",
+			want:     true,
+		},
+		{
+			name:     "absolute path - deeply nested child",
+			filePath: "/home/user/project/a/b/c/file.md",
+			want:     true,
+		},
+		{
+			name:     "absolute path - outside working dir",
+			filePath: "/tmp/cache/file.md",
+			want:     false,
+		},
+		{
+			name:     "absolute path - sibling directory",
+			filePath: "/home/user/other-project/file.md",
+			want:     false,
+		},
+		{
+			name:     "absolute path - parent directory",
+			filePath: "/home/user/file.md",
+			want:     false,
+		},
+		{
+			name:     "absolute path - similar prefix but not child",
+			filePath: "/home/user/project-other/file.md",
+			want:     false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := composer.isLocalFile(tt.filePath)
+			if got != tt.want {
+				t.Errorf("isLocalFile(%q) = %v, want %v", tt.filePath, got, tt.want)
+			}
+		})
+	}
 }
