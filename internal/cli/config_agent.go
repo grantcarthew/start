@@ -511,11 +511,27 @@ func runConfigAgentEdit(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	// Prompt for models
+	_, _ = fmt.Fprintln(stdout)
+	newModels, err := promptModels(stdout, stdin, agent.Models)
+	if err != nil {
+		return err
+	}
+
+	// Prompt for tags
+	_, _ = fmt.Fprintln(stdout)
+	newTags, err := promptTags(stdout, stdin, agent.Tags)
+	if err != nil {
+		return err
+	}
+
 	// Update agent
 	agent.Bin = newBin
 	agent.Command = newCommand
 	agent.DefaultModel = newDefaultModel
 	agent.Description = newDescription
+	agent.Models = newModels
+	agent.Tags = newTags
 	agents[name] = agent
 
 	// Write updated file
@@ -992,6 +1008,154 @@ func promptString(w io.Writer, r io.Reader, label, defaultVal string) (string, e
 		return defaultVal, nil
 	}
 	return input, nil
+}
+
+// promptTags prompts for editing a slice of tags.
+// Shows current tags and allows: comma-separated input to replace, empty to clear, Enter to keep.
+func promptTags(w io.Writer, r io.Reader, current []string) ([]string, error) {
+	if len(current) > 0 {
+		_, _ = fmt.Fprintf(w, "Current tags: [%s]\n", strings.Join(current, ", "))
+	} else {
+		_, _ = fmt.Fprintln(w, "Current tags: (none)")
+	}
+	_, _ = fmt.Fprint(w, "Tags (comma-separated, - to clear, Enter to keep): ")
+
+	reader := bufio.NewReader(r)
+	input, err := reader.ReadString('\n')
+	if err != nil {
+		return nil, fmt.Errorf("reading input: %w", err)
+	}
+
+	input = strings.TrimSpace(input)
+
+	// Enter keeps current
+	if input == "" {
+		return current, nil
+	}
+
+	// "-" clears tags
+	if input == "-" {
+		return nil, nil
+	}
+
+	// Parse comma-separated tags
+	var tags []string
+	for _, t := range strings.Split(input, ",") {
+		t = strings.TrimSpace(t)
+		if t != "" {
+			tags = append(tags, t)
+		}
+	}
+
+	return tags, nil
+}
+
+// promptModels prompts for editing a map of model aliases.
+// Offers options: (k)eep, (c)lear, (e)dit.
+func promptModels(w io.Writer, r io.Reader, current map[string]string) (map[string]string, error) {
+	reader := bufio.NewReader(r)
+
+	if len(current) > 0 {
+		_, _ = fmt.Fprintln(w, "Current models:")
+		var aliases []string
+		for alias := range current {
+			aliases = append(aliases, alias)
+		}
+		sort.Strings(aliases)
+		for _, alias := range aliases {
+			_, _ = fmt.Fprintf(w, "  %s: %s\n", alias, current[alias])
+		}
+	} else {
+		_, _ = fmt.Fprintln(w, "Current models: (none)")
+	}
+
+	_, _ = fmt.Fprint(w, "Models: (k)eep, (c)lear, (e)dit [k]: ")
+	choice, err := reader.ReadString('\n')
+	if err != nil {
+		return nil, fmt.Errorf("reading input: %w", err)
+	}
+	choice = strings.TrimSpace(strings.ToLower(choice))
+
+	switch choice {
+	case "", "k", "keep":
+		return current, nil
+	case "c", "clear":
+		return nil, nil
+	case "e", "edit":
+		return promptModelsEdit(w, reader, current)
+	default:
+		return nil, fmt.Errorf("invalid choice: %s", choice)
+	}
+}
+
+// promptModelsEdit handles the edit mode for models.
+func promptModelsEdit(w io.Writer, reader *bufio.Reader, current map[string]string) (map[string]string, error) {
+	result := make(map[string]string)
+
+	// Edit existing models
+	if len(current) > 0 {
+		_, _ = fmt.Fprintln(w, "Edit existing models (Enter to keep, - to delete):")
+		var aliases []string
+		for alias := range current {
+			aliases = append(aliases, alias)
+		}
+		sort.Strings(aliases)
+
+		for _, alias := range aliases {
+			currentVal := current[alias]
+			_, _ = fmt.Fprintf(w, "  %s [%s]: ", alias, currentVal)
+
+			input, err := reader.ReadString('\n')
+			if err != nil {
+				return nil, fmt.Errorf("reading input: %w", err)
+			}
+			input = strings.TrimSpace(input)
+
+			if input == "-" {
+				// Delete this model
+				continue
+			}
+			if input == "" {
+				// Keep current value
+				result[alias] = currentVal
+			} else {
+				// Update value
+				result[alias] = input
+			}
+		}
+	}
+
+	// Add new models
+	_, _ = fmt.Fprintln(w, "Add new models (alias=model-id, empty to finish):")
+	for {
+		_, _ = fmt.Fprint(w, "  > ")
+		input, err := reader.ReadString('\n')
+		if err != nil {
+			return nil, fmt.Errorf("reading input: %w", err)
+		}
+		input = strings.TrimSpace(input)
+
+		if input == "" {
+			break
+		}
+
+		parts := strings.SplitN(input, "=", 2)
+		if len(parts) != 2 {
+			_, _ = fmt.Fprintln(w, "  Invalid format. Use: alias=model-id")
+			continue
+		}
+
+		alias := strings.TrimSpace(parts[0])
+		modelID := strings.TrimSpace(parts[1])
+		if alias == "" || modelID == "" {
+			_, _ = fmt.Fprintln(w, "  Invalid format. Use: alias=model-id")
+			continue
+		}
+
+		result[alias] = modelID
+	}
+
+	return result, nil
 }
 
 // openInEditor opens a file in the user's editor.
