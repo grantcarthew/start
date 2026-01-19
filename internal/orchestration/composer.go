@@ -71,6 +71,30 @@ func (c *Composer) resolveFileToTemp(entityType, name, filePath string) (string,
 	return tempPath, nil
 }
 
+// isLocalFile returns true if the file path is local to the working directory.
+// Local files don't need to be copied to temp - they're already accessible.
+// A file is local if:
+//   - It's a relative path (e.g., "AGENTS.md", "./docs/file.md")
+//   - It's an absolute path that's a child of the working directory
+func (c *Composer) isLocalFile(filePath string) bool {
+	if filePath == "" {
+		return false
+	}
+
+	// Relative paths are local
+	if !filepath.IsAbs(filePath) {
+		return true
+	}
+
+	// Absolute paths are local if they're under the working directory
+	// Clean both paths to normalize them
+	cleanPath := filepath.Clean(filePath)
+	cleanWorkDir := filepath.Clean(c.workingDir)
+
+	// Check if the file path starts with the working directory
+	return strings.HasPrefix(cleanPath, cleanWorkDir+string(filepath.Separator))
+}
+
 // ComposeResult contains the result of prompt composition.
 type ComposeResult struct {
 	// Prompt is the fully composed prompt.
@@ -313,13 +337,8 @@ func (c *Composer) resolveContext(cfg cue.Value, name string) (ProcessResult, er
 		return ProcessResult{}, fmt.Errorf("invalid UTD: no file, command, or prompt")
 	}
 
-	// Track if this is a module file - these need temp path in {{.file}}
-	// because the original CUE cache path is inaccessible to AI agents.
-	// Local files keep their original value for semantic clarity.
-	isModuleFile := strings.HasPrefix(fields.File, "@module/")
-
 	// Resolve @module/ paths using origin field (per DR-023)
-	if isModuleFile {
+	if strings.HasPrefix(fields.File, "@module/") {
 		origin := extractOrigin(ctxVal)
 		if origin != "" {
 			resolved, err := resolveModulePath(fields.File, origin)
@@ -329,17 +348,21 @@ func (c *Composer) resolveContext(cfg cue.Value, name string) (ProcessResult, er
 		}
 	}
 
-	// Write file to temp for agent access
+	// Write file to temp for agent access (only for non-local files).
+	// Local files are already accessible - no temp copy needed.
 	var tempPath string
 	if fields.File != "" {
-		var err error
-		tempPath, err = c.resolveFileToTemp("context", name, fields.File)
-		if err != nil {
-			return ProcessResult{}, err
-		}
-		// Only replace fields.File with temp path for @module/ files.
-		// Local files keep original value for {{.file}} placeholder.
-		if isModuleFile {
+		if c.isLocalFile(fields.File) {
+			// Validate local file exists (don't copy, just check)
+			if _, err := os.Stat(fields.File); err != nil {
+				return ProcessResult{}, fmt.Errorf("reading context file %s: %w", fields.File, err)
+			}
+		} else {
+			var err error
+			tempPath, err = c.resolveFileToTemp("context", name, fields.File)
+			if err != nil {
+				return ProcessResult{}, err
+			}
 			fields.File = tempPath
 		}
 	}
@@ -365,13 +388,8 @@ func (c *Composer) resolveRole(cfg cue.Value, name string) (string, error) {
 		return "", fmt.Errorf("invalid UTD: no file, command, or prompt")
 	}
 
-	// Track if this is a module file - these need temp path in {{.file}}
-	// because the original CUE cache path is inaccessible to AI agents.
-	// Local files keep their original value for semantic clarity.
-	isModuleFile := strings.HasPrefix(fields.File, "@module/")
-
 	// Resolve @module/ paths using origin field (per DR-023)
-	if isModuleFile {
+	if strings.HasPrefix(fields.File, "@module/") {
 		origin := extractOrigin(roleVal)
 		if origin != "" {
 			resolved, err := resolveModulePath(fields.File, origin)
@@ -381,15 +399,19 @@ func (c *Composer) resolveRole(cfg cue.Value, name string) (string, error) {
 		}
 	}
 
-	// Write file to temp for agent access
+	// Write file to temp for agent access (only for non-local files).
+	// Local files are already accessible - no temp copy needed.
 	if fields.File != "" {
-		tempPath, err := c.resolveFileToTemp("role", name, fields.File)
-		if err != nil {
-			return "", err
-		}
-		// Only replace fields.File with temp path for @module/ files.
-		// Local files keep original value for {{.file}} placeholder.
-		if isModuleFile {
+		if c.isLocalFile(fields.File) {
+			// Validate local file exists (don't copy, just check)
+			if _, err := os.Stat(fields.File); err != nil {
+				return "", fmt.Errorf("reading role file %s: %w", fields.File, err)
+			}
+		} else {
+			tempPath, err := c.resolveFileToTemp("role", name, fields.File)
+			if err != nil {
+				return "", err
+			}
 			fields.File = tempPath
 		}
 	}
@@ -460,13 +482,8 @@ func (c *Composer) ResolveTask(cfg cue.Value, name, instructions string) (Proces
 		return ProcessResult{}, fmt.Errorf("invalid UTD: no file, command, or prompt")
 	}
 
-	// Track if this is a module file - these need temp path in {{.file}}
-	// because the original CUE cache path is inaccessible to AI agents.
-	// Local files keep their original value for semantic clarity.
-	isModuleFile := strings.HasPrefix(fields.File, "@module/")
-
 	// Resolve @module/ paths using origin field (per DR-023)
-	if isModuleFile {
+	if strings.HasPrefix(fields.File, "@module/") {
 		origin := extractOrigin(taskVal)
 		if origin != "" {
 			resolved, err := resolveModulePath(fields.File, origin)
@@ -477,17 +494,21 @@ func (c *Composer) ResolveTask(cfg cue.Value, name, instructions string) (Proces
 		}
 	}
 
-	// Write file to temp for agent access
+	// Write file to temp for agent access (only for non-local files).
+	// Local files are already accessible - no temp copy needed.
 	var tempPath string
 	if fields.File != "" {
-		var err error
-		tempPath, err = c.resolveFileToTemp("task", name, fields.File)
-		if err != nil {
-			return ProcessResult{}, err
-		}
-		// Only replace fields.File with temp path for @module/ files.
-		// Local files keep original value for {{.file}} placeholder.
-		if isModuleFile {
+		if c.isLocalFile(fields.File) {
+			// Validate local file exists (don't copy, just check)
+			if _, err := os.Stat(fields.File); err != nil {
+				return ProcessResult{}, fmt.Errorf("reading task file %s: %w", fields.File, err)
+			}
+		} else {
+			var err error
+			tempPath, err = c.resolveFileToTemp("task", name, fields.File)
+			if err != nil {
+				return ProcessResult{}, err
+			}
 			fields.File = tempPath
 		}
 	}

@@ -1,6 +1,7 @@
 # dr-020: Template Processing and File Resolution
 
 - Date: 2025-12-08
+- Updated: 2026-01-19
 - Status: Accepted
 - Category: UTD
 
@@ -18,17 +19,22 @@ Requirements:
 
 ## Decision
 
-All UTD content files are processed through Go's `text/template` engine. Resolved content is written to `.start/temp/` with path-derived file names. Placeholders return resolved content, not original file references.
+All UTD content files are processed through Go's `text/template` engine. Temp files are created **only for non-local files** (files outside the working directory, such as those from the CUE module cache). Local files are validated for existence but not copied.
 
 Temp directory location: `.start/temp/` (project-local)
 
 File naming convention: `<type>-<path-segments>.md`
 
-Examples:
+Examples (non-local files only):
 
-- `roles/golang/assistant/role.md` → `.start/temp/role-golang-assistant.md`
-- `tasks/code-review/task.md` → `.start/temp/task-code-review.md`
-- `contexts/environment.md` → `.start/temp/context-environment.md`
+- `@module/role.md` (from CUE cache) → `.start/temp/role-golang-assistant.md`
+- `@module/task.md` (from CUE cache) → `.start/temp/task-code-review.md`
+
+Local files (relative paths or absolute paths under working directory):
+
+- `AGENTS.md` → No temp file created, original path preserved
+- `./docs/context.md` → No temp file created, original path preserved
+- `/project/path/file.md` (if under working dir) → No temp file created
 
 ## Why
 
@@ -46,28 +52,28 @@ Path-derived naming:
 - "Read tmp-a8f3b2c1.md" provides no context
 - Names are unique (derived from full path)
 
-Always resolve to temp files:
+Conditional temp file creation (local vs non-local):
 
-- Consistent behavior (no conditional logic)
-- Agents always see resolved content
-- Original files may contain unresolved template syntax
-- Simple mental model for users
+- Local files are already accessible to AI agents - no copy needed
+- Avoids unnecessary disk I/O for common case (local project files)
+- Non-local files (CUE cache) require copying to accessible location
+- `{{.file}}` returns meaningful paths for local files ("AGENTS.md" vs temp path)
+- File existence is still validated for local files (fails fast if missing)
 
 ## Trade-offs
 
 Accept:
 
-- Requires `.start/temp/` in `.gitignore`
-- Creates files in project directory
+- Requires `.start/temp/` in `.gitignore` (only created when non-local files are used)
+- Slightly more complex logic (local vs non-local check)
 - User manages cleanup manually
-- Some disk I/O for temp file creation
 
 Gain:
 
 - Zero security configuration for agent access
-- Meaningful file names for agent context
-- Consistent template resolution
-- Simple, predictable behavior
+- No disk I/O for local files (common case)
+- Meaningful `{{.file}}` paths for local files
+- Non-local files still accessible via temp copies
 
 ## Alternatives
 
@@ -88,13 +94,21 @@ User config temp (~/.config/start/temp/):
 - Con: Path not project-relative
 - Rejected: Agent access is critical
 
-Conditional resolution (only if templates present):
+Conditional resolution based on template presence:
 
 - Pro: Skip I/O for simple files
 - Con: Inconsistent behavior
 - Con: False positives for `{{` in content
 - Con: Complex logic
-- Rejected: Consistency outweighs I/O savings
+- Rejected: Too fragile, doesn't address the real issue
+
+Conditional resolution based on file locality (adopted):
+
+- Pro: Skip I/O for local files (already accessible)
+- Pro: Meaningful `{{.file}}` paths for local files
+- Pro: Simple logic (relative path or under working dir)
+- Pro: Still validates file existence
+- Adopted: Best balance of efficiency and correctness
 
 In-memory only (no temp files):
 
@@ -139,21 +153,24 @@ Both `{{.role}}` and `{{.role_file}}` retained: different agents require differe
 
 Template resolution:
 
-1. Read content file (role.md, task.md, context.md)
-2. Parse as Go template
-3. Execute template with placeholder data
-4. Generate temp file path from source path
-5. Write resolved content to `.start/temp/<derived-name>.md`
-6. Provide path via `{{.file}}` or content via `{{.file_contents}}`
+1. Extract UTD fields (file, command, prompt)
+2. Resolve `@module/` paths using origin field
+3. Determine if file is local:
+   - Relative path (e.g., `AGENTS.md`, `./file.md`) → local
+   - Absolute path under working directory → local
+   - Otherwise → non-local
+4. For local files: validate existence with `os.Stat()`
+5. For non-local files: copy to `.start/temp/` and update path
+6. Process through Go template engine
+7. Provide path via `{{.file}}` or content via `{{.file_contents}}`
 
-File naming derivation:
+File naming derivation (for non-local files):
 
-1. Take source path relative to asset root
+1. Take entity type and name
 2. Replace path separators with hyphens
-3. Prepend type prefix (role-, task-, context-)
-4. Append .md extension
+3. Format as `<type>-<name>.md`
 
-Example: `roles/golang/assistant/role.md` → `role-golang-assistant.md`
+Example: Task `start/create-task` → `task-start-create-task.md`
 
 Conflict handling:
 
@@ -165,11 +182,13 @@ Conflict handling:
 
 Location: `.start/temp/`
 
+Creation: Only when non-local files are used (e.g., registry-installed assets with `@module/` paths). Projects using only local files will never see this directory.
+
 Cleanup: Manual (user responsibility)
 
-.gitignore: Required entry `.start/temp/`
+.gitignore: Entry `.start/temp/` recommended if using registry assets
 
-Bootstrap check: On startup, if in a git repository and `.start/temp/` not in `.gitignore`, emit warning:
+Bootstrap check: On startup, if in a git repository and `.start/temp/` exists but not in `.gitignore`, emit warning:
 
 ```
 Warning: .start/temp/ not in .gitignore - resolved files may be committed
