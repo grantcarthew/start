@@ -41,8 +41,9 @@ const maxTaskResults = 20
 // addTaskCommand adds the task command to the parent command.
 func addTaskCommand(parent *cobra.Command) {
 	taskCmd := &cobra.Command{
-		Use:   "task [name] [instructions]",
-		Short: "Run a predefined task",
+		Use:     "task [name] [instructions]",
+		Aliases: []string{"tasks"},
+		Short:   "Run a predefined task",
 		Long: `Run a predefined task with optional instructions.
 
 The name can be a config task name or a file path (starting with ./, /, or ~).
