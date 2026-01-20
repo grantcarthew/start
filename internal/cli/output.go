@@ -60,9 +60,9 @@ func PrintContextTable(w io.Writer, contexts []orchestration.Context) {
 	_, _ = fmt.Fprintln(w, "Context documents:")
 
 	// Calculate column widths
-	nameWidth := 4  // "Name" header
-	tagsWidth := 4  // "Tags" header
-	fileWidth := 4  // "File" header
+	nameWidth := 4 // "Name" header
+	tagsWidth := 4 // "Tags" header
+	fileWidth := 4 // "File" header
 
 	type row struct {
 		name   string
