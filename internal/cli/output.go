@@ -61,13 +61,13 @@ func PrintContextTable(w io.Writer, contexts []orchestration.Context) {
 
 	// Calculate column widths
 	nameWidth := 4  // "Name" header
-	flagsWidth := 5 // "Flags" header
+	tagsWidth := 4  // "Tags" header
 	fileWidth := 4  // "File" header
 
 	type row struct {
 		name   string
 		status string
-		flags  string
+		tags   string
 		file   string
 	}
 
@@ -79,18 +79,18 @@ func PrintContextTable(w io.Writer, contexts []orchestration.Context) {
 			status = "○"
 		}
 
-		// Flags: combine required, default, and tags
-		var flags []string
+		// Tags: combine required, default, and tags
+		var tags []string
 		if ctx.Required {
-			flags = append(flags, "required")
+			tags = append(tags, "required")
 		}
 		if ctx.Default {
-			flags = append(flags, "default")
+			tags = append(tags, "default")
 		}
-		flags = append(flags, ctx.Tags...)
-		flagStr := strings.Join(flags, ", ")
-		if flagStr == "" {
-			flagStr = "-"
+		tags = append(tags, ctx.Tags...)
+		tagStr := strings.Join(tags, ", ")
+		if tagStr == "" {
+			tagStr = "-"
 		}
 
 		// File: show basename, add error info if failed
@@ -107,7 +107,7 @@ func PrintContextTable(w io.Writer, contexts []orchestration.Context) {
 		rows[i] = row{
 			name:   ctx.Name,
 			status: status,
-			flags:  flagStr,
+			tags:   tagStr,
 			file:   file,
 		}
 
@@ -115,8 +115,8 @@ func PrintContextTable(w io.Writer, contexts []orchestration.Context) {
 		if len(ctx.Name) > nameWidth {
 			nameWidth = len(ctx.Name)
 		}
-		if len(flagStr) > flagsWidth {
-			flagsWidth = len(flagStr)
+		if len(tagStr) > tagsWidth {
+			tagsWidth = len(tagStr)
 		}
 		if len(file) > fileWidth {
 			fileWidth = len(file)
@@ -125,7 +125,7 @@ func PrintContextTable(w io.Writer, contexts []orchestration.Context) {
 
 	// Print header
 	_, _ = fmt.Fprintf(w, "  %-*s  %s  %-*s  %s\n",
-		nameWidth, "Name", "Status", flagsWidth, "Flags", "File")
+		nameWidth, "Name", "Status", tagsWidth, "Tags", "File")
 
 	// Print rows
 	for _, r := range rows {
@@ -136,7 +136,7 @@ func PrintContextTable(w io.Writer, contexts []orchestration.Context) {
 		} else {
 			_, _ = fmt.Fprint(w, r.status)
 		}
-		_, _ = fmt.Fprintf(w, "       %-*s  %s\n", flagsWidth, r.flags, r.file)
+		_, _ = fmt.Fprintf(w, "       %-*s  %s\n", tagsWidth, r.tags, r.file)
 	}
 	_, _ = fmt.Fprintln(w)
 }
