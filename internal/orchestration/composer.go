@@ -353,10 +353,15 @@ func (c *Composer) resolveContext(cfg cue.Value, name string) (ProcessResult, er
 	var tempPath string
 	if fields.File != "" {
 		if c.isLocalFile(fields.File) {
-			// Validate local file exists (don't copy, just check)
-			if _, err := os.Stat(fields.File); err != nil {
+			// Expand tilde and validate local file exists (don't copy, just check)
+			expandedPath, err := ExpandFilePath(fields.File)
+			if err != nil {
+				return ProcessResult{}, fmt.Errorf("expanding context file path %s: %w", fields.File, err)
+			}
+			if _, err := os.Stat(expandedPath); err != nil {
 				return ProcessResult{}, fmt.Errorf("reading context file %s: %w", fields.File, err)
 			}
+			fields.File = expandedPath
 		} else {
 			var err error
 			tempPath, err = c.resolveFileToTemp("context", name, fields.File)
@@ -403,10 +408,15 @@ func (c *Composer) resolveRole(cfg cue.Value, name string) (string, error) {
 	// Local files are already accessible - no temp copy needed.
 	if fields.File != "" {
 		if c.isLocalFile(fields.File) {
-			// Validate local file exists (don't copy, just check)
-			if _, err := os.Stat(fields.File); err != nil {
+			// Expand tilde and validate local file exists (don't copy, just check)
+			expandedPath, err := ExpandFilePath(fields.File)
+			if err != nil {
+				return "", fmt.Errorf("expanding role file path %s: %w", fields.File, err)
+			}
+			if _, err := os.Stat(expandedPath); err != nil {
 				return "", fmt.Errorf("reading role file %s: %w", fields.File, err)
 			}
+			fields.File = expandedPath
 		} else {
 			tempPath, err := c.resolveFileToTemp("role", name, fields.File)
 			if err != nil {
@@ -499,10 +509,15 @@ func (c *Composer) ResolveTask(cfg cue.Value, name, instructions string) (Proces
 	var tempPath string
 	if fields.File != "" {
 		if c.isLocalFile(fields.File) {
-			// Validate local file exists (don't copy, just check)
-			if _, err := os.Stat(fields.File); err != nil {
+			// Expand tilde and validate local file exists (don't copy, just check)
+			expandedPath, err := ExpandFilePath(fields.File)
+			if err != nil {
+				return ProcessResult{}, fmt.Errorf("expanding task file path %s: %w", fields.File, err)
+			}
+			if _, err := os.Stat(expandedPath); err != nil {
 				return ProcessResult{}, fmt.Errorf("reading task file %s: %w", fields.File, err)
 			}
+			fields.File = expandedPath
 		} else {
 			var err error
 			tempPath, err = c.resolveFileToTemp("task", name, fields.File)

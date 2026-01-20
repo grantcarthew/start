@@ -1074,3 +1074,173 @@ func TestComposer_isLocalFile(t *testing.T) {
 		})
 	}
 }
+
+func TestComposer_TildeExpansion_Context(t *testing.T) {
+	t.Parallel()
+	ctx := cuecontext.New()
+
+	// Get home directory and create a temp file there
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatalf("getting home dir: %v", err)
+	}
+
+	// Create a temp file in home directory
+	testFile := filepath.Join(home, ".start-test-context.md")
+	if err := os.WriteFile(testFile, []byte("Tilde context content"), 0644); err != nil {
+		t.Fatalf("writing test file: %v", err)
+	}
+	defer func() { _ = os.Remove(testFile) }()
+
+	workingDir := t.TempDir()
+
+	// Config uses tilde path
+	config := `
+		contexts: {
+			"tilde-test": {
+				file: "~/.start-test-context.md"
+				prompt: "Content: {{.file_contents}}"
+			}
+		}
+	`
+
+	cfg := ctx.CompileString(config)
+	if err := cfg.Err(); err != nil {
+		t.Fatalf("compiling config: %v", err)
+	}
+
+	processor := NewTemplateProcessor(nil, nil, workingDir)
+	composer := NewComposer(processor, workingDir)
+
+	result, err := composer.resolveContext(cfg, "tilde-test")
+	if err != nil {
+		t.Fatalf("resolveContext() error = %v", err)
+	}
+
+	if !strings.Contains(result.Content, "Tilde context content") {
+		t.Errorf("Content = %q, want to contain %q", result.Content, "Tilde context content")
+	}
+}
+
+func TestComposer_TildeExpansion_Role(t *testing.T) {
+	t.Parallel()
+	ctx := cuecontext.New()
+
+	// Get home directory and create a temp file there
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatalf("getting home dir: %v", err)
+	}
+
+	// Create a temp file in home directory
+	testFile := filepath.Join(home, ".start-test-role.md")
+	if err := os.WriteFile(testFile, []byte("Tilde role content"), 0644); err != nil {
+		t.Fatalf("writing test file: %v", err)
+	}
+	defer func() { _ = os.Remove(testFile) }()
+
+	workingDir := t.TempDir()
+
+	// Config uses tilde path
+	config := `
+		roles: {
+			"tilde-test": {
+				file: "~/.start-test-role.md"
+				prompt: "Role: {{.file_contents}}"
+			}
+		}
+	`
+
+	cfg := ctx.CompileString(config)
+	if err := cfg.Err(); err != nil {
+		t.Fatalf("compiling config: %v", err)
+	}
+
+	processor := NewTemplateProcessor(nil, nil, workingDir)
+	composer := NewComposer(processor, workingDir)
+
+	result, err := composer.resolveRole(cfg, "tilde-test")
+	if err != nil {
+		t.Fatalf("resolveRole() error = %v", err)
+	}
+
+	if !strings.Contains(result, "Tilde role content") {
+		t.Errorf("Content = %q, want to contain %q", result, "Tilde role content")
+	}
+}
+
+func TestComposer_TildeExpansion_Task(t *testing.T) {
+	t.Parallel()
+	ctx := cuecontext.New()
+
+	// Get home directory and create a temp file there
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatalf("getting home dir: %v", err)
+	}
+
+	// Create a temp file in home directory
+	testFile := filepath.Join(home, ".start-test-task.md")
+	if err := os.WriteFile(testFile, []byte("Tilde task content"), 0644); err != nil {
+		t.Fatalf("writing test file: %v", err)
+	}
+	defer func() { _ = os.Remove(testFile) }()
+
+	workingDir := t.TempDir()
+
+	// Config uses tilde path
+	config := `
+		tasks: {
+			"tilde-test": {
+				file: "~/.start-test-task.md"
+				prompt: "Task: {{.file_contents}}"
+			}
+		}
+	`
+
+	cfg := ctx.CompileString(config)
+	if err := cfg.Err(); err != nil {
+		t.Fatalf("compiling config: %v", err)
+	}
+
+	processor := NewTemplateProcessor(nil, nil, workingDir)
+	composer := NewComposer(processor, workingDir)
+
+	result, err := composer.ResolveTask(cfg, "tilde-test", "test instructions")
+	if err != nil {
+		t.Fatalf("ResolveTask() error = %v", err)
+	}
+
+	if !strings.Contains(result.Content, "Tilde task content") {
+		t.Errorf("Content = %q, want to contain %q", result.Content, "Tilde task content")
+	}
+}
+
+func TestComposer_TildeExpansion_FileNotFound(t *testing.T) {
+	t.Parallel()
+	ctx := cuecontext.New()
+	workingDir := t.TempDir()
+
+	// Config uses tilde path to nonexistent file
+	config := `
+		contexts: {
+			"missing": {
+				file: "~/.start-nonexistent-file-12345.md"
+				prompt: "Content: {{.file_contents}}"
+			}
+		}
+	`
+
+	cfg := ctx.CompileString(config)
+	if err := cfg.Err(); err != nil {
+		t.Fatalf("compiling config: %v", err)
+	}
+
+	processor := NewTemplateProcessor(nil, nil, workingDir)
+	composer := NewComposer(processor, workingDir)
+
+	_, err := composer.resolveContext(cfg, "missing")
+	if err == nil {
+		t.Error("expected error for nonexistent tilde path file")
+	}
+}
