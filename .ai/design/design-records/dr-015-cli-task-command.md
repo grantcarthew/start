@@ -46,15 +46,52 @@ Agent is user's choice:
 
 ## Task Resolution
 
+Terminology:
+
+- **Installed**: Task exists in user's config (local `./.start/` or global `~/.config/start/`)
+- **Registry**: Task exists in CUE Central Registry but not yet installed
+
 Resolution order:
 
-1. Exact match in local config (`./.start/`)
-2. Exact match in global config (`~/.config/start/`)
-3. Exact match in CUE registry (fetches if found)
-4. Substring match across all sources
-   - Single match: use it
-   - Multiple matches: error (non-TTY) or interactive selection (TTY)
-5. Not found: error
+1. Exact match installed → run immediately (no registry fetch)
+2. No exact match installed → fetch registry index, then:
+   a. Exact match in registry → install and run
+   b. Substring match across installed + registry (deduplicated) →
+      - Single match: run (install first if from registry)
+      - Multiple matches: error (non-TTY) or interactive selection (TTY)
+   c. No matches: error
+
+Interactive selection:
+
+- Display shows task name and source (installed/registry)
+- Limited to 20 results; if more, prompt user to refine search
+- User selects by number or by typing task name
+
+```
+Found 16 tasks matching "golang":
+
+   1. golang/debug                       installed
+   2. golang/refactor                    installed
+   3. golang/github-homebrew-release     registry
+   4. golang/review/architecture         installed
+   ...
+
+Select (1-16):
+```
+
+Large result sets:
+
+```
+Found 47 tasks matching "lang":
+
+   1. golang/debug                       installed
+   ...
+  20. clang/format                       registry
+
+Showing 20 of 47 matches. Refine search for more specific results.
+
+Select (1-20):
+```
 
 ## Execution Flow
 
@@ -274,3 +311,4 @@ Tasks bundle role content inline:
 
 - 2025-12-22: Changed task resolution from prefix match to substring match for better UX
 - 2025-12-22: Aligned exit codes with unified policy (0 success, 1 failure)
+- 2026-01-20: Unified task resolution across installed config and registry; added interactive selection with source labels; added 20-result limit for large result sets; clarified "installed" vs "registry" terminology

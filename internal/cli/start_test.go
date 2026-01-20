@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/grantcarthew/start/internal/orchestration"
+	"github.com/grantcarthew/start/internal/registry"
 )
 
 // setupStartTestConfig creates a minimal CUE config for start command testing.
@@ -185,7 +186,7 @@ func TestExecuteTask_DryRun(t *testing.T) {
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
 
-	err = executeTask(stdout, stderr, flags, "test-task", "focus on testing")
+	err = executeTask(stdout, stderr, strings.NewReader(""), flags, "test-task", "focus on testing")
 	if err != nil {
 		t.Fatalf("executeTask() error = %v", err)
 	}
@@ -339,7 +340,7 @@ func TestFindTask(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := findTask(cfg, tt.taskName)
+			result, matches, err := findTask(cfg, tt.taskName)
 
 			if tt.wantErr {
 				if err == nil {
@@ -357,6 +358,11 @@ func TestFindTask(t *testing.T) {
 				return
 			}
 
+			if len(matches) > 0 {
+				t.Errorf("unexpected multiple matches: %v", matches)
+				return
+			}
+
 			if result != tt.wantMatch {
 				t.Errorf("findTask() = %q, want %q", result, tt.wantMatch)
 			}
@@ -366,6 +372,12 @@ func TestFindTask(t *testing.T) {
 
 func TestFindTask_AmbiguousPrefix(t *testing.T) {
 	tmpDir := t.TempDir()
+
+	// Isolate from global config
+	oldHome := os.Getenv("HOME")
+	_ = os.Setenv("HOME", tmpDir)
+	defer func() { _ = os.Setenv("HOME", oldHome) }()
+
 	configDir := filepath.Join(tmpDir, ".start")
 	if err := os.MkdirAll(configDir, 0755); err != nil {
 		t.Fatalf("creating config dir: %v", err)
@@ -415,20 +427,39 @@ settings: {
 		t.Fatalf("loading config: %v", err)
 	}
 
-	// Ambiguous prefix should return error
-	_, err = findTask(cfg, "review")
-	if err == nil {
-		t.Error("expected error for ambiguous prefix")
+	// Ambiguous prefix should return matches (per DR-015)
+	result, matches, err := findTask(cfg, "review")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
 		return
 	}
 
-	if !strings.Contains(err.Error(), "ambiguous") {
-		t.Errorf("error = %q, want containing 'ambiguous'", err.Error())
+	if result != "" {
+		t.Errorf("expected empty result for multiple matches, got %q", result)
 	}
 
-	// Should list matching tasks
-	if !strings.Contains(err.Error(), "review-code") || !strings.Contains(err.Error(), "review-docs") {
-		t.Errorf("error should list matching tasks: %v", err)
+	if len(matches) != 3 {
+		t.Errorf("expected 3 matches, got %d: %v", len(matches), matches)
+		return
+	}
+
+	// Should contain all matching tasks
+	hasCode := false
+	hasDocs := false
+	hasTests := false
+	for _, m := range matches {
+		if m == "review-code" {
+			hasCode = true
+		}
+		if m == "review-docs" {
+			hasDocs = true
+		}
+		if m == "review-tests" {
+			hasTests = true
+		}
+	}
+	if !hasCode || !hasDocs || !hasTests {
+		t.Errorf("matches should contain review-code, review-docs, review-tests: %v", matches)
 	}
 }
 
@@ -477,7 +508,7 @@ settings: {
 		t.Fatalf("loading config: %v", err)
 	}
 
-	_, err = findTask(cfg, "anything")
+	_, _, err = findTask(cfg, "anything")
 	if err == nil {
 		t.Error("expected error when no tasks defined")
 		return
@@ -669,7 +700,7 @@ func TestExecuteTask_FilePathTask(t *testing.T) {
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
 
-	err = executeTask(stdout, stderr, flags, "./test-task.md", "")
+	err = executeTask(stdout, stderr, strings.NewReader(""), flags, "./test-task.md", "")
 	if err != nil {
 		t.Fatalf("executeTask() error = %v", err)
 	}
@@ -710,7 +741,7 @@ func TestExecuteTask_FilePathWithInstructions(t *testing.T) {
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
 
-	err = executeTask(stdout, stderr, flags, "./review-task.md", "focus on security")
+	err = executeTask(stdout, stderr, strings.NewReader(""), flags, "./review-task.md", "focus on security")
 	if err != nil {
 		t.Fatalf("executeTask() error = %v", err)
 	}
@@ -744,7 +775,7 @@ func TestExecuteTask_FilePathMissing(t *testing.T) {
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
 
-	err = executeTask(stdout, stderr, flags, "./nonexistent.md", "")
+	err = executeTask(stdout, stderr, strings.NewReader(""), flags, "./nonexistent.md", "")
 
 	if err == nil {
 		t.Error("Expected error for missing file")
@@ -792,5 +823,391 @@ func TestExecuteStart_FilePathContextMissing(t *testing.T) {
 	// Should show the missing context with error indicator
 	if !strings.Contains(output, "./missing-context.md") {
 		t.Errorf("Expected missing file path in output, got:\n%s", output)
+	}
+}
+
+// Tests for unified task resolution (DR-015 update)
+
+func TestHasExactInstalledTask(t *testing.T) {
+	tmpDir := setupStartTestConfig(t)
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getting working dir: %v", err)
+	}
+	defer func() { _ = os.Chdir(origDir) }()
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("changing to temp dir: %v", err)
+	}
+
+	cfg, err := loadMergedConfig()
+	if err != nil {
+		t.Fatalf("loading config: %v", err)
+	}
+
+	tests := []struct {
+		name     string
+		taskName string
+		want     bool
+	}{
+		{
+			name:     "exact match exists",
+			taskName: "test-task",
+			want:     true,
+		},
+		{
+			name:     "partial match does not count",
+			taskName: "test",
+			want:     false,
+		},
+		{
+			name:     "nonexistent task",
+			taskName: "nonexistent",
+			want:     false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := hasExactInstalledTask(cfg, tt.taskName)
+			if got != tt.want {
+				t.Errorf("hasExactInstalledTask(%q) = %v, want %v", tt.taskName, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestFindInstalledTasks(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Isolate from global config
+	oldHome := os.Getenv("HOME")
+	_ = os.Setenv("HOME", tmpDir)
+	defer func() { _ = os.Setenv("HOME", oldHome) }()
+
+	configDir := filepath.Join(tmpDir, ".start")
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		t.Fatalf("creating config dir: %v", err)
+	}
+
+	config := `
+agents: {
+	echo: {
+		bin: "echo"
+		command: "{{.bin}} test"
+	}
+}
+
+tasks: {
+	"golang/debug": {
+		prompt: "Debug Go code"
+	}
+	"golang/refactor": {
+		prompt: "Refactor Go code"
+	}
+	"python/debug": {
+		prompt: "Debug Python code"
+	}
+}
+
+settings: {
+	default_agent: "echo"
+}
+`
+	configFile := filepath.Join(configDir, "settings.cue")
+	if err := os.WriteFile(configFile, []byte(config), 0644); err != nil {
+		t.Fatalf("writing config: %v", err)
+	}
+
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getting working dir: %v", err)
+	}
+	defer func() { _ = os.Chdir(origDir) }()
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("changing to temp dir: %v", err)
+	}
+
+	cfg, err := loadMergedConfig()
+	if err != nil {
+		t.Fatalf("loading config: %v", err)
+	}
+
+	tests := []struct {
+		name       string
+		searchTerm string
+		wantCount  int
+		wantNames  []string
+	}{
+		{
+			name:       "match golang tasks",
+			searchTerm: "golang",
+			wantCount:  2,
+			wantNames:  []string{"golang/debug", "golang/refactor"},
+		},
+		{
+			name:       "match debug tasks",
+			searchTerm: "debug",
+			wantCount:  2,
+			wantNames:  []string{"golang/debug", "python/debug"},
+		},
+		{
+			name:       "no matches",
+			searchTerm: "nonexistent",
+			wantCount:  0,
+			wantNames:  nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			matches := findInstalledTasks(cfg, tt.searchTerm)
+			if len(matches) != tt.wantCount {
+				t.Errorf("findInstalledTasks(%q) returned %d matches, want %d", tt.searchTerm, len(matches), tt.wantCount)
+			}
+
+			for _, m := range matches {
+				if m.Source != TaskSourceInstalled {
+					t.Errorf("match %q has source %q, want %q", m.Name, m.Source, TaskSourceInstalled)
+				}
+			}
+
+			if tt.wantNames != nil {
+				for _, wantName := range tt.wantNames {
+					found := false
+					for _, m := range matches {
+						if m.Name == wantName {
+							found = true
+							break
+						}
+					}
+					if !found {
+						t.Errorf("expected match %q not found in results", wantName)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestFindRegistryTasks(t *testing.T) {
+	// Create mock registry index
+	index := &registry.Index{
+		Tasks: map[string]registry.IndexEntry{
+			"golang/debug": {
+				Module:      "github.com/example/golang-debug@v0",
+				Description: "Debug Go code",
+			},
+			"golang/review": {
+				Module:      "github.com/example/golang-review@v0",
+				Description: "Review Go code",
+			},
+			"python/debug": {
+				Module:      "github.com/example/python-debug@v0",
+				Description: "Debug Python code",
+			},
+		},
+	}
+
+	tests := []struct {
+		name       string
+		searchTerm string
+		wantCount  int
+		wantNames  []string
+	}{
+		{
+			name:       "match golang tasks",
+			searchTerm: "golang",
+			wantCount:  2,
+			wantNames:  []string{"golang/debug", "golang/review"},
+		},
+		{
+			name:       "match debug tasks",
+			searchTerm: "debug",
+			wantCount:  2,
+			wantNames:  []string{"golang/debug", "python/debug"},
+		},
+		{
+			name:       "no matches",
+			searchTerm: "nonexistent",
+			wantCount:  0,
+			wantNames:  nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			matches := findRegistryTasks(index, tt.searchTerm)
+			if len(matches) != tt.wantCount {
+				t.Errorf("findRegistryTasks(%q) returned %d matches, want %d", tt.searchTerm, len(matches), tt.wantCount)
+			}
+
+			for _, m := range matches {
+				if m.Source != TaskSourceRegistry {
+					t.Errorf("match %q has source %q, want %q", m.Name, m.Source, TaskSourceRegistry)
+				}
+			}
+
+			if tt.wantNames != nil {
+				for _, wantName := range tt.wantNames {
+					found := false
+					for _, m := range matches {
+						if m.Name == wantName {
+							found = true
+							break
+						}
+					}
+					if !found {
+						t.Errorf("expected match %q not found in results", wantName)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestMergeTaskMatches(t *testing.T) {
+	installed := []TaskMatch{
+		{Name: "golang/debug", Source: TaskSourceInstalled},
+		{Name: "golang/refactor", Source: TaskSourceInstalled},
+	}
+
+	registry := []TaskMatch{
+		{Name: "golang/debug", Source: TaskSourceRegistry},  // duplicate - should be excluded
+		{Name: "golang/review", Source: TaskSourceRegistry}, // new - should be included
+		{Name: "python/debug", Source: TaskSourceRegistry},  // new - should be included
+	}
+
+	merged := mergeTaskMatches(installed, registry)
+
+	// Should have 4 unique tasks
+	if len(merged) != 4 {
+		t.Errorf("mergeTaskMatches returned %d results, want 4", len(merged))
+	}
+
+	// Check that golang/debug is from installed (not registry)
+	for _, m := range merged {
+		if m.Name == "golang/debug" {
+			if m.Source != TaskSourceInstalled {
+				t.Errorf("golang/debug should have source 'installed', got %q", m.Source)
+			}
+		}
+	}
+
+	// Check results are sorted alphabetically
+	for i := 1; i < len(merged); i++ {
+		if merged[i-1].Name > merged[i].Name {
+			t.Errorf("results not sorted: %q > %q", merged[i-1].Name, merged[i].Name)
+		}
+	}
+}
+
+func TestPromptTaskSelection_NonTTY(t *testing.T) {
+	matches := []TaskMatch{
+		{Name: "golang/debug", Source: TaskSourceInstalled},
+		{Name: "golang/refactor", Source: TaskSourceRegistry},
+	}
+
+	stdout := new(bytes.Buffer)
+	stdin := strings.NewReader("")
+
+	_, err := promptTaskSelection(stdout, stdin, matches, "golang")
+	if err == nil {
+		t.Error("expected error for non-TTY input")
+		return
+	}
+
+	errMsg := err.Error()
+
+	// Error should mention ambiguous
+	if !strings.Contains(errMsg, "ambiguous") {
+		t.Errorf("error should mention ambiguous: %v", err)
+	}
+
+	// Error should list task names
+	if !strings.Contains(errMsg, "golang/debug") {
+		t.Errorf("error should contain 'golang/debug': %v", err)
+	}
+	if !strings.Contains(errMsg, "golang/refactor") {
+		t.Errorf("error should contain 'golang/refactor': %v", err)
+	}
+}
+
+func TestPromptTaskSelection_NonTTY_ManyMatches(t *testing.T) {
+	// Create 25 matches (more than maxTaskResults=20)
+	var matches []TaskMatch
+	for i := 1; i <= 25; i++ {
+		matches = append(matches, TaskMatch{
+			Name:   fmt.Sprintf("task/%02d", i),
+			Source: TaskSourceInstalled,
+		})
+	}
+
+	stdout := new(bytes.Buffer)
+	stdin := strings.NewReader("")
+
+	_, err := promptTaskSelection(stdout, stdin, matches, "task")
+	if err == nil {
+		t.Error("expected error for non-TTY input")
+		return
+	}
+
+	errMsg := err.Error()
+
+	// Error should mention ambiguous
+	if !strings.Contains(errMsg, "ambiguous") {
+		t.Errorf("error should mention ambiguous: %v", err)
+	}
+
+	// Error should list some task names
+	if !strings.Contains(errMsg, "task/01") {
+		t.Errorf("error should contain task names: %v", err)
+	}
+}
+
+func TestMergeTaskMatches_Sorting(t *testing.T) {
+	// Test that results are sorted alphabetically
+	installed := []TaskMatch{
+		{Name: "zebra/task", Source: TaskSourceInstalled},
+		{Name: "alpha/task", Source: TaskSourceInstalled},
+	}
+
+	registry := []TaskMatch{
+		{Name: "middle/task", Source: TaskSourceRegistry},
+	}
+
+	merged := mergeTaskMatches(installed, registry)
+
+	if len(merged) != 3 {
+		t.Fatalf("expected 3 results, got %d", len(merged))
+	}
+
+	// Check alphabetical order
+	expected := []string{"alpha/task", "middle/task", "zebra/task"}
+	for i, want := range expected {
+		if merged[i].Name != want {
+			t.Errorf("position %d: got %q, want %q", i, merged[i].Name, want)
+		}
+	}
+}
+
+func TestMergeTaskMatches_Empty(t *testing.T) {
+	// Test with empty inputs
+	merged := mergeTaskMatches(nil, nil)
+	if len(merged) != 0 {
+		t.Errorf("expected 0 results for empty inputs, got %d", len(merged))
+	}
+
+	// Test with only installed
+	installed := []TaskMatch{{Name: "task1", Source: TaskSourceInstalled}}
+	merged = mergeTaskMatches(installed, nil)
+	if len(merged) != 1 {
+		t.Errorf("expected 1 result, got %d", len(merged))
+	}
+
+	// Test with only registry
+	registry := []TaskMatch{{Name: "task2", Source: TaskSourceRegistry}}
+	merged = mergeTaskMatches(nil, registry)
+	if len(merged) != 1 {
+		t.Errorf("expected 1 result, got %d", len(merged))
 	}
 }
