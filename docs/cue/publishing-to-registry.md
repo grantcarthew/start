@@ -370,6 +370,39 @@ cue mod tidy
 cue mod get github.com/user/repo/path@v0.0.2
 ```
 
+## Updating the Index
+
+After publishing a new asset (role, context, task, or agent), you must also update and publish the index module so the asset is discoverable via `start assets`.
+
+```bash
+# 1. Add entry to index/index.cue under the appropriate section
+# Example for a new role:
+"dotai/default": {
+    module:      "github.com/grantcarthew/start-assets/roles/dotai/default@v0"
+    description: "Project-specific default role from .ai/roles/default.md"
+    tags: ["dotai", "project", "default"]
+}
+
+# 2. Validate the index
+cd start-assets/index
+cue vet
+
+# 3. Get current index version
+git tag -l 'index/*' | sort -V | tail -1
+# Example output: index/v0.1.3
+
+# 4. Commit, tag, push, and publish
+cd start-assets
+git add index/index.cue
+git commit -m "feat(index): add dotai/default role"
+git tag -a index/v0.1.4 -m "Release index v0.1.4 - add dotai/default role"
+git push origin main
+git push origin index/v0.1.4
+
+cd index
+cue mod publish v0.1.4 --verbose
+```
+
 ## References
 
 - [CUE Modules Documentation](https://cuelang.org/docs/concepts/modules-packages-instances/)

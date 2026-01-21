@@ -128,7 +128,7 @@ func (c *Composer) Compose(cfg cue.Value, selection ContextSelection, customText
 		} else {
 			ctx.Content = resolved.Content
 			if resolved.Content != "" {
-				promptParts = append(promptParts, resolved.Content)
+				promptParts = append(promptParts, strings.TrimRight(resolved.Content, "\n"))
 			}
 		}
 		result.Contexts = append(result.Contexts, ctx)
@@ -172,7 +172,7 @@ func (c *Composer) Compose(cfg cue.Value, selection ContextSelection, customText
 			} else {
 				ctx.Content = content
 				if content != "" {
-					promptParts = append(promptParts, content)
+					promptParts = append(promptParts, strings.TrimRight(content, "\n"))
 				}
 			}
 			result.Contexts = append(result.Contexts, ctx)
@@ -198,7 +198,7 @@ func (c *Composer) Compose(cfg cue.Value, selection ContextSelection, customText
 
 	// Append custom text or task instructions
 	if customText != "" {
-		promptParts = append(promptParts, customText)
+		promptParts = append(promptParts, strings.TrimRight(customText, "\n"))
 	}
 
 	result.Prompt = strings.Join(promptParts, "\n\n")
