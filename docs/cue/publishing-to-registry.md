@@ -374,6 +374,31 @@ cue mod get github.com/user/repo/path@v0.0.2
 
 After publishing a new asset (role, context, task, or agent), you must also update and publish the index module so the asset is discoverable via `start assets`.
 
+### Index Key Naming Convention
+
+Index keys must match the module subpath exactly. The subpath is the portion of the module path after the asset type directory.
+
+**Pattern:**
+
+```
+Module path: github.com/grantcarthew/start-assets/<type>/<subpath>@v0
+Index key:   <subpath>
+```
+
+**Examples:**
+
+| Module Path | Asset Type | Subpath | Index Key |
+|-------------|------------|---------|-----------|
+| `.../agents/claude@v0` | agents | `claude` | `claude` |
+| `.../agents/claude-bypass-permissions@v0` | agents | `claude-bypass-permissions` | `claude-bypass-permissions` |
+| `.../contexts/dotai/environment@v0` | contexts | `dotai/environment` | `dotai/environment` |
+| `.../roles/golang/assistant@v0` | roles | `golang/assistant` | `golang/assistant` |
+| `.../tasks/golang/review/security@v0` | tasks | `golang/review/security` | `golang/review/security` |
+
+This 1:1 mapping ensures predictability - users can derive the index key directly from the filesystem path.
+
+### Publishing Index Updates
+
 ```bash
 # 1. Add entry to index/index.cue under the appropriate section
 # Example for a new role:

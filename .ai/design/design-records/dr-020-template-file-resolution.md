@@ -1,7 +1,7 @@
 # dr-020: Template Processing and File Resolution
 
 - Date: 2025-12-08
-- Updated: 2026-01-19
+- Updated: 2026-01-21
 - Status: Accepted
 - Category: UTD
 
@@ -142,12 +142,30 @@ Agent command placeholders:
 | Placeholder | Value |
 |-------------|-------|
 | `{{.role}}` | Resolved role content (inline text) |
-| `{{.role_file}}` | Path to resolved role temp file |
+| `{{.role_file}}` | Path to role file (original for local, temp for non-local/inline) |
 | `{{.prompt}}` | Assembled prompt text |
 | `{{.bin}}` | Agent binary |
 | `{{.model}}` | Selected model |
 
 Both `{{.role}}` and `{{.role_file}}` retained: different agents require different input methods (inline vs file path).
+
+**`{{.role_file}}` semantics:**
+
+The `{{.role_file}}` placeholder follows the same local vs non-local logic as UTD `{{.file}}`:
+
+| Role Source | `{{.role_file}}` Value |
+|-------------|------------------------|
+| `file:` with local path | Original file path (already accessible) |
+| `file:` with `@module/` path | Temp file path (`.start/temp/role-<name>.md`) |
+| `prompt:` or `command:` (inline) | Temp file path (resolved content written to temp) |
+
+This ensures:
+
+- No unnecessary temp files for local role configurations
+- Agents can always read role content via the file path
+- Consistent behaviour with UTD `{{.file}}` placeholder
+
+When a role uses inline content (`prompt:` or `command:`), there is no source file, so the resolved content must be written to a temp file for agents that require file-based input (e.g., Claude's `--append-system-prompt-file`).
 
 ## Execution Flow
 

@@ -167,6 +167,7 @@ func executeStart(stdout, stderr io.Writer, flags *Flags, selection orchestratio
 		Agent:      env.Agent,
 		Model:      flags.Model,
 		Role:       result.Role,
+		RoleFile:   result.RoleFile,
 		Prompt:     result.Prompt,
 		WorkingDir: env.WorkingDir,
 		DryRun:     flags.DryRun,
@@ -267,10 +268,7 @@ func printExecutionInfo(w io.Writer, agent orchestration.Agent, model, modelSour
 
 	PrintContextTable(w, result.Contexts)
 
-	if result.RoleName != "" {
-		_, _ = fmt.Fprintf(w, "Role: %s\n", result.RoleName)
-		_, _ = fmt.Fprintln(w)
-	}
+	PrintRoleTable(w, result.RoleName, result.RoleFile, result.Role != "")
 
 	_, _ = fmt.Fprintf(w, "Starting %s - awaiting response...\n", agent.Name)
 }
@@ -286,10 +284,11 @@ func printDryRunSummary(w io.Writer, agent orchestration.Agent, model, modelSour
 	} else {
 		_, _ = fmt.Fprintf(w, "Model: -\n")
 	}
-	_, _ = fmt.Fprintf(w, "Role: %s\n", result.RoleName)
 	_, _ = fmt.Fprintln(w)
 
 	PrintContextTable(w, result.Contexts)
+
+	PrintRoleTable(w, result.RoleName, result.RoleFile, result.Role != "")
 
 	// Show role preview
 	if result.Role != "" {

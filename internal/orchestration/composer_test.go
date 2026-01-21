@@ -702,7 +702,7 @@ func TestComposer_ResolveRole_Errors(t *testing.T) {
 			processor := NewTemplateProcessor(nil, nil, "")
 			composer := NewComposer(processor, "")
 
-			_, err := composer.resolveRole(cfg, tt.roleName)
+			_, _, err := composer.resolveRole(cfg, tt.roleName)
 			if err == nil {
 				t.Error("expected error, got nil")
 				return
@@ -1159,13 +1159,13 @@ func TestComposer_TildeExpansion_Role(t *testing.T) {
 	processor := NewTemplateProcessor(nil, nil, workingDir)
 	composer := NewComposer(processor, workingDir)
 
-	result, err := composer.resolveRole(cfg, "tilde-test")
+	content, _, err := composer.resolveRole(cfg, "tilde-test")
 	if err != nil {
 		t.Fatalf("resolveRole() error = %v", err)
 	}
 
-	if !strings.Contains(result, "Tilde role content") {
-		t.Errorf("Content = %q, want to contain %q", result, "Tilde role content")
+	if !strings.Contains(content, "Tilde role content") {
+		t.Errorf("Content = %q, want to contain %q", content, "Tilde role content")
 	}
 }
 
