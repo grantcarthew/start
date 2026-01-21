@@ -103,6 +103,8 @@ type ComposeResult struct {
 	Contexts []Context
 	// Role is the resolved role content.
 	Role string
+	// RoleFile is the path to the role file (original for cwd files, temp for external/inline).
+	RoleFile string
 	// RoleName is the name of the role used.
 	RoleName string
 	// Warnings contains any non-fatal issues.
@@ -220,13 +222,18 @@ func (c *Composer) ComposeWithRole(cfg cue.Value, selection ContextSelection, ro
 
 	if roleName != "" {
 		var roleContent string
+		var roleFilePath string
 		var roleErr error
 
 		// Check if roleName is a file path (per DR-038)
 		if IsFilePath(roleName) {
 			roleContent, roleErr = ReadFilePath(roleName)
+			if roleErr == nil {
+				// For file path roles, use the expanded path
+				roleFilePath, _ = ExpandFilePath(roleName)
+			}
 		} else {
-			roleContent, roleErr = c.resolveRole(cfg, roleName)
+			roleContent, roleFilePath, roleErr = c.resolveRole(cfg, roleName)
 		}
 
 		if roleErr != nil {
@@ -234,6 +241,7 @@ func (c *Composer) ComposeWithRole(cfg cue.Value, selection ContextSelection, ro
 			result.Warnings = append(result.Warnings, fmt.Sprintf("role %q: %v", roleName, roleErr))
 		} else {
 			result.Role = roleContent
+			result.RoleFile = roleFilePath
 		}
 	}
 
@@ -382,15 +390,18 @@ func (c *Composer) resolveContext(cfg cue.Value, name string) (ProcessResult, er
 }
 
 // resolveRole resolves a role through UTD processing.
-func (c *Composer) resolveRole(cfg cue.Value, name string) (string, error) {
+// Returns the resolved content and the file path where the content can be read.
+// For file-based roles: returns original path (cwd) or temp path (external).
+// For inline roles (prompt/command): writes content to temp and returns temp path.
+func (c *Composer) resolveRole(cfg cue.Value, name string) (content, filePath string, err error) {
 	roleVal := cfg.LookupPath(cue.ParsePath(internalcue.KeyRoles)).LookupPath(cue.MakePath(cue.Str(name)))
 	if !roleVal.Exists() {
-		return "", fmt.Errorf("role not found")
+		return "", "", fmt.Errorf("role not found")
 	}
 
 	fields := extractUTDFields(roleVal)
 	if !IsUTDValid(fields) {
-		return "", fmt.Errorf("invalid UTD: no file, command, or prompt")
+		return "", "", fmt.Errorf("invalid UTD: no file, command, or prompt")
 	}
 
 	// Resolve @module/ paths using origin field (per DR-023)
@@ -404,34 +415,49 @@ func (c *Composer) resolveRole(cfg cue.Value, name string) (string, error) {
 		}
 	}
 
-	// Write file to temp for agent access (only for non-local files).
-	// Local files are already accessible - no temp copy needed.
+	// Track the file path for {{.role_file}} placeholder (per DR-020).
+	// For file-based roles: use original path (cwd) or temp path (external).
+	// For inline roles: will write to temp after processing.
+	var roleFilePath string
+
 	if fields.File != "" {
 		if c.isLocalFile(fields.File) {
 			// Expand tilde and validate local file exists (don't copy, just check)
 			expandedPath, err := ExpandFilePath(fields.File)
 			if err != nil {
-				return "", fmt.Errorf("expanding role file path %s: %w", fields.File, err)
+				return "", "", fmt.Errorf("expanding role file path %s: %w", fields.File, err)
 			}
 			if _, err := os.Stat(expandedPath); err != nil {
-				return "", fmt.Errorf("reading role file %s: %w", fields.File, err)
+				return "", "", fmt.Errorf("reading role file %s: %w", fields.File, err)
 			}
 			fields.File = expandedPath
+			roleFilePath = expandedPath
 		} else {
 			tempPath, err := c.resolveFileToTemp("role", name, fields.File)
 			if err != nil {
-				return "", err
+				return "", "", err
 			}
 			fields.File = tempPath
+			roleFilePath = tempPath
 		}
 	}
 
 	result, err := c.processor.Process(fields, "")
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
-	return result.Content, nil
+	// For inline roles (no source file), write resolved content to temp.
+	// This ensures {{.role_file}} always has a valid path for agents that need it.
+	if roleFilePath == "" && result.Content != "" {
+		tempPath, err := c.tempManager.WriteUTDFile("role", name, result.Content)
+		if err != nil {
+			return "", "", fmt.Errorf("writing role temp file: %w", err)
+		}
+		roleFilePath = tempPath
+	}
+
+	return result.Content, roleFilePath, nil
 }
 
 // getDefaultRole returns the default role name from config.

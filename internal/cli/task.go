@@ -268,6 +268,7 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 		Agent:      env.Agent,
 		Model:      flags.Model,
 		Role:       composeResult.Role,
+		RoleFile:   composeResult.RoleFile,
 		Prompt:     composeResult.Prompt,
 		WorkingDir: env.WorkingDir,
 		DryRun:     flags.DryRun,
@@ -349,9 +350,7 @@ func printTaskExecutionInfo(w io.Writer, agent orchestration.Agent, model string
 
 	PrintContextTable(w, result.Contexts)
 
-	if result.RoleName != "" {
-		_, _ = fmt.Fprintf(w, "Role: %s\n", result.RoleName)
-	}
+	PrintRoleTable(w, result.RoleName, result.RoleFile, result.Role != "")
 
 	if taskResult.CommandExecuted {
 		_, _ = fmt.Fprintln(w, "Command: executed")
@@ -379,10 +378,11 @@ func printTaskDryRunSummary(w io.Writer, agent orchestration.Agent, model string
 	}
 	_, _ = fmt.Fprintf(w, "Agent: %s\n", agent.Name)
 	_, _ = fmt.Fprintf(w, "Model: %s\n", modelStr)
-	_, _ = fmt.Fprintf(w, "Role: %s\n", result.RoleName)
 	_, _ = fmt.Fprintln(w)
 
 	PrintContextTable(w, result.Contexts)
+
+	PrintRoleTable(w, result.RoleName, result.RoleFile, result.Role != "")
 
 	if instructions != "" {
 		_, _ = fmt.Fprintf(w, "Instructions: %s\n", instructions)

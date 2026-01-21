@@ -140,3 +140,47 @@ func PrintContextTable(w io.Writer, contexts []orchestration.Context) {
 	}
 	_, _ = fmt.Fprintln(w)
 }
+
+// PrintRoleTable prints the role in a table format matching context display.
+// Shows status indicator: ✓ for loaded, ○ for failed/missing.
+func PrintRoleTable(w io.Writer, roleName, roleFile string, loaded bool) {
+	if roleName == "" {
+		return
+	}
+
+	_, _ = fmt.Fprintln(w, "Role:")
+
+	// Calculate column widths
+	nameWidth := len(roleName)
+	if nameWidth < 4 {
+		nameWidth = 4 // "Name" header
+	}
+
+	// Determine status and file display
+	status := "✓"
+	file := filepath.Base(roleFile)
+	if !loaded {
+		status = "○"
+		if file == "" || file == "." {
+			file = "(not found)"
+		} else {
+			file += " (not found)"
+		}
+	} else if file == "" || file == "." {
+		file = "-"
+	}
+
+	// Print header
+	_, _ = fmt.Fprintf(w, "  %-*s  %s  %s\n", nameWidth, "Name", "Status", "File")
+
+	// Print row
+	_, _ = fmt.Fprint(w, "  ")
+	_, _ = fmt.Fprintf(w, "%-*s  ", nameWidth, roleName)
+	if status == "✓" {
+		_, _ = colorSuccess.Fprintf(w, "%s", status)
+	} else {
+		_, _ = fmt.Fprint(w, status)
+	}
+	_, _ = fmt.Fprintf(w, "       %s\n", file)
+	_, _ = fmt.Fprintln(w)
+}
