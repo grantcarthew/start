@@ -296,6 +296,12 @@ func TestPrintContentPreview(t *testing.T) {
 
 func TestFindTask(t *testing.T) {
 	tmpDir := setupStartTestConfig(t)
+
+	// Isolate from global config
+	oldHome := os.Getenv("HOME")
+	_ = os.Setenv("HOME", tmpDir)
+	defer func() { _ = os.Setenv("HOME", oldHome) }()
+
 	origDir, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("getting working dir: %v", err)
