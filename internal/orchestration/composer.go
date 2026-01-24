@@ -71,12 +71,12 @@ func (c *Composer) resolveFileToTemp(entityType, name, filePath string) (string,
 	return tempPath, nil
 }
 
-// isLocalFile returns true if the file path is local to the working directory.
-// Local files don't need to be copied to temp - they're already accessible.
-// A file is local if:
+// isCwdPath returns true if the file path is within the working directory (cwd).
+// Files within cwd don't need to be copied to temp - they're already accessible.
+// A file is within cwd if:
 //   - It's a relative path (e.g., "AGENTS.md", "./docs/file.md")
 //   - It's an absolute path that's a child of the working directory
-func (c *Composer) isLocalFile(filePath string) bool {
+func (c *Composer) isCwdPath(filePath string) bool {
 	if filePath == "" {
 		return false
 	}
@@ -356,12 +356,12 @@ func (c *Composer) resolveContext(cfg cue.Value, name string) (ProcessResult, er
 		}
 	}
 
-	// Write file to temp for agent access (only for non-local files).
-	// Local files are already accessible - no temp copy needed.
+	// Write file to temp for agent access (only for external files).
+	// Files within cwd are already accessible - no temp copy needed.
 	var tempPath string
 	if fields.File != "" {
-		if c.isLocalFile(fields.File) {
-			// Expand tilde and validate local file exists (don't copy, just check)
+		if c.isCwdPath(fields.File) {
+			// Expand tilde and validate cwd file exists (don't copy, just check)
 			expandedPath, err := ExpandFilePath(fields.File)
 			if err != nil {
 				return ProcessResult{}, fmt.Errorf("expanding context file path %s: %w", fields.File, err)
@@ -421,8 +421,8 @@ func (c *Composer) resolveRole(cfg cue.Value, name string) (content, filePath st
 	var roleFilePath string
 
 	if fields.File != "" {
-		if c.isLocalFile(fields.File) {
-			// Expand tilde and validate local file exists (don't copy, just check)
+		if c.isCwdPath(fields.File) {
+			// Expand tilde and validate cwd file exists (don't copy, just check)
 			expandedPath, err := ExpandFilePath(fields.File)
 			if err != nil {
 				return "", "", fmt.Errorf("expanding role file path %s: %w", fields.File, err)
@@ -530,12 +530,12 @@ func (c *Composer) ResolveTask(cfg cue.Value, name, instructions string) (Proces
 		}
 	}
 
-	// Write file to temp for agent access (only for non-local files).
-	// Local files are already accessible - no temp copy needed.
+	// Write file to temp for agent access (only for external files).
+	// Files within cwd are already accessible - no temp copy needed.
 	var tempPath string
 	if fields.File != "" {
-		if c.isLocalFile(fields.File) {
-			// Expand tilde and validate local file exists (don't copy, just check)
+		if c.isCwdPath(fields.File) {
+			// Expand tilde and validate cwd file exists (don't copy, just check)
 			expandedPath, err := ExpandFilePath(fields.File)
 			if err != nil {
 				return ProcessResult{}, fmt.Errorf("expanding task file path %s: %w", fields.File, err)

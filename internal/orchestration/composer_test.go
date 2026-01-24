@@ -901,14 +901,14 @@ func TestComposer_ResolveContext_TempFile(t *testing.T) {
 	}
 }
 
-func TestComposer_LocalFile_NoTempFile(t *testing.T) {
+func TestComposer_CwdFile_NoTempFile(t *testing.T) {
 	t.Parallel()
 	ctx := cuecontext.New()
 	workingDir := t.TempDir()
 
-	// Create a local file within the working directory
+	// Create a file within the working directory (cwd)
 	sourceFile := filepath.Join(workingDir, "AGENTS.md")
-	if err := os.WriteFile(sourceFile, []byte("Local file content"), 0644); err != nil {
+	if err := os.WriteFile(sourceFile, []byte("Cwd file content"), 0644); err != nil {
 		t.Fatalf("writing source file: %v", err)
 	}
 
@@ -934,20 +934,20 @@ func TestComposer_LocalFile_NoTempFile(t *testing.T) {
 		t.Fatalf("resolveContext() error = %v", err)
 	}
 
-	// Verify NO temp file was created (local files don't need temp copies)
+	// Verify NO temp file was created (files within cwd don't need temp copies)
 	if result.TempFile != "" {
-		t.Errorf("TempFile should be empty for local file, got %q", result.TempFile)
+		t.Errorf("TempFile should be empty for cwd file, got %q", result.TempFile)
 	}
 
 	// Verify temp directory was not created
 	tempDir := filepath.Join(workingDir, ".start", "temp")
 	if _, err := os.Stat(tempDir); !os.IsNotExist(err) {
-		t.Errorf("temp directory should not exist for local files, but found: %s", tempDir)
+		t.Errorf("temp directory should not exist for cwd files, but found: %s", tempDir)
 	}
 
 	// Verify content was still read correctly
-	if result.Content != "Local file content" {
-		t.Errorf("Content = %q, want %q", result.Content, "Local file content")
+	if result.Content != "Cwd file content" {
+		t.Errorf("Content = %q, want %q", result.Content, "Cwd file content")
 	}
 }
 
@@ -997,7 +997,7 @@ func TestComposer_resolveFileToTemp(t *testing.T) {
 	})
 }
 
-func TestComposer_isLocalFile(t *testing.T) {
+func TestComposer_isCwdPath(t *testing.T) {
 	t.Parallel()
 	workingDir := "/home/user/project"
 	processor := NewTemplateProcessor(nil, nil, workingDir)
@@ -1067,9 +1067,9 @@ func TestComposer_isLocalFile(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := composer.isLocalFile(tt.filePath)
+			got := composer.isCwdPath(tt.filePath)
 			if got != tt.want {
-				t.Errorf("isLocalFile(%q) = %v, want %v", tt.filePath, got, tt.want)
+				t.Errorf("isCwdPath(%q) = %v, want %v", tt.filePath, got, tt.want)
 			}
 		})
 	}
