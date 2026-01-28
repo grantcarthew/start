@@ -127,16 +127,11 @@ func runConfigList(cmd *cobra.Command, args []string) error {
 	}
 
 	// Contexts
-	contexts, _ := loadContextsForScope(local)
+	contexts, contextOrder, _ := loadContextsForScope(local)
 	_, _ = fmt.Fprintln(w)
 	_, _ = fmt.Fprintf(w, "Contexts (%s): %d\n", scopeLabel, len(contexts))
 	if len(contexts) > 0 {
-		var names []string
-		for name := range contexts {
-			names = append(names, name)
-		}
-		sort.Strings(names)
-		for _, name := range names {
+		for _, name := range contextOrder {
 			ctx := contexts[name]
 			flags := ""
 			if ctx.Required {
