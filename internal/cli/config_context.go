@@ -67,7 +67,7 @@ Use --local to show only local contexts.`,
 // runConfigContextList lists all configured contexts.
 func runConfigContextList(cmd *cobra.Command, _ []string) error {
 	local := getFlags(cmd).Local
-	contexts, err := loadContextsForScope(local)
+	contexts, order, err := loadContextsForScope(local)
 	if err != nil {
 		return err
 	}
@@ -81,14 +81,7 @@ func runConfigContextList(cmd *cobra.Command, _ []string) error {
 	_, _ = fmt.Fprintln(w, "Contexts:")
 	_, _ = fmt.Fprintln(w)
 
-	// Sort context names for consistent output
-	var names []string
-	for name := range contexts {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-
-	for _, name := range names {
+	for _, name := range order {
 		ctx := contexts[name]
 		markers := ""
 		if ctx.Required {
@@ -321,7 +314,7 @@ func runConfigContextAdd(cmd *cobra.Command, _ []string) error {
 	}
 
 	// Load existing contexts from target directory
-	existingContexts, err := loadContextsFromDir(configDir)
+	existingContexts, _, err := loadContextsFromDir(configDir)
 	if err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("loading existing contexts: %w", err)
 	}
@@ -369,7 +362,7 @@ func runConfigContextInfo(cmd *cobra.Command, args []string) error {
 	name := args[0]
 	local := getFlags(cmd).Local
 
-	contexts, err := loadContextsForScope(local)
+	contexts, _, err := loadContextsForScope(local)
 	if err != nil {
 		return err
 	}
@@ -463,7 +456,7 @@ func runConfigContextEdit(cmd *cobra.Command, args []string) error {
 	stdout := cmd.OutOrStdout()
 
 	// Load existing contexts
-	contexts, err := loadContextsFromDir(configDir)
+	contexts, _, err := loadContextsFromDir(configDir)
 	if err != nil {
 		return fmt.Errorf("loading contexts: %w", err)
 	}
@@ -677,7 +670,7 @@ func runConfigContextRemove(cmd *cobra.Command, args []string) error {
 	}
 
 	// Load existing contexts
-	contexts, err := loadContextsFromDir(configDir)
+	contexts, _, err := loadContextsFromDir(configDir)
 	if err != nil {
 		return fmt.Errorf("loading contexts: %w", err)
 	}
@@ -741,73 +734,90 @@ type ContextConfig struct {
 }
 
 // loadContextsForScope loads contexts from the appropriate scope.
-func loadContextsForScope(localOnly bool) (map[string]ContextConfig, error) {
+// Returns the contexts map, names in definition order, and any error.
+// Order: global contexts first (in definition order), then local contexts (in definition order).
+// Local contexts override global contexts with the same name but appear in their local position.
+func loadContextsForScope(localOnly bool) (map[string]ContextConfig, []string, error) {
 	paths, err := config.ResolvePaths("")
 	if err != nil {
-		return nil, fmt.Errorf("resolving config paths: %w", err)
+		return nil, nil, fmt.Errorf("resolving config paths: %w", err)
 	}
 
 	contexts := make(map[string]ContextConfig)
+	var order []string
+	seen := make(map[string]bool)
 
 	if localOnly {
 		if paths.LocalExists {
-			localContexts, err := loadContextsFromDir(paths.Local)
+			localContexts, localOrder, err := loadContextsFromDir(paths.Local)
 			if err != nil && !os.IsNotExist(err) {
-				return nil, err
+				return nil, nil, err
 			}
-			for name, ctx := range localContexts {
+			for _, name := range localOrder {
+				ctx := localContexts[name]
 				ctx.Source = "local"
 				contexts[name] = ctx
+				order = append(order, name)
 			}
 		}
 	} else {
 		if paths.GlobalExists {
-			globalContexts, err := loadContextsFromDir(paths.Global)
+			globalContexts, globalOrder, err := loadContextsFromDir(paths.Global)
 			if err != nil && !os.IsNotExist(err) {
-				return nil, err
+				return nil, nil, err
 			}
-			for name, ctx := range globalContexts {
+			for _, name := range globalOrder {
+				ctx := globalContexts[name]
 				ctx.Source = "global"
 				contexts[name] = ctx
+				order = append(order, name)
+				seen[name] = true
 			}
 		}
 		if paths.LocalExists {
-			localContexts, err := loadContextsFromDir(paths.Local)
+			localContexts, localOrder, err := loadContextsFromDir(paths.Local)
 			if err != nil && !os.IsNotExist(err) {
-				return nil, err
+				return nil, nil, err
 			}
-			for name, ctx := range localContexts {
+			for _, name := range localOrder {
+				ctx := localContexts[name]
 				ctx.Source = "local"
 				contexts[name] = ctx
+				// Only add to order if not already present from global
+				if !seen[name] {
+					order = append(order, name)
+				}
 			}
 		}
 	}
 
-	return contexts, nil
+	return contexts, order, nil
 }
 
 // loadContextsFromDir loads contexts from a specific directory.
-func loadContextsFromDir(dir string) (map[string]ContextConfig, error) {
+// Returns the contexts map, names in definition order, and any error.
+func loadContextsFromDir(dir string) (map[string]ContextConfig, []string, error) {
 	contexts := make(map[string]ContextConfig)
+	var order []string
 
 	loader := internalcue.NewLoader()
 	cfg, err := loader.LoadSingle(dir)
 	if err != nil {
 		// If no CUE files exist, return empty map (not an error)
 		if strings.Contains(err.Error(), "no CUE files") {
-			return contexts, nil
+			return contexts, order, nil
 		}
-		return contexts, err
+		return contexts, order, err
 	}
 
 	contextsVal := cfg.LookupPath(cue.ParsePath(internalcue.KeyContexts))
 	if !contextsVal.Exists() {
-		return contexts, nil
+		return contexts, order, nil
 	}
 
 	iter, err := contextsVal.Fields()
 	if err != nil {
-		return nil, fmt.Errorf("iterating contexts: %w", err)
+		return nil, nil, fmt.Errorf("iterating contexts: %w", err)
 	}
 
 	for iter.Next() {
@@ -853,9 +863,10 @@ func loadContextsFromDir(dir string) (map[string]ContextConfig, error) {
 		}
 
 		contexts[name] = ctx
+		order = append(order, name)
 	}
 
-	return contexts, nil
+	return contexts, order, nil
 }
 
 // writeContextsFile writes the contexts configuration to a file.
