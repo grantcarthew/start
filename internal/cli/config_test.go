@@ -460,6 +460,74 @@ func TestConfigContextList_WithContexts(t *testing.T) {
 	}
 }
 
+func TestConfigContextList_PreservesDefinitionOrder(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	// Create global config with multiple contexts in specific order
+	globalDir := filepath.Join(tmpDir, "start")
+	if err := os.MkdirAll(globalDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Define contexts in a specific order: zebra, alpha, middle
+	// If sorted alphabetically, order would be: alpha, middle, zebra
+	contextsContent := `contexts: {
+	"zebra": {
+		file: "zebra.md"
+		description: "Zebra context (defined first)"
+	}
+	"alpha": {
+		file: "alpha.md"
+		description: "Alpha context (defined second)"
+	}
+	"middle": {
+		file: "middle.md"
+		description: "Middle context (defined third)"
+	}
+}`
+	if err := os.WriteFile(filepath.Join(globalDir, "contexts.cue"), []byte(contextsContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	origWd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chdir(origWd) }()
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := NewRootCmd()
+	stdout := &bytes.Buffer{}
+	cmd.SetOut(stdout)
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"config", "context", "list"})
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := stdout.String()
+
+	// Verify order is preserved (definition order, not alphabetical)
+	zebraIdx := strings.Index(output, "zebra")
+	alphaIdx := strings.Index(output, "alpha")
+	middleIdx := strings.Index(output, "middle")
+
+	if zebraIdx == -1 || alphaIdx == -1 || middleIdx == -1 {
+		t.Fatalf("expected all contexts in output, got: %s", output)
+	}
+
+	// Definition order: zebra < alpha < middle
+	if !(zebraIdx < alphaIdx && alphaIdx < middleIdx) {
+		t.Errorf("context order not preserved (expected zebra < alpha < middle): zebra=%d, alpha=%d, middle=%d\noutput: %s",
+			zebraIdx, alphaIdx, middleIdx, output)
+	}
+}
+
 func TestConfigTaskList_WithTasks(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", tmpDir)
