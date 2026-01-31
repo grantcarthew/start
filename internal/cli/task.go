@@ -248,9 +248,13 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 		selection.IncludeRequired, selection.IncludeDefaults, selection.Tags)
 
 	// Compose contexts and resolve role
-	composeResult, err := env.Composer.ComposeWithRole(env.Cfg.Value, selection, roleName, taskResult.Content, "")
-	if err != nil {
-		return fmt.Errorf("composing prompt: %w", err)
+	composeResult, composeErr := env.Composer.ComposeWithRole(env.Cfg.Value, selection, roleName, taskResult.Content, "")
+	if composeErr != nil {
+		// Show UI with role resolutions before returning error
+		if !flags.Quiet && len(composeResult.RoleResolutions) > 0 {
+			printComposeError(stdout, env.Agent, composeResult)
+		}
+		return fmt.Errorf("composing prompt: %w", composeErr)
 	}
 
 	for _, ctx := range composeResult.Contexts {
@@ -350,7 +354,7 @@ func printTaskExecutionInfo(w io.Writer, agent orchestration.Agent, model string
 
 	PrintContextTable(w, result.Contexts)
 
-	PrintRoleTable(w, result.RoleName, result.RoleFile, result.Role != "")
+	PrintRoleTable(w, result.RoleResolutions)
 
 	if taskResult.CommandExecuted {
 		_, _ = fmt.Fprintln(w, "Command: executed")
@@ -382,7 +386,7 @@ func printTaskDryRunSummary(w io.Writer, agent orchestration.Agent, model string
 
 	PrintContextTable(w, result.Contexts)
 
-	PrintRoleTable(w, result.RoleName, result.RoleFile, result.Role != "")
+	PrintRoleTable(w, result.RoleResolutions)
 
 	if instructions != "" {
 		_, _ = fmt.Fprintf(w, "Instructions: %s\n", instructions)

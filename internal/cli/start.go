@@ -139,9 +139,13 @@ func executeStart(stdout, stderr io.Writer, flags *Flags, selection orchestratio
 		selection.IncludeRequired, selection.IncludeDefaults, selection.Tags)
 
 	// Compose prompt with role
-	result, err := env.Composer.ComposeWithRole(env.Cfg.Value, selection, flags.Role, customText, "")
-	if err != nil {
-		return fmt.Errorf("composing prompt: %w", err)
+	result, composeErr := env.Composer.ComposeWithRole(env.Cfg.Value, selection, flags.Role, customText, "")
+	if composeErr != nil {
+		// Show UI with role resolutions before returning error
+		if !flags.Quiet && len(result.RoleResolutions) > 0 {
+			printComposeError(stdout, env.Agent, result)
+		}
+		return fmt.Errorf("composing prompt: %w", composeErr)
 	}
 
 	debugf(flags, "role", "Selected %q", result.RoleName)
@@ -268,7 +272,7 @@ func printExecutionInfo(w io.Writer, agent orchestration.Agent, model, modelSour
 
 	PrintContextTable(w, result.Contexts)
 
-	PrintRoleTable(w, result.RoleName, result.RoleFile, result.Role != "")
+	PrintRoleTable(w, result.RoleResolutions)
 
 	_, _ = fmt.Fprintf(w, "Starting %s - awaiting response...\n", agent.Name)
 }
@@ -288,7 +292,7 @@ func printDryRunSummary(w io.Writer, agent orchestration.Agent, model, modelSour
 
 	PrintContextTable(w, result.Contexts)
 
-	PrintRoleTable(w, result.RoleName, result.RoleFile, result.Role != "")
+	PrintRoleTable(w, result.RoleResolutions)
 
 	// Show role preview
 	if result.Role != "" {
@@ -306,6 +310,20 @@ func printDryRunSummary(w io.Writer, agent orchestration.Agent, model, modelSour
 	_, _ = fmt.Fprintln(w, "  role.md")
 	_, _ = fmt.Fprintln(w, "  prompt.md")
 	_, _ = fmt.Fprintln(w, "  command.txt")
+}
+
+// printComposeError prints UI before a composition error.
+// Shows agent, contexts, and role resolutions so user understands what failed.
+func printComposeError(w io.Writer, agent orchestration.Agent, result orchestration.ComposeResult) {
+	PrintHeader(w, "Starting AI Agent")
+	PrintSeparator(w)
+
+	_, _ = fmt.Fprintf(w, "Agent: %s\n", agent.Name)
+	_, _ = fmt.Fprintln(w)
+
+	PrintContextTable(w, result.Contexts)
+
+	PrintRoleTable(w, result.RoleResolutions)
 }
 
 // printContentPreview prints content with a header showing line count only when truncated.

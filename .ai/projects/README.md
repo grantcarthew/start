@@ -10,7 +10,7 @@ See [p-writing-guide.md](./p-writing-guide.md) for guidelines on creating and ma
 
 ### Active Projects
 
-None - all projects complete.
+None
 
 ### Completed Projects
 
@@ -35,12 +35,21 @@ None - all projects complete.
 | [p-017](./completed/p-017-cli-config-edit-flags.md) | CLI Config Edit Flags | 2026-01-16 |
 | [p-019](./completed/p-019-cli-file-path-inputs.md) | CLI File Path Inputs | 2026-01-16 |
 | [p-018](./completed/p-018-cli-interactive-edit-completeness.md) | CLI Interactive Edit Completeness | 2025-01-19 |
+| [p-020](./completed/p-020-role-optional-field.md) | Role Optional Field | 2026-01-31 |
 
 ---
 
 ## Project Overview
 
 ### Completed
+
+#### p-020: Role Optional Field
+
+Added `optional` field to role schema enabling discovery-based roles (like dotai roles) that gracefully skip when their files don't exist. Roles iterate in definition order; optional roles skip to next, required roles error. Updated error display to show UI before errors.
+
+**Key Deliverables:** Schema update (schemas/v0.2.0), composer role resolution, `--optional` CLI flag, dr-039, updated dr-007
+
+**Dependencies:** None
 
 #### p-018: CLI Interactive Edit Completeness
 

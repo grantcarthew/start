@@ -145,6 +145,7 @@ Examples:
 	addCmd.Flags().String("command", "", "Command to generate prompt")
 	addCmd.Flags().String("prompt", "", "Inline prompt text")
 	addCmd.Flags().StringSlice("tag", nil, "Tags")
+	addCmd.Flags().Bool("optional", false, "Skip gracefully when file is missing")
 
 	parent.AddCommand(addCmd)
 }
@@ -161,7 +162,7 @@ func runConfigRoleAdd(cmd *cobra.Command, _ []string) error {
 		isTTY = term.IsTerminal(int(f.Fd()))
 	}
 	// If any flags are set, skip prompts for optional fields
-	hasFlags := anyFlagChanged(cmd, "name", "description", "file", "command", "prompt", "tag")
+	hasFlags := anyFlagChanged(cmd, "name", "description", "file", "command", "prompt", "tag", "optional")
 	interactive := isTTY && !hasFlags
 
 	// Get flag values
@@ -264,6 +265,7 @@ func runConfigRoleAdd(cmd *cobra.Command, _ []string) error {
 
 	// Build role struct
 	tags, _ := cmd.Flags().GetStringSlice("tag")
+	optional, _ := cmd.Flags().GetBool("optional")
 	role := RoleConfig{
 		Name:        name,
 		Description: description,
@@ -271,6 +273,7 @@ func runConfigRoleAdd(cmd *cobra.Command, _ []string) error {
 		Command:     command,
 		Prompt:      prompt,
 		Tags:        tags,
+		Optional:    optional,
 	}
 
 	// Determine target directory
@@ -401,6 +404,7 @@ Examples:
 	editCmd.Flags().String("command", "", "Command to generate prompt")
 	editCmd.Flags().String("prompt", "", "Inline prompt text")
 	editCmd.Flags().StringSlice("tag", nil, "Tags")
+	editCmd.Flags().Bool("optional", false, "Skip gracefully when file is missing")
 
 	parent.AddCommand(editCmd)
 }
@@ -444,7 +448,7 @@ func runConfigRoleEdit(cmd *cobra.Command, args []string) error {
 	}
 
 	// Check if any edit flags are provided
-	hasEditFlags := anyFlagChanged(cmd, "description", "file", "command", "prompt", "tag")
+	hasEditFlags := anyFlagChanged(cmd, "description", "file", "command", "prompt", "tag", "optional")
 
 	if hasEditFlags {
 		// Non-interactive flag-based update
@@ -462,6 +466,9 @@ func runConfigRoleEdit(cmd *cobra.Command, args []string) error {
 		}
 		if cmd.Flags().Changed("tag") {
 			role.Tags, _ = cmd.Flags().GetStringSlice("tag")
+		}
+		if cmd.Flags().Changed("optional") {
+			role.Optional, _ = cmd.Flags().GetBool("optional")
 		}
 
 		roles[name] = role
@@ -757,6 +764,7 @@ type RoleConfig struct {
 	Command     string
 	Prompt      string
 	Tags        []string
+	Optional    bool   // If true, skip gracefully when file is missing
 	Source      string // "global" or "local" - for display only
 	Origin      string // Registry module path when installed from registry
 }
@@ -867,6 +875,11 @@ func loadRolesFromDir(dir string) (map[string]RoleConfig, error) {
 			role.Origin, _ = v.String()
 		}
 
+		// Load optional field
+		if v := val.LookupPath(cue.ParsePath("optional")); v.Exists() {
+			role.Optional, _ = v.Bool()
+		}
+
 		roles[name] = role
 	}
 
@@ -926,6 +939,9 @@ func writeRolesFile(path string, roles map[string]RoleConfig) error {
 				sb.WriteString(fmt.Sprintf("%q", tag))
 			}
 			sb.WriteString("]\n")
+		}
+		if role.Optional {
+			sb.WriteString("\t\toptional: true\n")
 		}
 
 		sb.WriteString("\t}\n")

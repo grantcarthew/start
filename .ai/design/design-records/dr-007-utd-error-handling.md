@@ -34,12 +34,12 @@ Error handling depends on the parent entity using UTD.
 - Continue processing other contexts
 - Session proceeds with available contexts
 
-**Roles: Warn and skip**
+**Roles: Depends on optional flag (see dr-039)**
 
-- Log warning to stdout with details
-- Skip role (no system prompt)
-- Continue execution
-- Agent runs without role
+- Required roles (optional: false, default): Error and stop execution
+- Optional roles (optional: true): Skip and try next role in definition order
+- All roles exhausted: Error with "no valid roles found"
+- Explicit --role flag: Always error if resolution fails
 
 **General principle:** Fail only when critical (tasks), otherwise warn and continue (best effort).
 
@@ -62,14 +62,14 @@ Contexts provide background information. If one fails:
 - Missing context reduces quality but doesn't prevent work
 - Best effort: use what works
 
-**Roles are optional prompts:**
+**Roles have configurable error handling (dr-039):**
 
-Roles customize agent behavior. If role fails:
+Roles customize agent behavior. Error handling depends on the `optional` field:
 
-- Agent has default behavior
-- Session still useful (general assistant)
-- User can fix role for next session
-- Not critical to execution
+- Required roles (default): Must resolve successfully or error
+- Optional roles: Skip gracefully, try next role in chain
+- Explicit selection (--role flag): Always error if broken
+- All roles exhausted: Error (no silent "no role" state)
 
 **Best effort maximizes utility:**
 
@@ -461,7 +461,8 @@ The tool tries to maximize utility:
 
 - Task is broken → fail (user-initiated)
 - Context is broken → skip (optional enrichment)
-- Role is broken → skip (optional behavior)
+- Required role is broken → fail (must resolve)
+- Optional role is broken → skip (try next role)
 
 **Principle:** Try to run if we can, fail only when we must.
 
@@ -493,18 +494,26 @@ Loaded contexts (2):
 
 Continues with 2 contexts
 
-**Role with template error:**
+**Optional role with template error:**
 
 ```
-Warning: invalid template syntax
-Template: "Role: {{.file_contents"
-Error: unclosed action
-Skipping role 'custom-reviewer'
-
-Agent running without role (using default behavior)
+Role:
+  custom-reviewer  ○  skipped
+  fallback-role    ✓  fallback.md
 ```
 
-Agent continues without role
+Optional role skipped, next role used
+
+**Required role with template error:**
+
+```
+Role:
+  custom-reviewer  ○  template error
+
+Error: role "custom-reviewer": invalid template syntax
+```
+
+Execution stops with error
 
 **Partial failure in context:**
 
@@ -545,4 +554,4 @@ Validate all runtime aspects:
 
 ## Updates
 
-None yet.
+- 2026-01-31: Role error handling updated by dr-039 (optional field). Optional roles skip on error, required roles now error instead of warn.
