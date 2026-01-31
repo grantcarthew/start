@@ -33,6 +33,15 @@ type Context struct {
 	Error       string // Error message if resolution failed
 }
 
+// RoleResolution tracks the resolution status of a role during fallback.
+type RoleResolution struct {
+	Name     string // Role name (map key or file path)
+	Status   string // "loaded", "skipped", "error"
+	File     string // Source file path (if file-based)
+	Optional bool   // Whether this role is optional
+	Error    string // Error message if resolution failed
+}
+
 // Composer handles prompt composition from CUE configuration.
 type Composer struct {
 	processor   *TemplateProcessor
@@ -107,6 +116,8 @@ type ComposeResult struct {
 	RoleFile string
 	// RoleName is the name of the role used.
 	RoleName string
+	// RoleResolutions tracks all roles checked during resolution for UI display.
+	RoleResolutions []RoleResolution
 	// Warnings contains any non-fatal issues.
 	Warnings []string
 }
@@ -208,15 +219,28 @@ func (c *Composer) Compose(cfg cue.Value, selection ContextSelection, customText
 }
 
 // ComposeWithRole composes prompt and resolves role.
+// When roleName is provided (explicit --role), errors are fatal.
+// When using default selection, optional roles are skipped gracefully.
 func (c *Composer) ComposeWithRole(cfg cue.Value, selection ContextSelection, roleName, customText, instructions string) (ComposeResult, error) {
 	result, err := c.Compose(cfg, selection, customText, instructions)
 	if err != nil {
 		return result, err
 	}
 
+	// Track whether this is an explicit role selection
+	explicitRole := roleName != ""
+
 	// Resolve role
 	if roleName == "" {
-		roleName = c.getDefaultRole(cfg)
+		var resolutions []RoleResolution
+		var selectErr error
+		roleName, resolutions, selectErr = c.selectDefaultRole(cfg)
+		result.RoleResolutions = resolutions
+
+		if selectErr != nil {
+			// Selection failed (required role missing or all optional roles skipped)
+			return result, selectErr
+		}
 	}
 	result.RoleName = roleName
 
@@ -232,12 +256,44 @@ func (c *Composer) ComposeWithRole(cfg cue.Value, selection ContextSelection, ro
 				// For file path roles, use the expanded path
 				roleFilePath, _ = ExpandFilePath(roleName)
 			}
+			// Add resolution tracking for file path roles
+			res := RoleResolution{
+				Name: roleName,
+				File: roleName,
+			}
+			if roleErr != nil {
+				res.Status = "error"
+				res.Error = roleErr.Error()
+			} else {
+				res.Status = "loaded"
+			}
+			result.RoleResolutions = append(result.RoleResolutions, res)
 		} else {
 			roleContent, roleFilePath, roleErr = c.resolveRole(cfg, roleName)
+
+			// Add resolution tracking for config roles (if not already tracked)
+			if len(result.RoleResolutions) == 0 || result.RoleResolutions[len(result.RoleResolutions)-1].Name != roleName {
+				res := RoleResolution{
+					Name: roleName,
+					File: roleFilePath,
+				}
+				if roleErr != nil {
+					res.Status = "error"
+					res.Error = roleErr.Error()
+				} else {
+					res.Status = "loaded"
+				}
+				result.RoleResolutions = append(result.RoleResolutions, res)
+			}
 		}
 
 		if roleErr != nil {
-			// Role errors are warnings (per DR-007)
+			if explicitRole {
+				// Explicit --role or settings.default_role: always error (per DR-039)
+				return result, fmt.Errorf("role %q: %w", roleName, roleErr)
+			}
+			// This shouldn't happen for default selection (selectDefaultRole already checked)
+			// but handle it defensively
 			result.Warnings = append(result.Warnings, fmt.Sprintf("role %q: %v", roleName, roleErr))
 		} else {
 			result.Role = roleContent
@@ -460,25 +516,108 @@ func (c *Composer) resolveRole(cfg cue.Value, name string) (content, filePath st
 	return result.Content, roleFilePath, nil
 }
 
-// getDefaultRole returns the default role name from config.
-func (c *Composer) getDefaultRole(cfg cue.Value) string {
+// selectDefaultRole returns the default role name and resolution tracking.
+// When settings.default_role is set, that role is used (no fallback).
+// Otherwise, roles are checked in definition order:
+// - Optional roles with missing files are skipped
+// - Required roles with missing files cause an error
+// - First available role is selected
+// Returns empty roleName with nil error if no roles are defined.
+// Returns error if all roles fail or a required role fails.
+func (c *Composer) selectDefaultRole(cfg cue.Value) (roleName string, resolutions []RoleResolution, err error) {
 	// Check settings.default_role
 	if def := cfg.LookupPath(cue.ParsePath(internalcue.KeySettings + ".default_role")); def.Exists() {
-		if s, err := def.String(); err == nil {
-			return s
+		if s, err := def.String(); err == nil && s != "" {
+			// Explicit default_role - return it directly (no fallback)
+			// The caller will handle errors (per DR-039)
+			return s, nil, nil
 		}
 	}
 
-	// Fall back to first role in definition order
+	// Iterate through roles in definition order
 	roles := cfg.LookupPath(cue.ParsePath(internalcue.KeyRoles))
-	if roles.Exists() {
-		iter, err := roles.Fields()
-		if err == nil && iter.Next() {
-			return iter.Selector().Unquoted()
-		}
+	if !roles.Exists() {
+		return "", nil, nil
 	}
 
-	return ""
+	iter, err := roles.Fields()
+	if err != nil {
+		return "", nil, fmt.Errorf("iterating roles: %w", err)
+	}
+
+	for iter.Next() {
+		name := iter.Selector().Unquoted()
+		roleVal := iter.Value()
+
+		// Extract optional field (default: false)
+		optional := false
+		if opt := roleVal.LookupPath(cue.ParsePath("optional")); opt.Exists() {
+			optional, _ = opt.Bool()
+		}
+
+		// Extract file field
+		var filePath string
+		if file := roleVal.LookupPath(cue.ParsePath("file")); file.Exists() {
+			filePath, _ = file.String()
+		}
+
+		// Check if role is available
+		available := true
+		var checkErr string
+
+		if filePath != "" {
+			// File-based role - check if file exists
+			expandedPath, err := ExpandFilePath(filePath)
+			if err != nil {
+				available = false
+				checkErr = fmt.Sprintf("expanding path: %v", err)
+			} else if _, err := os.Stat(expandedPath); err != nil {
+				available = false
+				checkErr = "file not found"
+			}
+		}
+		// Non-file roles (command/prompt only) are always available at selection time
+
+		res := RoleResolution{
+			Name:     name,
+			File:     filePath,
+			Optional: optional,
+		}
+
+		if available {
+			res.Status = "loaded"
+			resolutions = append(resolutions, res)
+			return name, resolutions, nil
+		}
+
+		// Role not available
+		if optional {
+			res.Status = "skipped"
+			res.Error = checkErr
+			resolutions = append(resolutions, res)
+			continue
+		}
+
+		// Required role failed
+		res.Status = "error"
+		res.Error = checkErr
+		resolutions = append(resolutions, res)
+		return "", resolutions, fmt.Errorf("role %q: %s", name, checkErr)
+	}
+
+	// All roles exhausted
+	if len(resolutions) > 0 {
+		return "", resolutions, fmt.Errorf("no valid roles found (all optional roles skipped)")
+	}
+
+	return "", nil, nil
+}
+
+// getDefaultRole returns the default role name from config.
+// Deprecated: Use selectDefaultRole for optional role support.
+func (c *Composer) getDefaultRole(cfg cue.Value) string {
+	roleName, _, _ := c.selectDefaultRole(cfg)
+	return roleName
 }
 
 // extractUTDFields extracts UTD fields from a CUE value.

@@ -12,7 +12,7 @@ Avoid references to the prototype in new documentation. This is a new design.
 
 Projects are stored in `.ai/projects/`. Continue by reading the active project.
 
-Active Project: None - all projects complete.
+Active Project: None
 
 Other Projects (paused):
 - None
@@ -180,6 +180,7 @@ start-assets/
 - p-014: CLI Supporting Commands Testing (assets, doctor, completion commands)
 - p-019: CLI File Path Inputs (file path support for --role, --context, task, and prompt commands)
 - p-018: CLI Interactive Edit Completeness (models and tags editing in interactive mode)
+- p-020: Role Optional Field (optional field for discovery-based roles, graceful fallback)
 
 **Current:** None - all projects complete
 

@@ -328,17 +328,11 @@ func TestComposer_ComposeWithRole(t *testing.T) {
 		}
 	})
 
-	t.Run("nonexistent role adds warning", func(t *testing.T) {
-		result, err := composer.ComposeWithRole(cfg, ContextSelection{IncludeRequired: true}, "nonexistent", "", "")
-		if err != nil {
-			t.Fatalf("ComposeWithRole() error = %v", err)
-		}
-
-		if len(result.Warnings) == 0 {
-			t.Error("expected warning for nonexistent role")
-		}
-		if result.Role != "" {
-			t.Errorf("Role should be empty for nonexistent role, got %q", result.Role)
+	t.Run("explicit nonexistent role returns error", func(t *testing.T) {
+		// Per DR-039: explicit --role with missing file always errors
+		_, err := composer.ComposeWithRole(cfg, ContextSelection{IncludeRequired: true}, "nonexistent", "", "")
+		if err == nil {
+			t.Error("expected error for explicit nonexistent role")
 		}
 	})
 }
@@ -599,6 +593,292 @@ func TestGetDefaultRole(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSelectDefaultRole(t *testing.T) {
+	t.Parallel()
+	ctx := cuecontext.New()
+
+	t.Run("optional role skipped when file missing", func(t *testing.T) {
+		config := `
+			roles: {
+				"optional-missing": {
+					file: "/nonexistent/path/role.md"
+					optional: true
+				}
+				"fallback": {
+					prompt: "Fallback role"
+				}
+			}
+		`
+		cfg := ctx.CompileString(config)
+		if err := cfg.Err(); err != nil {
+			t.Fatalf("compile config: %v", err)
+		}
+
+		processor := NewTemplateProcessor(nil, nil, "")
+		composer := NewComposer(processor, "")
+
+		roleName, resolutions, err := composer.selectDefaultRole(cfg)
+		if err != nil {
+			t.Fatalf("selectDefaultRole() error = %v", err)
+		}
+
+		if roleName != "fallback" {
+			t.Errorf("roleName = %q, want 'fallback'", roleName)
+		}
+
+		if len(resolutions) != 2 {
+			t.Fatalf("expected 2 resolutions, got %d", len(resolutions))
+		}
+
+		if resolutions[0].Status != "skipped" {
+			t.Errorf("first resolution status = %q, want 'skipped'", resolutions[0].Status)
+		}
+		if resolutions[1].Status != "loaded" {
+			t.Errorf("second resolution status = %q, want 'loaded'", resolutions[1].Status)
+		}
+	})
+
+	t.Run("required role errors when file missing", func(t *testing.T) {
+		config := `
+			roles: {
+				"required-missing": {
+					file: "/nonexistent/path/role.md"
+					optional: false
+				}
+			}
+		`
+		cfg := ctx.CompileString(config)
+		if err := cfg.Err(); err != nil {
+			t.Fatalf("compile config: %v", err)
+		}
+
+		processor := NewTemplateProcessor(nil, nil, "")
+		composer := NewComposer(processor, "")
+
+		_, resolutions, err := composer.selectDefaultRole(cfg)
+		if err == nil {
+			t.Error("expected error for required role with missing file")
+		}
+
+		if len(resolutions) == 0 {
+			t.Fatal("expected at least one resolution")
+		}
+		if resolutions[0].Status != "error" {
+			t.Errorf("resolution status = %q, want 'error'", resolutions[0].Status)
+		}
+	})
+
+	t.Run("first valid role selected from chain", func(t *testing.T) {
+		config := `
+			roles: {
+				"optional-missing-1": {
+					file: "/nonexistent/1.md"
+					optional: true
+				}
+				"optional-missing-2": {
+					file: "/nonexistent/2.md"
+					optional: true
+				}
+				"valid": {
+					prompt: "Valid role"
+				}
+				"not-reached": {
+					prompt: "Should not reach this"
+				}
+			}
+		`
+		cfg := ctx.CompileString(config)
+		if err := cfg.Err(); err != nil {
+			t.Fatalf("compile config: %v", err)
+		}
+
+		processor := NewTemplateProcessor(nil, nil, "")
+		composer := NewComposer(processor, "")
+
+		roleName, resolutions, err := composer.selectDefaultRole(cfg)
+		if err != nil {
+			t.Fatalf("selectDefaultRole() error = %v", err)
+		}
+
+		if roleName != "valid" {
+			t.Errorf("roleName = %q, want 'valid'", roleName)
+		}
+
+		// Should have 3 resolutions (2 skipped + 1 loaded)
+		if len(resolutions) != 3 {
+			t.Fatalf("expected 3 resolutions, got %d", len(resolutions))
+		}
+	})
+
+	t.Run("all optional missing returns error", func(t *testing.T) {
+		config := `
+			roles: {
+				"optional-1": {
+					file: "/nonexistent/1.md"
+					optional: true
+				}
+				"optional-2": {
+					file: "/nonexistent/2.md"
+					optional: true
+				}
+			}
+		`
+		cfg := ctx.CompileString(config)
+		if err := cfg.Err(); err != nil {
+			t.Fatalf("compile config: %v", err)
+		}
+
+		processor := NewTemplateProcessor(nil, nil, "")
+		composer := NewComposer(processor, "")
+
+		_, _, err := composer.selectDefaultRole(cfg)
+		if err == nil {
+			t.Error("expected error when all optional roles fail")
+		}
+		if !strings.Contains(err.Error(), "no valid roles found") {
+			t.Errorf("error = %q, want containing 'no valid roles found'", err.Error())
+		}
+	})
+
+	t.Run("settings default_role bypasses optional fallback", func(t *testing.T) {
+		config := `
+			settings: {
+				default_role: "explicit"
+			}
+			roles: {
+				"optional": {
+					file: "/nonexistent/optional.md"
+					optional: true
+				}
+				"explicit": {
+					prompt: "Explicit default"
+				}
+			}
+		`
+		cfg := ctx.CompileString(config)
+		if err := cfg.Err(); err != nil {
+			t.Fatalf("compile config: %v", err)
+		}
+
+		processor := NewTemplateProcessor(nil, nil, "")
+		composer := NewComposer(processor, "")
+
+		roleName, resolutions, err := composer.selectDefaultRole(cfg)
+		if err != nil {
+			t.Fatalf("selectDefaultRole() error = %v", err)
+		}
+
+		// When default_role is set, it's returned directly without fallback logic
+		if roleName != "explicit" {
+			t.Errorf("roleName = %q, want 'explicit'", roleName)
+		}
+
+		// No resolutions because default_role bypasses the chain
+		if len(resolutions) != 0 {
+			t.Errorf("expected 0 resolutions for default_role, got %d", len(resolutions))
+		}
+	})
+
+	t.Run("mixed optional and required chain", func(t *testing.T) {
+		config := `
+			roles: {
+				"optional-missing": {
+					file: "/nonexistent/optional.md"
+					optional: true
+				}
+				"required-valid": {
+					prompt: "Required role"
+				}
+			}
+		`
+		cfg := ctx.CompileString(config)
+		if err := cfg.Err(); err != nil {
+			t.Fatalf("compile config: %v", err)
+		}
+
+		processor := NewTemplateProcessor(nil, nil, "")
+		composer := NewComposer(processor, "")
+
+		roleName, resolutions, err := composer.selectDefaultRole(cfg)
+		if err != nil {
+			t.Fatalf("selectDefaultRole() error = %v", err)
+		}
+
+		if roleName != "required-valid" {
+			t.Errorf("roleName = %q, want 'required-valid'", roleName)
+		}
+
+		if len(resolutions) != 2 {
+			t.Fatalf("expected 2 resolutions, got %d", len(resolutions))
+		}
+		if resolutions[0].Status != "skipped" {
+			t.Errorf("first status = %q, want 'skipped'", resolutions[0].Status)
+		}
+		if resolutions[1].Status != "loaded" {
+			t.Errorf("second status = %q, want 'loaded'", resolutions[1].Status)
+		}
+	})
+}
+
+func TestComposeWithRole_OptionalBehavior(t *testing.T) {
+	t.Parallel()
+	ctx := cuecontext.New()
+	tmpDir := t.TempDir()
+
+	// Create a real role file
+	roleFile := filepath.Join(tmpDir, "role.md")
+	if err := os.WriteFile(roleFile, []byte("Real role content"), 0644); err != nil {
+		t.Fatalf("writing role file: %v", err)
+	}
+
+	t.Run("explicit role always errors on failure", func(t *testing.T) {
+		config := `
+			roles: {
+				"optional-missing": {
+					file: "/nonexistent/role.md"
+					optional: true
+				}
+			}
+		`
+		cfg := ctx.CompileString(config)
+		if err := cfg.Err(); err != nil {
+			t.Fatalf("compile config: %v", err)
+		}
+
+		processor := NewTemplateProcessor(nil, nil, tmpDir)
+		composer := NewComposer(processor, tmpDir)
+
+		// Explicit role selection should error even if optional: true
+		_, err := composer.ComposeWithRole(cfg, ContextSelection{}, "optional-missing", "", "")
+		if err == nil {
+			t.Error("expected error for explicit role with missing file, even if optional")
+		}
+	})
+
+	t.Run("file path role resolution tracked", func(t *testing.T) {
+		config := `{}`
+		cfg := ctx.CompileString(config)
+		if err := cfg.Err(); err != nil {
+			t.Fatalf("compile config: %v", err)
+		}
+
+		processor := NewTemplateProcessor(nil, nil, tmpDir)
+		composer := NewComposer(processor, tmpDir)
+
+		result, err := composer.ComposeWithRole(cfg, ContextSelection{}, roleFile, "", "")
+		if err != nil {
+			t.Fatalf("ComposeWithRole() error = %v", err)
+		}
+
+		if len(result.RoleResolutions) == 0 {
+			t.Error("expected role resolutions for file path role")
+		}
+		if result.Role != "Real role content" {
+			t.Errorf("Role = %q, want 'Real role content'", result.Role)
+		}
+	})
 }
 
 func TestComposer_ResolveContext_Errors(t *testing.T) {

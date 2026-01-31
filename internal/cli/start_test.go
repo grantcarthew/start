@@ -225,6 +225,9 @@ func TestPrintDryRunSummary(t *testing.T) {
 			{Name: "ctx1", File: "file1.md", Default: true},
 			{Name: "ctx2", File: "file2.md"},
 		},
+		RoleResolutions: []orchestration.RoleResolution{
+			{Name: "test-role", Status: "loaded", File: "test-role.md"},
+		},
 	}
 
 	printDryRunSummary(buf, agent, "", "", result, "/tmp/test-dir")

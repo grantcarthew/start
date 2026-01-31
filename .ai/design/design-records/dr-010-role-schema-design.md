@@ -166,6 +166,10 @@ Role selection precedence:
 3. Default role from settings
 4. First role in configuration
 
+## Updates
+
+- 2026-01-31: Added `optional` field for discovery-based roles (see dr-039)
+
 ## Agent Integration
 
 Roles are provided to agents through placeholders:
