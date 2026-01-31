@@ -168,6 +168,7 @@ func (e *Executor) BuildCommand(cfg ExecuteConfig) (string, error) {
 
 // validateCommandExecutable checks that the first token of the built command
 // is a valid executable (either in PATH or a direct path).
+// Skips leading environment variable assignments (VAR=value patterns).
 func validateCommandExecutable(cmdStr, template string) error {
 	fields := strings.Fields(cmdStr)
 	if len(fields) == 0 {
@@ -178,8 +179,23 @@ func validateCommandExecutable(cmdStr, template string) error {
 Check your agent's 'command' field`, template)
 	}
 
-	// Extract first token and strip surrounding quotes
-	firstToken := fields[0]
+	// Skip leading environment variable assignments (VAR=value patterns).
+	// These are valid shell syntax: VAR1=x VAR2=y command args...
+	cmdIndex := 0
+	for cmdIndex < len(fields) && isEnvVarAssignment(fields[cmdIndex]) {
+		cmdIndex++
+	}
+
+	if cmdIndex >= len(fields) {
+		return fmt.Errorf(`command template produced only environment variables, no command
+
+  Template: %s
+
+Check your agent's 'command' field - it must include an executable`, template)
+	}
+
+	// Extract command token and strip surrounding quotes
+	firstToken := fields[cmdIndex]
 	firstToken = strings.Trim(firstToken, "'\"")
 
 	// Check if it's a valid executable
@@ -195,6 +211,46 @@ Example: {{.bin}} --print {{.prompt}}`, template, firstToken, err)
 	}
 
 	return nil
+}
+
+// isEnvVarAssignment checks if a token looks like an environment variable assignment.
+// Valid patterns: VAR=value, VAR='value', VAR="value", VAR=
+// The variable name must be a valid shell identifier.
+func isEnvVarAssignment(token string) bool {
+	// Strip surrounding quotes (the token might be quoted)
+	stripped := strings.Trim(token, "'\"")
+
+	// Look for = sign
+	eqIdx := strings.Index(stripped, "=")
+	if eqIdx <= 0 {
+		return false
+	}
+
+	// Get the variable name (part before =)
+	varName := stripped[:eqIdx]
+
+	// Validate it's a proper env var name
+	return isValidEnvVarName(varName)
+}
+
+// isValidEnvVarName checks if a string is a valid shell environment variable name.
+// Must start with letter or underscore, contain only alphanumeric and underscore.
+func isValidEnvVarName(name string) bool {
+	if name == "" {
+		return false
+	}
+	for i, c := range name {
+		if i == 0 {
+			if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_') {
+				return false
+			}
+		} else {
+			if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_') {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 // Execute builds and runs the agent command, replacing the current process.
