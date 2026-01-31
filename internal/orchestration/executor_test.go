@@ -529,3 +529,150 @@ func TestExecutor_ExecuteWithoutReplace(t *testing.T) {
 		}
 	})
 }
+
+func TestIsValidEnvVarName(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name  string
+		input string
+		want  bool
+	}{
+		{"simple uppercase", "FOO", true},
+		{"simple lowercase", "foo", true},
+		{"mixed case", "FooBar", true},
+		{"with underscore", "FOO_BAR", true},
+		{"starts with underscore", "_FOO", true},
+		{"with numbers", "FOO123", true},
+		{"underscore and numbers", "_FOO_123", true},
+		{"empty string", "", false},
+		{"starts with number", "123FOO", false},
+		{"contains hyphen", "FOO-BAR", false},
+		{"contains dot", "FOO.BAR", false},
+		{"contains space", "FOO BAR", false},
+		{"contains equals", "FOO=BAR", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := isValidEnvVarName(tt.input)
+			if got != tt.want {
+				t.Errorf("isValidEnvVarName(%q) = %v, want %v", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestIsEnvVarAssignment(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name  string
+		token string
+		want  bool
+	}{
+		{"simple assignment", "FOO=bar", true},
+		{"empty value", "FOO=", true},
+		{"quoted value single", "FOO='bar'", true},
+		{"quoted value double", `FOO="bar"`, true},
+		{"quoted path", "GEMINI_SYSTEM_MD='/path/to/file.md'", true},
+		{"underscore var", "_FOO=bar", true},
+		{"mixed case var", "FooBar=value", true},
+		{"no equals", "FOO", false},
+		{"starts with equals", "=FOO", false},
+		{"starts with number", "123=bar", false},
+		{"hyphen in name", "FOO-BAR=value", false},
+		{"executable path", "/usr/bin/foo", false},
+		{"quoted executable", "'/usr/bin/foo'", false},
+		{"flag", "--model", false},
+		{"flag with value", "--model=sonnet", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := isEnvVarAssignment(tt.token)
+			if got != tt.want {
+				t.Errorf("isEnvVarAssignment(%q) = %v, want %v", tt.token, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestBuildCommand_WithEnvVarPrefix(t *testing.T) {
+	t.Parallel()
+	executor := NewExecutor("")
+
+	tests := []struct {
+		name        string
+		config      ExecuteConfig
+		wantContain string
+		wantErr     bool
+	}{
+		{
+			name: "command with env var prefix",
+			config: ExecuteConfig{
+				Agent: Agent{
+					Bin:     "gemini",
+					Command: "GEMINI_SYSTEM_MD={{.role_file}} {{.bin}} --model {{.model}}",
+					Models:  map[string]string{"pro": "gemini-2.5-pro"},
+				},
+				RoleFile: "/tmp/role.md",
+				Model:    "pro",
+			},
+			wantContain: "'gemini'",
+		},
+		{
+			name: "command with empty env var value",
+			config: ExecuteConfig{
+				Agent: Agent{
+					Bin:     "gemini",
+					Command: "GEMINI_SYSTEM_MD={{.role_file}} {{.bin}} --model {{.model}}",
+					Models:  map[string]string{"pro": "gemini-2.5-pro"},
+				},
+				RoleFile: "", // empty role file
+				Model:    "pro",
+			},
+			wantContain: "'gemini'",
+		},
+		{
+			name: "command with multiple env vars",
+			config: ExecuteConfig{
+				Agent: Agent{
+					Bin:     "echo",
+					Command: "FOO=bar BAZ=qux {{.bin}} hello",
+				},
+			},
+			wantContain: "'echo'",
+		},
+		{
+			name: "only env vars no command",
+			config: ExecuteConfig{
+				Agent: Agent{
+					Bin:     "gemini",
+					Command: "FOO=bar BAZ=qux",
+				},
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd, err := executor.BuildCommand(tt.config)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Error("expected error")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+				return
+			}
+
+			if !strings.Contains(cmd, tt.wantContain) {
+				t.Errorf("command = %q, want containing %q", cmd, tt.wantContain)
+			}
+		})
+	}
+}
