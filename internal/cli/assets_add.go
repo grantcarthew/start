@@ -548,10 +548,10 @@ func findAssetKey(content, assetKey string) (keyStart, keyLen int, err error) {
 func findMatchingBrace(content string, openBracePos int) (int, error) {
 	type state int
 	const (
-		stateNormal state = iota
-		stateInString       // Inside "..." string
-		stateInMultiString  // Inside """...""" string
-		stateInComment      // After // until newline
+		stateNormal        state = iota
+		stateInString            // Inside "..." string
+		stateInMultiString       // Inside """...""" string
+		stateInComment           // After // until newline
 	)
 
 	currentState := stateNormal
