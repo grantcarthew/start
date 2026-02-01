@@ -4,7 +4,10 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"sort"
+	"strings"
 
 	"cuelang.org/go/cue"
 	"github.com/grantcarthew/start/internal/config"
@@ -21,6 +24,8 @@ type InstalledAsset struct {
 	LatestVer    string // Latest available version
 	UpdateAvail  bool   // True if update is available
 	Scope        string // "global" or "local"
+	Origin       string // Registry module path (for updates)
+	ConfigFile   string // Path to config file containing this asset
 }
 
 // addAssetsListCommand adds the list subcommand to the assets command.
@@ -124,10 +129,35 @@ func collectInstalledAssets(v cue.Value, paths config.Paths) []InstalledAsset {
 
 		for iter.Next() {
 			name := iter.Selector().Unquoted()
+			assetVal := iter.Value()
+
+			// Extract origin field (registry provenance)
+			var origin string
+			if originVal := assetVal.LookupPath(cue.ParsePath("origin")); originVal.Exists() {
+				origin, _ = originVal.String()
+			}
+
+			// Only include assets with origin (from registry)
+			if origin == "" {
+				continue
+			}
+
+			// Parse version from origin (e.g., "github.com/.../task@v0.1.1" -> "v0.1.1")
+			// Assumes origin format is "module/path@version" from registry.
+			// If '@' is missing, installedVer remains empty (legacy or malformed origin).
+			var installedVer string
+			if idx := strings.Index(origin, "@"); idx != -1 {
+				installedVer = origin[idx+1:]
+			}
+
+			scope, configFile := determineScopeAndFile(paths, cat, name)
 			asset := InstalledAsset{
-				Category: cat,
-				Name:     name,
-				Scope:    determineScope(paths, cat, name),
+				Category:     cat,
+				Name:         name,
+				InstalledVer: installedVer,
+				Scope:        scope,
+				Origin:       origin,
+				ConfigFile:   configFile,
 			}
 			installed = append(installed, asset)
 		}
@@ -144,13 +174,46 @@ func collectInstalledAssets(v cue.Value, paths config.Paths) []InstalledAsset {
 	return installed
 }
 
-// determineScope determines whether an asset is from global or local config.
-func determineScope(paths config.Paths, category, name string) string {
-	// For now, default to "global" - could be enhanced to track source
+// determineScopeAndFile determines whether an asset is from global or local config
+// and returns the path to the config file.
+func determineScopeAndFile(paths config.Paths, category, name string) (scope, configFile string) {
+	configFileName := assetTypeToConfigFile(category)
+	assetKey := getAssetKey(name)
+
+	// Check local first (takes precedence)
 	if paths.LocalExists {
-		return "local"
+		localFile := filepath.Join(paths.Local, configFileName)
+		if fileContainsAsset(localFile, assetKey) {
+			return "local", localFile
+		}
 	}
-	return "global"
+
+	// Check global
+	globalFile := filepath.Join(paths.Global, configFileName)
+	if fileContainsAsset(globalFile, assetKey) {
+		return "global", globalFile
+	}
+
+	// Default to global if not found
+	// NOTE: This shouldn't happen for valid assets from collectInstalledAssets,
+	// since they came from CUE evaluation of these same files. But we return
+	// a sensible default rather than erroring, as the caller may use this for
+	// informational purposes (e.g., display to user).
+	return "global", globalFile
+}
+
+// fileContainsAsset checks if a config file contains an asset key.
+// Uses context-aware search (via findAssetKey) to avoid false positives from
+// comments and strings. Returns false if file doesn't exist or can't be read.
+func fileContainsAsset(filePath, assetKey string) bool {
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return false
+	}
+	content := string(data)
+	// Use context-aware search (ignores keys in comments/strings)
+	_, _, err = findAssetKey(content, assetKey)
+	return err == nil
 }
 
 // checkForUpdates checks registry for available updates.

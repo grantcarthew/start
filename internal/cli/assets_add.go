@@ -123,12 +123,8 @@ func runAssetsAdd(cmd *cobra.Command, args []string) error {
 	}
 
 	// Extract asset content from fetched module
-	// Strip version from module path for origin field (e.g., "start.cue.works/tasks/code-review@v0.0.1" -> "start.cue.works/tasks/code-review")
-	originPath := modulePath
-	if idx := strings.Index(originPath, "@"); idx != -1 {
-		originPath = originPath[:idx]
-	}
-	assetContent, err := extractAssetContent(fetchResult.SourceDir, selected, client.Registry(), originPath)
+	// Use resolved path with version for origin field (e.g., "github.com/.../task@v0.1.1")
+	assetContent, err := extractAssetContent(fetchResult.SourceDir, selected, client.Registry(), resolvedPath)
 	if err != nil {
 		return fmt.Errorf("extracting asset content: %w", err)
 	}
@@ -275,7 +271,7 @@ func formatAssetStruct(v cue.Value, category, originPath string) (string, error)
 	sb.WriteString("{\n")
 
 	// Write origin field first (tracks registry provenance)
-	sb.WriteString(fmt.Sprintf("\t\torigin: %q\n", originPath))
+	sb.WriteString(fmt.Sprintf("\torigin: %q\n", originPath))
 
 	// Define which fields to extract based on category
 	var fields []string
@@ -458,6 +454,296 @@ func writeAssetToConfig(configPath string, asset SearchResult, content, modulePa
 	} else {
 		sb.WriteString("\n}\n")
 	}
+
+	return os.WriteFile(configPath, []byte(sb.String()), 0644)
+}
+
+// findAssetKey finds the position of an asset key in CUE content, ignoring occurrences
+// in comments and strings. Returns the start position and length of the matched key pattern.
+//
+// Supported CUE syntax:
+//   - Single-line strings: "..."
+//   - Multi-line strings: """..."""
+//   - Line comments: // (CUE does not support block comments /* */)
+//   - Escape sequences: \" inside strings
+//
+// Searches for both quoted ("key":) and unquoted (key:) patterns.
+// Returns the first match found in normal state (not inside strings/comments).
+func findAssetKey(content, assetKey string) (keyStart, keyLen int, err error) {
+	type state int
+	const (
+		stateNormal state = iota
+		stateInString
+		stateInMultiString
+		stateInComment
+	)
+
+	quotedKey := fmt.Sprintf("%q:", assetKey)
+	unquotedKey := assetKey + ":"
+	currentState := stateNormal
+	pos := 0
+
+	for pos < len(content) {
+		ch := content[pos]
+
+		switch currentState {
+		case stateNormal:
+			// Check for matches only in normal state
+			if pos+len(quotedKey) <= len(content) && content[pos:pos+len(quotedKey)] == quotedKey {
+				return pos, len(quotedKey), nil
+			}
+			if pos+len(unquotedKey) <= len(content) && content[pos:pos+len(unquotedKey)] == unquotedKey {
+				return pos, len(unquotedKey), nil
+			}
+
+			// Check for string start
+			if ch == '"' {
+				if pos+2 < len(content) && content[pos:pos+3] == `"""` {
+					currentState = stateInMultiString
+					pos += 2
+				} else {
+					currentState = stateInString
+				}
+			} else if ch == '/' && pos+1 < len(content) && content[pos+1] == '/' {
+				currentState = stateInComment
+				pos++
+			}
+
+		case stateInString:
+			if ch == '\\' && pos+1 < len(content) {
+				pos++
+			} else if ch == '"' {
+				currentState = stateNormal
+			}
+
+		case stateInMultiString:
+			if ch == '"' && pos+2 < len(content) && content[pos:pos+3] == `"""` {
+				currentState = stateNormal
+				pos += 2
+			}
+
+		case stateInComment:
+			if ch == '\n' {
+				currentState = stateNormal
+			}
+		}
+
+		pos++
+	}
+
+	return 0, 0, fmt.Errorf("asset %q not found in config", assetKey)
+}
+
+// findMatchingBrace finds the position after the matching closing brace for an opening brace.
+// It respects CUE syntax: strings (both " and """), comments (//), and only counts braces
+// that are part of the actual structure, not those inside strings or comments.
+//
+// Supported CUE syntax (same as findAssetKey):
+//   - Single-line strings: "..."
+//   - Multi-line strings: """..."""
+//   - Line comments: // (CUE does not support block comments /* */)
+//   - Escape sequences: \" inside strings
+//
+// Returns the position immediately after the matching closing brace.
+func findMatchingBrace(content string, openBracePos int) (int, error) {
+	type state int
+	const (
+		stateNormal state = iota
+		stateInString       // Inside "..." string
+		stateInMultiString  // Inside """...""" string
+		stateInComment      // After // until newline
+	)
+
+	currentState := stateNormal
+	braceCount := 1
+	pos := openBracePos + 1
+
+	for pos < len(content) && braceCount > 0 {
+		ch := content[pos]
+
+		switch currentState {
+		case stateNormal:
+			// Check for string start
+			if ch == '"' {
+				// Check if it's a triple-quote
+				if pos+2 < len(content) && content[pos:pos+3] == `"""` {
+					currentState = stateInMultiString
+					pos += 2 // Skip next 2 quotes (we'll increment at end of loop)
+				} else {
+					currentState = stateInString
+				}
+			} else if ch == '/' && pos+1 < len(content) && content[pos+1] == '/' {
+				// Start of comment
+				currentState = stateInComment
+				pos++ // Skip second /
+			} else if ch == '{' {
+				braceCount++
+			} else if ch == '}' {
+				braceCount--
+			}
+
+		case stateInString:
+			// Check for escape sequences
+			if ch == '\\' && pos+1 < len(content) {
+				pos++ // Skip next character
+			} else if ch == '"' {
+				currentState = stateNormal
+			}
+
+		case stateInMultiString:
+			// Check for end of multi-line string
+			if ch == '"' && pos+2 < len(content) && content[pos:pos+3] == `"""` {
+				currentState = stateNormal
+				pos += 2 // Skip next 2 quotes
+			}
+
+		case stateInComment:
+			// Comment ends at newline
+			if ch == '\n' {
+				currentState = stateNormal
+			}
+		}
+
+		pos++
+	}
+
+	if braceCount != 0 {
+		return 0, fmt.Errorf("unmatched braces (count: %d)", braceCount)
+	}
+
+	return pos, nil
+}
+
+// findOpeningBrace finds the position of the first opening brace '{' after startPos,
+// while respecting CUE syntax (ignoring braces inside comments and strings).
+//
+// Supported CUE syntax (same as findAssetKey and findMatchingBrace):
+//   - Single-line strings: "..."
+//   - Multi-line strings: """..."""
+//   - Line comments: // (CUE does not support block comments /* */)
+//   - Escape sequences: \" inside strings
+//
+// Returns the position of the opening brace, or error if not found.
+func findOpeningBrace(content string, startPos int) (int, error) {
+	type state int
+	const (
+		stateNormal state = iota
+		stateInString
+		stateInMultiString
+		stateInComment
+	)
+
+	currentState := stateNormal
+	pos := startPos
+
+	for pos < len(content) {
+		ch := content[pos]
+
+		switch currentState {
+		case stateNormal:
+			// Found opening brace in normal state - this is what we're looking for
+			if ch == '{' {
+				return pos, nil
+			}
+
+			// Check for string start
+			if ch == '"' {
+				if pos+2 < len(content) && content[pos:pos+3] == `"""` {
+					currentState = stateInMultiString
+					pos += 2 // Skip next 2 quotes (we'll increment at end of loop)
+				} else {
+					currentState = stateInString
+				}
+			} else if ch == '/' && pos+1 < len(content) && content[pos+1] == '/' {
+				currentState = stateInComment
+				pos++ // Skip second /
+			}
+
+		case stateInString:
+			if ch == '\\' && pos+1 < len(content) {
+				pos++ // Skip next character (escape sequence)
+			} else if ch == '"' {
+				currentState = stateNormal
+			}
+
+		case stateInMultiString:
+			if ch == '"' && pos+2 < len(content) && content[pos:pos+3] == `"""` {
+				currentState = stateNormal
+				pos += 2 // Skip next 2 quotes
+			}
+
+		case stateInComment:
+			if ch == '\n' {
+				currentState = stateNormal
+			}
+		}
+
+		pos++
+	}
+
+	return 0, fmt.Errorf("opening brace not found")
+}
+
+// updateAssetInConfig replaces an existing asset entry in the config file.
+func updateAssetInConfig(configPath, category, name, newContent string) error {
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return fmt.Errorf("reading config file: %w", err)
+	}
+
+	content := string(data)
+	assetKey := getAssetKey(name)
+
+	// Find the asset entry using context-aware search (ignores keys in comments/strings)
+	keyStart, keyLen, err := findAssetKey(content, assetKey)
+	if err != nil {
+		return err
+	}
+
+	// Find the opening brace after the key using context-aware search
+	// This properly handles comments and strings between the key and brace
+	// (e.g., "key": // comment { with brace } \n {)
+	braceStart, err := findOpeningBrace(content, keyStart+keyLen)
+	if err != nil {
+		return fmt.Errorf("invalid config format: no opening brace for %q", assetKey)
+	}
+
+	// Find the matching closing brace using context-aware parsing
+	braceEnd, err := findMatchingBrace(content, braceStart)
+	if err != nil {
+		return fmt.Errorf("finding closing brace for %q: %w", assetKey, err)
+	}
+
+	// Build the new content - preserve key and replace value
+	var sb strings.Builder
+	sb.WriteString(content[:keyStart])
+	// NOTE: Always uses quoted key format ("key":) even if original was unquoted (key:).
+	// CUE accepts both formats, but this normalizes to quoted for consistency.
+	sb.WriteString(fmt.Sprintf("%q: ", assetKey))
+
+	// Indent the new content
+	// LIMITATION: This assumes a flat config structure where assets are direct children
+	// of the category (e.g., tasks: { "name": { ... } }). It adds exactly one tab to
+	// each line (except the first). If configs ever use nested structures, this would
+	// need to detect the current indentation level from content[:keyStart].
+	//
+	// Current structure: category: { asset: { fields } }
+	// - Line 0: '{' (no indent added, inherits position after key)
+	// - Line 1+: Add one tab to match category level
+	lines := strings.Split(newContent, "\n")
+	for i, line := range lines {
+		if i == 0 {
+			sb.WriteString(line)
+		} else {
+			if line != "" {
+				sb.WriteString("\n\t" + line)
+			} else {
+				sb.WriteString("\n")
+			}
+		}
+	}
+
+	sb.WriteString(content[braceEnd:])
 
 	return os.WriteFile(configPath, []byte(sb.String()), 0644)
 }
