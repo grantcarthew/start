@@ -170,9 +170,38 @@ func checkAndUpdate(ctx context.Context, client *registry.Client, index *registr
 		return result
 	}
 
-	_, err = client.Fetch(ctx, resolvedPath)
+	fetchResult, err := client.Fetch(ctx, resolvedPath)
 	if err != nil {
 		result.Error = err
+		return result
+	}
+
+	// Extract the new content from fetched module
+	searchResult := SearchResult{
+		Category: asset.Category,
+		Name:     asset.Name,
+		Entry:    *entry,
+	}
+
+	// Use resolved path with version for origin field (e.g., "github.com/.../task@v0.1.1")
+	// This preserves full provenance information for future updates.
+	assetContent, err := extractAssetContent(fetchResult.SourceDir, searchResult, client.Registry(), resolvedPath)
+	if err != nil {
+		result.Error = fmt.Errorf("extracting asset content: %w", err)
+		return result
+	}
+
+	// Update the config file with new content
+	// ConfigFile should always be set by collectInstalledAssets, but check defensively.
+	if asset.ConfigFile == "" {
+		result.Error = fmt.Errorf("no config file path for asset")
+		return result
+	}
+
+	// Replace the asset definition in-place, preserving file structure and other assets.
+	// Note: This validates that the asset exists before attempting update.
+	if err := updateAssetInConfig(asset.ConfigFile, asset.Category, asset.Name, assetContent); err != nil {
+		result.Error = fmt.Errorf("updating config: %w", err)
 		return result
 	}
 

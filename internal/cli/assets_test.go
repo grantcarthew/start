@@ -459,6 +459,529 @@ func TestAssetsCommandExists(t *testing.T) {
 	}
 }
 
+// TestUpdateAssetInConfig tests the updateAssetInConfig function.
+func TestUpdateAssetInConfig(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		initial     string
+		category    string
+		assetName   string
+		newContent  string
+		wantContain []string
+		wantErr     bool
+	}{
+		{
+			name: "update simple asset",
+			initial: `tasks: {
+	"my/task": {
+		origin: "old/origin"
+		description: "old description"
+		prompt: "old prompt"
+	}
+}
+`,
+			category:  "tasks",
+			assetName: "my/task",
+			newContent: `{
+	origin: "new/origin"
+	description: "new description"
+	prompt: "new prompt"
+}`,
+			wantContain: []string{
+				`"my/task": {`,
+				`origin: "new/origin"`,
+				`description: "new description"`,
+				`prompt: "new prompt"`,
+			},
+		},
+		{
+			name: "update asset with template braces",
+			initial: `tasks: {
+	"project/start": {
+		origin: "old/origin"
+		prompt: """
+			{{.instructions}}
+			"""
+	}
+}
+`,
+			category:  "tasks",
+			assetName: "project/start",
+			newContent: `{
+	origin: "new/origin"
+	prompt: """
+		{{if .instructions}}
+		## Custom Instructions
+		{{.instructions}}
+		{{end}}
+		"""
+}`,
+			wantContain: []string{
+				`"project/start": {`,
+				`origin: "new/origin"`,
+				`{{if .instructions}}`,
+				`{{end}}`,
+			},
+		},
+		{
+			name: "update preserves other assets",
+			initial: `tasks: {
+	"first/task": {
+		origin: "first/origin"
+		prompt: "first"
+	}
+	"second/task": {
+		origin: "second/origin"
+		prompt: "second"
+	}
+}
+`,
+			category:  "tasks",
+			assetName: "first/task",
+			newContent: `{
+	origin: "updated/origin"
+	prompt: "updated"
+}`,
+			wantContain: []string{
+				`"first/task": {`,
+				`origin: "updated/origin"`,
+				`"second/task": {`,
+				`origin: "second/origin"`,
+			},
+		},
+		{
+			name: "braces in string literals",
+			initial: `tasks: {
+	"my/task": {
+		origin: "old/origin"
+		description: "Use } to close blocks and { to open them"
+		prompt: "Code example: if (x) { return } else { continue }"
+	}
+}
+`,
+			category:  "tasks",
+			assetName: "my/task",
+			newContent: `{
+	origin: "new/origin"
+	description: "Updated: { and } are important"
+	prompt: "new prompt"
+}`,
+			wantContain: []string{
+				`"my/task": {`,
+				`origin: "new/origin"`,
+				`description: "Updated: { and } are important"`,
+				`prompt: "new prompt"`,
+			},
+		},
+		{
+			name: "comments with braces",
+			initial: `tasks: {
+	"my/task": {
+		origin: "old/origin"
+		// Note: use { and } carefully
+		description: "old description"
+		// TODO: update prompt { needs work }
+	}
+}
+`,
+			category:  "tasks",
+			assetName: "my/task",
+			newContent: `{
+	origin: "new/origin"
+	description: "new description"
+}`,
+			wantContain: []string{
+				`"my/task": {`,
+				`origin: "new/origin"`,
+				`description: "new description"`,
+			},
+		},
+		{
+			name: "key in comment before actual definition",
+			initial: `tasks: {
+	// TODO: Configure "my/task": needs setup
+	// Also check "my/task": for updates
+	"my/task": {
+		origin: "old/origin"
+		description: "old description"
+	}
+}
+`,
+			category:  "tasks",
+			assetName: "my/task",
+			newContent: `{
+	origin: "new/origin"
+	description: "updated"
+}`,
+			wantContain: []string{
+				`// TODO: Configure "my/task": needs setup`,
+				`"my/task": {`,
+				`origin: "new/origin"`,
+				`description: "updated"`,
+			},
+		},
+		{
+			name: "comment with braces between key and opening brace",
+			initial: `tasks: {
+	"my/task": // TODO: fix this { urgent }
+	{
+		origin: "old/origin"
+		description: "old description"
+	}
+}
+`,
+			category:  "tasks",
+			assetName: "my/task",
+			newContent: `{
+	origin: "new/origin"
+	description: "updated"
+}`,
+			wantContain: []string{
+				`"my/task": {`,
+				`origin: "new/origin"`,
+				`description: "updated"`,
+			},
+		},
+		{
+			name: "key in string before actual definition",
+			initial: `tasks: {
+	"other/task": {
+		origin: "other"
+		description: "This relates to my/task: the foundation"
+		prompt: "See my/task: for details"
+	}
+	"my/task": {
+		origin: "old/origin"
+		description: "old description"
+	}
+}
+`,
+			category:  "tasks",
+			assetName: "my/task",
+			newContent: `{
+	origin: "new/origin"
+	description: "updated"
+}`,
+			wantContain: []string{
+				`"other/task": {`,
+				`description: "This relates to my/task: the foundation"`,
+				`"my/task": {`,
+				`origin: "new/origin"`,
+			},
+		},
+		{
+			name: "asset not found",
+			initial: `tasks: {
+	"existing/task": {
+		origin: "origin"
+	}
+}
+`,
+			category:   "tasks",
+			assetName:  "nonexistent/task",
+			newContent: `{}`,
+			wantErr:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			configPath := filepath.Join(dir, "tasks.cue")
+
+			if err := os.WriteFile(configPath, []byte(tt.initial), 0644); err != nil {
+				t.Fatalf("failed to write initial config: %v", err)
+			}
+
+			err := updateAssetInConfig(configPath, tt.category, tt.assetName, tt.newContent)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Error("expected error, got nil")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			result, err := os.ReadFile(configPath)
+			if err != nil {
+				t.Fatalf("failed to read result: %v", err)
+			}
+
+			for _, want := range tt.wantContain {
+				if !strings.Contains(string(result), want) {
+					t.Errorf("result missing %q\ngot:\n%s", want, result)
+				}
+			}
+		})
+	}
+}
+
+// TestFileContainsAsset tests the fileContainsAsset function.
+func TestFileContainsAsset(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		content  string
+		assetKey string
+		want     bool
+	}{
+		{
+			name:     "quoted key found",
+			content:  `"my/asset": { origin: "test" }`,
+			assetKey: "my/asset",
+			want:     true,
+		},
+		{
+			name:     "unquoted key found",
+			content:  `simple: { origin: "test" }`,
+			assetKey: "simple",
+			want:     true,
+		},
+		{
+			name:     "key not found",
+			content:  `"other/asset": { origin: "test" }`,
+			assetKey: "my/asset",
+			want:     false,
+		},
+		{
+			name:     "partial match is not found",
+			content:  `"my/asset/extra": { origin: "test" }`,
+			assetKey: "my/asset",
+			want:     false,
+		},
+		{
+			name: "key in comment only - not found",
+			content: `tasks: {
+	// TODO: Add "my/asset": later
+	// Configure "my/asset": for production
+	"other/asset": { origin: "test" }
+}`,
+			assetKey: "my/asset",
+			want:     false,
+		},
+		{
+			name: "key in string value - not found",
+			content: `tasks: {
+	"other/asset": {
+		origin: "test"
+		description: "Related to my/asset: the base task"
+		prompt: "See my/asset: for details"
+	}
+}`,
+			assetKey: "my/asset",
+			want:     false,
+		},
+		{
+			name: "key in comment and actual definition - found",
+			content: `tasks: {
+	// TODO: Update "my/asset": needs work
+	"my/asset": { origin: "test" }
+}`,
+			assetKey: "my/asset",
+			want:     true,
+		},
+		{
+			name: "key in multi-line string - not found",
+			content: `tasks: {
+	"other/asset": {
+		origin: "test"
+		prompt: """
+			Related to my/asset: see documentation
+			Check my/asset: for updates
+			"""
+	}
+}`,
+			assetKey: "my/asset",
+			want:     false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			filePath := filepath.Join(dir, "test.cue")
+
+			if err := os.WriteFile(filePath, []byte(tt.content), 0644); err != nil {
+				t.Fatalf("failed to write test file: %v", err)
+			}
+
+			got := fileContainsAsset(filePath, tt.assetKey)
+			if got != tt.want {
+				t.Errorf("fileContainsAsset() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+
+	t.Run("file does not exist", func(t *testing.T) {
+		got := fileContainsAsset("/nonexistent/path/file.cue", "any")
+		if got != false {
+			t.Error("expected false for nonexistent file")
+		}
+	})
+}
+
+// TestFindOpeningBrace tests the findOpeningBrace function.
+func TestFindOpeningBrace(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		content  string
+		startPos int
+		wantPos  int
+		wantErr  bool
+	}{
+		{
+			name:     "simple case - immediate brace",
+			content:  `"key": {`,
+			startPos: 7, // After ": "
+			wantPos:  7,
+			wantErr:  false,
+		},
+		{
+			name:     "whitespace before brace",
+			content:  `"key":   {`,
+			startPos: 6, // After ":"
+			wantPos:  9,
+			wantErr:  false,
+		},
+		{
+			name:     "newline before brace",
+			content:  `"key":
+{`,
+			startPos: 6, // After ":"
+			wantPos:  7,
+			wantErr:  false,
+		},
+		{
+			name: "comment with brace before actual brace",
+			content: `"key": // TODO: fix this { urgent }
+{`,
+			startPos: 7,  // After ": "
+			wantPos:  36, // After newline, at the real {
+			wantErr:  false,
+		},
+		{
+			name: "multiple comments with braces",
+			content: `"key": // First comment { brace }
+    // Second comment { another }
+    {`,
+			startPos: 7,
+			wantPos:  72, // At the real {
+			wantErr:  false,
+		},
+		{
+			name:     "brace in single-line string",
+			content:  `"key": "description with { brace }" {`,
+			startPos: 7,
+			wantPos:  36,
+			wantErr:  false,
+		},
+		{
+			name: "brace in multi-line string",
+			content: `"key": """
+			Template: {{.field}}
+			More: { and }
+			""" {`,
+			startPos: 7,
+			wantPos:  59, // After """
+			wantErr:  false,
+		},
+		{
+			name: "complex case - comment and string with braces",
+			content: `"key": // comment { brace }
+    "description": "has { brace }"
+    {`,
+			startPos: 7,
+			wantPos:  67,
+			wantErr:  false,
+		},
+		{
+			name:     "escaped quote in string",
+			content:  `"key": "value with \" and { brace }" {`,
+			startPos: 7,
+			wantPos:  37,
+			wantErr:  false,
+		},
+		{
+			name: "multi-line string with escaped quotes",
+			content: `"key": """
+			Value: "quoted { brace }"
+			""" {`,
+			startPos: 7,
+			wantPos:  47,
+			wantErr:  false,
+		},
+		{
+			name:     "no brace found",
+			content:  `"key": "value"`,
+			startPos: 7,
+			wantPos:  0,
+			wantErr:  true,
+		},
+		{
+			name:     "brace only in comment - not found",
+			content:  `"key": // only { in } comment`,
+			startPos: 7,
+			wantPos:  0,
+			wantErr:  true,
+		},
+		{
+			name:     "brace only in string - not found",
+			content:  `"key": "only { in } string"`,
+			startPos: 7,
+			wantPos:  0,
+			wantErr:  true,
+		},
+		{
+			name: "real-world example",
+			content: `tasks: {
+	"my/task": // Needs review { important }
+	{
+		origin: "test"
+		description: "Task with { braces } in description"
+	}
+}`,
+			startPos: 19, // After "my/task":
+			wantPos:  52, // At the real opening brace
+			wantErr:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pos, err := findOpeningBrace(tt.content, tt.startPos)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Error("expected error, got nil")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if pos != tt.wantPos {
+				t.Errorf("findOpeningBrace() = %d, want %d\nContent: %q", pos, tt.wantPos, tt.content)
+			}
+
+			// Verify that the position actually points to '{'
+			if tt.content[pos] != '{' {
+				t.Errorf("position %d does not point to '{', got %q", pos, tt.content[pos])
+			}
+		})
+	}
+}
+
 // TestAssetsSearchValidation tests search command argument validation.
 func TestAssetsSearchValidation(t *testing.T) {
 	t.Parallel()

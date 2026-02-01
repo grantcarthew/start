@@ -738,10 +738,17 @@ func resolveModulePath(path, origin string) (string, error) {
 		return "", fmt.Errorf("getting CUE cache dir: %w", err)
 	}
 
-	// Origin format: "github.com/grantcarthew/start-assets/tasks/golang/code-review"
+	// Strip version from origin if present
+	// Origin format: "github.com/grantcarthew/start-assets/tasks/golang/code-review@v0.0.2"
+	// We need just: "github.com/grantcarthew/start-assets/tasks/golang/code-review"
+	originWithoutVersion := origin
+	if idx := strings.Index(origin, "@"); idx != -1 {
+		originWithoutVersion = origin[:idx]
+	}
+
 	// Module path in cache: cacheDir/mod/extract/github.com/grantcarthew/start-assets/tasks/golang/code-review@v0.x.x/
 	// We need to find the version directory
-	moduleBase := filepath.Join(cacheDir, "mod", "extract", origin)
+	moduleBase := filepath.Join(cacheDir, "mod", "extract", originWithoutVersion)
 
 	// Find version directory (there should be one matching @v*)
 	entries, err := os.ReadDir(filepath.Dir(moduleBase))
@@ -749,7 +756,7 @@ func resolveModulePath(path, origin string) (string, error) {
 		return "", fmt.Errorf("reading cache directory: %w", err)
 	}
 
-	baseName := filepath.Base(origin)
+	baseName := filepath.Base(originWithoutVersion)
 	var moduleDir string
 	for _, entry := range entries {
 		if entry.IsDir() && strings.HasPrefix(entry.Name(), baseName+"@v") {
