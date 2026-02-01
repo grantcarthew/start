@@ -853,8 +853,8 @@ func TestFindOpeningBrace(t *testing.T) {
 			wantErr:  false,
 		},
 		{
-			name:     "newline before brace",
-			content:  `"key":
+			name: "newline before brace",
+			content: `"key":
 {`,
 			startPos: 6, // After ":"
 			wantPos:  7,
