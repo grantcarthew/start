@@ -13,6 +13,7 @@ See [p-writing-guide.md](./p-writing-guide.md) for guidelines on creating and ma
 | Project | Title | Started |
 |---------|-------|---------|
 | [p-021](./p-021-auto-setup-default-assets.md) | Auto-Setup Default Assets | Pending |
+| [p-022](./p-022-assets-ast-refactor.md) | Assets AST Refactor | Pending |
 
 ### Completed Projects
 
@@ -44,6 +45,14 @@ See [p-writing-guide.md](./p-writing-guide.md) for guidelines on creating and ma
 ## Project Overview
 
 ### Active
+
+#### p-022: Assets AST Refactor
+
+Refactor asset installation code to use CUE's AST APIs instead of fragile string manipulation. Replace 160+ lines of manual parsing with proper AST operations.
+
+**Key Deliverables:** AST-based `internal/assets/install.go`, removed string manipulation, updated tests
+
+**Dependencies:** p-021
 
 #### p-021: Auto-Setup Default Assets
 
