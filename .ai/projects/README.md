@@ -10,7 +10,9 @@ See [p-writing-guide.md](./p-writing-guide.md) for guidelines on creating and ma
 
 ### Active Projects
 
-None
+| Project | Title | Started |
+|---------|-------|---------|
+| [p-021](./p-021-auto-setup-default-assets.md) | Auto-Setup Default Assets | Pending |
 
 ### Completed Projects
 
@@ -40,6 +42,16 @@ None
 ---
 
 ## Project Overview
+
+### Active
+
+#### p-021: Auto-Setup Default Assets
+
+Extract asset installation logic to shared package and enhance auto-setup to install commonly-needed contexts (starting with `cwd/agents-md`) during first-run configuration.
+
+**Key Deliverables:** `internal/assets` package, updated auto-setup, updated DR-018
+
+**Dependencies:** p-006, p-007
 
 ### Completed
 

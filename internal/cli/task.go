@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"cuelang.org/go/cue"
+	"github.com/grantcarthew/start/internal/assets"
 	"github.com/grantcarthew/start/internal/config"
 	internalcue "github.com/grantcarthew/start/internal/cue"
 	"github.com/grantcarthew/start/internal/orchestration"
@@ -152,7 +153,7 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 						if !flags.Quiet {
 							_, _ = fmt.Fprintf(stdout, "Installing %s from registry...\n", match.Name)
 						}
-						result := &SearchResult{
+						result := &assets.SearchResult{
 							Category: "tasks",
 							Name:     match.Name,
 							Entry:    match.Entry,
@@ -180,7 +181,7 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 						if !flags.Quiet {
 							_, _ = fmt.Fprintf(stdout, "Installing %s from registry...\n", selected.Name)
 						}
-						result := &SearchResult{
+						result := &assets.SearchResult{
 							Category: "tasks",
 							Name:     selected.Name,
 							Entry:    selected.Entry,
@@ -622,10 +623,10 @@ func promptTaskSelection(w io.Writer, r io.Reader, matches []TaskMatch, searchTe
 }
 
 // installTaskFromRegistry installs a task from the registry using a pre-fetched client and result.
-func installTaskFromRegistry(stdout io.Writer, flags *Flags, client *registry.Client, result SearchResult) error {
+func installTaskFromRegistry(stdout io.Writer, flags *Flags, client *registry.Client, result assets.SearchResult) error {
 	ctx := context.Background()
 
-	// Install the task using the same logic as assets add
+	// Install the task using the assets package
 	paths, err := config.ResolvePaths("")
 	if err != nil {
 		return fmt.Errorf("resolving config paths: %w", err)
@@ -634,40 +635,9 @@ func installTaskFromRegistry(stdout io.Writer, flags *Flags, client *registry.Cl
 	// Always install to global config for auto-install
 	configDir := paths.Global
 
-	// Fetch the actual asset module from registry
-	modulePath := result.Entry.Module
-	if !strings.Contains(modulePath, "@") {
-		modulePath += "@v0"
-	}
-
-	// Resolve to canonical version
-	resolvedPath, err := client.ResolveLatestVersion(ctx, modulePath)
-	if err != nil {
-		return fmt.Errorf("resolving asset version: %w", err)
-	}
-
-	fetchResult, err := client.Fetch(ctx, resolvedPath)
-	if err != nil {
-		return fmt.Errorf("fetching asset module: %w", err)
-	}
-
-	// Extract asset content from fetched module
-	originPath := modulePath
-	if idx := strings.Index(originPath, "@"); idx != -1 {
-		originPath = originPath[:idx]
-	}
-	assetContent, err := extractAssetContent(fetchResult.SourceDir, result, client.Registry(), originPath)
-	if err != nil {
-		return fmt.Errorf("extracting asset content: %w", err)
-	}
-
-	// Determine the config file
-	configFile := assetTypeToConfigFile(result.Category)
-	configPath := configDir + "/" + configFile
-
-	// Write the asset to config
-	if err := writeAssetToConfig(configPath, result, assetContent, modulePath); err != nil {
-		return fmt.Errorf("writing config: %w", err)
+	// Install the asset
+	if err := assets.InstallAsset(ctx, client, result, configDir); err != nil {
+		return err
 	}
 
 	if !flags.Quiet {
@@ -679,12 +649,12 @@ func installTaskFromRegistry(stdout io.Writer, flags *Flags, client *registry.Cl
 
 // findExactTaskInRegistry searches for an exact task match in the registry index.
 // Supports both "name" and "category/name" formats (e.g., "code-review" or "golang/code-review").
-func findExactTaskInRegistry(index *registry.Index, taskName string) *SearchResult {
+func findExactTaskInRegistry(index *registry.Index, taskName string) *assets.SearchResult {
 	// Check if taskName includes a path prefix (e.g., "golang/code-review")
 	for name, entry := range index.Tasks {
 		// Exact match on full name (e.g., "golang/code-review" matches "golang/code-review")
 		if name == taskName {
-			return &SearchResult{
+			return &assets.SearchResult{
 				Category: "tasks",
 				Name:     name,
 				Entry:    entry,
@@ -693,7 +663,7 @@ func findExactTaskInRegistry(index *registry.Index, taskName string) *SearchResu
 		// Also match if the short name matches (e.g., "code-review" matches "golang/code-review")
 		shortName := getAssetKey(name)
 		if shortName == taskName {
-			return &SearchResult{
+			return &assets.SearchResult{
 				Category: "tasks",
 				Name:     name,
 				Entry:    entry,

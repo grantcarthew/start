@@ -16,6 +16,7 @@ import (
 	"cuelang.org/go/cue/load"
 	"cuelang.org/go/mod/modconfig"
 
+	"github.com/grantcarthew/start/internal/assets"
 	"github.com/grantcarthew/start/internal/config"
 	internalcue "github.com/grantcarthew/start/internal/cue"
 	"github.com/grantcarthew/start/internal/detection"
@@ -115,6 +116,10 @@ func (a *AutoSetup) Run(ctx context.Context) (*AutoSetupResult, error) {
 	}
 
 	_, _ = fmt.Fprintf(a.stdout, "Configuration saved to %s\n", configPath)
+
+	// Install default assets (contexts that are commonly needed)
+	a.installDefaultAssets(ctx, client, index)
+
 	_, _ = fmt.Fprintln(a.stdout)
 	_, _ = fmt.Fprintln(a.stdout, "Note: The generated configuration uses generic model aliases.")
 	_, _ = fmt.Fprintln(a.stdout, "If using Vertex AI, Bedrock, or other providers, you may need to")
@@ -398,4 +403,65 @@ func generateSettingsCUE(defaultAgent string) string {
 	sb.WriteString("}\n")
 
 	return sb.String()
+}
+
+// installDefaultAssets installs commonly-needed contexts during auto-setup.
+// Errors are logged to stderr but don't fail the setup process.
+func (a *AutoSetup) installDefaultAssets(ctx context.Context, client *registry.Client, index *registry.Index) {
+	// Get global config directory
+	paths, err := config.ResolvePaths("")
+	if err != nil {
+		_, _ = fmt.Fprintf(a.stderr, "Warning: Failed to resolve config paths: %v\n", err)
+		return
+	}
+	configDir := paths.Global
+
+	// List of default assets to install (currently just cwd/agents-md)
+	defaultAssets := []struct {
+		category string
+		name     string
+	}{
+		{category: "contexts", name: "cwd/agents-md"},
+	}
+
+	for _, asset := range defaultAssets {
+		// Check if already installed (skip silently)
+		if assets.AssetExists(configDir, asset.category, asset.name) {
+			continue
+		}
+
+		// Look up the asset in the index
+		var entry *registry.IndexEntry
+		switch asset.category {
+		case "contexts":
+			if e, ok := index.Contexts[asset.name]; ok {
+				entry = &e
+			}
+		case "roles":
+			if e, ok := index.Roles[asset.name]; ok {
+				entry = &e
+			}
+		case "tasks":
+			if e, ok := index.Tasks[asset.name]; ok {
+				entry = &e
+			}
+		}
+
+		if entry == nil {
+			_, _ = fmt.Fprintf(a.stderr, "Warning: Default asset %s/%s not found in registry\n", asset.category, asset.name)
+			continue
+		}
+
+		// Create SearchResult for installation
+		searchResult := assets.SearchResult{
+			Category: asset.category,
+			Name:     asset.name,
+			Entry:    *entry,
+		}
+
+		// Install the asset (silent on success, log errors)
+		if err := assets.InstallAsset(ctx, client, searchResult, configDir); err != nil {
+			_, _ = fmt.Fprintf(a.stderr, "Warning: Failed to install %s/%s: %v\n", asset.category, asset.name, err)
+		}
+	}
 }

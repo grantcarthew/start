@@ -6,6 +6,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/grantcarthew/start/internal/assets"
 	"github.com/grantcarthew/start/internal/config"
 	internalcue "github.com/grantcarthew/start/internal/cue"
 	"github.com/grantcarthew/start/internal/registry"
@@ -52,7 +53,7 @@ func runAssetsInfo(cmd *cobra.Command, args []string) error {
 	}
 
 	// Search for matching assets
-	results := searchIndex(index, query)
+	results := assets.SearchIndex(index, query)
 
 	if len(results) == 0 {
 		return fmt.Errorf("no assets found matching %q", query)
@@ -75,7 +76,7 @@ func runAssetsInfo(cmd *cobra.Command, args []string) error {
 }
 
 // checkIfInstalled checks if an asset is installed in the config.
-func checkIfInstalled(asset SearchResult) (bool, string) {
+func checkIfInstalled(asset assets.SearchResult) (bool, string) {
 	paths, err := config.ResolvePaths("")
 	if err != nil {
 		return false, ""
@@ -105,7 +106,7 @@ func checkIfInstalled(asset SearchResult) (bool, string) {
 }
 
 // printAssetInfo prints detailed information about an asset.
-func printAssetInfo(w io.Writer, asset SearchResult, installed bool, scope string, verbose bool) {
+func printAssetInfo(w io.Writer, asset assets.SearchResult, installed bool, scope string, verbose bool) {
 	_, _ = fmt.Fprintf(w, "Asset: %s/%s\n", asset.Category, asset.Name)
 	_, _ = fmt.Fprintln(w, strings.Repeat("─", 60))
 

@@ -108,6 +108,42 @@ Subsequent runs:
 - Config exists → skip auto-setup, use existing config
 - User can re-run setup via `start init` if desired
 
+## Default Assets Installation
+
+After writing the agent configuration, auto-setup automatically installs commonly-needed contexts to reduce manual configuration steps.
+
+Assets installed by default:
+
+- `cwd/agents-md` - Reads repository AGENTS.md file for project-specific guidelines
+
+Installation behavior:
+
+- Silent on success (no output, keeps setup clean)
+- Skip silently if asset already exists
+- Log warnings to stderr on failure, but continue setup
+- Never fail auto-setup due to asset installation errors
+- Only install to global config (not local)
+
+Rationale:
+
+- Most projects benefit from repository-specific guidelines (AGENTS.md)
+- Auto-installing common contexts reduces friction for new users
+- Silent success keeps output focused on agent setup
+- Graceful error handling ensures setup completes even if registry is unavailable
+
+Future considerations:
+
+- Additional default contexts could be added
+- Registry index could mark assets as "recommended"
+- Interactive prompt: "Install recommended contexts?" (not implemented)
+
+Implementation:
+
+- Extracted asset installation logic to `internal/assets` package
+- Auto-setup calls `assets.InstallAsset()` after writing agent config
+- Uses same registry client as agent fetch
+- Checks `assets.AssetExists()` before attempting installation
+
 ## Terminal Output
 
 No agents detected:
@@ -233,3 +269,4 @@ Interactive selection:
 ## Updates
 
 - 2025-12-22: Aligned exit codes with unified policy (0 success, 1 failure)
+- 2026-02-03: Added default assets installation (installs cwd/agents-md context during auto-setup)
