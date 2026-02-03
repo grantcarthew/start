@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"cuelang.org/go/cue"
+	"github.com/grantcarthew/start/internal/assets"
 	"github.com/grantcarthew/start/internal/config"
 	internalcue "github.com/grantcarthew/start/internal/cue"
 	"github.com/grantcarthew/start/internal/registry"
@@ -291,4 +292,48 @@ func printInstalledAssets(w io.Writer, installed []InstalledAsset, verbose bool)
 		}
 		_, _ = fmt.Fprintln(w)
 	}
+}
+
+// Helper functions
+
+// categoryOrder returns the display order for a category.
+func categoryOrder(category string) int {
+	switch category {
+	case "agents":
+		return 0
+	case "roles":
+		return 1
+	case "tasks":
+		return 2
+	case "contexts":
+		return 3
+	default:
+		return 4
+	}
+}
+
+// assetTypeToConfigFile returns the config file name for an asset type.
+func assetTypeToConfigFile(category string) string {
+	switch category {
+	case "agents":
+		return "agents.cue"
+	case "roles":
+		return "roles.cue"
+	case "tasks":
+		return "tasks.cue"
+	case "contexts":
+		return "contexts.cue"
+	default:
+		return "settings.cue"
+	}
+}
+
+// getAssetKey returns the asset key name for use in config.
+func getAssetKey(name string) string {
+	return name
+}
+
+// findAssetKey finds the position of an asset key in CUE content.
+func findAssetKey(content, assetKey string) (keyStart, keyLen int, err error) {
+	return assets.FindAssetKey(content, assetKey)
 }
