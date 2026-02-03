@@ -24,8 +24,9 @@ import (
 // addAssetsAddCommand adds the add subcommand to the assets command.
 func addAssetsAddCommand(parent *cobra.Command) {
 	addCmd := &cobra.Command{
-		Use:   "add <query>",
-		Short: "Install asset from registry",
+		Use:     "add <query>",
+		Aliases: []string{"install"},
+		Short:   "Install asset from registry",
 		Long: `Install an asset from the CUE registry to your configuration.
 
 Searches the registry index for matching assets. If multiple matches are found,
