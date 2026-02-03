@@ -35,10 +35,10 @@ contexts: {
 	}
 
 	tests := []struct {
-		name     string
-		category string
+		name      string
+		category  string
 		assetName string
-		want     bool
+		want      bool
 	}{
 		{
 			name:      "existing asset with quotes",
@@ -178,11 +178,11 @@ func TestFindMatchingBrace(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name          string
-		content       string
-		openBracePos  int
-		wantEndPos    int
-		wantErr       bool
+		name         string
+		content      string
+		openBracePos int
+		wantEndPos   int
+		wantErr      bool
 	}{
 		{
 			name:         "simple nested",
@@ -376,13 +376,13 @@ func TestWriteAssetToConfig(t *testing.T) {
 	tempDir := t.TempDir()
 
 	tests := []struct {
-		name           string
-		existingFile   string
+		name            string
+		existingFile    string
 		existingContent string
-		asset          SearchResult
-		assetContent   string
-		wantErr        bool
-		wantContains   []string
+		asset           SearchResult
+		assetContent    string
+		wantErr         bool
+		wantContains    []string
 	}{
 		{
 			name:         "new file",
