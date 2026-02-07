@@ -7,6 +7,34 @@ import (
 	"testing"
 )
 
+func TestNewDryRunManager(t *testing.T) {
+	t.Parallel()
+	m := NewDryRunManager()
+
+	if m == nil {
+		t.Fatal("NewDryRunManager() returned nil")
+	}
+	if m.BaseDir == "" {
+		t.Error("NewDryRunManager() BaseDir is empty")
+	}
+	if m.BaseDir != os.TempDir() {
+		t.Errorf("NewDryRunManager() BaseDir = %q, want %q", m.BaseDir, os.TempDir())
+	}
+}
+
+func TestNewUTDManager(t *testing.T) {
+	t.Parallel()
+	m := NewUTDManager("/project")
+
+	if m == nil {
+		t.Fatal("NewUTDManager() returned nil")
+	}
+	want := filepath.Join("/project", ".start", "temp")
+	if m.BaseDir != want {
+		t.Errorf("NewUTDManager() BaseDir = %q, want %q", m.BaseDir, want)
+	}
+}
+
 func TestManager_DryRunDir(t *testing.T) {
 	t.Parallel()
 	tmpDir := t.TempDir()

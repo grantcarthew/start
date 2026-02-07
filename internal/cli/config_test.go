@@ -719,31 +719,49 @@ func TestWriteTasksFile(t *testing.T) {
 }
 
 func TestTruncatePrompt(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
+		name     string
 		input    string
 		max      int
 		expected string
 	}{
-		{"short", 10, "short"},
-		{"this is a longer string", 10, "this is..."},
-		{"with\nnewlines", 20, "with newlines"},
-		{"", 10, ""},
+		{"short string unchanged", "short", 10, "short"},
+		{"long string truncated with ellipsis", "this is a longer string", 10, "this is..."},
+		{"newlines replaced with spaces", "with\nnewlines", 20, "with newlines"},
+		{"empty string unchanged", "", 10, ""},
 	}
 
 	for _, tc := range tests {
-		result := truncatePrompt(tc.input, tc.max)
-		if result != tc.expected {
-			t.Errorf("truncatePrompt(%q, %d) = %q, want %q", tc.input, tc.max, result, tc.expected)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			result := truncatePrompt(tc.input, tc.max)
+			if result != tc.expected {
+				t.Errorf("truncatePrompt(%q, %d) = %q, want %q", tc.input, tc.max, result, tc.expected)
+			}
+		})
 	}
 }
 
 func TestScopeString(t *testing.T) {
-	if scopeString(true) != "local" {
-		t.Errorf("scopeString(true) = %q, want 'local'", scopeString(true))
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		local bool
+		want  string
+	}{
+		{"local scope", true, "local"},
+		{"global scope", false, "global"},
 	}
-	if scopeString(false) != "global" {
-		t.Errorf("scopeString(false) = %q, want 'global'", scopeString(false))
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := scopeString(tt.local)
+			if got != tt.want {
+				t.Errorf("scopeString(%v) = %q, want %q", tt.local, got, tt.want)
+			}
+		})
 	}
 }
 

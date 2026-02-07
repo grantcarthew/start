@@ -361,6 +361,10 @@ func writeAssetToConfig(configPath string, asset SearchResult, content, modulePa
 // Searches for both quoted ("key":) and unquoted (key:) patterns.
 // Returns the first match found in normal state (not inside strings/comments).
 func FindAssetKey(content, assetKey string) (keyStart, keyLen int, err error) {
+	if assetKey == "" {
+		return 0, 0, fmt.Errorf("asset key must not be empty")
+	}
+
 	type state int
 	const (
 		stateNormal state = iota
