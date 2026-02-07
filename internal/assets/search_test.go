@@ -260,6 +260,52 @@ func TestSearchCategory(t *testing.T) {
 	}
 }
 
+// TestSearchIndex_NilIndex documents Bug: SearchIndex panics on nil *registry.Index.
+// SearchIndex accesses index.Agents, index.Roles, etc. without a nil check.
+func TestSearchIndex_NilIndex(t *testing.T) {
+	t.Parallel()
+
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf("SearchIndex(nil, ...) panicked: %v", r)
+		}
+	}()
+
+	results := SearchIndex(nil, "test")
+	if len(results) != 0 {
+		t.Errorf("SearchIndex(nil, ...) returned %d results, want 0", len(results))
+	}
+}
+
+// TestSearchIndex_EmptyIndex tests SearchIndex with an empty (non-nil) index.
+func TestSearchIndex_EmptyIndex(t *testing.T) {
+	t.Parallel()
+
+	index := &registry.Index{}
+	results := SearchIndex(index, "test")
+
+	if len(results) != 0 {
+		t.Errorf("SearchIndex(empty, ...) returned %d results, want 0", len(results))
+	}
+}
+
+// TestSearchIndex_NilMaps tests SearchIndex with non-nil Index but nil category maps.
+func TestSearchIndex_NilMaps(t *testing.T) {
+	t.Parallel()
+
+	index := &registry.Index{
+		Agents:   nil,
+		Roles:    nil,
+		Tasks:    nil,
+		Contexts: nil,
+	}
+	results := SearchIndex(index, "test")
+
+	if len(results) != 0 {
+		t.Errorf("SearchIndex(nil maps, ...) returned %d results, want 0", len(results))
+	}
+}
+
 // TestSearchResultOrdering tests that results are ordered correctly.
 func TestSearchResultOrdering(t *testing.T) {
 	t.Parallel()

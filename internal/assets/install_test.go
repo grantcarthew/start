@@ -311,6 +311,207 @@ func TestFindOpeningBrace(t *testing.T) {
 	}
 }
 
+// TestFindAssetKey_EmptyKey documents Bug: empty assetKey matches any colon.
+// When assetKey is "", unquotedKey becomes ":", matching any colon in normal state.
+func TestFindAssetKey_EmptyKey(t *testing.T) {
+	t.Parallel()
+
+	content := `contexts: {
+	"existing": {
+		origin: "test"
+	}
+}`
+
+	_, _, err := FindAssetKey(content, "")
+	if err == nil {
+		t.Error("FindAssetKey() with empty key should return error, but matched a colon")
+	}
+}
+
+// TestFindAssetKey_EmptyContent tests FindAssetKey with empty content.
+func TestFindAssetKey_EmptyContent(t *testing.T) {
+	t.Parallel()
+
+	_, _, err := FindAssetKey("", "my/asset")
+	if err == nil {
+		t.Error("FindAssetKey() with empty content should return error")
+	}
+}
+
+// TestFindMatchingBrace_MultiLineString tests FindMatchingBrace with multi-line
+// strings containing triple quotes.
+func TestFindMatchingBrace_MultiLineString(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		content      string
+		openBracePos int
+		wantEndPos   int
+		wantErr      bool
+	}{
+		{
+			name: "multi-line string with braces inside",
+			content: "{\n\tprompt: \"\"\"\n\t\tif (x) { return }\n\t\t\"\"\"\n}",
+			openBracePos: 0,
+			wantErr:      false,
+		},
+		{
+			name: "multi-line string with nested triple quotes pattern",
+			content: "{\n\tprompt: \"\"\"\n\t\tuse {{.field}} here\n\t\t\"\"\"\n}",
+			openBracePos: 0,
+			wantErr:      false,
+		},
+		{
+			name: "multi-line string at end of content",
+			content: "{\n\tprompt: \"\"\"\n\t\thello\n\t\t\"\"\"\n}",
+			openBracePos: 0,
+			wantErr:      false,
+		},
+		{
+			name:         "unterminated multi-line string",
+			content:      "{\n\tprompt: \"\"\"\n\t\thello\n",
+			openBracePos: 0,
+			wantErr:      true,
+		},
+		{
+			name: "braces in both comments and multi-line strings",
+			content: "{\n\t// comment with { brace }\n\tprompt: \"\"\"\n\t\t{ and } in string\n\t\t\"\"\"\n}",
+			openBracePos: 0,
+			wantErr:      false,
+		},
+		{
+			name: "escaped quotes in single-line string before brace",
+			content: `{ "key": "value with \" and { brace }" }`,
+			openBracePos: 0,
+			wantErr:      false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			endPos, err := FindMatchingBrace(tt.content, tt.openBracePos)
+			if tt.wantErr {
+				if err == nil {
+					t.Error("FindMatchingBrace() expected error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Errorf("FindMatchingBrace() unexpected error: %v", err)
+				return
+			}
+			if tt.wantEndPos != 0 && endPos != tt.wantEndPos {
+				t.Errorf("FindMatchingBrace() = %d, want %d", endPos, tt.wantEndPos)
+			}
+			// Verify the content up to endPos has balanced braces
+			// (the closing brace should be at endPos-1)
+			if tt.content[endPos-1] != '}' {
+				t.Errorf("position before endPos (%d) is %q, want '}'", endPos-1, tt.content[endPos-1])
+			}
+		})
+	}
+}
+
+// TestFindOpeningBrace_MultiLineString tests FindOpeningBrace with multi-line strings.
+func TestFindOpeningBrace_MultiLineString(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		content  string
+		startPos int
+		wantErr  bool
+	}{
+		{
+			name: "brace after multi-line string",
+			content: "\"\"\"\n\t{ not this }\n\t\"\"\" {",
+			startPos: 0,
+			wantErr:  false,
+		},
+		{
+			name: "only braces inside multi-line string",
+			content: "\"\"\"\n\t{ not this }\n\t\"\"\"",
+			startPos: 0,
+			wantErr:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pos, err := FindOpeningBrace(tt.content, tt.startPos)
+			if tt.wantErr {
+				if err == nil {
+					t.Error("FindOpeningBrace() expected error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Errorf("FindOpeningBrace() unexpected error: %v", err)
+				return
+			}
+			if tt.content[pos] != '{' {
+				t.Errorf("position %d is %q, want '{'", pos, tt.content[pos])
+			}
+		})
+	}
+}
+
+// TestWriteAssetToConfig_NewCategory tests adding an asset with a category
+// that doesn't exist yet in an existing file.
+func TestWriteAssetToConfig_NewCategory(t *testing.T) {
+	t.Parallel()
+	tempDir := t.TempDir()
+	configPath := filepath.Join(tempDir, "tasks.cue")
+
+	existingContent := `// start configuration
+contexts: {
+	"existing": {
+		origin: "test"
+	}
+}
+`
+	if err := os.WriteFile(configPath, []byte(existingContent), 0644); err != nil {
+		t.Fatalf("Failed to write test file: %v", err)
+	}
+
+	asset := SearchResult{
+		Category: "tasks",
+		Name:     "new/task",
+		Entry:    registry.IndexEntry{Module: "github.com/test/tasks/new/task@v0"},
+	}
+	assetContent := `{
+	origin: "github.com/test/tasks/new/task@v0.1.0"
+	description: "A new task"
+}`
+
+	err := writeAssetToConfig(configPath, asset, assetContent, asset.Entry.Module)
+	if err != nil {
+		t.Fatalf("writeAssetToConfig() error: %v", err)
+	}
+
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatalf("Failed to read result: %v", err)
+	}
+
+	result := string(data)
+	// Should preserve the existing contexts block
+	if !strings.Contains(result, "contexts:") {
+		t.Error("result missing existing contexts block")
+	}
+	if !strings.Contains(result, `"existing":`) {
+		t.Error("result missing existing asset")
+	}
+	// Should have the new tasks block
+	if !strings.Contains(result, "tasks: {") {
+		t.Error("result missing new tasks category")
+	}
+	if !strings.Contains(result, `"new/task":`) {
+		t.Error("result missing new task asset")
+	}
+}
+
 // TestUpdateAssetInConfig tests the UpdateAssetInConfig function.
 func TestUpdateAssetInConfig(t *testing.T) {
 	t.Parallel()

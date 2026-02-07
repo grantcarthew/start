@@ -7,40 +7,50 @@ import (
 )
 
 func TestScope_String(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
+		name  string
 		scope Scope
 		want  string
 	}{
-		{ScopeMerged, "merged"},
-		{ScopeGlobal, "global"},
-		{ScopeLocal, "local"},
+		{"merged scope", ScopeMerged, "merged"},
+		{"global scope", ScopeGlobal, "global"},
+		{"local scope", ScopeLocal, "local"},
 	}
 
 	for _, tt := range tests {
-		got := tt.scope.String()
-		if got != tt.want {
-			t.Errorf("Scope(%d).String() = %q, want %q", tt.scope, got, tt.want)
-		}
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.scope.String()
+			if got != tt.want {
+				t.Errorf("Scope(%d).String() = %q, want %q", tt.scope, got, tt.want)
+			}
+		})
 	}
 }
 
 func TestParseScope(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
+		name  string
 		input string
 		want  Scope
 	}{
-		{"global", ScopeGlobal},
-		{"local", ScopeLocal},
-		{"merged", ScopeMerged},
-		{"", ScopeMerged},
-		{"unknown", ScopeMerged},
+		{"global string", "global", ScopeGlobal},
+		{"local string", "local", ScopeLocal},
+		{"merged string", "merged", ScopeMerged},
+		{"empty defaults to merged", "", ScopeMerged},
+		{"unknown defaults to merged", "unknown", ScopeMerged},
 	}
 
 	for _, tt := range tests {
-		got := ParseScope(tt.input)
-		if got != tt.want {
-			t.Errorf("ParseScope(%q) = %v, want %v", tt.input, got, tt.want)
-		}
+		t.Run(tt.name, func(t *testing.T) {
+			got := ParseScope(tt.input)
+			if got != tt.want {
+				t.Errorf("ParseScope(%q) = %v, want %v", tt.input, got, tt.want)
+			}
+		})
 	}
 }
 
@@ -93,10 +103,8 @@ func TestResolvePaths_XDGConfigHome(t *testing.T) {
 		t.Fatalf("Failed to create start config dir: %v", err)
 	}
 
-	// Set XDG_CONFIG_HOME
-	oldXDG := os.Getenv("XDG_CONFIG_HOME")
-	_ = os.Setenv("XDG_CONFIG_HOME", xdgDir)
-	defer func() { _ = os.Setenv("XDG_CONFIG_HOME", oldXDG) }()
+	// Set XDG_CONFIG_HOME (t.Setenv auto-restores on cleanup)
+	t.Setenv("XDG_CONFIG_HOME", xdgDir)
 
 	workDir := t.TempDir()
 	p, err := ResolvePaths(workDir)

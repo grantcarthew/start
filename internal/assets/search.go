@@ -17,6 +17,10 @@ type SearchResult struct {
 
 // SearchIndex searches all categories in the index for matching entries.
 func SearchIndex(index *registry.Index, query string) []SearchResult {
+	if index == nil {
+		return nil
+	}
+
 	var results []SearchResult
 	queryLower := strings.ToLower(query)
 
