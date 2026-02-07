@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"cuelang.org/go/cue/cuecontext"
 	"github.com/grantcarthew/start/internal/config"
 )
 
@@ -243,5 +244,283 @@ func TestShortenPath(t *testing.T) {
 				t.Errorf("shortenPath(%q) = %q, want %q", tt.input, got, tt.want)
 			}
 		})
+	}
+}
+
+// --- CheckAgents tests ---
+
+func TestCheckAgents_NoneConfigured(t *testing.T) {
+	t.Parallel()
+	cctx := cuecontext.New()
+	v := cctx.CompileString("{}")
+
+	section := CheckAgents(v)
+
+	if section.Name != "Agents" {
+		t.Errorf("Name = %q, want %q", section.Name, "Agents")
+	}
+	if len(section.Results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(section.Results))
+	}
+	if section.Results[0].Status != StatusInfo {
+		t.Errorf("status = %v, want StatusInfo", section.Results[0].Status)
+	}
+	if section.Results[0].Label != "None configured" {
+		t.Errorf("label = %q, want %q", section.Results[0].Label, "None configured")
+	}
+}
+
+func TestCheckAgents_ValidBinary(t *testing.T) {
+	t.Parallel()
+	cctx := cuecontext.New()
+	v := cctx.CompileString(`agents: { myagent: { bin: "go" } }`)
+
+	section := CheckAgents(v)
+
+	if len(section.Results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(section.Results))
+	}
+	if section.Results[0].Status != StatusPass {
+		t.Errorf("status = %v, want StatusPass", section.Results[0].Status)
+	}
+	if section.Results[0].Label != "myagent" {
+		t.Errorf("label = %q, want %q", section.Results[0].Label, "myagent")
+	}
+	if section.Summary != "1 configured" {
+		t.Errorf("summary = %q, want %q", section.Summary, "1 configured")
+	}
+}
+
+func TestCheckAgents_MissingBinary(t *testing.T) {
+	t.Parallel()
+	cctx := cuecontext.New()
+	v := cctx.CompileString(`agents: { broken: { bin: "nonexistent-binary-xyz-123" } }`)
+
+	section := CheckAgents(v)
+
+	if len(section.Results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(section.Results))
+	}
+	if section.Results[0].Status != StatusFail {
+		t.Errorf("status = %v, want StatusFail", section.Results[0].Status)
+	}
+	if section.Results[0].Fix == "" {
+		t.Error("expected a fix suggestion for missing binary")
+	}
+}
+
+func TestCheckAgents_NoBinField(t *testing.T) {
+	t.Parallel()
+	cctx := cuecontext.New()
+	v := cctx.CompileString(`agents: { nobin: { description: "no bin" } }`)
+
+	section := CheckAgents(v)
+
+	if len(section.Results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(section.Results))
+	}
+	if section.Results[0].Status != StatusWarn {
+		t.Errorf("status = %v, want StatusWarn", section.Results[0].Status)
+	}
+	if section.Results[0].Message != "No bin field" {
+		t.Errorf("message = %q, want %q", section.Results[0].Message, "No bin field")
+	}
+}
+
+// --- CheckContexts tests ---
+
+func TestCheckContexts_NoneConfigured(t *testing.T) {
+	t.Parallel()
+	cctx := cuecontext.New()
+	v := cctx.CompileString("{}")
+
+	section := CheckContexts(v)
+
+	if section.Name != "Contexts" {
+		t.Errorf("Name = %q, want %q", section.Name, "Contexts")
+	}
+	if len(section.Results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(section.Results))
+	}
+	if section.Results[0].Label != "None configured" {
+		t.Errorf("label = %q, want %q", section.Results[0].Label, "None configured")
+	}
+}
+
+func TestCheckContexts_FileExists(t *testing.T) {
+	t.Parallel()
+	tmpFile := filepath.Join(t.TempDir(), "context.md")
+	if err := os.WriteFile(tmpFile, []byte("context content"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cctx := cuecontext.New()
+	v := cctx.CompileString(`contexts: { myctx: { file: "` + tmpFile + `" } }`)
+
+	section := CheckContexts(v)
+
+	if len(section.Results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(section.Results))
+	}
+	if section.Results[0].Status != StatusPass {
+		t.Errorf("status = %v, want StatusPass", section.Results[0].Status)
+	}
+}
+
+func TestCheckContexts_FileMissingRequired(t *testing.T) {
+	t.Parallel()
+	cctx := cuecontext.New()
+	v := cctx.CompileString(`contexts: { reqctx: { file: "/nonexistent/path/file.md", required: true } }`)
+
+	section := CheckContexts(v)
+
+	if len(section.Results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(section.Results))
+	}
+	if section.Results[0].Status != StatusFail {
+		t.Errorf("status = %v, want StatusFail for required missing file", section.Results[0].Status)
+	}
+}
+
+func TestCheckContexts_FileMissingOptional(t *testing.T) {
+	t.Parallel()
+	cctx := cuecontext.New()
+	v := cctx.CompileString(`contexts: { optctx: { file: "/nonexistent/path/file.md", required: false } }`)
+
+	section := CheckContexts(v)
+
+	if len(section.Results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(section.Results))
+	}
+	if section.Results[0].Status != StatusWarn {
+		t.Errorf("status = %v, want StatusWarn for optional missing file", section.Results[0].Status)
+	}
+}
+
+func TestCheckContexts_InlinePrompt(t *testing.T) {
+	t.Parallel()
+	cctx := cuecontext.New()
+	v := cctx.CompileString(`contexts: { promptctx: { prompt: "You are helpful" } }`)
+
+	section := CheckContexts(v)
+
+	if len(section.Results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(section.Results))
+	}
+	if section.Results[0].Status != StatusPass {
+		t.Errorf("status = %v, want StatusPass", section.Results[0].Status)
+	}
+	if section.Results[0].Message != "(inline prompt)" {
+		t.Errorf("message = %q, want %q", section.Results[0].Message, "(inline prompt)")
+	}
+}
+
+func TestCheckContexts_Command(t *testing.T) {
+	t.Parallel()
+	cctx := cuecontext.New()
+	v := cctx.CompileString(`contexts: { cmdctx: { command: "echo hello" } }`)
+
+	section := CheckContexts(v)
+
+	if len(section.Results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(section.Results))
+	}
+	if section.Results[0].Status != StatusPass {
+		t.Errorf("status = %v, want StatusPass", section.Results[0].Status)
+	}
+	if section.Results[0].Message != "(command)" {
+		t.Errorf("message = %q, want %q", section.Results[0].Message, "(command)")
+	}
+}
+
+// --- CheckRoles tests ---
+
+func TestCheckRoles_NoneConfigured(t *testing.T) {
+	t.Parallel()
+	cctx := cuecontext.New()
+	v := cctx.CompileString("{}")
+
+	section := CheckRoles(v)
+
+	if section.Name != "Roles" {
+		t.Errorf("Name = %q, want %q", section.Name, "Roles")
+	}
+	if len(section.Results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(section.Results))
+	}
+	if section.Results[0].Label != "None configured" {
+		t.Errorf("label = %q, want %q", section.Results[0].Label, "None configured")
+	}
+}
+
+func TestCheckRoles_FileExists(t *testing.T) {
+	t.Parallel()
+	tmpFile := filepath.Join(t.TempDir(), "role.md")
+	if err := os.WriteFile(tmpFile, []byte("role content"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cctx := cuecontext.New()
+	v := cctx.CompileString(`roles: { myrole: { file: "` + tmpFile + `" } }`)
+
+	section := CheckRoles(v)
+
+	if len(section.Results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(section.Results))
+	}
+	if section.Results[0].Status != StatusPass {
+		t.Errorf("status = %v, want StatusPass", section.Results[0].Status)
+	}
+}
+
+func TestCheckRoles_FileMissing(t *testing.T) {
+	t.Parallel()
+	cctx := cuecontext.New()
+	v := cctx.CompileString(`roles: { badrole: { file: "/nonexistent/path/role.md" } }`)
+
+	section := CheckRoles(v)
+
+	if len(section.Results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(section.Results))
+	}
+	// Roles do NOT downgrade to warn - missing file stays as StatusFail
+	if section.Results[0].Status != StatusFail {
+		t.Errorf("status = %v, want StatusFail (roles don't downgrade)", section.Results[0].Status)
+	}
+}
+
+func TestCheckRoles_PromptFallback(t *testing.T) {
+	t.Parallel()
+	cctx := cuecontext.New()
+	v := cctx.CompileString(`roles: { prole: { prompt: "You are a code reviewer" } }`)
+
+	section := CheckRoles(v)
+
+	if len(section.Results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(section.Results))
+	}
+	if section.Results[0].Status != StatusPass {
+		t.Errorf("status = %v, want StatusPass", section.Results[0].Status)
+	}
+	if section.Results[0].Message != "(inline prompt)" {
+		t.Errorf("message = %q, want %q", section.Results[0].Message, "(inline prompt)")
+	}
+}
+
+func TestCheckRoles_NoFileOrPrompt(t *testing.T) {
+	t.Parallel()
+	cctx := cuecontext.New()
+	v := cctx.CompileString(`roles: { emptyrole: { description: "nothing useful" } }`)
+
+	section := CheckRoles(v)
+
+	if len(section.Results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(section.Results))
+	}
+	if section.Results[0].Status != StatusWarn {
+		t.Errorf("status = %v, want StatusWarn", section.Results[0].Status)
+	}
+	if section.Results[0].Message != "No file, prompt, or command" {
+		t.Errorf("message = %q, want %q", section.Results[0].Message, "No file, prompt, or command")
 	}
 }

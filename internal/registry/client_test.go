@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io/fs"
+	"strings"
 	"testing"
 	"time"
 
@@ -235,7 +236,7 @@ func TestFetch_InvalidModulePath(t *testing.T) {
 				t.Error("Fetch() expected error, got nil")
 				return
 			}
-			if !contains(err.Error(), tt.wantErr) {
+			if !strings.Contains(err.Error(), tt.wantErr) {
 				t.Errorf("Fetch() error = %v, want to contain %q", err, tt.wantErr)
 			}
 		})
@@ -374,17 +375,3 @@ func TestIsCanonicalVersion(t *testing.T) {
 	}
 }
 
-// contains checks if s contains substr.
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(substr) == 0 ||
-		(len(s) > 0 && len(substr) > 0 && findSubstring(s, substr)))
-}
-
-func findSubstring(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
-}

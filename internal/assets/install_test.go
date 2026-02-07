@@ -1,7 +1,6 @@
 package assets
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -142,14 +141,20 @@ func TestFindAssetKey(t *testing.T) {
 			wantFound: true,
 		},
 		{
-			name:      "key in comment ignored",
-			content:   `// "cwd/agents-md": comment\ncontexts: {`,
+			name: "key in comment ignored",
+			content: "// \"cwd/agents-md\": comment\ncontexts: {\n",
 			assetKey:  "cwd/agents-md",
 			wantFound: false,
 		},
 		{
-			name:      "key in string ignored",
-			content:   `description: "has cwd/agents-md in it"\ncontexts: {`,
+			name: "key in string ignored",
+			content: "description: \"has cwd/agents-md in it\"\ncontexts: {\n",
+			assetKey:  "cwd/agents-md",
+			wantFound: false,
+		},
+		{
+			name: "key in multi-line string ignored",
+			content: "description: \"\"\"\n\tcwd/agents-md: is mentioned here\n\t\"\"\"\ncontexts: {\n",
 			assetKey:  "cwd/agents-md",
 			wantFound: false,
 		},
@@ -504,13 +509,83 @@ contexts: {
 	}
 }
 
-// TestInstallAssetIntegration tests the full InstallAsset flow.
-// This is more of an integration test that would require a real registry client.
-// For now, we just test that the function signature is correct.
-func TestInstallAssetSignature(t *testing.T) {
+// TestWriteAssetToConfig_BracesInStringValues documents Bug 1:
+// writeAssetToConfig uses strings.LastIndex(existingContent, "}") to find
+// the closing brace of the category, but this matches the last "}" in the
+// entire file content. When a file has multiple top-level categories,
+// the last "}" belongs to a DIFFERENT category, causing the new asset
+// to be inserted into the wrong category block.
+func TestWriteAssetToConfig_BracesInStringValues(t *testing.T) {
 	t.Parallel()
+	tempDir := t.TempDir()
+	configPath := filepath.Join(tempDir, "contexts.cue")
 
-	// This test just ensures the function exists and has the right signature
-	// Real testing would require mocking the registry client
-	var _ func(context.Context, *registry.Client, SearchResult, string) error = InstallAsset
+	// File has two top-level categories. The code does:
+	//   1. strings.Index(content, "contexts:") -> finds "contexts:" at line 2
+	//   2. strings.LastIndex(content, "}") -> finds the LAST "}" which closes "settings:"
+	// So the new asset gets inserted at the end of "settings:" instead of "contexts:".
+	existingContent := `// start configuration
+contexts: {
+	"existing": {
+		origin: "test"
+		description: "An existing context"
+	}
+}
+
+settings: {
+	default_agent: "claude"
+}
+`
+	if err := os.WriteFile(configPath, []byte(existingContent), 0644); err != nil {
+		t.Fatalf("Failed to write test file: %v", err)
+	}
+
+	asset := SearchResult{
+		Category: "contexts",
+		Name:     "new-asset",
+		Entry: registry.IndexEntry{
+			Module: "github.com/test/contexts/new-asset@v0",
+		},
+	}
+	assetContent := `{
+	origin: "github.com/test/contexts/new-asset@v0.1.0"
+	description: "New asset"
+}`
+
+	err := writeAssetToConfig(configPath, asset, assetContent, asset.Entry.Module)
+	if err != nil {
+		t.Fatalf("writeAssetToConfig() error: %v", err)
+	}
+
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatalf("Failed to read config file: %v", err)
+	}
+
+	result := string(data)
+
+	// The result should contain both the existing and new assets
+	if !strings.Contains(result, `"existing":`) {
+		t.Error("result missing existing asset")
+	}
+	if !strings.Contains(result, `"new-asset":`) {
+		t.Error("result missing new asset")
+	}
+
+	// BUG: The new asset should be inside the contexts: {} block, not
+	// the settings: {} block. With strings.LastIndex, it inserts before
+	// the last "}" which belongs to settings, not contexts.
+	//
+	// Verify the new asset appears BEFORE "settings:" - if it doesn't,
+	// the bug has been triggered and the asset was put in the wrong block.
+	settingsPos := strings.Index(result, "settings:")
+	newAssetPos := strings.Index(result, `"new-asset":`)
+	if settingsPos == -1 || newAssetPos == -1 {
+		t.Fatal("cannot find settings or new-asset in result")
+	}
+	if newAssetPos > settingsPos {
+		t.Errorf("BUG: new asset was inserted into settings block instead of contexts block\n"+
+			"new-asset at pos %d, settings at pos %d\nResult:\n%s",
+			newAssetPos, settingsPos, result)
+	}
 }
