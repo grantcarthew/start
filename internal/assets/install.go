@@ -280,13 +280,18 @@ func writeAssetToConfig(configPath string, asset SearchResult, content, modulePa
 	// Build new content
 	var sb strings.Builder
 
+	// categoryClosingBrace tracks the position after the category's '}' so we
+	// can append the remainder of the file after inserting the new asset.
+	// A value of -1 means no existing category block was found.
+	categoryClosingBrace := -1
+
 	if existingContent == "" {
 		// New file
 		sb.WriteString("// start configuration\n")
 		sb.WriteString("// Managed by 'start assets add'\n\n")
 		sb.WriteString(fmt.Sprintf("%s: {\n", asset.Category))
 	} else {
-		// Append to existing - find the closing brace of the category
+		// Append to existing - find the category block
 		categoryStart := strings.Index(existingContent, asset.Category+":")
 		if categoryStart == -1 {
 			// Category doesn't exist, append it
@@ -296,15 +301,23 @@ func writeAssetToConfig(configPath string, asset SearchResult, content, modulePa
 			}
 			sb.WriteString(fmt.Sprintf("\n%s: {\n", asset.Category))
 		} else {
-			// Find the closing brace and insert before it
-			// This is a simple approach - for complex files might need proper parsing
-			closingBrace := strings.LastIndex(existingContent, "}")
-			if closingBrace == -1 {
+			// Find the opening brace of this category using context-aware parsing
+			openBrace, err := FindOpeningBrace(existingContent, categoryStart+len(asset.Category)+1)
+			if err != nil {
 				sb.WriteString(existingContent)
 				sb.WriteString(fmt.Sprintf("\n%s: {\n", asset.Category))
 			} else {
-				sb.WriteString(existingContent[:closingBrace])
-				sb.WriteString("\n")
+				// Find the matching closing brace for this specific category
+				closeBrace, err := FindMatchingBrace(existingContent, openBrace)
+				if err != nil {
+					sb.WriteString(existingContent)
+					sb.WriteString(fmt.Sprintf("\n%s: {\n", asset.Category))
+				} else {
+					categoryClosingBrace = closeBrace
+					// closeBrace is the position after '}', insert before it
+					sb.WriteString(existingContent[:closeBrace-1])
+					sb.WriteString("\n")
+				}
 			}
 		}
 	}
@@ -326,10 +339,11 @@ func writeAssetToConfig(configPath string, asset SearchResult, content, modulePa
 		}
 	}
 
-	if existingContent == "" || !strings.Contains(existingContent, asset.Category+":") {
-		sb.WriteString("\n}\n")
-	} else {
-		sb.WriteString("\n}\n")
+	sb.WriteString("\n}\n")
+
+	// Append the remainder of the file after the category block
+	if categoryClosingBrace != -1 {
+		sb.WriteString(existingContent[categoryClosingBrace:])
 	}
 
 	return os.WriteFile(configPath, []byte(sb.String()), 0644)
