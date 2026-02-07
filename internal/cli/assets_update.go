@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
-	"path/filepath"
 	"strings"
 
 	"cuelang.org/go/cue"
@@ -184,157 +182,34 @@ func checkAndUpdate(ctx context.Context, client *registry.Client, paths config.P
 		return result
 	}
 
-<<<<<<< Updated upstream
 	// Extract the new content from fetched module
 	searchResult := assets.SearchResult{
-=======
-	// Build SearchResult for extractAssetContent
-	searchResult := SearchResult{
->>>>>>> Stashed changes
 		Category: asset.Category,
 		Name:     asset.Name,
 		Entry:    *entry,
 	}
 
-<<<<<<< Updated upstream
 	// Use resolved path with version for origin field (e.g., "github.com/.../task@v0.1.1")
 	// This preserves full provenance information for future updates.
 	assetContent, err := extractAssetContent(fetchResult.SourceDir, searchResult, client.Registry(), resolvedPath)
-=======
-	// Strip version from modulePath for origin field
-	originPath := modulePath
-	if idx := strings.Index(originPath, "@"); idx != -1 {
-		originPath = originPath[:idx]
-	}
-
-	// Extract the asset content from the fetched module
-	assetContent, err := extractAssetContent(fetchResult.SourceDir, searchResult, client.Registry(), originPath)
->>>>>>> Stashed changes
 	if err != nil {
 		result.Error = fmt.Errorf("extracting asset content: %w", err)
 		return result
 	}
 
-<<<<<<< Updated upstream
 	// Update the config file with new content
-	// ConfigFile should always be set by collectInstalledAssets, but check defensively.
 	if asset.ConfigFile == "" {
 		result.Error = fmt.Errorf("no config file path for asset")
 		return result
 	}
 
-	// Replace the asset definition in-place, preserving file structure and other assets.
-	// Note: This validates that the asset exists before attempting update.
 	if err := assets.UpdateAssetInConfig(asset.ConfigFile, asset.Category, asset.Name, assetContent); err != nil {
 		result.Error = fmt.Errorf("updating config: %w", err)
-=======
-	// Determine config directory based on asset scope
-	var configDir string
-	if asset.Scope == "local" {
-		configDir = paths.Local
-	} else {
-		configDir = paths.Global
-	}
-
-	// Determine the config file and replace the asset entry
-	configFile := assetTypeToConfigFile(asset.Category)
-	configPath := filepath.Join(configDir, configFile)
-
-	if err := replaceAssetInConfig(configPath, asset.Name, assetContent); err != nil {
-		result.Error = fmt.Errorf("writing updated config: %w", err)
->>>>>>> Stashed changes
 		return result
 	}
 
 	result.Updated = true
 	return result
-}
-
-// replaceAssetInConfig replaces an existing asset entry in a config file.
-// It finds the asset key and its brace-delimited block, then replaces it with new content.
-func replaceAssetInConfig(configPath, assetName, newContent string) error {
-	data, err := os.ReadFile(configPath)
-	if err != nil {
-		return fmt.Errorf("reading config file: %w", err)
-	}
-
-	content := string(data)
-	assetKey := getAssetKey(assetName)
-
-	// Find the asset key - try quoted form first, then unquoted
-	keyPatterns := []string{
-		fmt.Sprintf("%q:", assetKey),
-		assetKey + ":",
-	}
-
-	keyStart := -1
-	keyLen := 0
-	for _, pattern := range keyPatterns {
-		idx := strings.Index(content, pattern)
-		if idx != -1 {
-			keyStart = idx
-			keyLen = len(pattern)
-			break
-		}
-	}
-
-	if keyStart == -1 {
-		return fmt.Errorf("asset %q not found in %s", assetKey, configPath)
-	}
-
-	// Find the opening brace after the key
-	afterKey := content[keyStart+keyLen:]
-	braceOffset := strings.Index(afterKey, "{")
-	if braceOffset == -1 {
-		return fmt.Errorf("no opening brace found for asset %q", assetKey)
-	}
-
-	// Count brace depth to find the matching close brace
-	blockStart := keyStart + keyLen + braceOffset
-	depth := 0
-	blockEnd := -1
-	for i := blockStart; i < len(content); i++ {
-		switch content[i] {
-		case '{':
-			depth++
-		case '}':
-			depth--
-			if depth == 0 {
-				blockEnd = i + 1
-				break
-			}
-		}
-		if blockEnd != -1 {
-			break
-		}
-	}
-
-	if blockEnd == -1 {
-		return fmt.Errorf("no matching close brace found for asset %q", assetKey)
-	}
-
-	// Replace the key + block with new key + content
-	var sb strings.Builder
-	sb.WriteString(content[:keyStart])
-	sb.WriteString(fmt.Sprintf("%q: ", assetKey))
-
-	// Indent the content to match the existing indentation
-	lines := strings.Split(newContent, "\n")
-	for i, line := range lines {
-		if i == 0 {
-			sb.WriteString(line)
-		} else {
-			if line != "" {
-				sb.WriteString("\n\t" + line)
-			} else {
-				sb.WriteString("\n")
-			}
-		}
-	}
-
-	sb.WriteString(content[blockEnd:])
-
-	return os.WriteFile(configPath, []byte(sb.String()), 0644)
 }
 
 // printUpdateResults prints the results of the update operation.
