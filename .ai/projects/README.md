@@ -14,6 +14,7 @@ See [p-writing-guide.md](./p-writing-guide.md) for guidelines on creating and ma
 |---------|-------|---------|
 | [p-021](./p-021-auto-setup-default-assets.md) | Auto-Setup Default Assets | Pending |
 | [p-022](./p-022-assets-ast-refactor.md) | Assets AST Refactor | Pending |
+| [p-023](./p-023-cli-config-reorder.md) | CLI Config Reorder | Pending |
 
 ### Completed Projects
 
@@ -53,6 +54,14 @@ Refactor asset installation code to use CUE's AST APIs instead of fragile string
 **Key Deliverables:** AST-based `internal/assets/install.go`, removed string manipulation, updated tests
 
 **Dependencies:** p-021
+
+#### p-023: CLI Config Reorder
+
+Add `order`/`reorder` command to context and role configuration for interactive move-up reordering. Refactor write functions to preserve definition order instead of alphabetically sorting.
+
+**Key Deliverables:** `config_order.go`, refactored write/load functions, DR-040
+
+**Dependencies:** None
 
 #### p-021: Auto-Setup Default Assets
 

@@ -12,7 +12,7 @@ Avoid references to the prototype in new documentation. This is a new design.
 
 Projects are stored in `.ai/projects/`. Continue by reading the active project.
 
-Active Project: None
+Active Project: [p-023 CLI Config Reorder](.ai/projects/p-023-cli-config-reorder.md)
 
 Other Projects (paused):
 - None
@@ -182,6 +182,6 @@ start-assets/
 - p-018: CLI Interactive Edit Completeness (models and tags editing in interactive mode)
 - p-020: Role Optional Field (optional field for discovery-based roles, graceful fallback)
 
-**Current:** None - all projects complete
+**Current:** p-023 CLI Config Reorder
 
 The prototype validated that this tool solves a real problem. This version will implement it properly.
