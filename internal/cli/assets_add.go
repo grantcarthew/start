@@ -3,6 +3,7 @@ package cli
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -19,28 +20,30 @@ import (
 // addAssetsAddCommand adds the add subcommand to the assets command.
 func addAssetsAddCommand(parent *cobra.Command) {
 	addCmd := &cobra.Command{
-		Use:     "add <query>",
+		Use:     "add <query>...",
 		Aliases: []string{"install"},
-		Short:   "Install asset from registry",
-		Long: `Install an asset from the CUE registry to your configuration.
+		Short:   "Install assets from registry",
+		Long: `Install one or more assets from the CUE registry to your configuration.
 
 Searches the registry index for matching assets. If multiple matches are found,
 prompts for selection. Use a direct path (e.g., "golang/code-review") for exact match.
 
+Multiple queries can be provided to install several assets at once.
+
 By default, installs to global config (~/.config/start/).
 Use --local to install to project config (./.start/).`,
-		Args: cobra.ExactArgs(1),
+		Args: cobra.MinimumNArgs(1),
 		RunE: runAssetsAdd,
 	}
 
 	parent.AddCommand(addCmd)
 }
 
-// runAssetsAdd searches for and installs an asset.
+// runAssetsAdd searches for and installs one or more assets.
 func runAssetsAdd(cmd *cobra.Command, args []string) error {
-	query := args[0]
 	ctx := context.Background()
 	flags := getFlags(cmd)
+	w := cmd.OutOrStdout()
 
 	// Create registry client
 	client, err := registry.NewClient()
@@ -50,29 +53,11 @@ func runAssetsAdd(cmd *cobra.Command, args []string) error {
 
 	// Fetch index
 	if !flags.Quiet {
-		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "Fetching index...")
+		_, _ = fmt.Fprintln(w, "Fetching index...")
 	}
 	index, err := client.FetchIndex(ctx)
 	if err != nil {
 		return fmt.Errorf("fetching index: %w", err)
-	}
-
-	// Search for matching assets
-	results := assets.SearchIndex(index, query)
-
-	if len(results) == 0 {
-		return fmt.Errorf("no assets found matching %q", query)
-	}
-
-	// Select asset
-	var selected assets.SearchResult
-	if len(results) == 1 {
-		selected = results[0]
-	} else {
-		selected, err = promptAssetSelection(cmd.OutOrStdout(), cmd.InOrStdin(), results)
-		if err != nil {
-			return err
-		}
 	}
 
 	// Determine config path
@@ -83,8 +68,7 @@ func runAssetsAdd(cmd *cobra.Command, args []string) error {
 
 	var configDir string
 	var scopeName string
-	local := getFlags(cmd).Local
-	if local {
+	if flags.Local {
 		configDir = paths.Local
 		scopeName = "local"
 	} else {
@@ -92,9 +76,43 @@ func runAssetsAdd(cmd *cobra.Command, args []string) error {
 		scopeName = "global"
 	}
 
+	// Install each queried asset
+	var errs []error
+	for _, query := range args {
+		if err := installAsset(ctx, cmd, client, index, query, configDir, scopeName, flags); err != nil {
+			errs = append(errs, fmt.Errorf("%s: %w", query, err))
+			_, _ = fmt.Fprintf(w, "Error installing %q: %v\n", query, err)
+		}
+	}
+
+	return errors.Join(errs...)
+}
+
+// installAsset searches for, selects, and installs a single asset.
+func installAsset(ctx context.Context, cmd *cobra.Command, client *registry.Client, index *registry.Index, query, configDir, scopeName string, flags *Flags) error {
+	w := cmd.OutOrStdout()
+
+	// Search for matching assets
+	results := assets.SearchIndex(index, query)
+	if len(results) == 0 {
+		return fmt.Errorf("no assets found matching %q", query)
+	}
+
+	// Select asset
+	var selected assets.SearchResult
+	if len(results) == 1 {
+		selected = results[0]
+	} else {
+		var err error
+		selected, err = promptAssetSelection(w, cmd.InOrStdin(), results)
+		if err != nil {
+			return err
+		}
+	}
+
 	// Install the asset
 	if !flags.Quiet {
-		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "Fetching asset...")
+		_, _ = fmt.Fprintln(w, "Fetching asset...")
 	}
 
 	if err := assets.InstallAsset(ctx, client, selected, configDir); err != nil {
@@ -111,8 +129,8 @@ func runAssetsAdd(cmd *cobra.Command, args []string) error {
 		if configFile == "" {
 			configFile = "settings.cue"
 		}
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "\nInstalled %s/%s to %s config\n", selected.Category, selected.Name, scopeName)
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Config: %s/%s\n", configDir, configFile)
+		_, _ = fmt.Fprintf(w, "\nInstalled %s/%s to %s config\n", selected.Category, selected.Name, scopeName)
+		_, _ = fmt.Fprintf(w, "Config: %s/%s\n", configDir, configFile)
 	}
 
 	return nil

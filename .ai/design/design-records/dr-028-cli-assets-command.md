@@ -17,7 +17,7 @@ Synopsis:
 ```bash
 start assets browse              # Open GitHub asset registry in browser
 start assets search <query>      # Search registry index
-start assets add <query>         # Install asset to config
+start assets add <query>...      # Install asset(s) to config
 start assets list                # List installed assets with update status
 start assets info <query>        # Show detailed asset information
 start assets update [query]      # Update installed assets
@@ -97,20 +97,24 @@ tasks/
 
 ### start assets add
 
-Install an asset from the registry to user configuration.
+Install one or more assets from the registry to user configuration.
 
 ```bash
 start assets add <query>              # Search and install (global)
 start assets add <query> --local      # Install to project config
 start assets add golang/code-review   # Direct path install
+start assets add golang/debug golang/refactor  # Install multiple assets
 ```
 
 Behaviour:
 
-1. Search index for matching asset
-2. If multiple matches, prompt for selection
-3. If single match, confirm and install
-4. Add CUE import to config file (`~/.config/start/` or `./.start/`)
+1. Fetch registry index once
+2. For each query:
+   a. Search index for matching asset
+   b. If multiple matches, prompt for selection
+   c. Install to config file (`~/.config/start/` or `./.start/`)
+3. If any install fails, report the error and continue with remaining queries
+4. Exit with error if any query failed
 
 Installation writes import to appropriate config file:
 
@@ -321,3 +325,4 @@ Single `list` command for both registry and config:
 ## Updates
 
 - 2025-12-22: Aligned exit codes with unified policy (0 success, 1 failure)
+- 2026-02-08: `assets add` now accepts multiple queries (issue #2)
