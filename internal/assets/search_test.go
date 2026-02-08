@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"cuelang.org/go/cue/cuecontext"
 	"github.com/grantcarthew/start/internal/registry"
 )
 
@@ -356,5 +357,255 @@ func TestSearchResultOrdering(t *testing.T) {
 		if seenTasks && cat == "roles" {
 			t.Error("SearchIndex() results not properly ordered: tasks before roles")
 		}
+	}
+}
+
+// TestSearchCategoryEntries tests the exported SearchCategoryEntries function.
+func TestSearchCategoryEntries(t *testing.T) {
+	t.Parallel()
+
+	entries := map[string]registry.IndexEntry{
+		"golang/assistant": {
+			Module:      "github.com/test/roles/golang/assistant@v0",
+			Description: "Go programming expert",
+			Tags:        []string{"golang", "programming"},
+		},
+		"python/assistant": {
+			Module:      "github.com/test/roles/python/assistant@v0",
+			Description: "Python programming expert",
+			Tags:        []string{"python", "programming"},
+		},
+		"rust/assistant": {
+			Module:      "github.com/test/roles/rust/assistant@v0",
+			Description: "Rust programming expert",
+			Tags:        []string{"rust", "systems"},
+		},
+	}
+
+	tests := []struct {
+		name      string
+		query     string
+		wantCount int
+		wantFirst string // expected first result name
+	}{
+		{
+			name:      "find golang",
+			query:     "golang",
+			wantCount: 1,
+			wantFirst: "golang/assistant",
+		},
+		{
+			name:      "find programming matches multiple",
+			query:     "programming",
+			wantCount: 3, // golang, python, rust all have "programming" in description
+		},
+		{
+			name:      "no match",
+			query:     "javascript",
+			wantCount: 0,
+		},
+		{
+			name:      "results sorted by score then name",
+			query:     "assistant",
+			wantCount: 3,
+			wantFirst: "golang/assistant", // all same score, alphabetical
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			results := SearchCategoryEntries("roles", entries, tt.query)
+
+			if len(results) != tt.wantCount {
+				t.Errorf("SearchCategoryEntries() returned %d results, want %d", len(results), tt.wantCount)
+			}
+
+			if tt.wantFirst != "" && len(results) > 0 {
+				if results[0].Name != tt.wantFirst {
+					t.Errorf("SearchCategoryEntries() first result = %q, want %q", results[0].Name, tt.wantFirst)
+				}
+			}
+
+			// Verify all results have correct category
+			for _, r := range results {
+				if r.Category != "roles" {
+					t.Errorf("result %q has category %q, want %q", r.Name, r.Category, "roles")
+				}
+			}
+		})
+	}
+}
+
+// TestSearchInstalledConfig tests searching installed CUE config values.
+func TestSearchInstalledConfig(t *testing.T) {
+	t.Parallel()
+
+	cctx := cuecontext.New()
+	cfg := cctx.CompileString(`{
+		agents: {
+			claude: {
+				description: "Anthropic Claude AI assistant"
+				tags: ["ai", "llm"]
+				origin: "github.com/test/agents/claude@v0"
+			}
+			"gemini-non-interactive": {
+				description: "Google Gemini non-interactive mode"
+				tags: ["ai", "google"]
+			}
+		}
+		roles: {
+			"golang/assistant": {
+				description: "Go programming expert"
+				tags: ["golang", "programming"]
+			}
+		}
+	}`)
+
+	tests := []struct {
+		name      string
+		cueKey    string
+		category  string
+		query     string
+		wantCount int
+		wantFirst string
+	}{
+		{
+			name:      "find agent by name substring",
+			cueKey:    "agents",
+			category:  "agents",
+			query:     "claude",
+			wantCount: 1,
+			wantFirst: "claude",
+		},
+		{
+			name:      "find agent by tag",
+			cueKey:    "agents",
+			category:  "agents",
+			query:     "ai",
+			wantCount: 2,
+		},
+		{
+			name:      "find agent by description",
+			cueKey:    "agents",
+			category:  "agents",
+			query:     "google",
+			wantCount: 1,
+			wantFirst: "gemini-non-interactive",
+		},
+		{
+			name:      "find role by name",
+			cueKey:    "roles",
+			category:  "roles",
+			query:     "golang",
+			wantCount: 1,
+			wantFirst: "golang/assistant",
+		},
+		{
+			name:      "no matches",
+			cueKey:    "agents",
+			category:  "agents",
+			query:     "nonexistent",
+			wantCount: 0,
+		},
+		{
+			name:      "missing category returns nil",
+			cueKey:    "tasks",
+			category:  "tasks",
+			query:     "anything",
+			wantCount: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			results := SearchInstalledConfig(cfg, tt.cueKey, tt.category, tt.query)
+
+			if len(results) != tt.wantCount {
+				t.Errorf("SearchInstalledConfig() returned %d results, want %d", len(results), tt.wantCount)
+			}
+
+			if tt.wantFirst != "" && len(results) > 0 {
+				if results[0].Name != tt.wantFirst {
+					t.Errorf("SearchInstalledConfig() first result = %q, want %q", results[0].Name, tt.wantFirst)
+				}
+			}
+
+			// Verify all results have correct category
+			for _, r := range results {
+				if r.Category != tt.category {
+					t.Errorf("result %q has category %q, want %q", r.Name, r.Category, tt.category)
+				}
+			}
+		})
+	}
+}
+
+// TestExtractIndexEntryFromCUE tests field extraction from CUE values.
+func TestExtractIndexEntryFromCUE(t *testing.T) {
+	t.Parallel()
+
+	cctx := cuecontext.New()
+
+	tests := []struct {
+		name            string
+		cueStr          string
+		wantDescription string
+		wantTags        []string
+		wantModule      string
+	}{
+		{
+			name: "full entry",
+			cueStr: `{
+				description: "Go programming expert"
+				tags: ["golang", "programming"]
+				origin: "github.com/test/roles/golang@v0"
+			}`,
+			wantDescription: "Go programming expert",
+			wantTags:        []string{"golang", "programming"},
+			wantModule:      "github.com/test/roles/golang@v0",
+		},
+		{
+			name: "description only",
+			cueStr: `{
+				description: "Simple entry"
+			}`,
+			wantDescription: "Simple entry",
+			wantTags:        nil,
+			wantModule:      "",
+		},
+		{
+			name: "empty struct",
+			cueStr: `{
+				prompt: "some prompt"
+			}`,
+			wantDescription: "",
+			wantTags:        nil,
+			wantModule:      "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			v := cctx.CompileString(tt.cueStr)
+			entry := extractIndexEntryFromCUE(v)
+
+			if entry.Description != tt.wantDescription {
+				t.Errorf("Description = %q, want %q", entry.Description, tt.wantDescription)
+			}
+
+			if len(entry.Tags) != len(tt.wantTags) {
+				t.Errorf("Tags = %v, want %v", entry.Tags, tt.wantTags)
+			} else {
+				for i, tag := range entry.Tags {
+					if tag != tt.wantTags[i] {
+						t.Errorf("Tags[%d] = %q, want %q", i, tag, tt.wantTags[i])
+					}
+				}
+			}
+
+			if entry.Module != tt.wantModule {
+				t.Errorf("Module = %q, want %q", entry.Module, tt.wantModule)
+			}
+		})
 	}
 }

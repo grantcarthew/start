@@ -197,14 +197,21 @@ func (c *Composer) Compose(cfg cue.Value, selection ContextSelection, customText
 				addConfigContext(ctx)
 			}
 		} else {
-			// Config tag - find matching contexts (config order within this tag)
-			tagSelection := ContextSelection{Tags: []string{tag}}
-			contexts, _ := c.selectContexts(cfg, tagSelection)
-			if len(contexts) == 0 {
-				result.Warnings = append(result.Warnings, fmt.Sprintf("tag %q matched no contexts", tag))
-			}
-			for _, ctx := range contexts {
+			// Try exact context name match first (from search resolution)
+			ctxVal := cfg.LookupPath(cue.ParsePath(internalcue.KeyContexts))
+			if ctxVal.Exists() && ctxVal.LookupPath(cue.MakePath(cue.Str(tag))).Exists() {
+				ctx := Context{Name: tag}
 				addConfigContext(ctx)
+			} else {
+				// Fall back to tag matching
+				tagSelection := ContextSelection{Tags: []string{tag}}
+				contexts, _ := c.selectContexts(cfg, tagSelection)
+				if len(contexts) == 0 {
+					result.Warnings = append(result.Warnings, fmt.Sprintf("context %q not found", tag))
+				}
+				for _, ctx := range contexts {
+					addConfigContext(ctx)
+				}
 			}
 		}
 	}
