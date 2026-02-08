@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 
 	"cuelang.org/go/cue"
@@ -34,6 +33,7 @@ Each role specifies a prompt via inline text, file reference, or command.`,
 	addConfigRoleEditCommand(roleCmd)
 	addConfigRoleRemoveCommand(roleCmd)
 	addConfigRoleDefaultCommand(roleCmd)
+	addConfigRoleOrderCommand(roleCmd)
 
 	parent.AddCommand(roleCmd)
 }
@@ -68,7 +68,7 @@ Use --local to show only local roles.`,
 // runConfigRoleList lists all configured roles.
 func runConfigRoleList(cmd *cobra.Command, _ []string) error {
 	local := getFlags(cmd).Local
-	roles, err := loadRolesForScope(local)
+	roles, order, err := loadRolesForScope(local)
 	if err != nil {
 		return err
 	}
@@ -88,14 +88,7 @@ func runConfigRoleList(cmd *cobra.Command, _ []string) error {
 	_, _ = fmt.Fprintln(w, "Roles:")
 	_, _ = fmt.Fprintln(w)
 
-	// Sort role names for consistent output
-	var names []string
-	for name := range roles {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-
-	for _, name := range names {
+	for _, name := range order {
 		role := roles[name]
 		marker := "  "
 		if name == defaultRole {
@@ -298,7 +291,7 @@ func runConfigRoleAdd(cmd *cobra.Command, _ []string) error {
 	}
 
 	// Load existing roles from target directory
-	existingRoles, err := loadRolesFromDir(configDir)
+	existingRoles, existingOrder, err := loadRolesFromDir(configDir)
 	if err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("loading existing roles: %w", err)
 	}
@@ -313,7 +306,7 @@ func runConfigRoleAdd(cmd *cobra.Command, _ []string) error {
 
 	// Write roles file
 	rolePath := filepath.Join(configDir, "roles.cue")
-	if err := writeRolesFile(rolePath, existingRoles); err != nil {
+	if err := writeRolesFile(rolePath, existingRoles, append(existingOrder, name)); err != nil {
 		return fmt.Errorf("writing roles file: %w", err)
 	}
 
@@ -346,7 +339,7 @@ func runConfigRoleInfo(cmd *cobra.Command, args []string) error {
 	name := args[0]
 	local := getFlags(cmd).Local
 
-	roles, err := loadRolesForScope(local)
+	roles, _, err := loadRolesForScope(local)
 	if err != nil {
 		return err
 	}
@@ -437,7 +430,7 @@ func runConfigRoleEdit(cmd *cobra.Command, args []string) error {
 	stdout := cmd.OutOrStdout()
 
 	// Load existing roles
-	roles, err := loadRolesFromDir(configDir)
+	roles, order, err := loadRolesFromDir(configDir)
 	if err != nil {
 		return fmt.Errorf("loading roles: %w", err)
 	}
@@ -473,7 +466,7 @@ func runConfigRoleEdit(cmd *cobra.Command, args []string) error {
 
 		roles[name] = role
 
-		if err := writeRolesFile(rolePath, roles); err != nil {
+		if err := writeRolesFile(rolePath, roles, order); err != nil {
 			return fmt.Errorf("writing roles file: %w", err)
 		}
 
@@ -581,7 +574,7 @@ func runConfigRoleEdit(cmd *cobra.Command, args []string) error {
 	roles[name] = role
 
 	// Write updated file
-	if err := writeRolesFile(rolePath, roles); err != nil {
+	if err := writeRolesFile(rolePath, roles, order); err != nil {
 		return fmt.Errorf("writing roles file: %w", err)
 	}
 
@@ -627,7 +620,7 @@ func runConfigRoleRemove(cmd *cobra.Command, args []string) error {
 	}
 
 	// Load existing roles
-	roles, err := loadRolesFromDir(configDir)
+	roles, order, err := loadRolesFromDir(configDir)
 	if err != nil {
 		return fmt.Errorf("loading roles: %w", err)
 	}
@@ -659,12 +652,18 @@ func runConfigRoleRemove(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Remove role
+	// Remove role and its order entry
 	delete(roles, name)
+	newOrder := make([]string, 0, len(order))
+	for _, n := range order {
+		if n != name {
+			newOrder = append(newOrder, n)
+		}
+	}
 
 	// Write updated file
 	rolePath := filepath.Join(configDir, "roles.cue")
-	if err := writeRolesFile(rolePath, roles); err != nil {
+	if err := writeRolesFile(rolePath, roles, newOrder); err != nil {
 		return fmt.Errorf("writing roles file: %w", err)
 	}
 
@@ -729,7 +728,7 @@ func runConfigRoleDefault(cmd *cobra.Command, args []string) error {
 	name := args[0]
 
 	// Verify role exists
-	roles, err := loadRolesForScope(local)
+	roles, _, err := loadRolesForScope(local)
 	if err != nil {
 		return err
 	}
@@ -770,73 +769,90 @@ type RoleConfig struct {
 }
 
 // loadRolesForScope loads roles from the appropriate scope.
-func loadRolesForScope(localOnly bool) (map[string]RoleConfig, error) {
+// Returns the roles map, names in definition order, and any error.
+// Order: global roles first (in definition order), then local roles (in definition order).
+// Local roles override global roles with the same name but retain their global position.
+func loadRolesForScope(localOnly bool) (map[string]RoleConfig, []string, error) {
 	paths, err := config.ResolvePaths("")
 	if err != nil {
-		return nil, fmt.Errorf("resolving config paths: %w", err)
+		return nil, nil, fmt.Errorf("resolving config paths: %w", err)
 	}
 
 	roles := make(map[string]RoleConfig)
+	var order []string
+	seen := make(map[string]bool)
 
 	if localOnly {
 		if paths.LocalExists {
-			localRoles, err := loadRolesFromDir(paths.Local)
+			localRoles, localOrder, err := loadRolesFromDir(paths.Local)
 			if err != nil && !os.IsNotExist(err) {
-				return nil, err
+				return nil, nil, err
 			}
-			for name, role := range localRoles {
+			for _, name := range localOrder {
+				role := localRoles[name]
 				role.Source = "local"
 				roles[name] = role
+				order = append(order, name)
 			}
 		}
 	} else {
 		if paths.GlobalExists {
-			globalRoles, err := loadRolesFromDir(paths.Global)
+			globalRoles, globalOrder, err := loadRolesFromDir(paths.Global)
 			if err != nil && !os.IsNotExist(err) {
-				return nil, err
+				return nil, nil, err
 			}
-			for name, role := range globalRoles {
+			for _, name := range globalOrder {
+				role := globalRoles[name]
 				role.Source = "global"
 				roles[name] = role
+				order = append(order, name)
+				seen[name] = true
 			}
 		}
 		if paths.LocalExists {
-			localRoles, err := loadRolesFromDir(paths.Local)
+			localRoles, localOrder, err := loadRolesFromDir(paths.Local)
 			if err != nil && !os.IsNotExist(err) {
-				return nil, err
+				return nil, nil, err
 			}
-			for name, role := range localRoles {
+			for _, name := range localOrder {
+				role := localRoles[name]
 				role.Source = "local"
 				roles[name] = role
+				// Only add to order if not already present from global
+				if !seen[name] {
+					order = append(order, name)
+				}
 			}
 		}
 	}
 
-	return roles, nil
+	return roles, order, nil
 }
 
 // loadRolesFromDir loads roles from a specific directory.
-func loadRolesFromDir(dir string) (map[string]RoleConfig, error) {
+// Returns the roles map, names in definition order, and any error.
+func loadRolesFromDir(dir string) (map[string]RoleConfig, []string, error) {
 	roles := make(map[string]RoleConfig)
+	var order []string
 
 	loader := internalcue.NewLoader()
 	cfg, err := loader.LoadSingle(dir)
 	if err != nil {
 		// If no CUE files exist, return empty map (not an error)
 		if strings.Contains(err.Error(), "no CUE files") {
-			return roles, nil
+			return roles, order, nil
 		}
-		return roles, err
+		return roles, order, err
 	}
 
 	rolesVal := cfg.LookupPath(cue.ParsePath(internalcue.KeyRoles))
 	if !rolesVal.Exists() {
-		return roles, nil
+		return roles, order, nil
 	}
 
 	iter, err := rolesVal.Fields()
 	if err != nil {
-		return nil, fmt.Errorf("iterating roles: %w", err)
+		return nil, nil, fmt.Errorf("iterating roles: %w", err)
 	}
 
 	for iter.Next() {
@@ -881,27 +897,22 @@ func loadRolesFromDir(dir string) (map[string]RoleConfig, error) {
 		}
 
 		roles[name] = role
+		order = append(order, name)
 	}
 
-	return roles, nil
+	return roles, order, nil
 }
 
 // writeRolesFile writes the roles configuration to a file.
-func writeRolesFile(path string, roles map[string]RoleConfig) error {
+// Fields are written in the provided order.
+func writeRolesFile(path string, roles map[string]RoleConfig, order []string) error {
 	var sb strings.Builder
 
 	sb.WriteString("// Auto-generated by start config\n")
 	sb.WriteString("// Edit this file to customize your role configuration\n\n")
 	sb.WriteString("roles: {\n")
 
-	// Sort role names for consistent output
-	var names []string
-	for name := range roles {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-
-	for _, name := range names {
+	for _, name := range order {
 		role := roles[name]
 		sb.WriteString(fmt.Sprintf("\t%q: {\n", name))
 

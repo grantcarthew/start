@@ -36,6 +36,7 @@ Use --local to target project-specific configuration.`,
 	addConfigContextCommand(configCmd)
 	addConfigTaskCommand(configCmd)
 	addConfigSettingsCommand(configCmd)
+	addConfigOrderCommand(configCmd)
 
 	parent.AddCommand(configCmd)
 }
@@ -103,7 +104,7 @@ func runConfigList(cmd *cobra.Command, args []string) error {
 	}
 
 	// Roles
-	roles, _ := loadRolesForScope(local)
+	roles, roleOrder, _ := loadRolesForScope(local)
 	_, _ = fmt.Fprintln(w)
 	_, _ = fmt.Fprintf(w, "Roles (%s): %d\n", scopeLabel, len(roles))
 	if len(roles) > 0 {
@@ -111,12 +112,7 @@ func runConfigList(cmd *cobra.Command, args []string) error {
 		if cfg, err := loadConfigForScope(local); err == nil {
 			defaultRole = getDefaultRoleFromConfig(cfg)
 		}
-		var names []string
-		for name := range roles {
-			names = append(names, name)
-		}
-		sort.Strings(names)
-		for _, name := range names {
+		for _, name := range roleOrder {
 			role := roles[name]
 			marker := "  "
 			if name == defaultRole {
