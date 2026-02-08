@@ -223,21 +223,37 @@ func printUpdateResults(w io.Writer, results []UpdateResult, dryRun bool) {
 	var updated, current, failed int
 
 	for _, r := range results {
-		prefix := "  "
+		name := r.Asset.Category + "/" + r.Asset.Name
+		_, _ = fmt.Fprintf(w, "  %s ", name)
+
 		if r.Error != nil {
-			_, _ = fmt.Fprintf(w, "%sFailed %s/%s: %v\n", prefix, r.Asset.Category, r.Asset.Name, r.Error)
+			_, _ = colorCyan.Fprint(w, "(")
+			_, _ = colorError.Fprintf(w, "error: %v", r.Error)
+			_, _ = colorCyan.Fprintln(w, ")")
 			failed++
 		} else if r.Updated {
-			if r.OldVersion != "" && r.NewVersion != "" {
-				_, _ = fmt.Fprintf(w, "%sUpdated %s/%-20s %s -> %s\n", prefix, r.Asset.Category, r.Asset.Name, r.OldVersion, r.NewVersion)
-			} else if r.NewVersion != "" {
-				_, _ = fmt.Fprintf(w, "%sUpdated %s/%-20s -> %s\n", prefix, r.Asset.Category, r.Asset.Name, r.NewVersion)
-			} else {
-				_, _ = fmt.Fprintf(w, "%sUpdated %s/%s\n", prefix, r.Asset.Category, r.Asset.Name)
+			_, _ = colorCyan.Fprint(w, "(")
+			if r.OldVersion != "" {
+				_, _ = colorDim.Fprint(w, r.OldVersion)
+				_, _ = fmt.Fprint(w, " ")
 			}
+			_, _ = colorBlue.Fprint(w, "->")
+			if r.NewVersion != "" {
+				_, _ = fmt.Fprint(w, " ")
+				_, _ = colorSuccess.Fprint(w, r.NewVersion)
+			}
+			_, _ = colorCyan.Fprintln(w, ")")
 			updated++
 		} else {
-			_, _ = fmt.Fprintf(w, "%sCurrent %s/%s\n", prefix, r.Asset.Category, r.Asset.Name)
+			_, _ = colorCyan.Fprint(w, "(")
+			if r.OldVersion != "" {
+				_, _ = colorDim.Fprint(w, r.OldVersion)
+				_, _ = fmt.Fprint(w, " ")
+				_, _ = colorBlue.Fprint(w, "->")
+				_, _ = fmt.Fprint(w, " ")
+			}
+			_, _ = colorDim.Fprint(w, "current")
+			_, _ = colorCyan.Fprintln(w, ")")
 			current++
 		}
 	}

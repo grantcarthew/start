@@ -17,6 +17,9 @@ var (
 	colorSuccess   = color.New(color.FgGreen)
 	colorHeader    = color.New(color.FgGreen)
 	colorSeparator = color.New(color.FgMagenta)
+	colorDim       = color.New(color.Faint)
+	colorCyan      = color.New(color.FgCyan)
+	colorBlue      = color.New(color.FgBlue)
 )
 
 // PrintError prints an error message in red.
