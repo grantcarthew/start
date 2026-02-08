@@ -33,6 +33,7 @@ type Flags struct {
 	Debug     bool
 	NoColor   bool
 	Local     bool
+	NoRole    bool
 }
 
 // getFlags retrieves Flags from the command context.
@@ -138,8 +139,15 @@ func executeStart(stdout, stderr io.Writer, flags *Flags, selection orchestratio
 	debugf(flags, "context", "Selection: required=%t, defaults=%t, tags=%v",
 		selection.IncludeRequired, selection.IncludeDefaults, selection.Tags)
 
-	// Compose prompt with role
-	result, composeErr := env.Composer.ComposeWithRole(env.Cfg.Value, selection, flags.Role, customText, "")
+	// Compose prompt with or without role
+	var result orchestration.ComposeResult
+	var composeErr error
+	if flags.NoRole {
+		debugf(flags, "role", "Skipping role (--no-role)")
+		result, composeErr = env.Composer.Compose(env.Cfg.Value, selection, customText, "")
+	} else {
+		result, composeErr = env.Composer.ComposeWithRole(env.Cfg.Value, selection, flags.Role, customText, "")
+	}
 	if composeErr != nil {
 		// Show UI with role resolutions before returning error
 		if !flags.Quiet && len(result.RoleResolutions) > 0 {

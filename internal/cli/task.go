@@ -80,7 +80,10 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 	// Check if taskName is a file path (per DR-038)
 	var taskResult orchestration.ProcessResult
 	var resolvedName string
-	roleName := flags.Role
+	var roleName string
+	if !flags.NoRole {
+		roleName = flags.Role
+	}
 	if orchestration.IsFilePath(taskName) {
 		debugf(flags, "task", "Detected file path, reading file")
 		content, err := orchestration.ReadFilePath(taskName)
@@ -212,8 +215,8 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 			return fmt.Errorf("resolving task: %w", err)
 		}
 
-		// Get task's role if not specified via flag
-		if roleName == "" {
+		// Get task's role if not specified via flag and --no-role not set
+		if !flags.NoRole && roleName == "" {
 			roleName = orchestration.GetTaskRole(env.Cfg.Value, resolvedName)
 			if roleName != "" {
 				debugf(flags, "role", "Selected %q (from task)", roleName)
@@ -249,7 +252,14 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 		selection.IncludeRequired, selection.IncludeDefaults, selection.Tags)
 
 	// Compose contexts and resolve role
-	composeResult, composeErr := env.Composer.ComposeWithRole(env.Cfg.Value, selection, roleName, taskResult.Content, "")
+	var composeResult orchestration.ComposeResult
+	var composeErr error
+	if flags.NoRole {
+		debugf(flags, "role", "Skipping role (--no-role)")
+		composeResult, composeErr = env.Composer.Compose(env.Cfg.Value, selection, taskResult.Content, "")
+	} else {
+		composeResult, composeErr = env.Composer.ComposeWithRole(env.Cfg.Value, selection, roleName, taskResult.Content, "")
+	}
 	if composeErr != nil {
 		// Show UI with role resolutions before returning error
 		if !flags.Quiet && len(composeResult.RoleResolutions) > 0 {

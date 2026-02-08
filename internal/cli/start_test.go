@@ -116,6 +116,99 @@ func TestExecuteStart_DryRun(t *testing.T) {
 	}
 }
 
+func TestExecuteStart_NoRole(t *testing.T) {
+	tmpDir := setupStartTestConfig(t)
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getting working dir: %v", err)
+	}
+	defer func() { _ = os.Chdir(origDir) }()
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("changing to temp dir: %v", err)
+	}
+
+	flags := &Flags{DryRun: true, NoRole: true}
+
+	selection := orchestration.ContextSelection{
+		IncludeRequired: true,
+		IncludeDefaults: true,
+	}
+
+	stdout := new(bytes.Buffer)
+	stderr := new(bytes.Buffer)
+
+	err = executeStart(stdout, stderr, flags, selection, "")
+	if err != nil {
+		t.Fatalf("executeStart() error = %v", err)
+	}
+
+	output := stdout.String()
+
+	// Should show dry run header
+	if !strings.Contains(output, "Dry Run") {
+		t.Errorf("Expected 'Dry Run' in output, got:\n%s", output)
+	}
+
+	// Should show agent
+	if !strings.Contains(output, "echo") {
+		t.Errorf("Expected agent 'echo' in output")
+	}
+
+	// Should still show contexts
+	if !strings.Contains(output, "env") {
+		t.Errorf("Expected context 'env' in output")
+	}
+
+	// Should NOT contain role content
+	if strings.Contains(output, "You are a helpful assistant") {
+		t.Errorf("Expected no role content in output, got:\n%s", output)
+	}
+
+	// Role name should be empty
+	if strings.Contains(output, "assistant") {
+		t.Errorf("Expected no role name 'assistant' in output, got:\n%s", output)
+	}
+}
+
+func TestExecuteTask_NoRole(t *testing.T) {
+	tmpDir := setupStartTestConfig(t)
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getting working dir: %v", err)
+	}
+	defer func() { _ = os.Chdir(origDir) }()
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("changing to temp dir: %v", err)
+	}
+
+	flags := &Flags{DryRun: true, NoRole: true}
+
+	stdout := new(bytes.Buffer)
+	stderr := new(bytes.Buffer)
+
+	err = executeTask(stdout, stderr, strings.NewReader(""), flags, "test-task", "focus on testing")
+	if err != nil {
+		t.Fatalf("executeTask() error = %v", err)
+	}
+
+	output := stdout.String()
+
+	// Should show task name
+	if !strings.Contains(output, "test-task") {
+		t.Errorf("Expected task name in output")
+	}
+
+	// Should show instructions
+	if !strings.Contains(output, "focus on testing") {
+		t.Errorf("Expected instructions in output")
+	}
+
+	// Should NOT contain role content (task has role: "assistant" configured)
+	if strings.Contains(output, "You are a helpful assistant") {
+		t.Errorf("Expected no role content with --no-role, got:\n%s", output)
+	}
+}
+
 func TestExecuteStart_ContextSelection(t *testing.T) {
 	tmpDir := setupStartTestConfig(t)
 	origDir, err := os.Getwd()
