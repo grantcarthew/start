@@ -12,7 +12,7 @@ Avoid references to the prototype in new documentation. This is a new design.
 
 Projects are stored in `.ai/projects/`. Continue by reading the active project.
 
-Active Project: [p-023 CLI Config Reorder](.ai/projects/p-023-cli-config-reorder.md)
+Active Project: [p-024 CLI Flag Asset Search](.ai/projects/p-024-cli-flag-asset-search.md)
 
 Other Projects (paused):
 - None
@@ -181,7 +181,9 @@ start-assets/
 - p-019: CLI File Path Inputs (file path support for --role, --context, task, and prompt commands)
 - p-018: CLI Interactive Edit Completeness (models and tags editing in interactive mode)
 - p-020: Role Optional Field (optional field for discovery-based roles, graceful fallback)
+- p-021: Auto-Setup Default Assets (internal/assets package, default context installation)
+- p-023: CLI Config Reorder (interactive reordering, definition order preservation)
 
-**Current:** p-023 CLI Config Reorder
+**Current:** p-024 CLI Flag Asset Search
 
 The prototype validated that this tool solves a real problem. This version will implement it properly.
