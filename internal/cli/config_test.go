@@ -632,7 +632,7 @@ func TestWriteRolesFile(t *testing.T) {
 		},
 	}
 
-	err := writeRolesFile(path, roles)
+	err := writeRolesFile(path, roles, []string{"go-expert"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -664,7 +664,7 @@ func TestWriteContextsFile(t *testing.T) {
 		},
 	}
 
-	err := writeContextsFile(path, contexts)
+	err := writeContextsFile(path, contexts, []string{"project"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
