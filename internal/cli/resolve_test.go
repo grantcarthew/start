@@ -1,0 +1,686 @@
+package cli
+
+import (
+	"io"
+	"strings"
+	"testing"
+
+	"cuelang.org/go/cue/cuecontext"
+	internalcue "github.com/grantcarthew/start/internal/cue"
+	"github.com/grantcarthew/start/internal/orchestration"
+	"github.com/grantcarthew/start/internal/registry"
+)
+
+// buildTestCfg creates a LoadResult from a CUE string for testing.
+func buildTestCfg(t *testing.T, cueStr string) internalcue.LoadResult {
+	t.Helper()
+	cctx := cuecontext.New()
+	v := cctx.CompileString(cueStr)
+	if v.Err() != nil {
+		t.Fatalf("compiling test CUE: %v", v.Err())
+	}
+	return internalcue.LoadResult{Value: v}
+}
+
+func TestHasExactInstalled(t *testing.T) {
+	t.Parallel()
+
+	cfg := buildTestCfg(t, `{
+		agents: {
+			claude: {
+				bin: "claude"
+				command: "{{.bin}}"
+			}
+			"gemini-non-interactive": {
+				bin: "gemini"
+				command: "{{.bin}}"
+			}
+		}
+		roles: {
+			"golang/assistant": {
+				prompt: "You are a Go expert"
+			}
+		}
+		contexts: {
+			env: {
+				required: true
+				prompt: "environment"
+			}
+		}
+	}`)
+
+	tests := []struct {
+		name     string
+		cueKey   string
+		assetKey string
+		want     bool
+	}{
+		{"exact agent match", internalcue.KeyAgents, "claude", true},
+		{"exact agent with slash", internalcue.KeyAgents, "gemini-non-interactive", true},
+		{"partial agent no match", internalcue.KeyAgents, "clau", false},
+		{"nonexistent agent", internalcue.KeyAgents, "nonexistent", false},
+		{"exact role match", internalcue.KeyRoles, "golang/assistant", true},
+		{"partial role no match", internalcue.KeyRoles, "golang", false},
+		{"exact context match", internalcue.KeyContexts, "env", true},
+		{"missing category", internalcue.KeyTasks, "anything", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := hasExactInstalled(cfg.Value, tt.cueKey, tt.assetKey)
+			if got != tt.want {
+				t.Errorf("hasExactInstalled(%q, %q) = %v, want %v", tt.cueKey, tt.assetKey, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestFindExactInRegistry(t *testing.T) {
+	t.Parallel()
+
+	entries := map[string]registry.IndexEntry{
+		"golang/assistant": {
+			Module:      "github.com/test/roles/golang/assistant@v0",
+			Description: "Go programming expert",
+		},
+		"python/debug": {
+			Module:      "github.com/test/roles/python/debug@v0",
+			Description: "Python debugger",
+		},
+	}
+
+	tests := []struct {
+		name     string
+		query    string
+		wantName string
+		wantNil  bool
+	}{
+		{"full name match", "golang/assistant", "golang/assistant", false},
+		{"short name match", "assistant", "golang/assistant", false},
+		{"no match", "nonexistent", "", true},
+		{"partial no match", "gol", "", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := findExactInRegistry(entries, "roles", tt.query)
+			if tt.wantNil {
+				if result != nil {
+					t.Errorf("findExactInRegistry(%q) = %v, want nil", tt.query, result)
+				}
+				return
+			}
+			if result == nil {
+				t.Fatalf("findExactInRegistry(%q) = nil, want %q", tt.query, tt.wantName)
+			}
+			if result.Name != tt.wantName {
+				t.Errorf("findExactInRegistry(%q).Name = %q, want %q", tt.query, result.Name, tt.wantName)
+			}
+		})
+	}
+}
+
+func TestMergeAssetMatches(t *testing.T) {
+	t.Parallel()
+
+	installed := []AssetMatch{
+		{Name: "claude", Category: "agents", Source: AssetSourceInstalled, Score: 3},
+		{Name: "gemini", Category: "agents", Source: AssetSourceInstalled, Score: 3},
+	}
+	reg := []AssetMatch{
+		{Name: "claude", Category: "agents", Source: AssetSourceRegistry, Score: 5},   // dup
+		{Name: "openai", Category: "agents", Source: AssetSourceRegistry, Score: 3},   // new
+		{Name: "copilot", Category: "agents", Source: AssetSourceRegistry, Score: 1},  // new, low score
+	}
+
+	merged := mergeAssetMatches(installed, reg)
+
+	// Should have 4 unique entries (claude deduplicated)
+	if len(merged) != 4 {
+		t.Fatalf("mergeAssetMatches returned %d results, want 4", len(merged))
+	}
+
+	// Claude should be from installed (installed wins)
+	for _, m := range merged {
+		if m.Name == "claude" && m.Source != AssetSourceInstalled {
+			t.Errorf("claude should be from installed, got %q", m.Source)
+		}
+	}
+
+	// Should be sorted by score desc, then name
+	for i := 1; i < len(merged); i++ {
+		if merged[i-1].Score < merged[i].Score {
+			t.Errorf("results not sorted by score: %d < %d at positions %d,%d",
+				merged[i-1].Score, merged[i].Score, i-1, i)
+		}
+	}
+}
+
+func TestMergeAssetMatches_Empty(t *testing.T) {
+	t.Parallel()
+
+	merged := mergeAssetMatches(nil, nil)
+	if len(merged) != 0 {
+		t.Errorf("expected 0 results for empty inputs, got %d", len(merged))
+	}
+}
+
+// newTestResolver creates a resolver for testing that skips registry access.
+func newTestResolver(cfg internalcue.LoadResult) *resolver {
+	r := newResolver(cfg, &Flags{}, io.Discard, strings.NewReader(""))
+	r.skipRegistry = true
+	return r
+}
+
+func TestResolveAgent_ExactMatch(t *testing.T) {
+	t.Parallel()
+
+	cfg := buildTestCfg(t, `{
+		agents: {
+			claude: {
+				bin: "claude"
+				command: "{{.bin}}"
+			}
+		}
+	}`)
+
+	r := newTestResolver(cfg)
+	name, err := r.resolveAgent("claude")
+	if err != nil {
+		t.Fatalf("resolveAgent() error = %v", err)
+	}
+	if name != "claude" {
+		t.Errorf("resolveAgent() = %q, want %q", name, "claude")
+	}
+}
+
+func TestResolveAgent_SubstringMatch(t *testing.T) {
+	t.Parallel()
+
+	cfg := buildTestCfg(t, `{
+		agents: {
+			"gemini-non-interactive": {
+				description: "Google Gemini agent"
+				bin: "gemini"
+				command: "{{.bin}}"
+			}
+		}
+	}`)
+
+	r := newTestResolver(cfg)
+	name, err := r.resolveAgent("gemini")
+	if err != nil {
+		t.Fatalf("resolveAgent() error = %v", err)
+	}
+	if name != "gemini-non-interactive" {
+		t.Errorf("resolveAgent() = %q, want %q", name, "gemini-non-interactive")
+	}
+}
+
+func TestResolveAgent_NoMatch(t *testing.T) {
+	t.Parallel()
+
+	cfg := buildTestCfg(t, `{
+		agents: {
+			claude: {
+				bin: "claude"
+				command: "{{.bin}}"
+			}
+		}
+	}`)
+
+	r := newTestResolver(cfg)
+	_, err := r.resolveAgent("nonexistent")
+	if err == nil {
+		t.Fatal("expected error for no match")
+	}
+	if !strings.Contains(err.Error(), "not found") {
+		t.Errorf("error = %q, want containing 'not found'", err.Error())
+	}
+}
+
+func TestResolveAgent_MultipleMatches_NonTTY(t *testing.T) {
+	t.Parallel()
+
+	cfg := buildTestCfg(t, `{
+		agents: {
+			"claude-code": {
+				description: "Claude for coding"
+				bin: "claude"
+				command: "{{.bin}}"
+			}
+			"claude-chat": {
+				description: "Claude for chatting"
+				bin: "claude"
+				command: "{{.bin}}"
+			}
+		}
+	}`)
+
+	r := newTestResolver(cfg)
+	_, err := r.resolveAgent("claude")
+	if err == nil {
+		t.Fatal("expected error for multiple matches in non-TTY")
+	}
+	if !strings.Contains(err.Error(), "ambiguous") {
+		t.Errorf("error = %q, want containing 'ambiguous'", err.Error())
+	}
+	if !strings.Contains(err.Error(), "claude-code") {
+		t.Errorf("error should list claude-code: %v", err)
+	}
+	if !strings.Contains(err.Error(), "claude-chat") {
+		t.Errorf("error should list claude-chat: %v", err)
+	}
+}
+
+func TestResolveAgent_Empty(t *testing.T) {
+	t.Parallel()
+
+	cfg := buildTestCfg(t, `{agents: {}}`)
+	r := newTestResolver(cfg)
+	name, err := r.resolveAgent("")
+	if err != nil {
+		t.Fatalf("resolveAgent('') error = %v", err)
+	}
+	if name != "" {
+		t.Errorf("resolveAgent('') = %q, want empty", name)
+	}
+}
+
+func TestResolveRole_ExactMatch(t *testing.T) {
+	t.Parallel()
+
+	cfg := buildTestCfg(t, `{
+		roles: {
+			"golang/assistant": {
+				prompt: "You are a Go expert"
+			}
+		}
+	}`)
+
+	r := newTestResolver(cfg)
+	name, err := r.resolveRole("golang/assistant")
+	if err != nil {
+		t.Fatalf("resolveRole() error = %v", err)
+	}
+	if name != "golang/assistant" {
+		t.Errorf("resolveRole() = %q, want %q", name, "golang/assistant")
+	}
+}
+
+func TestResolveRole_FilePathBypass(t *testing.T) {
+	t.Parallel()
+
+	cfg := buildTestCfg(t, `{roles: {}}`)
+	r := newTestResolver(cfg)
+
+	tests := []string{"./my-role.md", "/tmp/role.md", "~/roles/test.md"}
+	for _, path := range tests {
+		t.Run(path, func(t *testing.T) {
+			name, err := r.resolveRole(path)
+			if err != nil {
+				t.Fatalf("resolveRole(%q) error = %v", path, err)
+			}
+			if name != path {
+				t.Errorf("resolveRole(%q) = %q, want %q", path, name, path)
+			}
+		})
+	}
+}
+
+func TestResolveRole_SubstringMatch(t *testing.T) {
+	t.Parallel()
+
+	cfg := buildTestCfg(t, `{
+		roles: {
+			"golang/assistant": {
+				description: "Go programming expert"
+				prompt: "You are a Go expert"
+			}
+		}
+	}`)
+
+	r := newTestResolver(cfg)
+	name, err := r.resolveRole("golang")
+	if err != nil {
+		t.Fatalf("resolveRole() error = %v", err)
+	}
+	if name != "golang/assistant" {
+		t.Errorf("resolveRole() = %q, want %q", name, "golang/assistant")
+	}
+}
+
+func TestResolveModelName_ExactMatch(t *testing.T) {
+	t.Parallel()
+
+	agent := orchestration.Agent{
+		Models: map[string]string{
+			"sonnet": "claude-sonnet-4-5",
+			"opus":   "claude-opus-4-6",
+			"haiku":  "claude-haiku-4-5",
+		},
+	}
+
+	r := newTestResolver(internalcue.LoadResult{})
+	name := r.resolveModelName("sonnet", agent)
+	if name != "sonnet" {
+		t.Errorf("resolveModelName() = %q, want %q", name, "sonnet")
+	}
+}
+
+func TestResolveModelName_SubstringMatch(t *testing.T) {
+	t.Parallel()
+
+	agent := orchestration.Agent{
+		Models: map[string]string{
+			"sonnet": "claude-sonnet-4-5",
+			"opus":   "claude-opus-4-6",
+			"haiku":  "claude-haiku-4-5",
+		},
+	}
+
+	r := newTestResolver(internalcue.LoadResult{})
+	name := r.resolveModelName("son", agent)
+	if name != "sonnet" {
+		t.Errorf("resolveModelName() = %q, want %q", name, "sonnet")
+	}
+}
+
+func TestResolveModelName_Passthrough(t *testing.T) {
+	t.Parallel()
+
+	agent := orchestration.Agent{
+		Models: map[string]string{
+			"sonnet": "claude-sonnet-4-5",
+		},
+	}
+
+	r := newTestResolver(internalcue.LoadResult{})
+	name := r.resolveModelName("gpt-4o", agent)
+	if name != "gpt-4o" {
+		t.Errorf("resolveModelName() = %q, want %q (passthrough)", name, "gpt-4o")
+	}
+}
+
+func TestResolveModelName_MultipleMatches_Passthrough(t *testing.T) {
+	t.Parallel()
+
+	agent := orchestration.Agent{
+		Models: map[string]string{
+			"sonnet-4":   "claude-sonnet-4",
+			"sonnet-4-5": "claude-sonnet-4-5",
+		},
+	}
+
+	r := newTestResolver(internalcue.LoadResult{})
+	name := r.resolveModelName("sonnet", agent)
+	// Multiple substring matches -> passthrough
+	if name != "sonnet" {
+		t.Errorf("resolveModelName() = %q, want %q (passthrough on multiple)", name, "sonnet")
+	}
+}
+
+func TestResolveModelName_NilModels(t *testing.T) {
+	t.Parallel()
+
+	agent := orchestration.Agent{} // no models map
+	r := newTestResolver(internalcue.LoadResult{})
+	name := r.resolveModelName("sonnet", agent)
+	if name != "sonnet" {
+		t.Errorf("resolveModelName() = %q, want %q (passthrough)", name, "sonnet")
+	}
+}
+
+func TestResolveModelName_Empty(t *testing.T) {
+	t.Parallel()
+
+	agent := orchestration.Agent{
+		Models: map[string]string{"sonnet": "claude-sonnet"},
+	}
+	r := newTestResolver(internalcue.LoadResult{})
+	name := r.resolveModelName("", agent)
+	if name != "" {
+		t.Errorf("resolveModelName('') = %q, want empty", name)
+	}
+}
+
+func TestResolveContexts_ExactName(t *testing.T) {
+	t.Parallel()
+
+	cfg := buildTestCfg(t, `{
+		contexts: {
+			env: {
+				required: true
+				prompt: "environment"
+			}
+			project: {
+				default: true
+				prompt: "project info"
+			}
+		}
+	}`)
+
+	r := newTestResolver(cfg)
+	resolved := r.resolveContexts([]string{"env"})
+	if len(resolved) != 1 || resolved[0] != "env" {
+		t.Errorf("resolveContexts([env]) = %v, want [env]", resolved)
+	}
+}
+
+func TestResolveContexts_FilePathBypass(t *testing.T) {
+	t.Parallel()
+
+	cfg := buildTestCfg(t, `{contexts: {}}`)
+	r := newTestResolver(cfg)
+	resolved := r.resolveContexts([]string{"./docs/guide.md"})
+	if len(resolved) != 1 || resolved[0] != "./docs/guide.md" {
+		t.Errorf("resolveContexts([./docs/guide.md]) = %v, want [./docs/guide.md]", resolved)
+	}
+}
+
+func TestResolveContexts_DefaultPassthrough(t *testing.T) {
+	t.Parallel()
+
+	cfg := buildTestCfg(t, `{contexts: {}}`)
+	r := newTestResolver(cfg)
+	resolved := r.resolveContexts([]string{"default"})
+	if len(resolved) != 1 || resolved[0] != "default" {
+		t.Errorf("resolveContexts([default]) = %v, want [default]", resolved)
+	}
+}
+
+func TestResolveContexts_SearchMatch(t *testing.T) {
+	t.Parallel()
+
+	cfg := buildTestCfg(t, `{
+		contexts: {
+			"golang-env": {
+				description: "Go development environment"
+				tags: ["golang", "development"]
+				prompt: "Go env context"
+			}
+		}
+	}`)
+
+	r := newTestResolver(cfg)
+	resolved := r.resolveContexts([]string{"golang"})
+	if len(resolved) != 1 || resolved[0] != "golang-env" {
+		t.Errorf("resolveContexts([golang]) = %v, want [golang-env]", resolved)
+	}
+}
+
+func TestResolveContexts_NoMatchPassthrough(t *testing.T) {
+	t.Parallel()
+
+	cfg := buildTestCfg(t, `{
+		contexts: {
+			env: {
+				prompt: "environment"
+			}
+		}
+	}`)
+
+	r := newTestResolver(cfg)
+	resolved := r.resolveContexts([]string{"nonexistent"})
+	// No matches -> pass through as-is (composer will warn)
+	if len(resolved) != 1 || resolved[0] != "nonexistent" {
+		t.Errorf("resolveContexts([nonexistent]) = %v, want [nonexistent]", resolved)
+	}
+}
+
+func TestResolveContexts_Mixed(t *testing.T) {
+	t.Parallel()
+
+	cfg := buildTestCfg(t, `{
+		contexts: {
+			env: {
+				required: true
+				prompt: "environment"
+			}
+			"golang-env": {
+				description: "Go development environment"
+				tags: ["golang"]
+				prompt: "Go env"
+			}
+		}
+	}`)
+
+	r := newTestResolver(cfg)
+	resolved := r.resolveContexts([]string{"./custom.md", "default", "env"})
+	if len(resolved) != 3 {
+		t.Fatalf("resolveContexts() returned %d items, want 3: %v", len(resolved), resolved)
+	}
+	if resolved[0] != "./custom.md" {
+		t.Errorf("resolved[0] = %q, want %q", resolved[0], "./custom.md")
+	}
+	if resolved[1] != "default" {
+		t.Errorf("resolved[1] = %q, want %q", resolved[1], "default")
+	}
+	if resolved[2] != "env" {
+		t.Errorf("resolved[2] = %q, want %q", resolved[2], "env")
+	}
+}
+
+func TestSelectSingleMatch_Zero(t *testing.T) {
+	t.Parallel()
+
+	r := newTestResolver(internalcue.LoadResult{})
+	_, err := r.selectSingleMatch(nil, "agent", "test")
+	if err == nil {
+		t.Fatal("expected error for zero matches")
+	}
+	if !strings.Contains(err.Error(), "not found") {
+		t.Errorf("error = %q, want containing 'not found'", err.Error())
+	}
+}
+
+func TestSelectSingleMatch_Single(t *testing.T) {
+	t.Parallel()
+
+	matches := []AssetMatch{{Name: "claude", Source: AssetSourceInstalled, Score: 3}}
+	r := newTestResolver(internalcue.LoadResult{})
+	selected, err := r.selectSingleMatch(matches, "agent", "clau")
+	if err != nil {
+		t.Fatalf("selectSingleMatch() error = %v", err)
+	}
+	if selected.Name != "claude" {
+		t.Errorf("selectSingleMatch().Name = %q, want %q", selected.Name, "claude")
+	}
+}
+
+func TestPromptAssetSelection_NonTTY(t *testing.T) {
+	t.Parallel()
+
+	matches := []AssetMatch{
+		{Name: "claude-code", Source: AssetSourceInstalled, Score: 3},
+		{Name: "claude-chat", Source: AssetSourceRegistry, Score: 3},
+	}
+
+	r := newTestResolver(internalcue.LoadResult{})
+	_, err := r.promptAssetSelection(matches, "agent", "claude")
+	if err == nil {
+		t.Fatal("expected error for non-TTY")
+	}
+	if !strings.Contains(err.Error(), "ambiguous") {
+		t.Errorf("error = %q, want containing 'ambiguous'", err.Error())
+	}
+}
+
+func TestSearchInstalled(t *testing.T) {
+	t.Parallel()
+
+	cfg := buildTestCfg(t, `{
+		agents: {
+			claude: {
+				description: "Anthropic Claude"
+				tags: ["ai"]
+			}
+		}
+	}`)
+
+	matches := searchInstalled(cfg.Value, "agents", "agents", "claude")
+	if len(matches) != 1 {
+		t.Fatalf("searchInstalled() returned %d matches, want 1", len(matches))
+	}
+	if matches[0].Name != "claude" {
+		t.Errorf("match.Name = %q, want %q", matches[0].Name, "claude")
+	}
+	if matches[0].Source != AssetSourceInstalled {
+		t.Errorf("match.Source = %q, want %q", matches[0].Source, AssetSourceInstalled)
+	}
+}
+
+func TestSearchRegistryCategory(t *testing.T) {
+	t.Parallel()
+
+	entries := map[string]registry.IndexEntry{
+		"claude": {
+			Module:      "github.com/test/agents/claude@v0",
+			Description: "Anthropic Claude",
+			Tags:        []string{"ai"},
+		},
+	}
+
+	matches := searchRegistryCategory(entries, "agents", "claude")
+	if len(matches) != 1 {
+		t.Fatalf("searchRegistryCategory() returned %d matches, want 1", len(matches))
+	}
+	if matches[0].Name != "claude" {
+		t.Errorf("match.Name = %q, want %q", matches[0].Name, "claude")
+	}
+	if matches[0].Source != AssetSourceRegistry {
+		t.Errorf("match.Source = %q, want %q", matches[0].Source, AssetSourceRegistry)
+	}
+}
+
+// TestContextScoreThreshold_LowScoreExcluded verifies context results below
+// threshold are excluded.
+func TestContextScoreThreshold_LowScoreExcluded(t *testing.T) {
+	t.Parallel()
+
+	// "env" prompt doesn't contain "golang" so it should score 0.
+	// "golang-env" has "golang" in name (3 points) + tag (1 point) = 4.
+	cfg := buildTestCfg(t, `{
+		contexts: {
+			env: {
+				prompt: "basic environment"
+			}
+			"golang-env": {
+				description: "Go development environment"
+				tags: ["golang"]
+				prompt: "Go env"
+			}
+		}
+	}`)
+
+	r := newTestResolver(cfg)
+	resolved := r.resolveContexts([]string{"golang"})
+
+	// Should only find golang-env (score 4), not env (score 0)
+	if len(resolved) != 1 {
+		t.Fatalf("resolveContexts() returned %d items, want 1: %v", len(resolved), resolved)
+	}
+	if resolved[0] != "golang-env" {
+		t.Errorf("resolved[0] = %q, want %q", resolved[0], "golang-env")
+	}
+}

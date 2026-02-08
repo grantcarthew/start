@@ -70,9 +70,60 @@ func runTask(cmd *cobra.Command, args []string) error {
 
 // executeTask handles task execution.
 func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskName, instructions string) error {
-	env, err := prepareExecutionEnv(flags)
+	// Phase 1: Load config
+	cfg, workingDir, err := loadExecutionConfig(flags)
 	if err != nil {
 		return err
+	}
+
+	// Phase 2: Resolve asset flags (agent, role, context)
+	r := newResolver(cfg, flags, stdout, stdin)
+
+	agentName := flags.Agent
+	if agentName != "" {
+		agentName, err = r.resolveAgent(agentName)
+		if err != nil {
+			return err
+		}
+	}
+
+	var roleName string
+	if !flags.NoRole {
+		roleName = flags.Role
+		if roleName != "" {
+			roleName, err = r.resolveRole(roleName)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	contextTags := flags.Context
+	if len(contextTags) > 0 {
+		contextTags = r.resolveContexts(contextTags)
+	}
+
+	// Track if we need a config reload (from flag resolution installs)
+	flagInstalled := r.didInstall
+
+	// If flag resolution installed assets, reload config
+	if flagInstalled {
+		if err := r.reloadConfig(workingDir); err != nil {
+			return err
+		}
+		cfg = r.cfg
+	}
+
+	// Phase 3: Build execution environment with resolved agent
+	env, err := buildExecutionEnv(cfg, workingDir, agentName, flags)
+	if err != nil {
+		return err
+	}
+
+	// Resolve --model flag against agent's models map
+	resolvedModel := flags.Model
+	if resolvedModel != "" {
+		resolvedModel = r.resolveModelName(resolvedModel, env.Agent)
 	}
 
 	debugf(flags, "task", "Searching for task %q", taskName)
@@ -80,10 +131,6 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 	// Check if taskName is a file path (per DR-038)
 	var taskResult orchestration.ProcessResult
 	var resolvedName string
-	var roleName string
-	if !flags.NoRole {
-		roleName = flags.Role
-	}
 	if orchestration.IsFilePath(taskName) {
 		debugf(flags, "task", "Detected file path, reading file")
 		content, err := orchestration.ReadFilePath(taskName)
@@ -130,8 +177,12 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 				if err := installTaskFromRegistry(stdout, flags, client, *exactRegistry); err != nil {
 					return err
 				}
-				// Reload config
-				env, err = prepareExecutionEnv(flags)
+				// Reload config after install
+				reloadedCfg, err := loadMergedConfigFromDirWithDebug(workingDir, flags)
+				if err != nil {
+					return fmt.Errorf("reloading configuration: %w", err)
+				}
+				env, err = buildExecutionEnv(reloadedCfg, workingDir, agentName, flags)
 				if err != nil {
 					return err
 				}
@@ -164,8 +215,12 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 						if err := installTaskFromRegistry(stdout, flags, client, *result); err != nil {
 							return err
 						}
-						// Reload config
-						env, err = prepareExecutionEnv(flags)
+						// Reload config after install
+						reloadedCfg, reloadErr := loadMergedConfigFromDirWithDebug(workingDir, flags)
+						if reloadErr != nil {
+							return fmt.Errorf("reloading configuration: %w", reloadErr)
+						}
+						env, err = buildExecutionEnv(reloadedCfg, workingDir, agentName, flags)
 						if err != nil {
 							return err
 						}
@@ -192,8 +247,12 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 						if err := installTaskFromRegistry(stdout, flags, client, *result); err != nil {
 							return err
 						}
-						// Reload config
-						env, err = prepareExecutionEnv(flags)
+						// Reload config after install
+						reloadedCfg, reloadErr := loadMergedConfigFromDirWithDebug(workingDir, flags)
+						if reloadErr != nil {
+							return fmt.Errorf("reloading configuration: %w", reloadErr)
+						}
+						env, err = buildExecutionEnv(reloadedCfg, workingDir, agentName, flags)
 						if err != nil {
 							return err
 						}
@@ -245,7 +304,7 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 	selection := orchestration.ContextSelection{
 		IncludeRequired: true,
 		IncludeDefaults: false,
-		Tags:            flags.Context,
+		Tags:            contextTags,
 	}
 
 	debugf(flags, "context", "Selection: required=%t, defaults=%t, tags=%v",
@@ -281,7 +340,7 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 	// Build execution config
 	execConfig := orchestration.ExecuteConfig{
 		Agent:      env.Agent,
-		Model:      flags.Model,
+		Model:      resolvedModel,
 		Role:       composeResult.Role,
 		RoleFile:   composeResult.RoleFile,
 		Prompt:     composeResult.Prompt,

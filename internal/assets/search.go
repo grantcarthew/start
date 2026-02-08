@@ -4,6 +4,7 @@ import (
 	"sort"
 	"strings"
 
+	"cuelang.org/go/cue"
 	"github.com/grantcarthew/start/internal/registry"
 )
 
@@ -96,6 +97,91 @@ func matchScore(name string, entry registry.IndexEntry, queryLower string) int {
 	}
 
 	return score
+}
+
+// SearchCategoryEntries searches a single category's registry entries with scoring.
+// Returns results sorted by score descending, then by name ascending.
+func SearchCategoryEntries(category string, entries map[string]registry.IndexEntry, query string) []SearchResult {
+	queryLower := strings.ToLower(query)
+	results := searchCategory(category, entries, queryLower)
+
+	sort.Slice(results, func(i, j int) bool {
+		if results[i].MatchScore != results[j].MatchScore {
+			return results[i].MatchScore > results[j].MatchScore
+		}
+		return results[i].Name < results[j].Name
+	})
+
+	return results
+}
+
+// SearchInstalledConfig searches installed CUE config entries for a category.
+// It iterates entries under the given CUE key (e.g. "agents"), extracts
+// description/tags into IndexEntry structs, applies matchScore, and returns
+// scored results.
+func SearchInstalledConfig(cfg cue.Value, cueKey, category, query string) []SearchResult {
+	catVal := cfg.LookupPath(cue.ParsePath(cueKey))
+	if !catVal.Exists() {
+		return nil
+	}
+
+	iter, err := catVal.Fields()
+	if err != nil {
+		return nil
+	}
+
+	queryLower := strings.ToLower(query)
+	var results []SearchResult
+
+	for iter.Next() {
+		name := iter.Selector().Unquoted()
+		entry := extractIndexEntryFromCUE(iter.Value())
+		score := matchScore(name, entry, queryLower)
+		if score > 0 {
+			results = append(results, SearchResult{
+				Category:   category,
+				Name:       name,
+				Entry:      entry,
+				MatchScore: score,
+			})
+		}
+	}
+
+	sort.Slice(results, func(i, j int) bool {
+		if results[i].MatchScore != results[j].MatchScore {
+			return results[i].MatchScore > results[j].MatchScore
+		}
+		return results[i].Name < results[j].Name
+	})
+
+	return results
+}
+
+// extractIndexEntryFromCUE extracts description, tags, and origin from a CUE value
+// into an IndexEntry for scoring.
+func extractIndexEntryFromCUE(v cue.Value) registry.IndexEntry {
+	var entry registry.IndexEntry
+
+	if desc := v.LookupPath(cue.ParsePath("description")); desc.Exists() {
+		entry.Description, _ = desc.String()
+	}
+
+	if tags := v.LookupPath(cue.ParsePath("tags")); tags.Exists() {
+		tagIter, err := tags.List()
+		if err == nil {
+			for tagIter.Next() {
+				if s, err := tagIter.Value().String(); err == nil {
+					entry.Tags = append(entry.Tags, s)
+				}
+			}
+		}
+	}
+
+	if origin := v.LookupPath(cue.ParsePath("origin")); origin.Exists() {
+		entry.Module, _ = origin.String()
+	}
+
+	return entry
 }
 
 // categoryOrder returns the display order for a category.

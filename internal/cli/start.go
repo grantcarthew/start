@@ -62,10 +62,10 @@ type ExecutionEnv struct {
 	Executor   *orchestration.Executor
 }
 
-// prepareExecutionEnv prepares the common execution environment.
-// This is shared between executeStart and executeTask to avoid code duplication.
-func prepareExecutionEnv(flags *Flags) (*ExecutionEnv, error) {
-	// Determine working directory
+// loadExecutionConfig loads configuration and resolves the working directory.
+// This is the first phase of execution environment setup, separated so the
+// resolver can search installed config before building the full environment.
+func loadExecutionConfig(flags *Flags) (internalcue.LoadResult, string, error) {
 	var workingDir string
 	var err error
 	if flags.Directory != "" {
@@ -74,19 +74,22 @@ func prepareExecutionEnv(flags *Flags) (*ExecutionEnv, error) {
 	} else {
 		workingDir, err = os.Getwd()
 		if err != nil {
-			return nil, fmt.Errorf("getting working directory: %w", err)
+			return internalcue.LoadResult{}, "", fmt.Errorf("getting working directory: %w", err)
 		}
 		debugf(flags, "config", "Working directory (from pwd): %s", workingDir)
 	}
 
-	// Load configuration (uses workingDir for local config lookup)
 	cfg, err := loadMergedConfigFromDirWithDebug(workingDir, flags)
 	if err != nil {
-		return nil, fmt.Errorf("loading configuration: %w", err)
+		return internalcue.LoadResult{}, "", fmt.Errorf("loading configuration: %w", err)
 	}
 
-	// Select agent
-	agentName := flags.Agent
+	return cfg, workingDir, nil
+}
+
+// buildExecutionEnv builds the execution environment from a loaded config and agent name.
+// This is the second phase, called after the resolver has resolved flag values.
+func buildExecutionEnv(cfg internalcue.LoadResult, workingDir string, agentName string, flags *Flags) (*ExecutionEnv, error) {
 	if agentName == "" {
 		agentName = orchestration.GetDefaultAgent(cfg.Value)
 		debugf(flags, "agent", "Selected %q (config default)", agentName)
@@ -104,7 +107,6 @@ func prepareExecutionEnv(flags *Flags) (*ExecutionEnv, error) {
 	debugf(flags, "agent", "Binary: %s", agent.Bin)
 	debugf(flags, "agent", "Command template: %s", agent.Command)
 
-	// Create shell runner and template processor
 	shellRunner := shell.NewRunner()
 	processor := orchestration.NewTemplateProcessor(nil, shellRunner, workingDir)
 	composer := orchestration.NewComposer(processor, workingDir)
@@ -119,6 +121,17 @@ func prepareExecutionEnv(flags *Flags) (*ExecutionEnv, error) {
 	}, nil
 }
 
+// prepareExecutionEnv prepares the common execution environment.
+// This is a thin wrapper for backward compatibility, calling loadExecutionConfig
+// and buildExecutionEnv in sequence.
+func prepareExecutionEnv(flags *Flags) (*ExecutionEnv, error) {
+	cfg, workingDir, err := loadExecutionConfig(flags)
+	if err != nil {
+		return nil, err
+	}
+	return buildExecutionEnv(cfg, workingDir, flags.Agent, flags)
+}
+
 // runStart executes the start command (root command with no subcommand).
 func runStart(cmd *cobra.Command, args []string) error {
 	flags := getFlags(cmd)
@@ -131,9 +144,56 @@ func runStart(cmd *cobra.Command, args []string) error {
 
 // executeStart is the shared execution logic for start commands.
 func executeStart(stdout, stderr io.Writer, flags *Flags, selection orchestration.ContextSelection, customText string) error {
-	env, err := prepareExecutionEnv(flags)
+	// Phase 1: Load config
+	cfg, workingDir, err := loadExecutionConfig(flags)
 	if err != nil {
 		return err
+	}
+
+	// Phase 2: Resolve asset flags
+	r := newResolver(cfg, flags, stdout, os.Stdin)
+
+	// Resolve --agent flag
+	agentName := flags.Agent
+	if agentName != "" {
+		agentName, err = r.resolveAgent(agentName)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Resolve --role flag
+	roleName := flags.Role
+	if roleName != "" && !flags.NoRole {
+		roleName, err = r.resolveRole(roleName)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Resolve --context flags
+	if len(selection.Tags) > 0 {
+		selection.Tags = r.resolveContexts(selection.Tags)
+	}
+
+	// If any registry installs happened, reload config
+	if r.didInstall {
+		if err := r.reloadConfig(workingDir); err != nil {
+			return err
+		}
+		cfg = r.cfg
+	}
+
+	// Phase 3: Build execution environment with resolved agent
+	env, err := buildExecutionEnv(cfg, workingDir, agentName, flags)
+	if err != nil {
+		return err
+	}
+
+	// Resolve --model flag against agent's models map
+	resolvedModel := flags.Model
+	if resolvedModel != "" {
+		resolvedModel = r.resolveModelName(resolvedModel, env.Agent)
 	}
 
 	debugf(flags, "context", "Selection: required=%t, defaults=%t, tags=%v",
@@ -146,7 +206,7 @@ func executeStart(stdout, stderr io.Writer, flags *Flags, selection orchestratio
 		debugf(flags, "role", "Skipping role (--no-role)")
 		result, composeErr = env.Composer.Compose(env.Cfg.Value, selection, customText, "")
 	} else {
-		result, composeErr = env.Composer.ComposeWithRole(env.Cfg.Value, selection, flags.Role, customText, "")
+		result, composeErr = env.Composer.ComposeWithRole(env.Cfg.Value, selection, roleName, customText, "")
 	}
 	if composeErr != nil {
 		// Show UI with role resolutions before returning error
@@ -167,7 +227,7 @@ func executeStart(stdout, stderr io.Writer, flags *Flags, selection orchestratio
 	printWarnings(flags, stderr, result.Warnings)
 
 	// Determine effective model and its source
-	model, modelSource := resolveModel(flags.Model, env.Agent.DefaultModel)
+	model, modelSource := resolveModel(resolvedModel, env.Agent.DefaultModel)
 	if model != "" {
 		debugf(flags, "agent", "Model: %s (%s)", model, modelSource)
 	} else {
@@ -177,7 +237,7 @@ func executeStart(stdout, stderr io.Writer, flags *Flags, selection orchestratio
 	// Build execution config
 	execConfig := orchestration.ExecuteConfig{
 		Agent:      env.Agent,
-		Model:      flags.Model,
+		Model:      resolvedModel,
 		Role:       result.Role,
 		RoleFile:   result.RoleFile,
 		Prompt:     result.Prompt,
