@@ -1,8 +1,8 @@
 # p-023: CLI Config Reorder
 
-- Status: Pending
-- Started: (not yet started)
-- Completed: (not yet completed)
+- Status: Completed
+- Started: 2026-02-08
+- Completed: 2026-02-08
 - Issue: #3
 
 ## Overview

@@ -12,9 +12,8 @@ See [p-writing-guide.md](./p-writing-guide.md) for guidelines on creating and ma
 
 | Project | Title | Started |
 |---------|-------|---------|
-| [p-021](./p-021-auto-setup-default-assets.md) | Auto-Setup Default Assets | Pending |
 | [p-022](./p-022-assets-ast-refactor.md) | Assets AST Refactor | Pending |
-| [p-023](./p-023-cli-config-reorder.md) | CLI Config Reorder | Pending |
+| [p-024](./p-024-cli-flag-asset-search.md) | CLI Flag Asset Search | Pending |
 
 ### Completed Projects
 
@@ -40,6 +39,8 @@ See [p-writing-guide.md](./p-writing-guide.md) for guidelines on creating and ma
 | [p-019](./completed/p-019-cli-file-path-inputs.md) | CLI File Path Inputs | 2026-01-16 |
 | [p-018](./completed/p-018-cli-interactive-edit-completeness.md) | CLI Interactive Edit Completeness | 2025-01-19 |
 | [p-020](./completed/p-020-role-optional-field.md) | Role Optional Field | 2026-01-31 |
+| [p-021](./completed/p-021-auto-setup-default-assets.md) | Auto-Setup Default Assets | 2026-02-08 |
+| [p-023](./completed/p-023-cli-config-reorder.md) | CLI Config Reorder | 2026-02-08 |
 
 ---
 
@@ -55,9 +56,19 @@ Refactor asset installation code to use CUE's AST APIs instead of fragile string
 
 **Dependencies:** p-021
 
+#### p-024: CLI Flag Asset Search
+
+Extend substring search to `--agent`, `--role`, `--model`, and `--context` flags. Replace exact-match-only resolution with three-tier search (exact config, exact registry, substring search). Change `--context` from tag-only to unified search.
+
+**Key Deliverables:** Updated flag resolution in start.go/executor.go/composer.go, installed config search, DR-041
+
+**Dependencies:** p-021
+
+### Completed
+
 #### p-023: CLI Config Reorder
 
-Add `order`/`reorder` command to context and role configuration for interactive move-up reordering. Refactor write functions to preserve definition order instead of alphabetically sorting.
+Added `order`/`reorder` command to context and role configuration for interactive move-up reordering. Refactored write functions to preserve definition order instead of alphabetically sorting.
 
 **Key Deliverables:** `config_order.go`, refactored write/load functions, DR-040
 
@@ -65,13 +76,11 @@ Add `order`/`reorder` command to context and role configuration for interactive 
 
 #### p-021: Auto-Setup Default Assets
 
-Extract asset installation logic to shared package and enhance auto-setup to install commonly-needed contexts (starting with `cwd/agents-md`) during first-run configuration.
+Extracted asset installation logic to shared `internal/assets` package and enhanced auto-setup to install commonly-needed contexts (`cwd/agents-md`) during first-run configuration.
 
 **Key Deliverables:** `internal/assets` package, updated auto-setup, updated DR-018
 
 **Dependencies:** p-006, p-007
-
-### Completed
 
 #### p-020: Role Optional Field
 

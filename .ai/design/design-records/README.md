@@ -46,6 +46,7 @@ Design Records (DRs) document architectural decisions, algorithms, breaking chan
 | dr-038 | CLI File Path Inputs | CLI | Accepted | 2026-01-16 |
 | dr-039 | Role Optional Field | Role | Accepted | 2026-01-31 |
 | dr-040 | CLI Config Reorder Command | CLI | Accepted | 2026-02-08 |
+| dr-041 | CLI Flag Asset Search | CLI | Accepted | 2026-02-08 |
 
 ## Process
 
