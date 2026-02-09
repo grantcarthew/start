@@ -128,9 +128,9 @@ func TestMergeAssetMatches(t *testing.T) {
 		{Name: "gemini", Category: "agents", Source: AssetSourceInstalled, Score: 3},
 	}
 	reg := []AssetMatch{
-		{Name: "claude", Category: "agents", Source: AssetSourceRegistry, Score: 5},   // dup
-		{Name: "openai", Category: "agents", Source: AssetSourceRegistry, Score: 3},   // new
-		{Name: "copilot", Category: "agents", Source: AssetSourceRegistry, Score: 1},  // new, low score
+		{Name: "claude", Category: "agents", Source: AssetSourceRegistry, Score: 5},  // dup
+		{Name: "openai", Category: "agents", Source: AssetSourceRegistry, Score: 3},  // new
+		{Name: "copilot", Category: "agents", Source: AssetSourceRegistry, Score: 1}, // new, low score
 	}
 
 	merged := mergeAssetMatches(installed, reg)

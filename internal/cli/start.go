@@ -121,17 +121,6 @@ func buildExecutionEnv(cfg internalcue.LoadResult, workingDir string, agentName 
 	}, nil
 }
 
-// prepareExecutionEnv prepares the common execution environment.
-// This is a thin wrapper for backward compatibility, calling loadExecutionConfig
-// and buildExecutionEnv in sequence.
-func prepareExecutionEnv(flags *Flags) (*ExecutionEnv, error) {
-	cfg, workingDir, err := loadExecutionConfig(flags)
-	if err != nil {
-		return nil, err
-	}
-	return buildExecutionEnv(cfg, workingDir, flags.Agent, flags)
-}
-
 // runStart executes the start command (root command with no subcommand).
 func runStart(cmd *cobra.Command, args []string) error {
 	flags := getFlags(cmd)

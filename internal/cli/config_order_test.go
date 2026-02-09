@@ -239,7 +239,7 @@ func TestWriteContextsFile_PreservesOrder(t *testing.T) {
 		t.Fatalf("missing contexts in output: %s", contentStr)
 	}
 
-	if !(zebraIdx < alphaIdx && alphaIdx < middleIdx) {
+	if zebraIdx >= alphaIdx || alphaIdx >= middleIdx {
 		t.Errorf("order not preserved: zebra=%d, alpha=%d, middle=%d\n%s",
 			zebraIdx, alphaIdx, middleIdx, contentStr)
 	}
@@ -284,7 +284,7 @@ func TestWriteRolesFile_PreservesOrder(t *testing.T) {
 		t.Fatalf("missing roles in output: %s", contentStr)
 	}
 
-	if !(zebraIdx < alphaIdx && alphaIdx < middleIdx) {
+	if zebraIdx >= alphaIdx || alphaIdx >= middleIdx {
 		t.Errorf("order not preserved: zebra=%d, alpha=%d, middle=%d\n%s",
 			zebraIdx, alphaIdx, middleIdx, contentStr)
 	}
@@ -451,7 +451,7 @@ func TestConfigContextOrder_Command(t *testing.T) {
 	zebraIdx := strings.Index(contentStr, `"zebra"`)
 	middleIdx := strings.Index(contentStr, `"middle"`)
 
-	if !(alphaIdx < zebraIdx && zebraIdx < middleIdx) {
+	if alphaIdx >= zebraIdx || zebraIdx >= middleIdx {
 		t.Errorf("expected order alpha < zebra < middle, got alpha=%d, zebra=%d, middle=%d\n%s",
 			alphaIdx, zebraIdx, middleIdx, contentStr)
 	}
@@ -515,7 +515,7 @@ func TestConfigRoleOrder_Command(t *testing.T) {
 	alphaIdx := strings.Index(contentStr, `"alpha"`)
 	zebraIdx := strings.Index(contentStr, `"zebra"`)
 
-	if !(alphaIdx < zebraIdx) {
+	if alphaIdx >= zebraIdx {
 		t.Errorf("expected alpha before zebra, got alpha=%d, zebra=%d\n%s",
 			alphaIdx, zebraIdx, contentStr)
 	}
@@ -579,7 +579,7 @@ func TestConfigContextOrder_Cancel(t *testing.T) {
 	zebraIdx := strings.Index(contentStr, `"zebra"`)
 	alphaIdx := strings.Index(contentStr, `"alpha"`)
 
-	if !(zebraIdx < alphaIdx) {
+	if zebraIdx >= alphaIdx {
 		t.Errorf("file should not have been modified, got zebra=%d, alpha=%d",
 			zebraIdx, alphaIdx)
 	}
@@ -723,7 +723,7 @@ func TestConfigContextAdd_PreservesOrder(t *testing.T) {
 	alphaIdx := strings.Index(contentStr, `"alpha"`)
 	betaIdx := strings.Index(contentStr, `"beta"`)
 
-	if !(zebraIdx < alphaIdx && alphaIdx < betaIdx) {
+	if zebraIdx >= alphaIdx || alphaIdx >= betaIdx {
 		t.Errorf("expected order zebra < alpha < beta, got zebra=%d, alpha=%d, beta=%d\n%s",
 			zebraIdx, alphaIdx, betaIdx, contentStr)
 	}
@@ -787,7 +787,7 @@ func TestConfigRoleAdd_PreservesOrder(t *testing.T) {
 	alphaIdx := strings.Index(contentStr, `"alpha"`)
 	betaIdx := strings.Index(contentStr, `"beta"`)
 
-	if !(zebraIdx < alphaIdx && alphaIdx < betaIdx) {
+	if zebraIdx >= alphaIdx || alphaIdx >= betaIdx {
 		t.Errorf("expected order zebra < alpha < beta, got zebra=%d, alpha=%d, beta=%d\n%s",
 			zebraIdx, alphaIdx, betaIdx, contentStr)
 	}
@@ -850,7 +850,7 @@ func TestConfigRoleList_PreservesDefinitionOrder(t *testing.T) {
 		t.Fatalf("expected all roles in output, got: %s", output)
 	}
 
-	if !(zebraIdx < alphaIdx && alphaIdx < middleIdx) {
+	if zebraIdx >= alphaIdx || alphaIdx >= middleIdx {
 		t.Errorf("role order not preserved (expected zebra < alpha < middle): zebra=%d, alpha=%d, middle=%d\noutput: %s",
 			zebraIdx, alphaIdx, middleIdx, output)
 	}
