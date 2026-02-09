@@ -141,20 +141,20 @@ func TestFindAssetKey(t *testing.T) {
 			wantFound: true,
 		},
 		{
-			name: "key in comment ignored",
-			content: "// \"cwd/agents-md\": comment\ncontexts: {\n",
+			name:      "key in comment ignored",
+			content:   "// \"cwd/agents-md\": comment\ncontexts: {\n",
 			assetKey:  "cwd/agents-md",
 			wantFound: false,
 		},
 		{
-			name: "key in string ignored",
-			content: "description: \"has cwd/agents-md in it\"\ncontexts: {\n",
+			name:      "key in string ignored",
+			content:   "description: \"has cwd/agents-md in it\"\ncontexts: {\n",
 			assetKey:  "cwd/agents-md",
 			wantFound: false,
 		},
 		{
-			name: "key in multi-line string ignored",
-			content: "description: \"\"\"\n\tcwd/agents-md: is mentioned here\n\t\"\"\"\ncontexts: {\n",
+			name:      "key in multi-line string ignored",
+			content:   "description: \"\"\"\n\tcwd/agents-md: is mentioned here\n\t\"\"\"\ncontexts: {\n",
 			assetKey:  "cwd/agents-md",
 			wantFound: false,
 		},
@@ -351,20 +351,20 @@ func TestFindMatchingBrace_MultiLineString(t *testing.T) {
 		wantErr      bool
 	}{
 		{
-			name: "multi-line string with braces inside",
-			content: "{\n\tprompt: \"\"\"\n\t\tif (x) { return }\n\t\t\"\"\"\n}",
+			name:         "multi-line string with braces inside",
+			content:      "{\n\tprompt: \"\"\"\n\t\tif (x) { return }\n\t\t\"\"\"\n}",
 			openBracePos: 0,
 			wantErr:      false,
 		},
 		{
-			name: "multi-line string with nested triple quotes pattern",
-			content: "{\n\tprompt: \"\"\"\n\t\tuse {{.field}} here\n\t\t\"\"\"\n}",
+			name:         "multi-line string with nested triple quotes pattern",
+			content:      "{\n\tprompt: \"\"\"\n\t\tuse {{.field}} here\n\t\t\"\"\"\n}",
 			openBracePos: 0,
 			wantErr:      false,
 		},
 		{
-			name: "multi-line string at end of content",
-			content: "{\n\tprompt: \"\"\"\n\t\thello\n\t\t\"\"\"\n}",
+			name:         "multi-line string at end of content",
+			content:      "{\n\tprompt: \"\"\"\n\t\thello\n\t\t\"\"\"\n}",
 			openBracePos: 0,
 			wantErr:      false,
 		},
@@ -375,14 +375,14 @@ func TestFindMatchingBrace_MultiLineString(t *testing.T) {
 			wantErr:      true,
 		},
 		{
-			name: "braces in both comments and multi-line strings",
-			content: "{\n\t// comment with { brace }\n\tprompt: \"\"\"\n\t\t{ and } in string\n\t\t\"\"\"\n}",
+			name:         "braces in both comments and multi-line strings",
+			content:      "{\n\t// comment with { brace }\n\tprompt: \"\"\"\n\t\t{ and } in string\n\t\t\"\"\"\n}",
 			openBracePos: 0,
 			wantErr:      false,
 		},
 		{
-			name: "escaped quotes in single-line string before brace",
-			content: `{ "key": "value with \" and { brace }" }`,
+			name:         "escaped quotes in single-line string before brace",
+			content:      `{ "key": "value with \" and { brace }" }`,
 			openBracePos: 0,
 			wantErr:      false,
 		},
@@ -424,14 +424,14 @@ func TestFindOpeningBrace_MultiLineString(t *testing.T) {
 		wantErr  bool
 	}{
 		{
-			name: "brace after multi-line string",
-			content: "\"\"\"\n\t{ not this }\n\t\"\"\" {",
+			name:     "brace after multi-line string",
+			content:  "\"\"\"\n\t{ not this }\n\t\"\"\" {",
 			startPos: 0,
 			wantErr:  false,
 		},
 		{
-			name: "only braces inside multi-line string",
-			content: "\"\"\"\n\t{ not this }\n\t\"\"\"",
+			name:     "only braces inside multi-line string",
+			content:  "\"\"\"\n\t{ not this }\n\t\"\"\"",
 			startPos: 0,
 			wantErr:  true,
 		},

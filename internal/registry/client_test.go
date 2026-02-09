@@ -374,4 +374,3 @@ func TestIsCanonicalVersion(t *testing.T) {
 		})
 	}
 }
-

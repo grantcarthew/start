@@ -522,7 +522,7 @@ func TestConfigContextList_PreservesDefinitionOrder(t *testing.T) {
 	}
 
 	// Definition order: zebra < alpha < middle
-	if !(zebraIdx < alphaIdx && alphaIdx < middleIdx) {
+	if zebraIdx >= alphaIdx || alphaIdx >= middleIdx {
 		t.Errorf("context order not preserved (expected zebra < alpha < middle): zebra=%d, alpha=%d, middle=%d\noutput: %s",
 			zebraIdx, alphaIdx, middleIdx, output)
 	}

@@ -240,12 +240,13 @@ func isValidEnvVarName(name string) bool {
 		return false
 	}
 	for i, c := range name {
+		isLetter := (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
 		if i == 0 {
-			if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_') {
+			if !isLetter && c != '_' {
 				return false
 			}
 		} else {
-			if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_') {
+			if !isLetter && (c < '0' || c > '9') && c != '_' {
 				return false
 			}
 		}
