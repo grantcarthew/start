@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"cuelang.org/go/cue/cuecontext"
 	"github.com/grantcarthew/start/internal/registry"
 )
 
@@ -710,21 +711,12 @@ contexts: {
 	}
 }
 
-// TestWriteAssetToConfig_BracesInStringValues documents Bug 1:
-// writeAssetToConfig uses strings.LastIndex(existingContent, "}") to find
-// the closing brace of the category, but this matches the last "}" in the
-// entire file content. When a file has multiple top-level categories,
-// the last "}" belongs to a DIFFERENT category, causing the new asset
-// to be inserted into the wrong category block.
+// TestWriteAssetToConfig_BracesInStringValues verifies that assets are inserted
+// into the correct category block when multiple top-level categories exist.
 func TestWriteAssetToConfig_BracesInStringValues(t *testing.T) {
 	t.Parallel()
 	tempDir := t.TempDir()
 	configPath := filepath.Join(tempDir, "contexts.cue")
-
-	// File has two top-level categories. The code does:
-	//   1. strings.Index(content, "contexts:") -> finds "contexts:" at line 2
-	//   2. strings.LastIndex(content, "}") -> finds the LAST "}" which closes "settings:"
-	// So the new asset gets inserted at the end of "settings:" instead of "contexts:".
 	existingContent := `// start configuration
 contexts: {
 	"existing": {
@@ -773,12 +765,7 @@ settings: {
 		t.Error("result missing new asset")
 	}
 
-	// BUG: The new asset should be inside the contexts: {} block, not
-	// the settings: {} block. With strings.LastIndex, it inserts before
-	// the last "}" which belongs to settings, not contexts.
-	//
-	// Verify the new asset appears BEFORE "settings:" - if it doesn't,
-	// the bug has been triggered and the asset was put in the wrong block.
+	// Verify the new asset appears inside contexts: {} block, not settings: {} block.
 	settingsPos := strings.Index(result, "settings:")
 	newAssetPos := strings.Index(result, `"new-asset":`)
 	if settingsPos == -1 || newAssetPos == -1 {
@@ -788,5 +775,247 @@ settings: {
 		t.Errorf("BUG: new asset was inserted into settings block instead of contexts block\n"+
 			"new-asset at pos %d, settings at pos %d\nResult:\n%s",
 			newAssetPos, settingsPos, result)
+	}
+}
+
+// TestFindRoleDependency tests the findRoleDependency function.
+func TestFindRoleDependency(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		moduleCue   string
+		wantDepPath string
+	}{
+		{
+			name: "task with role dependency",
+			moduleCue: `module: "github.com/test/tasks/golang/debug@v0"
+language: {
+	version: "v0.15.1"
+}
+deps: {
+	"github.com/test/roles/golang/agent@v0": {
+		v: "v0.1.1"
+	}
+	"github.com/test/schemas@v0": {
+		v: "v0.1.0"
+	}
+}
+`,
+			wantDepPath: "github.com/test/roles/golang/agent@v0",
+		},
+		{
+			name: "task without role dependency",
+			moduleCue: `module: "github.com/test/tasks/jira/read-issue@v0"
+language: {
+	version: "v0.15.1"
+}
+deps: {
+	"github.com/test/schemas@v0": {
+		v: "v0.1.0"
+	}
+}
+`,
+			wantDepPath: "",
+		},
+		{
+			name:        "missing module.cue",
+			moduleCue:   "",
+			wantDepPath: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			moduleDir := t.TempDir()
+
+			if tt.moduleCue != "" {
+				cueModDir := filepath.Join(moduleDir, "cue.mod")
+				if err := os.MkdirAll(cueModDir, 0755); err != nil {
+					t.Fatalf("creating cue.mod dir: %v", err)
+				}
+				if err := os.WriteFile(filepath.Join(cueModDir, "module.cue"), []byte(tt.moduleCue), 0644); err != nil {
+					t.Fatalf("writing module.cue: %v", err)
+				}
+			}
+
+			gotPath := findRoleDependency(moduleDir)
+			if gotPath != tt.wantDepPath {
+				t.Errorf("findRoleDependency() depPath = %q, want %q", gotPath, tt.wantDepPath)
+			}
+		})
+	}
+}
+
+// TestFindRoleDependency_MultipleRoleDeps verifies that when multiple role deps
+// exist, one is still returned (not skipped). Any task-specific role is better
+// than falling back to the default role.
+func TestFindRoleDependency_MultipleRoleDeps(t *testing.T) {
+	t.Parallel()
+
+	moduleDir := t.TempDir()
+	cueModDir := filepath.Join(moduleDir, "cue.mod")
+	if err := os.MkdirAll(cueModDir, 0755); err != nil {
+		t.Fatalf("creating cue.mod dir: %v", err)
+	}
+
+	moduleCue := `module: "github.com/test/tasks/multi@v0"
+language: {
+	version: "v0.15.1"
+}
+deps: {
+	"github.com/test/roles/golang/agent@v0": {
+		v: "v0.1.1"
+	}
+	"github.com/test/roles/golang/assistant@v0": {
+		v: "v0.1.0"
+	}
+	"github.com/test/schemas@v0": {
+		v: "v0.1.0"
+	}
+}
+`
+	if err := os.WriteFile(filepath.Join(cueModDir, "module.cue"), []byte(moduleCue), 0644); err != nil {
+		t.Fatalf("writing module.cue: %v", err)
+	}
+
+	gotPath := findRoleDependency(moduleDir)
+	// With sorted iteration, the alphabetically first role dep is returned.
+	wantPath := "github.com/test/roles/golang/agent@v0"
+	if gotPath != wantPath {
+		t.Errorf("findRoleDependency() depPath = %q, want %q", gotPath, wantPath)
+	}
+}
+
+// TestResolveRoleName tests the ResolveRoleName function.
+func TestResolveRoleName(t *testing.T) {
+	t.Parallel()
+
+	index := &registry.Index{
+		Roles: map[string]registry.IndexEntry{
+			"golang/agent": {
+				Module:      "github.com/test/roles/golang/agent@v0",
+				Description: "Go expert",
+			},
+			"golang/assistant": {
+				Module:      "github.com/test/roles/golang/assistant@v0",
+				Description: "Go assistant",
+			},
+		},
+	}
+
+	tests := []struct {
+		name      string
+		index     *registry.Index
+		depPath   string
+		wantName  string
+		wantFound bool
+	}{
+		{
+			name:      "matching role",
+			index:     index,
+			depPath:   "github.com/test/roles/golang/agent@v0",
+			wantName:  "golang/agent",
+			wantFound: true,
+		},
+		{
+			name:      "no match",
+			index:     index,
+			depPath:   "github.com/test/roles/unknown@v0",
+			wantName:  "",
+			wantFound: false,
+		},
+		{
+			name:      "nil index",
+			index:     nil,
+			depPath:   "github.com/test/roles/golang/agent@v0",
+			wantName:  "",
+			wantFound: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotName, _, gotFound := ResolveRoleName(tt.index, tt.depPath)
+			if gotName != tt.wantName {
+				t.Errorf("ResolveRoleName() name = %q, want %q", gotName, tt.wantName)
+			}
+			if gotFound != tt.wantFound {
+				t.Errorf("ResolveRoleName() found = %v, want %v", gotFound, tt.wantFound)
+			}
+		})
+	}
+}
+
+// TestFormatAssetStruct_RoleNameOverride tests that formatAssetStruct replaces
+// an inline role struct with a string reference when roleName is provided.
+func TestFormatAssetStruct_RoleNameOverride(t *testing.T) {
+	t.Parallel()
+
+	// Build a CUE value with a struct role field
+	ctx := cuecontext.New()
+	v := ctx.CompileString(`{
+		description: "Test task"
+		tags: ["test"]
+		role: {
+			description: "A role"
+			file: "@module/role.md"
+		}
+		file: "@module/task.md"
+		prompt: "Read {{.file}}"
+	}`)
+	if v.Err() != nil {
+		t.Fatalf("compiling CUE: %v", v.Err())
+	}
+
+	tests := []struct {
+		name         string
+		roleName     string
+		wantContains []string
+		wantExcludes []string
+	}{
+		{
+			name:     "role name replaces struct",
+			roleName: "golang/agent",
+			wantContains: []string{
+				`role: "golang/agent"`,
+				`description: "Test task"`,
+				`file: "@module/task.md"`,
+			},
+			wantExcludes: []string{
+				"@module/role.md",
+				`"A role"`,
+			},
+		},
+		{
+			name:     "empty role name preserves struct",
+			roleName: "",
+			wantContains: []string{
+				"role: {",
+				`"A role"`,
+				"@module/role.md",
+			},
+			wantExcludes: []string{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := formatAssetStruct(v, "tasks", "github.com/test@v0.1.0", tt.roleName)
+			if err != nil {
+				t.Fatalf("formatAssetStruct() error: %v", err)
+			}
+
+			for _, want := range tt.wantContains {
+				if !strings.Contains(result, want) {
+					t.Errorf("result missing %q\nGot:\n%s", want, result)
+				}
+			}
+			for _, exclude := range tt.wantExcludes {
+				if strings.Contains(result, exclude) {
+					t.Errorf("result should not contain %q\nGot:\n%s", exclude, result)
+				}
+			}
+		})
 	}
 }

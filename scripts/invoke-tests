@@ -17,6 +17,7 @@ Options:
   -i, --integration    Include integration tests
   -e, --e2e            Include integration and e2e tests
   -a, --all            Run all tests (unit + integration + e2e)
+  -r, --race           Enable race detector
   -c, --coverage       Generate coverage report
   -v, --verbose        Verbose test output
   -s, --short          Skip long-running tests
@@ -26,6 +27,7 @@ Examples:
   $(basename "$0")           Run unit tests only
   $(basename "$0") -i        Run unit + integration tests
   $(basename "$0") -a -c     Run all tests with coverage
+  $(basename "$0") -r        Run unit tests with race detection
   $(basename "$0") -v -s     Verbose output, skip long tests
 EOF
 }
@@ -41,6 +43,7 @@ trap ctrlc_trap SIGINT
 # -----------------------------------------------------------------------------
 include_integration=false
 include_e2e=false
+race=false
 coverage=false
 verbose=false
 short=false
@@ -59,6 +62,10 @@ while [[ $# -gt 0 ]]; do
     -a|--all)
       include_integration=true
       include_e2e=true
+      shift
+      ;;
+    -r|--race)
+      race=true
       shift
       ;;
     -c|--coverage)
@@ -119,6 +126,11 @@ if [[ "${include_e2e}" == true ]]; then
 fi
 if [[ ${#tags[@]} -gt 0 ]]; then
   test_args+=("-tags=$(IFS=,; echo "${tags[*]}")")
+fi
+
+# Race detector
+if [[ "${race}" == true ]]; then
+  test_args+=("-race")
 fi
 
 # Coverage

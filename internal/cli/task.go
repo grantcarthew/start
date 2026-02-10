@@ -174,7 +174,7 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 				if !flags.Quiet {
 					_, _ = fmt.Fprintf(stdout, "Installing %s from registry...\n", exactRegistry.Name)
 				}
-				if err := installTaskFromRegistry(stdout, flags, client, *exactRegistry); err != nil {
+				if err := installTaskFromRegistry(stdout, flags, client, index, *exactRegistry); err != nil {
 					return err
 				}
 				// Reload config after install
@@ -212,7 +212,7 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 							Name:     match.Name,
 							Entry:    match.Entry,
 						}
-						if err := installTaskFromRegistry(stdout, flags, client, *result); err != nil {
+						if err := installTaskFromRegistry(stdout, flags, client, index, *result); err != nil {
 							return err
 						}
 						// Reload config after install
@@ -244,7 +244,7 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 							Name:     selected.Name,
 							Entry:    selected.Entry,
 						}
-						if err := installTaskFromRegistry(stdout, flags, client, *result); err != nil {
+						if err := installTaskFromRegistry(stdout, flags, client, index, *result); err != nil {
 							return err
 						}
 						// Reload config after install
@@ -692,7 +692,7 @@ func promptTaskSelection(w io.Writer, r io.Reader, matches []TaskMatch, searchTe
 }
 
 // installTaskFromRegistry installs a task from the registry using a pre-fetched client and result.
-func installTaskFromRegistry(stdout io.Writer, flags *Flags, client *registry.Client, result assets.SearchResult) error {
+func installTaskFromRegistry(stdout io.Writer, flags *Flags, client *registry.Client, index *registry.Index, result assets.SearchResult) error {
 	ctx := context.Background()
 
 	// Install the task using the assets package
@@ -705,7 +705,7 @@ func installTaskFromRegistry(stdout io.Writer, flags *Flags, client *registry.Cl
 	configDir := paths.Global
 
 	// Install the asset
-	if err := assets.InstallAsset(ctx, client, result, configDir); err != nil {
+	if err := assets.InstallAsset(ctx, client, index, result, configDir); err != nil {
 		return err
 	}
 

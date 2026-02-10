@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"cuelang.org/go/cue"
@@ -12,13 +13,17 @@ import (
 	"cuelang.org/go/cue/format"
 	"cuelang.org/go/cue/load"
 	"cuelang.org/go/mod/modconfig"
+	"cuelang.org/go/mod/modfile"
 	"github.com/grantcarthew/start/internal/registry"
 )
 
 // InstallAsset installs an asset from the registry to the config directory.
 // It fetches the asset module, extracts the content, and writes it to the appropriate config file.
+// For tasks with role dependencies, the role is installed as a separate asset and the task
+// references it by name. The index parameter enables role dependency resolution; pass nil
+// to skip role dependency handling.
 // Returns an error if the asset is already installed or if any step fails.
-func InstallAsset(ctx context.Context, client *registry.Client, selected SearchResult, configDir string) error {
+func InstallAsset(ctx context.Context, client *registry.Client, index *registry.Index, selected SearchResult, configDir string) error {
 	// Ensure config directory exists
 	if err := os.MkdirAll(configDir, 0755); err != nil {
 		return fmt.Errorf("creating config directory: %w", err)
@@ -41,9 +46,19 @@ func InstallAsset(ctx context.Context, client *registry.Client, selected SearchR
 		return fmt.Errorf("fetching asset module: %w", err)
 	}
 
+	// For tasks, detect and install role dependencies before extracting content.
+	// The role is installed as a separate asset, and the task references it by name.
+	var roleName string
+	if selected.Category == "tasks" && index != nil {
+		roleName, err = InstallRoleDependency(ctx, client, index, fetchResult.SourceDir, configDir)
+		if err != nil {
+			return fmt.Errorf("installing role dependency: %w", err)
+		}
+	}
+
 	// Extract asset content from fetched module
 	// Use resolved path with version for origin field (e.g., "github.com/.../task@v0.1.1")
-	assetContent, err := extractAssetContent(fetchResult.SourceDir, selected, client.Registry(), resolvedPath)
+	assetContent, err := ExtractAssetContent(fetchResult.SourceDir, selected, client.Registry(), resolvedPath, roleName)
 	if err != nil {
 		return fmt.Errorf("extracting asset content: %w", err)
 	}
@@ -58,6 +73,41 @@ func InstallAsset(ctx context.Context, client *registry.Client, selected SearchR
 	}
 
 	return nil
+}
+
+// InstallRoleDependency checks if a task module has a role dependency and installs it
+// as a separate asset if not already present. Returns the role name for use as a string
+// reference in the task config, or empty string if no role dependency exists.
+func InstallRoleDependency(ctx context.Context, client *registry.Client, index *registry.Index, moduleDir, configDir string) (string, error) {
+	depPath := findRoleDependency(moduleDir)
+	if depPath == "" {
+		return "", nil
+	}
+
+	roleName, roleEntry, found := ResolveRoleName(index, depPath)
+	if !found {
+		// Role dependency exists in module but isn't in the index.
+		// Fall back silently: the task keeps its inline role struct.
+		return "", nil
+	}
+
+	// Skip if the role is already installed
+	if AssetExists(configDir, "roles", roleName) {
+		return roleName, nil
+	}
+
+	// Install the role as a separate asset
+	roleResult := SearchResult{
+		Category: "roles",
+		Name:     roleName,
+		Entry:    roleEntry,
+	}
+
+	if err := InstallAsset(ctx, client, nil, roleResult, configDir); err != nil {
+		return "", fmt.Errorf("role %q: %w", roleName, err)
+	}
+
+	return roleName, nil
 }
 
 // AssetExists checks if an asset with the given name already exists in the config file.
@@ -95,9 +145,10 @@ func assetTypeToConfigFile(category string) string {
 	}
 }
 
-// extractAssetContent loads the asset module and extracts its content as CUE.
+// ExtractAssetContent loads the asset module and extracts its content as CUE.
 // originPath is the module path (without version) to store in the origin field.
-func extractAssetContent(moduleDir string, asset SearchResult, reg interface{}, originPath string) (string, error) {
+// roleName, if non-empty, replaces an inline role struct with a string reference.
+func ExtractAssetContent(moduleDir string, asset SearchResult, reg interface{}, originPath, roleName string) (string, error) {
 	cctx := cuecontext.New()
 
 	cfg := &load.Config{
@@ -138,12 +189,13 @@ func extractAssetContent(moduleDir string, asset SearchResult, reg interface{}, 
 	}
 
 	// Build a concrete struct with just the fields we need
-	return formatAssetStruct(assetVal, asset.Category, originPath)
+	return formatAssetStruct(assetVal, asset.Category, originPath, roleName)
 }
 
 // formatAssetStruct formats a CUE value as a concrete struct.
 // originPath is written as the origin field to track registry provenance.
-func formatAssetStruct(v cue.Value, category, originPath string) (string, error) {
+// roleName, if non-empty, replaces an inline role struct with a string reference.
+func formatAssetStruct(v cue.Value, category, originPath, roleName string) (string, error) {
 	var sb strings.Builder
 	sb.WriteString("{\n")
 
@@ -166,6 +218,12 @@ func formatAssetStruct(v cue.Value, category, originPath string) (string, error)
 	}
 
 	for _, field := range fields {
+		// Replace inline role struct with string reference when a role name is available
+		if field == "role" && roleName != "" {
+			sb.WriteString(fmt.Sprintf("\trole: %q\n", roleName))
+			continue
+		}
+
 		fieldVal := v.LookupPath(cue.ParsePath(field))
 		if !fieldVal.Exists() {
 			continue
@@ -259,6 +317,56 @@ func formatFieldValue(name string, v cue.Value) (string, error) {
 // e.g., "golang/code-review" -> "golang/code-review"
 func getAssetKey(name string) string {
 	return name
+}
+
+// findRoleDependency reads a task module's cue.mod/module.cue and returns
+// the role dependency module path, if one exists.
+// Returns an empty string if the module has no role dependency.
+func findRoleDependency(moduleDir string) string {
+	moduleFile := filepath.Join(moduleDir, "cue.mod", "module.cue")
+	data, err := os.ReadFile(moduleFile)
+	if err != nil {
+		return ""
+	}
+
+	f, err := modfile.Parse(data, moduleFile)
+	if err != nil {
+		return ""
+	}
+
+	// Sort dependency paths for deterministic selection when multiple role
+	// dependencies exist. The alphabetically first match is chosen.
+	var depPaths []string
+	for path := range f.Deps {
+		depPaths = append(depPaths, path)
+	}
+	sort.Strings(depPaths)
+
+	for _, path := range depPaths {
+		if strings.Contains(path, "/roles/") {
+			return path
+		}
+	}
+
+	return ""
+}
+
+// ResolveRoleName finds a role's asset name in the index by matching its module path.
+// The depPath is the dependency key (e.g., "github.com/.../roles/golang/agent@v0")
+// which is matched against index entries' Module field.
+// Returns the role name, its index entry, and whether a match was found.
+func ResolveRoleName(index *registry.Index, depPath string) (name string, entry registry.IndexEntry, found bool) {
+	if index == nil {
+		return "", registry.IndexEntry{}, false
+	}
+
+	for roleName, roleEntry := range index.Roles {
+		if roleEntry.Module == depPath {
+			return roleName, roleEntry, true
+		}
+	}
+
+	return "", registry.IndexEntry{}, false
 }
 
 // writeAssetToConfig writes the asset content to the config file.

@@ -460,7 +460,7 @@ func (a *AutoSetup) installDefaultAssets(ctx context.Context, client *registry.C
 		}
 
 		// Install the asset (silent on success, log errors)
-		if err := assets.InstallAsset(ctx, client, searchResult, configDir); err != nil {
+		if err := assets.InstallAsset(ctx, client, index, searchResult, configDir); err != nil {
 			_, _ = fmt.Fprintf(a.stderr, "Warning: Failed to install %s/%s: %v\n", asset.category, asset.name, err)
 		}
 	}
