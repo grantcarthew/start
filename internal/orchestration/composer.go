@@ -614,7 +614,7 @@ func (c *Composer) selectDefaultRole(cfg cue.Value) (roleName string, resolution
 
 	// All roles exhausted
 	if len(resolutions) > 0 {
-		return "", resolutions, fmt.Errorf("no valid roles found (all optional roles skipped)")
+		return "", resolutions, fmt.Errorf("no roles available — all configured roles reference missing files\n  Run 'start config roles' to check your role configuration\n  Run 'start assets add <role-name>' to install a role from the registry")
 	}
 
 	return "", nil, nil

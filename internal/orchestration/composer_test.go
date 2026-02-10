@@ -737,8 +737,8 @@ func TestSelectDefaultRole(t *testing.T) {
 		if err == nil {
 			t.Error("expected error when all optional roles fail")
 		}
-		if !strings.Contains(err.Error(), "no valid roles found") {
-			t.Errorf("error = %q, want containing 'no valid roles found'", err.Error())
+		if !strings.Contains(err.Error(), "no roles available") {
+			t.Errorf("error = %q, want containing 'no roles available'", err.Error())
 		}
 	})
 
