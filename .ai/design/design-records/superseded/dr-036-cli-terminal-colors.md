@@ -1,7 +1,7 @@
 # dr-036: CLI Terminal Colors
 
 - Date: 2025-12-24
-- Status: Accepted
+- Status: Superseded by [dr-042](../dr-042-terminal-colour-standard.md)
 - Category: CLI
 
 ## Problem

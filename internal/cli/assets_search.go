@@ -6,7 +6,10 @@ import (
 	"io"
 	"strings"
 
+	"github.com/fatih/color"
 	"github.com/grantcarthew/start/internal/assets"
+	"github.com/grantcarthew/start/internal/config"
+	internalcue "github.com/grantcarthew/start/internal/cue"
 	"github.com/grantcarthew/start/internal/registry"
 	"github.com/spf13/cobra"
 )
@@ -59,15 +62,41 @@ func runAssetsSearch(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
+	// Collect installed asset names for marking in output
+	installed := collectInstalledNames()
+
 	// Print results
 	verbose, _ := cmd.Flags().GetBool("verbose")
-	printSearchResults(cmd.OutOrStdout(), results, verbose)
+	printSearchResults(cmd.OutOrStdout(), results, verbose, installed)
 
 	return nil
 }
 
+// collectInstalledNames returns a set of "category/name" keys for installed assets.
+func collectInstalledNames() map[string]bool {
+	paths, err := config.ResolvePaths("")
+	if err != nil || !paths.AnyExists() {
+		return nil
+	}
+
+	dirs := paths.ForScope(config.ScopeMerged)
+	loader := internalcue.NewLoader()
+	cfg, err := loader.Load(dirs)
+	if err != nil {
+		return nil
+	}
+
+	installedAssets := collectInstalledAssets(cfg.Value, paths)
+	names := make(map[string]bool, len(installedAssets))
+	for _, a := range installedAssets {
+		names[a.Category+"/"+a.Name] = true
+	}
+	return names
+}
+
 // printSearchResults prints search results grouped by category.
-func printSearchResults(w io.Writer, results []assets.SearchResult, verbose bool) {
+// installed is an optional set of "category/name" keys for marking installed assets.
+func printSearchResults(w io.Writer, results []assets.SearchResult, verbose bool, installed map[string]bool) {
 	_, _ = fmt.Fprintf(w, "Found %d matches:\n\n", len(results))
 
 	// Group by category for display
@@ -84,16 +113,22 @@ func printSearchResults(w io.Writer, results []assets.SearchResult, verbose bool
 			continue
 		}
 
-		_, _ = fmt.Fprintf(w, "%s/\n", cat)
+		_, _ = categoryColor(cat).Fprint(w, cat)
+		_, _ = fmt.Fprintln(w, "/")
 		for _, r := range catResults {
+			marker := ""
+			if installed[r.Category+"/"+r.Name] {
+				marker = " " + color.HiGreenString("*")
+			}
+
 			if verbose {
-				_, _ = fmt.Fprintf(w, "  %-25s %s\n", r.Name, r.Entry.Description)
-				_, _ = fmt.Fprintf(w, "    Module: %s\n", r.Entry.Module)
+				_, _ = fmt.Fprintf(w, "  %-25s %s%s\n", r.Name, colorDim.Sprint(r.Entry.Description), marker)
+				_, _ = fmt.Fprintf(w, "    Module: %s\n", colorDim.Sprint(r.Entry.Module))
 				if len(r.Entry.Tags) > 0 {
-					_, _ = fmt.Fprintf(w, "    Tags: %s\n", strings.Join(r.Entry.Tags, ", "))
+					_, _ = fmt.Fprintf(w, "    Tags: %s\n", colorDim.Sprint(strings.Join(r.Entry.Tags, ", ")))
 				}
 			} else {
-				_, _ = fmt.Fprintf(w, "  %-25s %s\n", r.Name, r.Entry.Description)
+				_, _ = fmt.Fprintf(w, "  %-25s %s%s\n", r.Name, colorDim.Sprint(r.Entry.Description), marker)
 			}
 		}
 		_, _ = fmt.Fprintln(w)

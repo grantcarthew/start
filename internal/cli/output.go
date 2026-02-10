@@ -20,7 +20,29 @@ var (
 	colorDim       = color.New(color.Faint)
 	colorCyan      = color.New(color.FgCyan)
 	colorBlue      = color.New(color.FgBlue)
+
+	// Asset category colours
+	colorAgents   = color.New(color.FgBlue)
+	colorRoles    = color.New(color.FgGreen)
+	colorContexts = color.New(color.FgCyan)
+	colorTasks    = color.New(color.FgHiYellow)
 )
+
+// categoryColor returns the colour for an asset category.
+func categoryColor(category string) *color.Color {
+	switch category {
+	case "agents":
+		return colorAgents
+	case "roles":
+		return colorRoles
+	case "contexts":
+		return colorContexts
+	case "tasks":
+		return colorTasks
+	default:
+		return colorDim
+	}
+}
 
 // PrintError prints an error message in red.
 func PrintError(w io.Writer, format string, args ...interface{}) {

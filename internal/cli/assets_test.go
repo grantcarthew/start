@@ -216,7 +216,7 @@ func TestPrintSearchResults(t *testing.T) {
 
 	t.Run("non-verbose output", func(t *testing.T) {
 		var buf bytes.Buffer
-		printSearchResults(&buf, results, false)
+		printSearchResults(&buf, results, false, nil)
 		output := buf.String()
 
 		if !strings.Contains(output, "Found 2 matches") {
@@ -235,7 +235,7 @@ func TestPrintSearchResults(t *testing.T) {
 
 	t.Run("verbose output", func(t *testing.T) {
 		var buf bytes.Buffer
-		printSearchResults(&buf, results, true)
+		printSearchResults(&buf, results, true, nil)
 		output := buf.String()
 
 		if !strings.Contains(output, "Module:") {
@@ -243,6 +243,19 @@ func TestPrintSearchResults(t *testing.T) {
 		}
 		if !strings.Contains(output, "Tags:") {
 			t.Errorf("verbose output missing Tags, got: %s", output)
+		}
+	})
+
+	t.Run("installed marker", func(t *testing.T) {
+		var buf bytes.Buffer
+		installed := map[string]bool{
+			"agents/ai/claude": true,
+		}
+		printSearchResults(&buf, results, false, installed)
+		output := buf.String()
+
+		if !strings.Contains(output, "*") {
+			t.Errorf("output missing installed marker for ai/claude, got: %s", output)
 		}
 	})
 }
