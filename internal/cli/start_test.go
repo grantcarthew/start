@@ -390,7 +390,7 @@ func TestPrintContentPreview(t *testing.T) {
 	}
 }
 
-func TestFindTask(t *testing.T) {
+func TestTaskResolution(t *testing.T) {
 	tmpDir := setupStartTestConfig(t)
 
 	// Isolate from global config
@@ -413,66 +413,37 @@ func TestFindTask(t *testing.T) {
 		t.Fatalf("loading config: %v", err)
 	}
 
-	tests := []struct {
-		name        string
-		taskName    string
-		wantMatch   string
-		wantErr     bool
-		errContains string
-	}{
-		{
-			name:      "exact match",
-			taskName:  "test-task",
-			wantMatch: "test-task",
-			wantErr:   false,
-		},
-		{
-			name:      "prefix match",
-			taskName:  "test",
-			wantMatch: "test-task",
-			wantErr:   false,
-		},
-		{
-			name:        "no match",
-			taskName:    "nonexistent",
-			wantErr:     true,
-			errContains: "not found",
-		},
-	}
+	t.Run("exact match", func(t *testing.T) {
+		if !hasExactInstalledTask(cfg, "test-task") {
+			t.Error("hasExactInstalledTask() = false, want true")
+		}
+	})
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result, matches, err := findTask(cfg, tt.taskName)
+	t.Run("exact match not found", func(t *testing.T) {
+		if hasExactInstalledTask(cfg, "nonexistent") {
+			t.Error("hasExactInstalledTask() = true, want false")
+		}
+	})
 
-			if tt.wantErr {
-				if err == nil {
-					t.Errorf("expected error, got nil")
-					return
-				}
-				if tt.errContains != "" && !strings.Contains(err.Error(), tt.errContains) {
-					t.Errorf("error = %q, want containing %q", err.Error(), tt.errContains)
-				}
-				return
-			}
+	t.Run("substring match", func(t *testing.T) {
+		matches := findInstalledTasks(cfg, "test")
+		if len(matches) != 1 {
+			t.Fatalf("findInstalledTasks() returned %d results, want 1", len(matches))
+		}
+		if matches[0].Name != "test-task" {
+			t.Errorf("findInstalledTasks() name = %q, want %q", matches[0].Name, "test-task")
+		}
+	})
 
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-				return
-			}
-
-			if len(matches) > 0 {
-				t.Errorf("unexpected multiple matches: %v", matches)
-				return
-			}
-
-			if result != tt.wantMatch {
-				t.Errorf("findTask() = %q, want %q", result, tt.wantMatch)
-			}
-		})
-	}
+	t.Run("no match", func(t *testing.T) {
+		matches := findInstalledTasks(cfg, "nonexistent")
+		if len(matches) != 0 {
+			t.Errorf("findInstalledTasks() returned %d results, want 0", len(matches))
+		}
+	})
 }
 
-func TestFindTask_AmbiguousPrefix(t *testing.T) {
+func TestTaskResolution_AmbiguousPrefix(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// Isolate from global config
@@ -529,43 +500,34 @@ settings: {
 		t.Fatalf("loading config: %v", err)
 	}
 
-	// Ambiguous prefix should return matches (per DR-015)
-	result, matches, err := findTask(cfg, "review")
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-		return
-	}
-
-	if result != "" {
-		t.Errorf("expected empty result for multiple matches, got %q", result)
-	}
-
+	// Ambiguous prefix should return multiple matches
+	matches := findInstalledTasks(cfg, "review")
 	if len(matches) != 3 {
-		t.Errorf("expected 3 matches, got %d: %v", len(matches), matches)
-		return
+		t.Fatalf("expected 3 matches, got %d: %v", len(matches), matches)
 	}
 
 	// Should contain all matching tasks
-	hasCode := false
-	hasDocs := false
-	hasTests := false
+	names := make(map[string]bool)
 	for _, m := range matches {
-		if m == "review-code" {
-			hasCode = true
-		}
-		if m == "review-docs" {
-			hasDocs = true
-		}
-		if m == "review-tests" {
-			hasTests = true
+		names[m.Name] = true
+	}
+	for _, want := range []string{"review-code", "review-docs", "review-tests"} {
+		if !names[want] {
+			t.Errorf("matches missing %q, got %v", want, matches)
 		}
 	}
-	if !hasCode || !hasDocs || !hasTests {
-		t.Errorf("matches should contain review-code, review-docs, review-tests: %v", matches)
+
+	// Multi-term AND should narrow results
+	matches = findInstalledTasks(cfg, "review,code")
+	if len(matches) != 1 {
+		t.Fatalf("expected 1 match for 'review,code', got %d: %v", len(matches), matches)
+	}
+	if matches[0].Name != "review-code" {
+		t.Errorf("match name = %q, want %q", matches[0].Name, "review-code")
 	}
 }
 
-func TestFindTask_NoTasksDefined(t *testing.T) {
+func TestTaskResolution_NoTasksDefined(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// Isolate from global config
@@ -610,14 +572,13 @@ settings: {
 		t.Fatalf("loading config: %v", err)
 	}
 
-	_, _, err = findTask(cfg, "anything")
-	if err == nil {
-		t.Error("expected error when no tasks defined")
-		return
+	if hasExactInstalledTask(cfg, "anything") {
+		t.Error("hasExactInstalledTask() = true, want false for missing tasks")
 	}
 
-	if !strings.Contains(err.Error(), "no tasks defined") {
-		t.Errorf("error = %q, want containing 'no tasks defined'", err.Error())
+	matches := findInstalledTasks(cfg, "anything")
+	if len(matches) != 0 {
+		t.Errorf("findInstalledTasks() returned %d results, want 0", len(matches))
 	}
 }
 

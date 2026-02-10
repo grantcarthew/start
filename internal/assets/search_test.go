@@ -1,12 +1,104 @@
 package assets
 
 import (
-	"strings"
+	"slices"
 	"testing"
 
 	"cuelang.org/go/cue/cuecontext"
 	"github.com/grantcarthew/start/internal/registry"
 )
+
+// TestParseSearchTerms tests splitting input into search terms.
+func TestParseSearchTerms(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		input string
+		want  []string
+	}{
+		{"single term", "golang", []string{"golang"}},
+		{"two space-separated", "go expert", []string{"go", "expert"}},
+		{"csv terms", "go,expert", []string{"go", "expert"}},
+		{"mixed delimiters", "go expert,review", []string{"go", "expert", "review"}},
+		{"empty string", "", nil},
+		{"only commas", ",,,", nil},
+		{"only spaces", "   ", nil},
+		{"duplicate terms", "go go", []string{"go"}},
+		{"case dedup", "Go go GO", []string{"go"}},
+		{"leading trailing whitespace", "  go  expert  ", []string{"go", "expert"}},
+		{"leading trailing commas", ",go,expert,", []string{"go", "expert"}},
+		{"empty csv segments", "go,,expert", []string{"go", "expert"}},
+		{"mixed case", "Go Expert", []string{"go", "expert"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := ParseSearchTerms(tt.input)
+			if !slices.Equal(got, tt.want) {
+				t.Errorf("ParseSearchTerms(%q) = %v, want %v", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestMatchScoreTerms tests multi-term AND scoring.
+func TestMatchScoreTerms(t *testing.T) {
+	t.Parallel()
+
+	entry := registry.IndexEntry{
+		Module:      "github.com/test/roles/golang/assistant@v0",
+		Description: "Go programming expert for code assistance",
+		Tags:        []string{"golang", "programming", "expert"},
+	}
+
+	tests := []struct {
+		name      string
+		assetName string
+		terms     []string
+		wantScore int
+	}{
+		{
+			name:      "single term backward compat",
+			assetName: "golang",
+			terms:     []string{"golang"},
+			wantScore: 4, // name(3) + tag(1)
+		},
+		{
+			name:      "two terms both match",
+			assetName: "golang",
+			terms:     []string{"golang", "expert"},
+			wantScore: 6, // golang: name(3)+tag(1)=4, expert: desc(1)+tag(1)=2
+		},
+		{
+			name:      "two terms one fails",
+			assetName: "golang",
+			terms:     []string{"golang", "python"},
+			wantScore: 0,
+		},
+		{
+			name:      "empty terms",
+			assetName: "golang",
+			terms:     nil,
+			wantScore: 0,
+		},
+		{
+			name:      "three terms all match",
+			assetName: "golang",
+			terms:     []string{"golang", "programming", "code"},
+			wantScore: 7, // golang: name(3)+tag(1)=4, programming: desc(1)+tag(1)=2, code: desc(1)=1
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			score := matchScoreTerms(tt.assetName, entry, tt.terms)
+			if score != tt.wantScore {
+				t.Errorf("matchScoreTerms() = %d, want %d", score, tt.wantScore)
+			}
+		})
+	}
+}
 
 // TestSearchIndex tests the SearchIndex function.
 func TestSearchIndex(t *testing.T) {
@@ -89,6 +181,28 @@ func TestSearchIndex(t *testing.T) {
 			wantCount: 1,
 			wantFirst: "roles/golang/code-review",
 		},
+		{
+			name:      "multi-term AND narrows results",
+			query:     "golang review",
+			wantCount: 1,
+			wantFirst: "roles/golang/code-review",
+		},
+		{
+			name:      "multi-term AND with csv",
+			query:     "golang,review",
+			wantCount: 1,
+			wantFirst: "roles/golang/code-review",
+		},
+		{
+			name:      "multi-term AND no match when one term fails",
+			query:     "golang python",
+			wantCount: 0,
+		},
+		{
+			name:      "empty query returns nil",
+			query:     "",
+			wantCount: 0,
+		},
 	}
 
 	for _, tt := range tests {
@@ -115,65 +229,6 @@ func TestSearchIndex(t *testing.T) {
 						t.Errorf("SearchIndex() first result = %q, want %q", first, tt.wantFirst)
 					}
 				}
-			}
-		})
-	}
-}
-
-// TestMatchScore tests the matchScore function.
-func TestMatchScore(t *testing.T) {
-	t.Parallel()
-
-	entry := registry.IndexEntry{
-		Module:      "github.com/test/roles/golang/assistant@v0",
-		Description: "Go programming expert for code assistance",
-		Tags:        []string{"golang", "programming", "expert"},
-	}
-
-	tests := []struct {
-		name      string
-		assetName string
-		query     string
-		wantScore int
-	}{
-		{
-			name:      "exact name match scores highest",
-			assetName: "golang",
-			query:     "golang",
-			wantScore: 6, // name(3) + module(2) + tag(1)
-		},
-		{
-			name:      "module path match",
-			assetName: "assistant",
-			query:     "golang",
-			wantScore: 3, // module(2) + tag(1)
-		},
-		{
-			name:      "description only match",
-			assetName: "assistant",
-			query:     "programming",
-			wantScore: 2, // description(1) + tag(1)
-		},
-		{
-			name:      "tag only match",
-			assetName: "assistant",
-			query:     "expert",
-			wantScore: 2, // description(1) + tag(1)
-		},
-		{
-			name:      "no match",
-			assetName: "assistant",
-			query:     "nonexistent",
-			wantScore: 0,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			score := matchScore(tt.assetName, entry, strings.ToLower(tt.query))
-
-			if score != tt.wantScore {
-				t.Errorf("matchScore() = %d, want %d", score, tt.wantScore)
 			}
 		})
 	}
@@ -223,29 +278,39 @@ func TestSearchCategory(t *testing.T) {
 
 	tests := []struct {
 		name      string
-		query     string
+		terms     []string
 		wantCount int
 	}{
 		{
 			name:      "find golang",
-			query:     "golang",
+			terms:     []string{"golang"},
 			wantCount: 1,
 		},
 		{
 			name:      "find programming (both match)",
-			query:     "programming",
+			terms:     []string{"programming"},
 			wantCount: 2,
 		},
 		{
 			name:      "no match",
-			query:     "javascript",
+			terms:     []string{"javascript"},
+			wantCount: 0,
+		},
+		{
+			name:      "multi-term AND narrows to one",
+			terms:     []string{"golang", "programming"},
+			wantCount: 1,
+		},
+		{
+			name:      "multi-term AND no match",
+			terms:     []string{"golang", "python"},
 			wantCount: 0,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			results := searchCategory("roles", entries, tt.query)
+			results := searchCategory("roles", entries, tt.terms)
 
 			if len(results) != tt.wantCount {
 				t.Errorf("searchCategory() returned %d results, want %d", len(results), tt.wantCount)
@@ -334,7 +399,7 @@ func TestSearchResultOrdering(t *testing.T) {
 	}
 
 	// Results should be ordered by score (descending), then category, then name
-	// All have "golang" in name and module, so scores should be similar
+	// All have "golang" in name, so scores should be similar
 	// Check that categories are in order (roles before tasks)
 	categoryOrder := make([]string, len(results))
 	for i, r := range results {
@@ -402,6 +467,17 @@ func TestSearchCategoryEntries(t *testing.T) {
 			query:     "assistant",
 			wantCount: 3,
 			wantFirst: "golang/assistant", // all same score, alphabetical
+		},
+		{
+			name:      "multi-term AND narrows",
+			query:     "golang,programming",
+			wantCount: 1,
+			wantFirst: "golang/assistant",
+		},
+		{
+			name:      "multi-term AND no match",
+			query:     "golang rust",
+			wantCount: 0,
 		},
 	}
 
@@ -505,6 +581,21 @@ func TestSearchInstalledConfig(t *testing.T) {
 			cueKey:    "tasks",
 			category:  "tasks",
 			query:     "anything",
+			wantCount: 0,
+		},
+		{
+			name:      "multi-term AND narrows agents",
+			cueKey:    "agents",
+			category:  "agents",
+			query:     "ai,claude",
+			wantCount: 1,
+			wantFirst: "claude",
+		},
+		{
+			name:      "multi-term AND no match",
+			cueKey:    "agents",
+			category:  "agents",
+			query:     "claude google",
 			wantCount: 0,
 		},
 	}

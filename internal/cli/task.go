@@ -490,47 +490,34 @@ func hasExactInstalledTask(cfg internalcue.LoadResult, name string) bool {
 	return tasks.LookupPath(cue.MakePath(cue.Str(name))).Exists()
 }
 
-// findInstalledTasks finds tasks in the config that match the search term (substring match).
+// findInstalledTasks finds tasks in the config that match the search term.
+// Uses the scoring system to match against name, description, and tags.
+// Multiple terms (space or comma separated) use AND logic - all must match.
 func findInstalledTasks(cfg internalcue.LoadResult, searchTerm string) []TaskMatch {
+	results := assets.SearchInstalledConfig(cfg.Value, internalcue.KeyTasks, "tasks", searchTerm)
 	var matches []TaskMatch
-
-	tasks := cfg.Value.LookupPath(cue.ParsePath(internalcue.KeyTasks))
-	if !tasks.Exists() {
-		return matches
+	for _, r := range results {
+		matches = append(matches, TaskMatch{
+			Name:   r.Name,
+			Source: TaskSourceInstalled,
+		})
 	}
-
-	iter, err := tasks.Fields()
-	if err != nil {
-		return matches
-	}
-
-	for iter.Next() {
-		taskName := iter.Selector().Unquoted()
-		if strings.Contains(taskName, searchTerm) {
-			matches = append(matches, TaskMatch{
-				Name:   taskName,
-				Source: TaskSourceInstalled,
-			})
-		}
-	}
-
 	return matches
 }
 
-// findRegistryTasks finds tasks in the registry that match the search term (substring match).
+// findRegistryTasks finds tasks in the registry that match the search term.
+// Uses the scoring system to match against name, description, and tags.
+// Multiple terms (space or comma separated) use AND logic - all must match.
 func findRegistryTasks(index *registry.Index, searchTerm string) []TaskMatch {
+	results := assets.SearchCategoryEntries("tasks", index.Tasks, searchTerm)
 	var matches []TaskMatch
-
-	for name, entry := range index.Tasks {
-		if strings.Contains(name, searchTerm) {
-			matches = append(matches, TaskMatch{
-				Name:   name,
-				Source: TaskSourceRegistry,
-				Entry:  entry,
-			})
-		}
+	for _, r := range results {
+		matches = append(matches, TaskMatch{
+			Name:   r.Name,
+			Source: TaskSourceRegistry,
+			Entry:  r.Entry,
+		})
 	}
-
 	return matches
 }
 
@@ -561,47 +548,6 @@ func mergeTaskMatches(installed, registry []TaskMatch) []TaskMatch {
 	})
 
 	return merged
-}
-
-// findTask attempts to find a task by exact name or substring match (installed only).
-// Returns (resolvedName, nil, nil) for exact/unique match.
-// Returns ("", matches, nil) when multiple tasks match (caller should prompt for selection).
-// Returns ("", nil, error) for actual errors (no tasks defined, task not found, etc.).
-// Note: This function is kept for backward compatibility with tests.
-func findTask(cfg internalcue.LoadResult, name string) (string, []string, error) {
-	tasks := cfg.Value.LookupPath(cue.ParsePath(internalcue.KeyTasks))
-	if !tasks.Exists() {
-		return "", nil, fmt.Errorf("no tasks defined")
-	}
-
-	// Try exact match first
-	if tasks.LookupPath(cue.MakePath(cue.Str(name))).Exists() {
-		return name, nil, nil
-	}
-
-	// Try substring match
-	var matches []string
-	iter, err := tasks.Fields()
-	if err != nil {
-		return "", nil, fmt.Errorf("reading tasks: %w", err)
-	}
-
-	for iter.Next() {
-		taskName := iter.Selector().Unquoted()
-		if strings.Contains(taskName, name) {
-			matches = append(matches, taskName)
-		}
-	}
-
-	switch len(matches) {
-	case 0:
-		return "", nil, fmt.Errorf("task %q not found", name)
-	case 1:
-		return matches[0], nil, nil
-	default:
-		// Multiple matches - return them for interactive selection
-		return "", matches, nil
-	}
 }
 
 // promptTaskSelection prompts the user to select a task from multiple matches.

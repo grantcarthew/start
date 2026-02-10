@@ -17,14 +17,16 @@ import (
 // addAssetsSearchCommand adds the search subcommand to the assets command.
 func addAssetsSearchCommand(parent *cobra.Command) {
 	searchCmd := &cobra.Command{
-		Use:     "search <query>",
+		Use:     "search <query>...",
 		Aliases: []string{"find"},
 		Short:   "Search registry for assets",
 		Long: `Search the asset registry index by keyword.
 
-Searches asset names, descriptions, and tags. Query must be at least 3 characters.
+Searches asset names, descriptions, and tags. Multiple words are combined
+with AND logic - all terms must match. Terms can be space-separated or
+comma-separated. Total query must be at least 3 characters.
 Results are grouped by type (agents, roles, tasks, contexts).`,
-		Args: cobra.ExactArgs(1),
+		Args: cobra.MinimumNArgs(1),
 		RunE: runAssetsSearch,
 	}
 
@@ -35,9 +37,14 @@ Results are grouped by type (agents, roles, tasks, contexts).`,
 
 // runAssetsSearch searches the registry index for matching assets.
 func runAssetsSearch(cmd *cobra.Command, args []string) error {
-	query := args[0]
+	query := strings.Join(args, " ")
 
-	if len(query) < 3 {
+	terms := assets.ParseSearchTerms(query)
+	totalLen := 0
+	for _, t := range terms {
+		totalLen += len(t)
+	}
+	if totalLen < 3 {
 		return fmt.Errorf("query must be at least 3 characters")
 	}
 

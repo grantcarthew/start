@@ -184,7 +184,7 @@ func (r *resolver) resolveRole(name string) (string, error) {
 
 // resolveModelName resolves a model name against an agent's models map.
 // 1. Exact match in agent.Models
-// 2. Substring match in agent.Models
+// 2. Substring match in agent.Models (multi-term AND if comma/space separated)
 // 3. Passthrough (value used as-is)
 func (r *resolver) resolveModelName(name string, agent orchestration.Agent) string {
 	if name == "" {
@@ -197,11 +197,23 @@ func (r *resolver) resolveModelName(name string, agent orchestration.Agent) stri
 		return name
 	}
 
-	// Substring match
-	nameLower := strings.ToLower(name)
+	// Multi-term AND substring match
+	terms := assets.ParseSearchTerms(name)
+	if len(terms) == 0 {
+		return name
+	}
+
 	var matches []string
 	for key := range agent.Models {
-		if strings.Contains(strings.ToLower(key), nameLower) {
+		keyLower := strings.ToLower(key)
+		allMatch := true
+		for _, term := range terms {
+			if !strings.Contains(keyLower, term) {
+				allMatch = false
+				break
+			}
+		}
+		if allMatch {
 			matches = append(matches, key)
 		}
 	}
@@ -209,7 +221,7 @@ func (r *resolver) resolveModelName(name string, agent orchestration.Agent) stri
 	sort.Strings(matches)
 
 	if len(matches) == 1 {
-		debugf(r.flags, "resolve", "Model %q: substring match %q", name, matches[0])
+		debugf(r.flags, "resolve", "Model %q: match %q", name, matches[0])
 		return matches[0]
 	}
 
