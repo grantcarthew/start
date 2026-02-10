@@ -274,7 +274,8 @@ func printInstalledAssets(w io.Writer, installed []InstalledAsset, verbose bool)
 			continue
 		}
 
-		_, _ = fmt.Fprintf(w, "%s/\n", cat)
+		_, _ = categoryColor(cat).Fprint(w, cat)
+		_, _ = fmt.Fprintln(w, "/")
 		for _, a := range assets {
 			if verbose && a.LatestVer != "" {
 				if a.UpdateAvail {
@@ -287,7 +288,15 @@ func printInstalledAssets(w io.Writer, installed []InstalledAsset, verbose bool)
 				if verbose {
 					scopeIndicator = fmt.Sprintf(" [%s]", a.Scope)
 				}
-				_, _ = fmt.Fprintf(w, "  %s%s\n", a.Name, scopeIndicator)
+				if a.InstalledVer != "" {
+					_, _ = fmt.Fprintf(w, "  %-25s ", a.Name)
+					_, _ = colorCyan.Fprint(w, "(")
+					_, _ = colorDim.Fprint(w, a.InstalledVer)
+					_, _ = colorCyan.Fprint(w, ")")
+					_, _ = fmt.Fprintf(w, "%s\n", scopeIndicator)
+				} else {
+					_, _ = fmt.Fprintf(w, "  %s%s\n", a.Name, scopeIndicator)
+				}
 			}
 		}
 		_, _ = fmt.Fprintln(w)

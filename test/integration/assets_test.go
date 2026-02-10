@@ -186,21 +186,25 @@ agents: {
 	claude: {
 		bin: "claude"
 		command: "{{.bin}} --model {{.model}}"
+		origin: "github.com/grantcarthew/start-assets/agents/ai/claude@v0.2.0"
 	}
 }
 
 roles: {
 	assistant: {
 		prompt: "You are a helpful assistant."
+		origin: "github.com/grantcarthew/start-assets/roles/assistant@v0.1.0"
 	}
 	reviewer: {
 		prompt: "You are a code reviewer."
+		origin: "github.com/grantcarthew/start-assets/roles/reviewer@v0.3.1"
 	}
 }
 
 tasks: {
 	review: {
 		prompt: "Review this code."
+		origin: "github.com/grantcarthew/start-assets/tasks/review@v0.1.0"
 	}
 }
 `
@@ -250,6 +254,12 @@ tasks: {
 	}
 	if !strings.Contains(output, "assistant") {
 		t.Errorf("output should show assistant role, got: %s", output)
+	}
+	if !strings.Contains(output, "v0.2.0") {
+		t.Errorf("output should show claude version, got: %s", output)
+	}
+	if !strings.Contains(output, "v0.1.0") {
+		t.Errorf("output should show assistant version, got: %s", output)
 	}
 }
 
