@@ -26,8 +26,9 @@ type UpdateResult struct {
 // addAssetsUpdateCommand adds the update subcommand to the assets command.
 func addAssetsUpdateCommand(parent *cobra.Command) {
 	updateCmd := &cobra.Command{
-		Use:   "update [query]",
-		Short: "Update installed assets",
+		Use:     "update [query]",
+		Aliases: []string{"upgrade"},
+		Short:   "Update installed assets",
 		Long: `Update installed assets to their latest versions.
 
 Without arguments, updates all installed assets.

@@ -28,8 +28,9 @@ type ShowResult struct {
 // addShowCommand adds the show command and its subcommands to the parent command.
 func addShowCommand(parent *cobra.Command) {
 	showCmd := &cobra.Command{
-		Use:   "show",
-		Short: "Display resolved configuration content",
+		Use:     "show",
+		Aliases: []string{"view"},
+		Short:   "Display resolved configuration content",
 		Long:  `Display resolved configuration content after UTD processing and config merging.`,
 		RunE:  runShow,
 	}
