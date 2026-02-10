@@ -4,13 +4,9 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"path/filepath"
 	"strings"
 
-	"cuelang.org/go/cue"
-	"cuelang.org/go/cue/cuecontext"
-	"cuelang.org/go/cue/format"
-	"cuelang.org/go/cue/load"
-	"cuelang.org/go/mod/modconfig"
 	"github.com/grantcarthew/start/internal/assets"
 	"github.com/grantcarthew/start/internal/config"
 	internalcue "github.com/grantcarthew/start/internal/cue"
@@ -162,6 +158,11 @@ func checkAndUpdate(ctx context.Context, client *registry.Client, paths config.P
 		return result
 	}
 
+	if asset.ConfigFile == "" {
+		result.Error = fmt.Errorf("no config file path for asset")
+		return result
+	}
+
 	// Re-fetch the module to get latest version
 	// First resolve @v0 to canonical version (e.g., @v0.0.1)
 	modulePath := entry.Module
@@ -189,20 +190,26 @@ func checkAndUpdate(ctx context.Context, client *registry.Client, paths config.P
 		Entry:    *entry,
 	}
 
+	// For tasks, detect and install role dependencies before extracting content
+	var roleName string
+	if asset.Category == "tasks" && index != nil {
+		configDir := filepath.Dir(asset.ConfigFile)
+		roleName, err = assets.InstallRoleDependency(ctx, client, index, fetchResult.SourceDir, configDir)
+		if err != nil {
+			result.Error = fmt.Errorf("installing role dependency: %w", err)
+			return result
+		}
+	}
+
 	// Use resolved path with version for origin field (e.g., "github.com/.../task@v0.1.1")
 	// This preserves full provenance information for future updates.
-	assetContent, err := extractAssetContent(fetchResult.SourceDir, searchResult, client.Registry(), resolvedPath)
+	assetContent, err := assets.ExtractAssetContent(fetchResult.SourceDir, searchResult, client.Registry(), resolvedPath, roleName)
 	if err != nil {
 		result.Error = fmt.Errorf("extracting asset content: %w", err)
 		return result
 	}
 
 	// Update the config file with new content
-	if asset.ConfigFile == "" {
-		result.Error = fmt.Errorf("no config file path for asset")
-		return result
-	}
-
 	if err := assets.UpdateAssetInConfig(asset.ConfigFile, asset.Category, asset.Name, assetContent); err != nil {
 		result.Error = fmt.Errorf("updating config: %w", err)
 		return result
@@ -266,159 +273,3 @@ func printUpdateResults(w io.Writer, results []UpdateResult, dryRun bool) {
 	_, _ = fmt.Fprintln(w)
 }
 
-// extractAssetContent loads the asset module and extracts its content as CUE.
-// This is a copy of the function from the assets package, kept here for update-specific needs.
-func extractAssetContent(moduleDir string, asset assets.SearchResult, reg interface{}, originPath string) (string, error) {
-	cctx := cuecontext.New()
-
-	cfg := &load.Config{
-		Dir: moduleDir,
-	}
-
-	// Add registry if provided
-	if regVal, ok := reg.(modconfig.Registry); ok {
-		cfg.Registry = regVal
-	}
-
-	insts := load.Instances([]string{"."}, cfg)
-	if len(insts) == 0 {
-		return "", fmt.Errorf("no CUE instances found in %s", moduleDir)
-	}
-
-	inst := insts[0]
-	if inst.Err != nil {
-		return "", fmt.Errorf("loading module: %w", inst.Err)
-	}
-
-	v := cctx.BuildInstance(inst)
-	if err := v.Err(); err != nil {
-		return "", fmt.Errorf("building module: %w", err)
-	}
-
-	// Extract the asset definition - try singular field name first
-	singular := strings.TrimSuffix(asset.Category, "s")
-	assetVal := v.LookupPath(cue.ParsePath(singular))
-	if !assetVal.Exists() {
-		// Try the key name
-		assetKey := asset.Name
-		assetVal = v.LookupPath(cue.MakePath(cue.Str(assetKey)))
-	}
-	if !assetVal.Exists() {
-		return "", fmt.Errorf("asset definition not found in module (tried %q)", singular)
-	}
-
-	// Format as concrete struct
-	return formatAssetStruct(v, assetVal, asset.Category, originPath)
-}
-
-// formatAssetStruct formats a CUE value as a concrete struct.
-func formatAssetStruct(ctx cue.Value, v cue.Value, category, originPath string) (string, error) {
-	var sb strings.Builder
-	sb.WriteString("{\n")
-
-	// Write origin field first
-	sb.WriteString(fmt.Sprintf("\torigin: %q\n", originPath))
-
-	// Define which fields to extract based on category
-	var fields []string
-	switch category {
-	case "tasks":
-		fields = []string{"description", "tags", "role", "file", "command", "prompt"}
-	case "roles":
-		fields = []string{"description", "tags", "file", "command", "prompt", "optional"}
-	case "agents":
-		fields = []string{"description", "tags", "bin", "command", "default_model", "models"}
-	case "contexts":
-		fields = []string{"description", "tags", "file", "command", "prompt", "required", "default"}
-	default:
-		fields = []string{"description", "tags", "prompt"}
-	}
-
-	for _, field := range fields {
-		fieldVal := v.LookupPath(cue.ParsePath(field))
-		if !fieldVal.Exists() {
-			continue
-		}
-
-		// Format the field value
-		formatted, err := formatFieldValue(field, fieldVal)
-		if err != nil {
-			continue // Skip fields that can't be formatted
-		}
-		sb.WriteString(formatted)
-	}
-
-	sb.WriteString("}")
-	return sb.String(), nil
-}
-
-// formatFieldValue formats a single field value as CUE syntax.
-func formatFieldValue(name string, v cue.Value) (string, error) {
-	var sb strings.Builder
-
-	switch v.Kind() {
-	case cue.StringKind:
-		s, err := v.String()
-		if err != nil {
-			return "", err
-		}
-		// Use multi-line string for prompts and long strings
-		if strings.Contains(s, "\n") || len(s) > 80 {
-			sb.WriteString(fmt.Sprintf("\t%s: \"\"\"\n", name))
-			for _, line := range strings.Split(s, "\n") {
-				sb.WriteString(fmt.Sprintf("\t\t%s\n", line))
-			}
-			sb.WriteString("\t\t\"\"\"\n")
-		} else {
-			sb.WriteString(fmt.Sprintf("\t%s: %q\n", name, s))
-		}
-
-	case cue.BoolKind:
-		b, err := v.Bool()
-		if err != nil {
-			return "", err
-		}
-		sb.WriteString(fmt.Sprintf("\t%s: %t\n", name, b))
-
-	case cue.ListKind:
-		iter, err := v.List()
-		if err != nil {
-			return "", err
-		}
-		var items []string
-		for iter.Next() {
-			if s, err := iter.Value().String(); err == nil {
-				items = append(items, fmt.Sprintf("%q", s))
-			}
-		}
-		if len(items) > 0 {
-			sb.WriteString(fmt.Sprintf("\t%s: [%s]\n", name, strings.Join(items, ", ")))
-		}
-
-	case cue.StructKind:
-		// For maps like "models"
-		sb.WriteString(fmt.Sprintf("\t%s: {\n", name))
-		iter, err := v.Fields()
-		if err != nil {
-			return "", err
-		}
-		for iter.Next() {
-			key := iter.Selector().Unquoted()
-			if s, err := iter.Value().String(); err == nil {
-				sb.WriteString(fmt.Sprintf("\t\t%q: %q\n", key, s))
-			}
-		}
-		sb.WriteString("\t}\n")
-
-	default:
-		// Try to get string representation
-		syn := v.Syntax()
-		formatted, err := format.Node(syn, format.Simplify())
-		if err != nil {
-			return "", err
-		}
-		sb.WriteString(fmt.Sprintf("\t%s: %s\n", name, string(formatted)))
-	}
-
-	return sb.String(), nil
-}

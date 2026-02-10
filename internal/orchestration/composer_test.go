@@ -1524,3 +1524,216 @@ func TestComposer_TildeExpansion_FileNotFound(t *testing.T) {
 		t.Error("expected error for nonexistent tilde path file")
 	}
 }
+
+func TestComposer_ProcessContent(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		content      string
+		instructions string
+		wantContains string
+	}{
+		{
+			name:         "plain content without placeholders",
+			content:      "Review this code for bugs.",
+			instructions: "",
+			wantContains: "Review this code for bugs.",
+		},
+		{
+			name:         "content with instructions placeholder",
+			content:      "Review code. Focus on: {{.instructions}}",
+			instructions: "security issues",
+			wantContains: "security issues",
+		},
+		{
+			name:         "content with no matching placeholders",
+			content:      "Simple content with no templates.",
+			instructions: "ignored instructions",
+			wantContains: "Simple content with no templates.",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			processor := NewTemplateProcessor(nil, nil, "")
+			composer := NewComposer(processor, "")
+
+			result, err := composer.ProcessContent(tt.content, tt.instructions)
+			if err != nil {
+				t.Fatalf("ProcessContent() error: %v", err)
+			}
+			if tt.wantContains != "" && !strings.Contains(result.Content, tt.wantContains) {
+				t.Errorf("ProcessContent() content = %q, want to contain %q", result.Content, tt.wantContains)
+			}
+		})
+	}
+}
+
+func TestExtractOrigin(t *testing.T) {
+	t.Parallel()
+	ctx := cuecontext.New()
+
+	tests := []struct {
+		name   string
+		cueStr string
+		want   string
+	}{
+		{
+			name:   "extracts origin field",
+			cueStr: `{ origin: "github.com/test/module@v0.1.0" }`,
+			want:   "github.com/test/module@v0.1.0",
+		},
+		{
+			name:   "returns empty for missing origin",
+			cueStr: `{ description: "no origin here" }`,
+			want:   "",
+		},
+		{
+			name:   "returns empty for non-string origin",
+			cueStr: `{ origin: 42 }`,
+			want:   "",
+		},
+		{
+			name:   "returns empty for empty struct",
+			cueStr: `{}`,
+			want:   "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			v := ctx.CompileString(tt.cueStr)
+			if err := v.Err(); err != nil {
+				t.Fatalf("compiling CUE: %v", err)
+			}
+
+			got := extractOrigin(v)
+			if got != tt.want {
+				t.Errorf("extractOrigin() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGetCUECacheDir(t *testing.T) {
+	t.Run("respects CUE_CACHE_DIR env var", func(t *testing.T) {
+		t.Setenv("CUE_CACHE_DIR", "/custom/cue/cache")
+
+		dir, err := getCUECacheDir()
+		if err != nil {
+			t.Fatalf("getCUECacheDir() error: %v", err)
+		}
+		if dir != "/custom/cue/cache" {
+			t.Errorf("getCUECacheDir() = %q, want %q", dir, "/custom/cue/cache")
+		}
+	})
+
+	t.Run("falls back to user cache dir", func(t *testing.T) {
+		t.Setenv("CUE_CACHE_DIR", "")
+
+		dir, err := getCUECacheDir()
+		if err != nil {
+			t.Fatalf("getCUECacheDir() error: %v", err)
+		}
+		if !strings.HasSuffix(dir, string(filepath.Separator)+"cue") {
+			t.Errorf("getCUECacheDir() = %q, want suffix /cue", dir)
+		}
+	})
+}
+
+func TestResolveModulePath(t *testing.T) {
+	t.Run("non-module path returned unchanged", func(t *testing.T) {
+		result, err := resolveModulePath("/some/absolute/path.md", "any-origin")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if result != "/some/absolute/path.md" {
+			t.Errorf("got %q, want %q", result, "/some/absolute/path.md")
+		}
+	})
+
+	t.Run("relative path returned unchanged", func(t *testing.T) {
+		result, err := resolveModulePath("relative/path.md", "any-origin")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if result != "relative/path.md" {
+			t.Errorf("got %q, want %q", result, "relative/path.md")
+		}
+	})
+
+	t.Run("resolves module path from cache", func(t *testing.T) {
+		cacheDir := t.TempDir()
+		t.Setenv("CUE_CACHE_DIR", cacheDir)
+
+		origin := "github.com/test/tasks/mytask@v0.1.0"
+		moduleDir := filepath.Join(cacheDir, "mod", "extract", "github.com", "test", "tasks", "mytask@v0.1.0")
+		if err := os.MkdirAll(moduleDir, 0755); err != nil {
+			t.Fatalf("creating cache dir: %v", err)
+		}
+		promptFile := filepath.Join(moduleDir, "prompt.md")
+		if err := os.WriteFile(promptFile, []byte("test"), 0644); err != nil {
+			t.Fatalf("writing test file: %v", err)
+		}
+
+		result, err := resolveModulePath("@module/prompt.md", origin)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if result != promptFile {
+			t.Errorf("got %q, want %q", result, promptFile)
+		}
+	})
+
+	t.Run("module not found in cache", func(t *testing.T) {
+		cacheDir := t.TempDir()
+		t.Setenv("CUE_CACHE_DIR", cacheDir)
+
+		parentDir := filepath.Join(cacheDir, "mod", "extract", "github.com", "test", "tasks")
+		if err := os.MkdirAll(parentDir, 0755); err != nil {
+			t.Fatalf("creating parent dir: %v", err)
+		}
+
+		_, err := resolveModulePath("@module/prompt.md", "github.com/test/tasks/mytask@v0.1.0")
+		if err == nil {
+			t.Fatal("expected error for missing module")
+		}
+		if !strings.Contains(err.Error(), "not found in cache") {
+			t.Errorf("error %q should mention 'not found in cache'", err.Error())
+		}
+	})
+
+	t.Run("cache directory does not exist", func(t *testing.T) {
+		cacheDir := t.TempDir()
+		t.Setenv("CUE_CACHE_DIR", cacheDir)
+
+		_, err := resolveModulePath("@module/prompt.md", "github.com/test/tasks/mytask@v0.1.0")
+		if err == nil {
+			t.Fatal("expected error for missing cache directory")
+		}
+	})
+
+	t.Run("origin without version", func(t *testing.T) {
+		cacheDir := t.TempDir()
+		t.Setenv("CUE_CACHE_DIR", cacheDir)
+
+		moduleDir := filepath.Join(cacheDir, "mod", "extract", "github.com", "test", "tasks", "mytask@v0.2.0")
+		if err := os.MkdirAll(moduleDir, 0755); err != nil {
+			t.Fatalf("creating cache dir: %v", err)
+		}
+
+		result, err := resolveModulePath("@module/data.cue", "github.com/test/tasks/mytask")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		want := filepath.Join(moduleDir, "data.cue")
+		if result != want {
+			t.Errorf("got %q, want %q", result, want)
+		}
+	})
+}

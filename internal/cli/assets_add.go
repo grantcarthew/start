@@ -115,7 +115,7 @@ func installAsset(ctx context.Context, cmd *cobra.Command, client *registry.Clie
 		_, _ = fmt.Fprintln(w, "Fetching asset...")
 	}
 
-	if err := assets.InstallAsset(ctx, client, selected, configDir); err != nil {
+	if err := assets.InstallAsset(ctx, client, index, selected, configDir); err != nil {
 		return err
 	}
 

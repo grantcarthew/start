@@ -516,7 +516,7 @@ func (r *resolver) autoInstall(client *registry.Client, result assets.SearchResu
 		_, _ = fmt.Fprintf(r.stdout, "Installing %s from registry...\n", result.Name)
 	}
 
-	if err := assets.InstallAsset(ctx, client, result, paths.Global); err != nil {
+	if err := assets.InstallAsset(ctx, client, r.index, result, paths.Global); err != nil {
 		return err
 	}
 

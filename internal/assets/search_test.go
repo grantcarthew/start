@@ -261,16 +261,9 @@ func TestSearchCategory(t *testing.T) {
 	}
 }
 
-// TestSearchIndex_NilIndex documents Bug: SearchIndex panics on nil *registry.Index.
-// SearchIndex accesses index.Agents, index.Roles, etc. without a nil check.
+// TestSearchIndex_NilIndex verifies SearchIndex returns nil for a nil index.
 func TestSearchIndex_NilIndex(t *testing.T) {
 	t.Parallel()
-
-	defer func() {
-		if r := recover(); r != nil {
-			t.Errorf("SearchIndex(nil, ...) panicked: %v", r)
-		}
-	}()
 
 	results := SearchIndex(nil, "test")
 	if len(results) != 0 {
