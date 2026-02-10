@@ -16,13 +16,14 @@ import (
 // addAssetsInfoCommand adds the info subcommand to the assets command.
 func addAssetsInfoCommand(parent *cobra.Command) {
 	infoCmd := &cobra.Command{
-		Use:   "info <query>",
+		Use:   "info <query>...",
 		Short: "Show asset details",
 		Long: `Show detailed information about an asset.
 
 Searches for the asset in the registry index and displays full details
-including description, module path, tags, and installation status.`,
-		Args: cobra.ExactArgs(1),
+including description, module path, tags, and installation status.
+Multiple words are combined with AND logic.`,
+		Args: cobra.MinimumNArgs(1),
 		RunE: runAssetsInfo,
 	}
 
@@ -33,7 +34,7 @@ including description, module path, tags, and installation status.`,
 
 // runAssetsInfo shows detailed information about an asset.
 func runAssetsInfo(cmd *cobra.Command, args []string) error {
-	query := args[0]
+	query := strings.Join(args, " ")
 	ctx := context.Background()
 	flags := getFlags(cmd)
 

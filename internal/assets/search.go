@@ -16,20 +16,45 @@ type SearchResult struct {
 	MatchScore int // Higher = better match
 }
 
+// ParseSearchTerms splits an input string into unique, lowercased search terms.
+// It splits on both whitespace and commas, removes empty strings and duplicates.
+// Returns nil if no valid terms remain.
+func ParseSearchTerms(input string) []string {
+	normalized := strings.ReplaceAll(input, ",", " ")
+	parts := strings.Fields(normalized)
+
+	seen := make(map[string]bool, len(parts))
+	var terms []string
+	for _, p := range parts {
+		lower := strings.ToLower(p)
+		if !seen[lower] {
+			seen[lower] = true
+			terms = append(terms, lower)
+		}
+	}
+	return terms
+}
+
 // SearchIndex searches all categories in the index for matching entries.
+// The query is split into terms (by whitespace and commas) and all terms
+// must match for an entry to be included (AND semantics).
 func SearchIndex(index *registry.Index, query string) []SearchResult {
 	if index == nil {
 		return nil
 	}
 
+	terms := ParseSearchTerms(query)
+	if len(terms) == 0 {
+		return nil
+	}
+
 	var results []SearchResult
-	queryLower := strings.ToLower(query)
 
 	// Search each category
-	results = append(results, searchCategory("agents", index.Agents, queryLower)...)
-	results = append(results, searchCategory("roles", index.Roles, queryLower)...)
-	results = append(results, searchCategory("tasks", index.Tasks, queryLower)...)
-	results = append(results, searchCategory("contexts", index.Contexts, queryLower)...)
+	results = append(results, searchCategory("agents", index.Agents, terms)...)
+	results = append(results, searchCategory("roles", index.Roles, terms)...)
+	results = append(results, searchCategory("tasks", index.Tasks, terms)...)
+	results = append(results, searchCategory("contexts", index.Contexts, terms)...)
 
 	// Sort by match score (descending), then by category, then by name
 	sort.Slice(results, func(i, j int) bool {
@@ -46,11 +71,11 @@ func SearchIndex(index *registry.Index, query string) []SearchResult {
 }
 
 // searchCategory searches a single category map for matching entries.
-func searchCategory(category string, entries map[string]registry.IndexEntry, queryLower string) []SearchResult {
+func searchCategory(category string, entries map[string]registry.IndexEntry, terms []string) []SearchResult {
 	var results []SearchResult
 
 	for name, entry := range entries {
-		score := matchScore(name, entry, queryLower)
+		score := matchScoreTerms(name, entry, terms)
 		if score > 0 {
 			results = append(results, SearchResult{
 				Category:   category,
@@ -64,46 +89,53 @@ func searchCategory(category string, entries map[string]registry.IndexEntry, que
 	return results
 }
 
-// matchScore calculates how well an entry matches the query.
-// Returns 0 if no match, higher values for better matches.
-// Priority: name (3) > path (2) > description (1) > tags (1)
-func matchScore(name string, entry registry.IndexEntry, queryLower string) int {
-	score := 0
+// matchScoreTerms calculates how well an entry matches ALL search terms.
+// Returns 0 if any term fails to match at least one field (AND semantics).
+// Score is the sum of per-term field scores.
+// Field weights: name (3) > description (1) > tags (1)
+func matchScoreTerms(name string, entry registry.IndexEntry, terms []string) int {
+	if len(terms) == 0 {
+		return 0
+	}
+
 	nameLower := strings.ToLower(name)
 	descLower := strings.ToLower(entry.Description)
-	moduleLower := strings.ToLower(entry.Module)
 
-	// Name match (highest priority)
-	if strings.Contains(nameLower, queryLower) {
-		score += 3
-	}
+	totalScore := 0
+	for _, term := range terms {
+		termScore := 0
 
-	// Module path match
-	if strings.Contains(moduleLower, queryLower) {
-		score += 2
-	}
-
-	// Description match
-	if strings.Contains(descLower, queryLower) {
-		score += 1
-	}
-
-	// Tags match
-	for _, tag := range entry.Tags {
-		if strings.Contains(strings.ToLower(tag), queryLower) {
-			score += 1
-			break // Only count tag match once
+		if strings.Contains(nameLower, term) {
+			termScore += 3
 		}
+		if strings.Contains(descLower, term) {
+			termScore += 1
+		}
+		for _, tag := range entry.Tags {
+			if strings.Contains(strings.ToLower(tag), term) {
+				termScore += 1
+				break
+			}
+		}
+
+		if termScore == 0 {
+			return 0 // AND: every term must match something
+		}
+		totalScore += termScore
 	}
 
-	return score
+	return totalScore
 }
 
 // SearchCategoryEntries searches a single category's registry entries with scoring.
+// The query is split into terms and all must match (AND semantics).
 // Returns results sorted by score descending, then by name ascending.
 func SearchCategoryEntries(category string, entries map[string]registry.IndexEntry, query string) []SearchResult {
-	queryLower := strings.ToLower(query)
-	results := searchCategory(category, entries, queryLower)
+	terms := ParseSearchTerms(query)
+	if len(terms) == 0 {
+		return nil
+	}
+	results := searchCategory(category, entries, terms)
 
 	sort.Slice(results, func(i, j int) bool {
 		if results[i].MatchScore != results[j].MatchScore {
@@ -117,8 +149,8 @@ func SearchCategoryEntries(category string, entries map[string]registry.IndexEnt
 
 // SearchInstalledConfig searches installed CUE config entries for a category.
 // It iterates entries under the given CUE key (e.g. "agents"), extracts
-// description/tags into IndexEntry structs, applies matchScore, and returns
-// scored results.
+// description/tags into IndexEntry structs, applies scoring, and returns
+// scored results. The query is split into terms with AND semantics.
 func SearchInstalledConfig(cfg cue.Value, cueKey, category, query string) []SearchResult {
 	catVal := cfg.LookupPath(cue.ParsePath(cueKey))
 	if !catVal.Exists() {
@@ -130,13 +162,17 @@ func SearchInstalledConfig(cfg cue.Value, cueKey, category, query string) []Sear
 		return nil
 	}
 
-	queryLower := strings.ToLower(query)
+	terms := ParseSearchTerms(query)
+	if len(terms) == 0 {
+		return nil
+	}
+
 	var results []SearchResult
 
 	for iter.Next() {
 		name := iter.Selector().Unquoted()
 		entry := extractIndexEntryFromCUE(iter.Value())
-		score := matchScore(name, entry, queryLower)
+		score := matchScoreTerms(name, entry, terms)
 		if score > 0 {
 			results = append(results, SearchResult{
 				Category:   category,
