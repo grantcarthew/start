@@ -41,12 +41,13 @@ Design Records (DRs) document architectural decisions, algorithms, breaking chan
 | dr-033 | Additional CLI Global Flags | CLI | Accepted | 2025-12-19 |
 | dr-034 | CLI Parent Command Defaults | CLI | Accepted | 2025-12-23 |
 | dr-035 | CLI Debug Logging | CLI | Proposed | 2025-12-23 |
-| dr-036 | CLI Terminal Colors | CLI | Accepted | 2025-12-24 |
+| dr-036 | CLI Terminal Colors | CLI | Superseded by dr-042 | 2025-12-24 |
 | dr-037 | Base Schema for Common Asset Fields | CUE | Proposed | 2026-01-05 |
 | dr-038 | CLI File Path Inputs | CLI | Accepted | 2026-01-16 |
 | dr-039 | Role Optional Field | Role | Accepted | 2026-01-31 |
 | dr-040 | CLI Config Reorder Command | CLI | Accepted | 2026-02-08 |
 | dr-041 | CLI Flag Asset Search | CLI | Accepted | 2026-02-08 |
+| dr-042 | Terminal Colour Standard | CLI | Accepted | 2026-02-10 |
 
 ## Process
 
