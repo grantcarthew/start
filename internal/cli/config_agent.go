@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
 	"cuelang.org/go/cue"
@@ -483,7 +484,7 @@ func runConfigAgentEdit(cmd *cobra.Command, args []string) error {
 	}
 
 	// Prompt for each field with current value as default
-	_, _ = fmt.Fprintf(stdout, "Editing agent %q (press Enter to keep current value)\n\n", name)
+	_, _ = fmt.Fprintf(stdout, "Editing agent %q %s%s%s\n\n", name, colorCyan.Sprint("("), colorDim.Sprint("press Enter to keep current value"), colorCyan.Sprint(")"))
 
 	newBin, err := promptString(stdout, stdin, "Binary", agent.Bin)
 	if err != nil {
@@ -501,19 +502,20 @@ func runConfigAgentEdit(cmd *cobra.Command, args []string) error {
 		newCommand = agent.Command
 	}
 
-	newDefaultModel, err := promptString(stdout, stdin, "Default model", agent.DefaultModel)
-	if err != nil {
-		return err
-	}
-
 	newDescription, err := promptString(stdout, stdin, "Description", agent.Description)
 	if err != nil {
 		return err
 	}
 
-	// Prompt for models
+	// Prompt for models before default model so the user can see available choices
 	_, _ = fmt.Fprintln(stdout)
 	newModels, err := promptModels(stdout, stdin, agent.Models)
+	if err != nil {
+		return err
+	}
+
+	_, _ = fmt.Fprintln(stdout)
+	newDefaultModel, err := promptDefaultModel(stdout, stdin, agent.DefaultModel, newModels)
 	if err != nil {
 		return err
 	}
@@ -992,7 +994,7 @@ func writeDefaultAgentSetting(path string, agentName string) error {
 // promptString prompts for a string value with a default.
 func promptString(w io.Writer, r io.Reader, label, defaultVal string) (string, error) {
 	if defaultVal != "" {
-		_, _ = fmt.Fprintf(w, "%s [%s]: ", label, defaultVal)
+		_, _ = fmt.Fprintf(w, "%s %s%s%s: ", label, colorCyan.Sprint("["), colorDim.Sprint(defaultVal), colorCyan.Sprint("]"))
 	} else {
 		_, _ = fmt.Fprintf(w, "%s: ", label)
 	}
@@ -1010,15 +1012,75 @@ func promptString(w io.Writer, r io.Reader, label, defaultVal string) (string, e
 	return input, nil
 }
 
+// promptDefaultModel prompts for a default model selection.
+// When models are defined, displays a numbered list for selection.
+// Falls back to free-text input when no models are defined.
+func promptDefaultModel(w io.Writer, r io.Reader, current string, models map[string]string) (string, error) {
+	if len(models) == 0 {
+		return promptString(w, r, "Default model", current)
+	}
+
+	// Sort aliases for stable ordering
+	aliases := make([]string, 0, len(models))
+	for alias := range models {
+		aliases = append(aliases, alias)
+	}
+	sort.Strings(aliases)
+
+	_, _ = fmt.Fprintln(w, "Default model:")
+	for i, alias := range aliases {
+		if alias == current {
+			_, _ = fmt.Fprintf(w, "  %d. %s - %s %s%s%s\n", i+1, alias, colorDim.Sprint(models[alias]), colorCyan.Sprint("("), colorSuccess.Sprint("current"), colorCyan.Sprint(")"))
+		} else {
+			_, _ = fmt.Fprintf(w, "  %d. %s - %s\n", i+1, alias, colorDim.Sprint(models[alias]))
+		}
+	}
+
+	_, _ = fmt.Fprintln(w)
+	if current != "" {
+		_, _ = fmt.Fprintf(w, "Select model %s%s%s: ", colorCyan.Sprint("("), colorDim.Sprintf("number, alias, or Enter to keep %q", current), colorCyan.Sprint(")"))
+	} else {
+		_, _ = fmt.Fprintf(w, "Select model %s%s%s: ", colorCyan.Sprint("("), colorDim.Sprint("number or alias"), colorCyan.Sprint(")"))
+	}
+
+	reader := bufio.NewReader(r)
+	input, err := reader.ReadString('\n')
+	if err != nil {
+		return "", fmt.Errorf("reading input: %w", err)
+	}
+
+	input = strings.TrimSpace(input)
+	if input == "" {
+		return current, nil
+	}
+
+	// Try parsing as number
+	if choice, err := strconv.Atoi(input); err == nil {
+		if choice >= 1 && choice <= len(aliases) {
+			return aliases[choice-1], nil
+		}
+		return "", fmt.Errorf("invalid selection: %s (choose 1-%d)", input, len(aliases))
+	}
+
+	// Try matching by alias
+	for _, alias := range aliases {
+		if strings.EqualFold(alias, input) {
+			return alias, nil
+		}
+	}
+
+	return "", fmt.Errorf("invalid selection: %q is not a known model alias", input)
+}
+
 // promptTags prompts for editing a slice of tags.
 // Shows current tags and allows: comma-separated input to replace, empty to clear, Enter to keep.
 func promptTags(w io.Writer, r io.Reader, current []string) ([]string, error) {
 	if len(current) > 0 {
-		_, _ = fmt.Fprintf(w, "Current tags: [%s]\n", strings.Join(current, ", "))
+		_, _ = fmt.Fprintf(w, "Current tags: %s%s%s\n", colorCyan.Sprint("["), colorDim.Sprint(strings.Join(current, ", ")), colorCyan.Sprint("]"))
 	} else {
-		_, _ = fmt.Fprintln(w, "Current tags: (none)")
+		_, _ = fmt.Fprintf(w, "Current tags: %s%s%s\n", colorCyan.Sprint("("), colorDim.Sprint("none"), colorCyan.Sprint(")"))
 	}
-	_, _ = fmt.Fprint(w, "Tags (comma-separated, - to clear, Enter to keep): ")
+	_, _ = fmt.Fprintf(w, "Tags %s%s%s: ", colorCyan.Sprint("("), colorDim.Sprint("comma-separated, - to clear, Enter to keep"), colorCyan.Sprint(")"))
 
 	reader := bufio.NewReader(r)
 	input, err := reader.ReadString('\n')
@@ -1063,13 +1125,17 @@ func promptModels(w io.Writer, r io.Reader, current map[string]string) (map[stri
 		}
 		sort.Strings(aliases)
 		for _, alias := range aliases {
-			_, _ = fmt.Fprintf(w, "  %s: %s\n", alias, current[alias])
+			_, _ = fmt.Fprintf(w, "  %s: %s\n", alias, colorDim.Sprint(current[alias]))
 		}
 	} else {
-		_, _ = fmt.Fprintln(w, "Current models: (none)")
+		_, _ = fmt.Fprintf(w, "Current models: %s%s%s\n", colorCyan.Sprint("("), colorDim.Sprint("none"), colorCyan.Sprint(")"))
 	}
 
-	_, _ = fmt.Fprint(w, "Models: (k)eep, (c)lear, (e)dit [k]: ")
+	_, _ = fmt.Fprintf(w, "Models: %sk%seep, %sc%slear, %se%sdit %s%s%s: ",
+		colorCyan.Sprint("("), colorCyan.Sprint(")"),
+		colorCyan.Sprint("("), colorCyan.Sprint(")"),
+		colorCyan.Sprint("("), colorCyan.Sprint(")"),
+		colorCyan.Sprint("["), colorDim.Sprint("k"), colorCyan.Sprint("]"))
 	choice, err := reader.ReadString('\n')
 	if err != nil {
 		return nil, fmt.Errorf("reading input: %w", err)
@@ -1103,7 +1169,7 @@ func promptModelsEdit(w io.Writer, reader *bufio.Reader, current map[string]stri
 
 		for _, alias := range aliases {
 			currentVal := current[alias]
-			_, _ = fmt.Fprintf(w, "  %s [%s]: ", alias, currentVal)
+			_, _ = fmt.Fprintf(w, "  %s %s%s%s: ", alias, colorCyan.Sprint("["), colorDim.Sprint(currentVal), colorCyan.Sprint("]"))
 
 			input, err := reader.ReadString('\n')
 			if err != nil {

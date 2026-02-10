@@ -1254,6 +1254,183 @@ func TestPromptTags_Empty(t *testing.T) {
 	}
 }
 
+func TestPromptDefaultModel_NoModels(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	stdin := strings.NewReader("gpt-4\n")
+
+	result, err := promptDefaultModel(stdout, stdin, "gpt-3", nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if result != "gpt-4" {
+		t.Errorf("expected 'gpt-4', got: %s", result)
+	}
+
+	output := stdout.String()
+	if !strings.Contains(output, "Default model") {
+		t.Errorf("expected promptString fallback, got: %s", output)
+	}
+}
+
+func TestPromptDefaultModel_NoModelsKeepCurrent(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	stdin := strings.NewReader("\n")
+
+	result, err := promptDefaultModel(stdout, stdin, "gpt-3", nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if result != "gpt-3" {
+		t.Errorf("expected 'gpt-3', got: %s", result)
+	}
+}
+
+func TestPromptDefaultModel_SelectByNumber(t *testing.T) {
+	models := map[string]string{
+		"haiku":  "claude-3-5-haiku-20241022",
+		"sonnet": "claude-3-7-sonnet-20250219",
+		"opus":   "claude-opus-4-20250514",
+	}
+	stdout := &bytes.Buffer{}
+	stdin := strings.NewReader("3\n")
+
+	result, err := promptDefaultModel(stdout, stdin, "sonnet", models)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Sorted: haiku=1, opus=2, sonnet=3
+	if result != "sonnet" {
+		t.Errorf("expected 'sonnet', got: %s", result)
+	}
+
+	output := stdout.String()
+	if !strings.Contains(output, "1. haiku") {
+		t.Errorf("expected numbered list, got: %s", output)
+	}
+	if !strings.Contains(output, "(current)") {
+		t.Errorf("expected current marker, got: %s", output)
+	}
+}
+
+func TestPromptDefaultModel_SelectByAlias(t *testing.T) {
+	models := map[string]string{
+		"haiku":  "claude-3-5-haiku-20241022",
+		"sonnet": "claude-3-7-sonnet-20250219",
+	}
+	stdout := &bytes.Buffer{}
+	stdin := strings.NewReader("haiku\n")
+
+	result, err := promptDefaultModel(stdout, stdin, "sonnet", models)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if result != "haiku" {
+		t.Errorf("expected 'haiku', got: %s", result)
+	}
+}
+
+func TestPromptDefaultModel_SelectByAliasCaseInsensitive(t *testing.T) {
+	models := map[string]string{
+		"haiku":  "claude-3-5-haiku-20241022",
+		"sonnet": "claude-3-7-sonnet-20250219",
+	}
+	stdout := &bytes.Buffer{}
+	stdin := strings.NewReader("HAIKU\n")
+
+	result, err := promptDefaultModel(stdout, stdin, "sonnet", models)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if result != "haiku" {
+		t.Errorf("expected 'haiku', got: %s", result)
+	}
+}
+
+func TestPromptDefaultModel_EnterKeepsCurrent(t *testing.T) {
+	models := map[string]string{
+		"haiku":  "claude-3-5-haiku-20241022",
+		"sonnet": "claude-3-7-sonnet-20250219",
+	}
+	stdout := &bytes.Buffer{}
+	stdin := strings.NewReader("\n")
+
+	result, err := promptDefaultModel(stdout, stdin, "sonnet", models)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if result != "sonnet" {
+		t.Errorf("expected 'sonnet', got: %s", result)
+	}
+}
+
+func TestPromptDefaultModel_InvalidNumber(t *testing.T) {
+	models := map[string]string{
+		"haiku":  "claude-3-5-haiku-20241022",
+		"sonnet": "claude-3-7-sonnet-20250219",
+	}
+	stdout := &bytes.Buffer{}
+	stdin := strings.NewReader("5\n")
+
+	_, err := promptDefaultModel(stdout, stdin, "sonnet", models)
+	if err == nil {
+		t.Fatal("expected error for invalid number")
+	}
+
+	if !strings.Contains(err.Error(), "invalid selection") {
+		t.Errorf("expected 'invalid selection' error, got: %v", err)
+	}
+}
+
+func TestPromptDefaultModel_InvalidAlias(t *testing.T) {
+	models := map[string]string{
+		"haiku":  "claude-3-5-haiku-20241022",
+		"sonnet": "claude-3-7-sonnet-20250219",
+	}
+	stdout := &bytes.Buffer{}
+	stdin := strings.NewReader("turbo\n")
+
+	_, err := promptDefaultModel(stdout, stdin, "sonnet", models)
+	if err == nil {
+		t.Fatal("expected error for invalid alias")
+	}
+
+	if !strings.Contains(err.Error(), "not a known model alias") {
+		t.Errorf("expected 'not a known model alias' error, got: %v", err)
+	}
+}
+
+func TestPromptDefaultModel_NoCurrent(t *testing.T) {
+	models := map[string]string{
+		"haiku":  "claude-3-5-haiku-20241022",
+		"sonnet": "claude-3-7-sonnet-20250219",
+	}
+	stdout := &bytes.Buffer{}
+	stdin := strings.NewReader("1\n")
+
+	result, err := promptDefaultModel(stdout, stdin, "", models)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if result != "haiku" {
+		t.Errorf("expected 'haiku', got: %s", result)
+	}
+
+	output := stdout.String()
+	if strings.Contains(output, "(current)") {
+		t.Errorf("expected no current marker when no default set, got: %s", output)
+	}
+	if strings.Contains(output, "Enter to keep") {
+		t.Errorf("expected no keep prompt when no default set, got: %s", output)
+	}
+}
+
 func TestPromptModels_Keep(t *testing.T) {
 	current := map[string]string{"fast": "gpt-4", "smart": "gpt-4-turbo"}
 	stdout := &bytes.Buffer{}
