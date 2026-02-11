@@ -260,57 +260,6 @@ func TestPrintSearchResults(t *testing.T) {
 	})
 }
 
-// TestIsAssetRepo tests the isAssetRepo function.
-func TestIsAssetRepo(t *testing.T) {
-	t.Parallel()
-	t.Run("valid asset repo with agents", func(t *testing.T) {
-		dir := t.TempDir()
-		_ = os.MkdirAll(filepath.Join(dir, "agents"), 0755)
-
-		if !isAssetRepo(dir) {
-			t.Error("expected isAssetRepo to return true for dir with agents/")
-		}
-	})
-
-	t.Run("valid asset repo with roles", func(t *testing.T) {
-		dir := t.TempDir()
-		_ = os.MkdirAll(filepath.Join(dir, "roles"), 0755)
-
-		if !isAssetRepo(dir) {
-			t.Error("expected isAssetRepo to return true for dir with roles/")
-		}
-	})
-
-	t.Run("valid asset repo with multiple dirs", func(t *testing.T) {
-		dir := t.TempDir()
-		_ = os.MkdirAll(filepath.Join(dir, "agents"), 0755)
-		_ = os.MkdirAll(filepath.Join(dir, "roles"), 0755)
-		_ = os.MkdirAll(filepath.Join(dir, "tasks"), 0755)
-		_ = os.MkdirAll(filepath.Join(dir, "contexts"), 0755)
-
-		if !isAssetRepo(dir) {
-			t.Error("expected isAssetRepo to return true for full asset repo")
-		}
-	})
-
-	t.Run("not an asset repo", func(t *testing.T) {
-		dir := t.TempDir()
-		_ = os.MkdirAll(filepath.Join(dir, "src"), 0755)
-
-		if isAssetRepo(dir) {
-			t.Error("expected isAssetRepo to return false for non-asset dir")
-		}
-	})
-
-	t.Run("empty directory", func(t *testing.T) {
-		dir := t.TempDir()
-
-		if isAssetRepo(dir) {
-			t.Error("expected isAssetRepo to return false for empty dir")
-		}
-	})
-}
-
 // TestAssetTypeToConfigFile tests the assetTypeToConfigFile function.
 func TestAssetTypeToConfigFile(t *testing.T) {
 	t.Parallel()
@@ -389,63 +338,6 @@ func TestGenerateAssetCUE(t *testing.T) {
 }
 */
 
-// TestGenerateIndexCUE tests the generateIndexCUE function.
-func TestGenerateIndexCUE(t *testing.T) {
-	t.Parallel()
-	index := &ScannedIndex{
-		Agents: []ScannedAsset{
-			{
-				Category:    "agents",
-				Name:        "ai/claude",
-				Module:      "github.com/test/agents/ai/claude",
-				Description: "Claude by Anthropic",
-				Tags:        []string{"ai", "llm"},
-				Bin:         "claude",
-			},
-		},
-		Roles: []ScannedAsset{
-			{
-				Category:    "roles",
-				Name:        "golang/assistant",
-				Module:      "github.com/test/roles/golang/assistant",
-				Description: "Go programming expert",
-				Tags:        []string{"golang"},
-			},
-		},
-		Tasks:    []ScannedAsset{},
-		Contexts: []ScannedAsset{},
-	}
-
-	content := generateIndexCUE(index)
-
-	// Check header
-	if !strings.Contains(content, "// Auto-generated") {
-		t.Error("missing auto-generated comment")
-	}
-	if !strings.Contains(content, "package index") {
-		t.Error("missing package declaration")
-	}
-
-	// Check agents section
-	if !strings.Contains(content, "agents: {") {
-		t.Error("missing agents section")
-	}
-	if !strings.Contains(content, `"ai/claude"`) {
-		t.Error("missing quoted agent key")
-	}
-	if !strings.Contains(content, `bin: "claude"`) {
-		t.Error("missing bin field for agent")
-	}
-
-	// Check roles section
-	if !strings.Contains(content, "roles: {") {
-		t.Error("missing roles section")
-	}
-	if !strings.Contains(content, `"golang/assistant"`) {
-		t.Error("missing quoted role key")
-	}
-}
-
 // TestAssetsCommandExists tests that the assets command is registered.
 func TestAssetsCommandExists(t *testing.T) {
 	t.Parallel()
@@ -465,7 +357,7 @@ func TestAssetsCommandExists(t *testing.T) {
 	}
 
 	// Check subcommands
-	subcommands := []string{"browse", "search", "add", "list", "info", "update", "index"}
+	subcommands := []string{"browse", "search", "add", "list", "info", "update"}
 	for _, name := range subcommands {
 		found := false
 		for _, c := range assetsCmd.Commands() {
