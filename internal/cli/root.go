@@ -94,6 +94,7 @@ It manages prompt composition, context injection, and workflow automation.`,
 	addTaskCommand(cmd)
 	addAssetsCommand(cmd)
 	addConfigCommand(cmd)
+	addSearchCommand(cmd)
 	addDoctorCommand(cmd)
 	addCompletionCommand(cmd)
 
