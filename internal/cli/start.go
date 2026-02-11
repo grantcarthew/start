@@ -1,12 +1,15 @@
 package cli
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 
+	"cuelang.org/go/cue"
 	"github.com/grantcarthew/start/internal/config"
 	internalcue "github.com/grantcarthew/start/internal/cue"
 	"github.com/grantcarthew/start/internal/orchestration"
@@ -87,17 +90,70 @@ func loadExecutionConfig(flags *Flags) (internalcue.LoadResult, string, error) {
 	return cfg, workingDir, nil
 }
 
+// resolveAgentName determines which agent to use when no --agent flag was provided.
+// It checks settings.default_agent, falls back to the only configured agent,
+// or prompts interactively when multiple agents exist and stdin is a TTY.
+func resolveAgentName(cfg internalcue.LoadResult, flags *Flags, stdout io.Writer, stdin io.Reader) (string, error) {
+	// Try settings.default_agent
+	if def := cfg.Value.LookupPath(cue.ParsePath(internalcue.KeySettings + ".default_agent")); def.Exists() {
+		if s, err := def.String(); err == nil && s != "" {
+			debugf(flags, "agent", "Selected %q (config default)", s)
+			return s, nil
+		}
+	}
+
+	// No default - check configured agents
+	choices := getConfiguredAgents(cfg.Value)
+	switch len(choices) {
+	case 0:
+		return "", fmt.Errorf("no agent configured")
+	case 1:
+		debugf(flags, "agent", "Selected %q (only agent)", choices[0].Name)
+		return choices[0].Name, nil
+	}
+
+	// Multiple agents - check if interactive selection is possible
+	isTTY := false
+	if f, ok := stdin.(*os.File); ok {
+		isTTY = term.IsTerminal(int(f.Fd()))
+	}
+	if !isTTY {
+		// Non-TTY fallback: use first agent
+		name := choices[0].Name
+		debugf(flags, "agent", "Selected %q (first agent, non-TTY)", name)
+		if !flags.Quiet {
+			_, _ = fmt.Fprintf(stdout, "Using agent %q (set default_agent or use --agent to specify)\n", name)
+		}
+		return name, nil
+	}
+
+	// Note: bufio.NewReader may buffer ahead from stdin. This is safe because
+	// nothing reads from stdin after agent resolution (the process is replaced by syscall.Exec).
+	reader := bufio.NewReader(stdin)
+	selected, err := promptAgentSelection(stdout, reader, choices)
+	if err != nil {
+		return "", err
+	}
+	debugf(flags, "agent", "Selected %q (interactive)", selected)
+	if promptSetDefault(stdout, reader, selected) {
+		if err := setSetting(stdout, flags, "default_agent", selected, false); err != nil {
+			PrintWarning(stdout, "could not save default: %v", err)
+		}
+	}
+	return selected, nil
+}
+
 // buildExecutionEnv builds the execution environment from a loaded config and agent name.
 // This is the second phase, called after the resolver has resolved flag values.
-func buildExecutionEnv(cfg internalcue.LoadResult, workingDir string, agentName string, flags *Flags) (*ExecutionEnv, error) {
+func buildExecutionEnv(cfg internalcue.LoadResult, workingDir string, agentName string, flags *Flags, stdout io.Writer, stdin io.Reader) (*ExecutionEnv, error) {
 	if agentName == "" {
-		agentName = orchestration.GetDefaultAgent(cfg.Value)
-		debugf(flags, "agent", "Selected %q (config default)", agentName)
+		resolved, err := resolveAgentName(cfg, flags, stdout, stdin)
+		if err != nil {
+			return nil, err
+		}
+		agentName = resolved
 	} else {
 		debugf(flags, "agent", "Selected %q (--agent flag)", agentName)
-	}
-	if agentName == "" {
-		return nil, fmt.Errorf("no agent configured")
 	}
 
 	agent, err := orchestration.ExtractAgent(cfg.Value, agentName)
@@ -121,10 +177,116 @@ func buildExecutionEnv(cfg internalcue.LoadResult, workingDir string, agentName 
 	}, nil
 }
 
+// agentChoice represents an agent available for interactive selection.
+type agentChoice struct {
+	Name        string
+	Description string
+}
+
+// getConfiguredAgents returns the list of configured agents in definition order.
+func getConfiguredAgents(cfg cue.Value) []agentChoice {
+	agents := cfg.LookupPath(cue.ParsePath(internalcue.KeyAgents))
+	if !agents.Exists() {
+		return nil
+	}
+	iter, err := agents.Fields()
+	if err != nil {
+		return nil
+	}
+	var choices []agentChoice
+	for iter.Next() {
+		name := iter.Selector().Unquoted()
+		val := iter.Value()
+		var desc string
+		if v := val.LookupPath(cue.ParsePath("description")); v.Exists() {
+			desc, _ = v.String()
+		}
+		choices = append(choices, agentChoice{Name: name, Description: desc})
+	}
+	return choices
+}
+
+// promptAgentSelection prompts the user to select an agent from multiple choices.
+// The caller is responsible for TTY detection; this function assumes interactive input.
+func promptAgentSelection(w io.Writer, reader *bufio.Reader, choices []agentChoice) (string, error) {
+	_, _ = fmt.Fprintf(w, "Multiple agents configured. Select an agent:\n\n")
+
+	// Find longest name for alignment
+	maxNameLen := 0
+	for _, c := range choices {
+		if len(c.Name) > maxNameLen {
+			maxNameLen = len(c.Name)
+		}
+	}
+
+	for i, c := range choices {
+		if c.Description != "" {
+			padding := strings.Repeat(" ", maxNameLen-len(c.Name)+2)
+			_, _ = fmt.Fprintf(w, "  %2d. %s%s%s\n", i+1, c.Name, padding, c.Description)
+		} else {
+			_, _ = fmt.Fprintf(w, "  %2d. %s\n", i+1, c.Name)
+		}
+	}
+
+	_, _ = fmt.Fprintln(w)
+	_, _ = fmt.Fprintf(w, "Select (1-%d): ", len(choices))
+
+	input, err := reader.ReadString('\n')
+	if err != nil {
+		return "", fmt.Errorf("reading input: %w", err)
+	}
+	input = strings.TrimSpace(input)
+	if input == "" {
+		return "", fmt.Errorf("no selection provided")
+	}
+
+	// Try number
+	if choice, err := strconv.Atoi(input); err == nil {
+		if choice >= 1 && choice <= len(choices) {
+			return choices[choice-1].Name, nil
+		}
+		return "", fmt.Errorf("invalid selection: %s (choose 1-%d)", input, len(choices))
+	}
+
+	// Try exact name match
+	inputLower := strings.ToLower(input)
+	for _, c := range choices {
+		if strings.ToLower(c.Name) == inputLower {
+			return c.Name, nil
+		}
+	}
+
+	// Try substring match
+	var subMatches []agentChoice
+	for _, c := range choices {
+		if strings.Contains(strings.ToLower(c.Name), inputLower) {
+			subMatches = append(subMatches, c)
+		}
+	}
+	if len(subMatches) == 1 {
+		return subMatches[0].Name, nil
+	}
+
+	return "", fmt.Errorf("invalid selection: %s", input)
+}
+
+// promptSetDefault asks the user whether to set the selected agent as default.
+// The caller is responsible for TTY detection; this function assumes interactive input.
+func promptSetDefault(w io.Writer, reader *bufio.Reader, agentName string) bool {
+	_, _ = fmt.Fprintf(w, "Set %q as default agent? [y/N]: ", agentName)
+
+	input, err := reader.ReadString('\n')
+	if err != nil {
+		return false
+	}
+	input = strings.TrimSpace(strings.ToLower(input))
+	return input == "y" || input == "yes"
+}
+
 // runStart executes the start command (root command with no subcommand).
 func runStart(cmd *cobra.Command, args []string) error {
 	flags := getFlags(cmd)
-	return executeStart(cmd.OutOrStdout(), cmd.ErrOrStderr(), flags, orchestration.ContextSelection{
+	return executeStart(cmd.OutOrStdout(), cmd.ErrOrStderr(), cmd.InOrStdin(), flags, orchestration.ContextSelection{
 		IncludeRequired: true,
 		IncludeDefaults: true,
 		Tags:            flags.Context,
@@ -132,7 +294,7 @@ func runStart(cmd *cobra.Command, args []string) error {
 }
 
 // executeStart is the shared execution logic for start commands.
-func executeStart(stdout, stderr io.Writer, flags *Flags, selection orchestration.ContextSelection, customText string) error {
+func executeStart(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, selection orchestration.ContextSelection, customText string) error {
 	// Phase 1: Load config
 	cfg, workingDir, err := loadExecutionConfig(flags)
 	if err != nil {
@@ -140,7 +302,7 @@ func executeStart(stdout, stderr io.Writer, flags *Flags, selection orchestratio
 	}
 
 	// Phase 2: Resolve asset flags
-	r := newResolver(cfg, flags, stdout, os.Stdin)
+	r := newResolver(cfg, flags, stdout, stdin)
 
 	// Resolve --agent flag
 	agentName := flags.Agent
@@ -174,7 +336,7 @@ func executeStart(stdout, stderr io.Writer, flags *Flags, selection orchestratio
 	}
 
 	// Phase 3: Build execution environment with resolved agent
-	env, err := buildExecutionEnv(cfg, workingDir, agentName, flags)
+	env, err := buildExecutionEnv(cfg, workingDir, agentName, flags, stdout, stdin)
 	if err != nil {
 		return err
 	}

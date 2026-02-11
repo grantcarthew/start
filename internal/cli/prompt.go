@@ -49,5 +49,5 @@ func runPrompt(cmd *cobra.Command, args []string) error {
 		Tags:            flags.Context,
 	}
 
-	return executeStart(cmd.OutOrStdout(), cmd.ErrOrStderr(), flags, selection, customText)
+	return executeStart(cmd.OutOrStdout(), cmd.ErrOrStderr(), cmd.InOrStdin(), flags, selection, customText)
 }

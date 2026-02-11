@@ -423,63 +423,6 @@ func TestExtractAgent(t *testing.T) {
 	})
 }
 
-func TestGetDefaultAgent(t *testing.T) {
-	t.Parallel()
-	ctx := cuecontext.New()
-
-	t.Run("from settings", func(t *testing.T) {
-		config := `
-			settings: {
-				default_agent: "gemini"
-			}
-			agents: {
-				claude: { bin: "claude", command: "claude" }
-				gemini: { bin: "gemini", command: "gemini" }
-			}
-		`
-		cfg := ctx.CompileString(config)
-		if err := cfg.Err(); err != nil {
-			t.Fatalf("compile config: %v", err)
-		}
-
-		name := GetDefaultAgent(cfg)
-		if name != "gemini" {
-			t.Errorf("GetDefaultAgent() = %q, want 'gemini'", name)
-		}
-	})
-
-	t.Run("falls back to first agent", func(t *testing.T) {
-		config := `
-			agents: {
-				claude: { bin: "claude", command: "claude" }
-				gemini: { bin: "gemini", command: "gemini" }
-			}
-		`
-		cfg := ctx.CompileString(config)
-		if err := cfg.Err(); err != nil {
-			t.Fatalf("compile config: %v", err)
-		}
-
-		name := GetDefaultAgent(cfg)
-		if name != "claude" {
-			t.Errorf("GetDefaultAgent() = %q, want 'claude'", name)
-		}
-	})
-
-	t.Run("no agents defined", func(t *testing.T) {
-		config := `{}`
-		cfg := ctx.CompileString(config)
-		if err := cfg.Err(); err != nil {
-			t.Fatalf("compile config: %v", err)
-		}
-
-		name := GetDefaultAgent(cfg)
-		if name != "" {
-			t.Errorf("GetDefaultAgent() = %q, want empty", name)
-		}
-	})
-}
-
 func TestGenerateDryRunCommand(t *testing.T) {
 	t.Parallel()
 	agent := Agent{

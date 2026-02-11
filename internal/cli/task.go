@@ -115,7 +115,7 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 	}
 
 	// Phase 3: Build execution environment with resolved agent
-	env, err := buildExecutionEnv(cfg, workingDir, agentName, flags)
+	env, err := buildExecutionEnv(cfg, workingDir, agentName, flags, stdout, stdin)
 	if err != nil {
 		return err
 	}
@@ -182,7 +182,7 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 				if err != nil {
 					return fmt.Errorf("reloading configuration: %w", err)
 				}
-				env, err = buildExecutionEnv(reloadedCfg, workingDir, agentName, flags)
+				env, err = buildExecutionEnv(reloadedCfg, workingDir, agentName, flags, stdout, stdin)
 				if err != nil {
 					return err
 				}
@@ -220,7 +220,7 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 						if reloadErr != nil {
 							return fmt.Errorf("reloading configuration: %w", reloadErr)
 						}
-						env, err = buildExecutionEnv(reloadedCfg, workingDir, agentName, flags)
+						env, err = buildExecutionEnv(reloadedCfg, workingDir, agentName, flags, stdout, stdin)
 						if err != nil {
 							return err
 						}
@@ -229,7 +229,19 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 				default:
 					// Multiple matches - interactive selection
 					debugf(flags, "task", "Multiple matches, prompting for selection")
-					selected, err := promptTaskSelection(stdout, stdin, allMatches, taskName)
+					isTTY := false
+					if f, ok := stdin.(*os.File); ok {
+						isTTY = term.IsTerminal(int(f.Fd()))
+					}
+					if !isTTY {
+						var names []string
+						for _, m := range allMatches {
+							names = append(names, m.Name)
+						}
+						return fmt.Errorf("ambiguous task %q matches: %s\nSpecify exact name or run interactively", taskName, strings.Join(names, ", "))
+					}
+					reader := bufio.NewReader(stdin)
+					selected, err := promptTaskSelection(stdout, reader, allMatches, taskName)
 					if err != nil {
 						return err
 					}
@@ -252,7 +264,7 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 						if reloadErr != nil {
 							return fmt.Errorf("reloading configuration: %w", reloadErr)
 						}
-						env, err = buildExecutionEnv(reloadedCfg, workingDir, agentName, flags)
+						env, err = buildExecutionEnv(reloadedCfg, workingDir, agentName, flags, stdout, stdin)
 						if err != nil {
 							return err
 						}
@@ -551,22 +563,9 @@ func mergeTaskMatches(installed, registry []TaskMatch) []TaskMatch {
 }
 
 // promptTaskSelection prompts the user to select a task from multiple matches.
+// The caller is responsible for TTY detection; this function assumes interactive input.
 // Returns the selected TaskMatch or an error if selection fails.
-func promptTaskSelection(w io.Writer, r io.Reader, matches []TaskMatch, searchTerm string) (TaskMatch, error) {
-	// Check if stdin is a TTY
-	isTTY := false
-	if f, ok := r.(*os.File); ok {
-		isTTY = term.IsTerminal(int(f.Fd()))
-	}
-
-	if !isTTY {
-		var names []string
-		for _, m := range matches {
-			names = append(names, m.Name)
-		}
-		return TaskMatch{}, fmt.Errorf("ambiguous task %q matches: %s\nSpecify exact name or run interactively", searchTerm, strings.Join(names, ", "))
-	}
-
+func promptTaskSelection(w io.Writer, reader *bufio.Reader, matches []TaskMatch, searchTerm string) (TaskMatch, error) {
 	totalCount := len(matches)
 	displayCount := totalCount
 	truncated := false
@@ -599,7 +598,6 @@ func promptTaskSelection(w io.Writer, r io.Reader, matches []TaskMatch, searchTe
 	_, _ = fmt.Fprintln(w)
 	_, _ = fmt.Fprintf(w, "Select (1-%d): ", displayCount)
 
-	reader := bufio.NewReader(r)
 	input, err := reader.ReadString('\n')
 	if err != nil {
 		return TaskMatch{}, fmt.Errorf("reading input: %w", err)
