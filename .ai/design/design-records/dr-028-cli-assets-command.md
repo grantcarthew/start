@@ -21,7 +21,6 @@ start assets add <query>...      # Install asset(s) to config
 start assets list                # List installed assets with update status
 start assets info <query>        # Show detailed asset information
 start assets update [query]      # Update installed assets
-start assets index               # Regenerate index.cue (asset repo only)
 ```
 
 ## Why
@@ -215,30 +214,6 @@ Updated: 1 asset
 Current: 1 asset
 ```
 
-### start assets index
-
-Regenerate the index.cue file in an asset repository.
-
-```bash
-start assets index
-```
-
-Behaviour:
-
-1. Verify current directory is an asset repo (check for `agents/`, `roles/`, `tasks/`, `contexts/` directories)
-2. Scan asset directories for published modules
-3. Generate/update `index/index.cue`
-
-Error if not in asset repo:
-
-```
-Error: Not an asset repository.
-
-Required directories not found: agents/, roles/, tasks/, contexts/
-
-This command is for asset repository maintainers only.
-```
-
 ## Flags
 
 | Flag | Commands | Description |
@@ -310,12 +285,6 @@ Omit `browse` command:
 - Con: Loses visual exploration option
 - Rejected: Browse provides valuable discovery path
 
-Omit `index` command:
-
-- Pro: Simpler, less to maintain
-- Con: Asset maintainers need a way to update the index
-- Rejected: Essential for asset repo maintenance
-
 Single `list` command for both registry and config:
 
 - Pro: Fewer commands
@@ -326,3 +295,4 @@ Single `list` command for both registry and config:
 
 - 2025-12-22: Aligned exit codes with unified policy (0 success, 1 failure)
 - 2026-02-08: `assets add` now accepts multiple queries (issue #2)
+- 2026-02-11: Removed `assets index` subcommand (asset repo maintainer tooling, not needed in CLI)
