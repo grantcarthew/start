@@ -48,6 +48,7 @@ Design Records (DRs) document architectural decisions, algorithms, breaking chan
 | dr-040 | CLI Config Reorder Command | CLI | Accepted | 2026-02-08 |
 | dr-041 | CLI Flag Asset Search | CLI | Accepted | 2026-02-08 |
 | dr-042 | Terminal Colour Standard | CLI | Accepted | 2026-02-10 |
+| dr-043 | CLI Unified Search Command | CLI | Accepted | 2026-02-11 |
 
 ## Process
 
