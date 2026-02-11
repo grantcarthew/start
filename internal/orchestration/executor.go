@@ -395,27 +395,6 @@ func ExtractAgent(cfg cue.Value, name string) (Agent, error) {
 	return agent, nil
 }
 
-// GetDefaultAgent returns the name of the default agent.
-func GetDefaultAgent(cfg cue.Value) string {
-	// Check settings.default_agent
-	if def := cfg.LookupPath(cue.ParsePath(internalcue.KeySettings + ".default_agent")); def.Exists() {
-		if s, err := def.String(); err == nil {
-			return s
-		}
-	}
-
-	// Fall back to first agent in definition order
-	agents := cfg.LookupPath(cue.ParsePath(internalcue.KeyAgents))
-	if agents.Exists() {
-		iter, err := agents.Fields()
-		if err == nil && iter.Next() {
-			return iter.Selector().Unquoted()
-		}
-	}
-
-	return ""
-}
-
 // GenerateDryRunCommand generates the command.txt content for dry-run.
 func GenerateDryRunCommand(agent Agent, model, roleName string, contexts []string, workingDir string, cmdStr string) string {
 	var sb strings.Builder

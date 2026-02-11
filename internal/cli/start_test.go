@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 	"os"
@@ -93,7 +94,7 @@ func TestExecuteStart_DryRun(t *testing.T) {
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
 
-	err = executeStart(stdout, stderr, flags, selection, "")
+	err = executeStart(stdout, stderr, strings.NewReader(""), flags, selection, "")
 	if err != nil {
 		t.Fatalf("executeStart() error = %v", err)
 	}
@@ -137,7 +138,7 @@ func TestExecuteStart_NoRole(t *testing.T) {
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
 
-	err = executeStart(stdout, stderr, flags, selection, "")
+	err = executeStart(stdout, stderr, strings.NewReader(""), flags, selection, "")
 	if err != nil {
 		t.Fatalf("executeStart() error = %v", err)
 	}
@@ -250,7 +251,7 @@ func TestExecuteStart_ContextSelection(t *testing.T) {
 			stdout := new(bytes.Buffer)
 			stderr := new(bytes.Buffer)
 
-			err := executeStart(stdout, stderr, flags, tt.selection, "")
+			err := executeStart(stdout, stderr, strings.NewReader(""), flags, tt.selection, "")
 			if err != nil {
 				t.Fatalf("executeStart() error = %v", err)
 			}
@@ -615,7 +616,7 @@ func TestExecuteStart_FilePathRole(t *testing.T) {
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
 
-	err = executeStart(stdout, stderr, flags, selection, "")
+	err = executeStart(stdout, stderr, strings.NewReader(""), flags, selection, "")
 	if err != nil {
 		t.Fatalf("executeStart() error = %v", err)
 	}
@@ -664,7 +665,7 @@ func TestExecuteStart_FilePathContext(t *testing.T) {
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
 
-	err = executeStart(stdout, stderr, flags, selection, "")
+	err = executeStart(stdout, stderr, strings.NewReader(""), flags, selection, "")
 	if err != nil {
 		t.Fatalf("executeStart() error = %v", err)
 	}
@@ -710,7 +711,7 @@ func TestExecuteStart_MixedContextOrder(t *testing.T) {
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
 
-	err = executeStart(stdout, stderr, flags, selection, "")
+	err = executeStart(stdout, stderr, strings.NewReader(""), flags, selection, "")
 	if err != nil {
 		t.Fatalf("executeStart() error = %v", err)
 	}
@@ -876,7 +877,7 @@ func TestExecuteStart_FilePathContextMissing(t *testing.T) {
 	stderr := new(bytes.Buffer)
 
 	// Missing context files should not cause fatal error (per DR-038: show ○ status)
-	err = executeStart(stdout, stderr, flags, selection, "")
+	err = executeStart(stdout, stderr, strings.NewReader(""), flags, selection, "")
 	if err != nil {
 		t.Fatalf("executeStart() should not fail for missing context file: %v", err)
 	}
@@ -1164,69 +1165,6 @@ func TestMergeTaskMatches(t *testing.T) {
 	}
 }
 
-func TestPromptTaskSelection_NonTTY(t *testing.T) {
-	matches := []TaskMatch{
-		{Name: "golang/debug", Source: TaskSourceInstalled},
-		{Name: "golang/refactor", Source: TaskSourceRegistry},
-	}
-
-	stdout := new(bytes.Buffer)
-	stdin := strings.NewReader("")
-
-	_, err := promptTaskSelection(stdout, stdin, matches, "golang")
-	if err == nil {
-		t.Error("expected error for non-TTY input")
-		return
-	}
-
-	errMsg := err.Error()
-
-	// Error should mention ambiguous
-	if !strings.Contains(errMsg, "ambiguous") {
-		t.Errorf("error should mention ambiguous: %v", err)
-	}
-
-	// Error should list task names
-	if !strings.Contains(errMsg, "golang/debug") {
-		t.Errorf("error should contain 'golang/debug': %v", err)
-	}
-	if !strings.Contains(errMsg, "golang/refactor") {
-		t.Errorf("error should contain 'golang/refactor': %v", err)
-	}
-}
-
-func TestPromptTaskSelection_NonTTY_ManyMatches(t *testing.T) {
-	// Create 25 matches (more than maxTaskResults=20)
-	var matches []TaskMatch
-	for i := 1; i <= 25; i++ {
-		matches = append(matches, TaskMatch{
-			Name:   fmt.Sprintf("task/%02d", i),
-			Source: TaskSourceInstalled,
-		})
-	}
-
-	stdout := new(bytes.Buffer)
-	stdin := strings.NewReader("")
-
-	_, err := promptTaskSelection(stdout, stdin, matches, "task")
-	if err == nil {
-		t.Error("expected error for non-TTY input")
-		return
-	}
-
-	errMsg := err.Error()
-
-	// Error should mention ambiguous
-	if !strings.Contains(errMsg, "ambiguous") {
-		t.Errorf("error should mention ambiguous: %v", err)
-	}
-
-	// Error should list some task names
-	if !strings.Contains(errMsg, "task/01") {
-		t.Errorf("error should contain task names: %v", err)
-	}
-}
-
 func TestMergeTaskMatches_Sorting(t *testing.T) {
 	// Test that results are sorted alphabetically
 	installed := []TaskMatch{
@@ -1272,5 +1210,302 @@ func TestMergeTaskMatches_Empty(t *testing.T) {
 	merged = mergeTaskMatches(nil, registry)
 	if len(merged) != 1 {
 		t.Errorf("expected 1 result, got %d", len(merged))
+	}
+}
+
+func TestGetConfiguredAgents(t *testing.T) {
+	t.Parallel()
+	cfg := buildTestCfg(t, `{
+		agents: {
+			claude: {
+				bin: "claude"
+				command: "{{.bin}}"
+				description: "Anthropic Claude"
+			}
+			copilot: {
+				bin: "gh"
+				command: "{{.bin}} copilot"
+				description: "GitHub Copilot"
+			}
+			aider: {
+				bin: "aider"
+				command: "{{.bin}}"
+			}
+		}
+	}`)
+
+	choices := getConfiguredAgents(cfg.Value)
+	if len(choices) != 3 {
+		t.Fatalf("expected 3 agents, got %d", len(choices))
+	}
+	if choices[0].Name != "claude" {
+		t.Errorf("expected first agent 'claude', got %q", choices[0].Name)
+	}
+	if choices[0].Description != "Anthropic Claude" {
+		t.Errorf("expected description 'Anthropic Claude', got %q", choices[0].Description)
+	}
+	if choices[1].Name != "copilot" {
+		t.Errorf("expected second agent 'copilot', got %q", choices[1].Name)
+	}
+	if choices[2].Name != "aider" {
+		t.Errorf("expected third agent 'aider', got %q", choices[2].Name)
+	}
+	if choices[2].Description != "" {
+		t.Errorf("expected empty description for aider, got %q", choices[2].Description)
+	}
+}
+
+func TestGetConfiguredAgents_Empty(t *testing.T) {
+	t.Parallel()
+	cfg := buildTestCfg(t, `{
+		roles: {
+			assistant: { prompt: "hello" }
+		}
+	}`)
+
+	choices := getConfiguredAgents(cfg.Value)
+	if len(choices) != 0 {
+		t.Errorf("expected 0 agents, got %d", len(choices))
+	}
+}
+
+func TestPromptAgentSelection_ByNumber(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	reader := bufio.NewReader(strings.NewReader("2\n"))
+
+	choices := []agentChoice{
+		{Name: "claude", Description: "Anthropic Claude"},
+		{Name: "copilot", Description: "GitHub Copilot"},
+	}
+
+	selected, err := promptAgentSelection(&buf, reader, choices)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if selected != "copilot" {
+		t.Errorf("expected 'copilot', got %q", selected)
+	}
+}
+
+func TestPromptAgentSelection_ByExactName(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	reader := bufio.NewReader(strings.NewReader("copilot\n"))
+
+	choices := []agentChoice{
+		{Name: "claude", Description: "Anthropic Claude"},
+		{Name: "copilot", Description: "GitHub Copilot"},
+	}
+
+	selected, err := promptAgentSelection(&buf, reader, choices)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if selected != "copilot" {
+		t.Errorf("expected 'copilot', got %q", selected)
+	}
+}
+
+func TestPromptAgentSelection_ByExactNameCaseInsensitive(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	reader := bufio.NewReader(strings.NewReader("CLAUDE\n"))
+
+	choices := []agentChoice{
+		{Name: "claude", Description: "Anthropic Claude"},
+		{Name: "copilot", Description: "GitHub Copilot"},
+	}
+
+	selected, err := promptAgentSelection(&buf, reader, choices)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if selected != "claude" {
+		t.Errorf("expected 'claude', got %q", selected)
+	}
+}
+
+func TestPromptAgentSelection_BySubstring(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	reader := bufio.NewReader(strings.NewReader("cop\n"))
+
+	choices := []agentChoice{
+		{Name: "claude", Description: "Anthropic Claude"},
+		{Name: "copilot", Description: "GitHub Copilot"},
+	}
+
+	selected, err := promptAgentSelection(&buf, reader, choices)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if selected != "copilot" {
+		t.Errorf("expected 'copilot', got %q", selected)
+	}
+}
+
+func TestPromptAgentSelection_InvalidNumber(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	reader := bufio.NewReader(strings.NewReader("5\n"))
+
+	choices := []agentChoice{
+		{Name: "claude", Description: "Anthropic Claude"},
+		{Name: "copilot", Description: "GitHub Copilot"},
+	}
+
+	_, err := promptAgentSelection(&buf, reader, choices)
+	if err == nil {
+		t.Fatal("expected error for out-of-range number")
+	}
+	if !strings.Contains(err.Error(), "invalid selection") {
+		t.Errorf("expected 'invalid selection' in error, got: %v", err)
+	}
+}
+
+func TestPromptAgentSelection_AmbiguousSubstring(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	reader := bufio.NewReader(strings.NewReader("c\n"))
+
+	choices := []agentChoice{
+		{Name: "claude", Description: "Anthropic Claude"},
+		{Name: "copilot", Description: "GitHub Copilot"},
+	}
+
+	_, err := promptAgentSelection(&buf, reader, choices)
+	if err == nil {
+		t.Fatal("expected error for ambiguous substring")
+	}
+	if !strings.Contains(err.Error(), "invalid selection") {
+		t.Errorf("expected 'invalid selection' in error, got: %v", err)
+	}
+}
+
+func TestPromptAgentSelection_EmptyInput(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	reader := bufio.NewReader(strings.NewReader("\n"))
+
+	choices := []agentChoice{
+		{Name: "claude", Description: "Anthropic Claude"},
+		{Name: "copilot", Description: "GitHub Copilot"},
+	}
+
+	_, err := promptAgentSelection(&buf, reader, choices)
+	if err == nil {
+		t.Fatal("expected error for empty input")
+	}
+	if !strings.Contains(err.Error(), "no selection provided") {
+		t.Errorf("expected 'no selection provided' in error, got: %v", err)
+	}
+}
+
+func TestPromptSetDefault_Yes(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	reader := bufio.NewReader(strings.NewReader("y\n"))
+
+	result := promptSetDefault(&buf, reader, "claude")
+	if !result {
+		t.Error("expected true for 'y' input")
+	}
+}
+
+func TestPromptSetDefault_No(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	reader := bufio.NewReader(strings.NewReader("n\n"))
+
+	result := promptSetDefault(&buf, reader, "claude")
+	if result {
+		t.Error("expected false for 'n' input")
+	}
+}
+
+func TestBuildExecutionEnv_SingleAgent_AutoSelect(t *testing.T) {
+	t.Parallel()
+	cfg := buildTestCfg(t, `{
+		agents: {
+			echo: {
+				bin: "echo"
+				command: "{{.bin}} hello"
+			}
+		}
+	}`)
+
+	flags := &Flags{}
+	var buf bytes.Buffer
+	r := strings.NewReader("")
+
+	env, err := buildExecutionEnv(cfg, t.TempDir(), "", flags, &buf, r)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if env.Agent.Name != "echo" {
+		t.Errorf("expected agent 'echo', got %q", env.Agent.Name)
+	}
+}
+
+func TestBuildExecutionEnv_DefaultAgentSet(t *testing.T) {
+	t.Parallel()
+	cfg := buildTestCfg(t, `{
+		settings: {
+			default_agent: "copilot"
+		}
+		agents: {
+			claude: {
+				bin: "claude"
+				command: "{{.bin}}"
+			}
+			copilot: {
+				bin: "gh"
+				command: "{{.bin}} copilot"
+			}
+		}
+	}`)
+
+	flags := &Flags{}
+	var buf bytes.Buffer
+	r := strings.NewReader("")
+
+	env, err := buildExecutionEnv(cfg, t.TempDir(), "", flags, &buf, r)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if env.Agent.Name != "copilot" {
+		t.Errorf("expected agent 'copilot', got %q", env.Agent.Name)
+	}
+}
+
+func TestBuildExecutionEnv_MultipleAgents_NonTTY(t *testing.T) {
+	t.Parallel()
+	cfg := buildTestCfg(t, `{
+		agents: {
+			claude: {
+				bin: "claude"
+				command: "{{.bin}}"
+			}
+			copilot: {
+				bin: "gh"
+				command: "{{.bin}} copilot"
+			}
+		}
+	}`)
+
+	flags := &Flags{}
+	var buf bytes.Buffer
+	r := strings.NewReader("") // non-TTY: falls back to first agent
+
+	env, err := buildExecutionEnv(cfg, t.TempDir(), "", flags, &buf, r)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if env.Agent.Name != "claude" {
+		t.Errorf("expected first agent 'claude', got %q", env.Agent.Name)
+	}
+	if !strings.Contains(buf.String(), "Using agent") {
+		t.Errorf("expected non-TTY fallback message, got: %q", buf.String())
 	}
 }

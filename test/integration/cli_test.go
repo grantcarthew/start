@@ -367,30 +367,6 @@ func TestIntegration_ExecutorBuildCommand(t *testing.T) {
 	}
 }
 
-func TestIntegration_GetDefaultAgent(t *testing.T) {
-	tmpDir := setupTestConfig(t)
-
-	origDir, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getting working dir: %v", err)
-	}
-	defer os.Chdir(origDir)
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatalf("changing to temp dir: %v", err)
-	}
-
-	loader := internalcue.NewLoader()
-	result, err := loader.Load([]string{filepath.Join(tmpDir, ".start")})
-	if err != nil {
-		t.Fatalf("loading CUE config: %v", err)
-	}
-
-	agentName := orchestration.GetDefaultAgent(result.Value)
-	if agentName != "echo" {
-		t.Errorf("expected default agent 'echo', got %q", agentName)
-	}
-}
-
 func TestIntegration_GetTaskRole(t *testing.T) {
 	tmpDir := setupTestConfig(t)
 
