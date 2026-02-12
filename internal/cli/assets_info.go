@@ -27,8 +27,6 @@ Multiple words are combined with AND logic.`,
 		RunE: runAssetsInfo,
 	}
 
-	infoCmd.Flags().BoolP("verbose", "v", false, "Show additional details")
-
 	parent.AddCommand(infoCmd)
 }
 
@@ -73,8 +71,7 @@ func runAssetsInfo(cmd *cobra.Command, args []string) error {
 	installed, installedScope := checkIfInstalled(selected)
 
 	// Print detailed info
-	verbose, _ := cmd.Flags().GetBool("verbose")
-	printAssetInfo(cmd.OutOrStdout(), selected, installed, installedScope, verbose)
+	printAssetInfo(cmd.OutOrStdout(), selected, installed, installedScope, flags.Verbose)
 
 	return nil
 }
@@ -111,38 +108,47 @@ func checkIfInstalled(asset assets.SearchResult) (bool, string) {
 
 // printAssetInfo prints detailed information about an asset.
 func printAssetInfo(w io.Writer, asset assets.SearchResult, installed bool, scope string, verbose bool) {
-	_, _ = fmt.Fprintf(w, "Asset: %s/%s\n", asset.Category, asset.Name)
-	_, _ = fmt.Fprintln(w, strings.Repeat("─", 60))
-
-	_, _ = fmt.Fprintf(w, "Type: %s\n", asset.Category)
-	_, _ = fmt.Fprintf(w, "Module: %s\n", asset.Entry.Module)
 	_, _ = fmt.Fprintln(w)
+	_, _ = categoryColor(asset.Category).Fprint(w, asset.Category)
+	_, _ = fmt.Fprintf(w, "/%s\n", asset.Name)
+	PrintSeparator(w)
+
+	_, _ = colorDim.Fprint(w, "Type:")
+	_, _ = fmt.Fprintf(w, " %s\n", asset.Category)
+	_, _ = colorDim.Fprint(w, "Module:")
+	_, _ = fmt.Fprintf(w, " %s\n", asset.Entry.Module)
 
 	if asset.Entry.Description != "" {
-		_, _ = fmt.Fprintln(w, "Description:")
-		_, _ = fmt.Fprintf(w, "  %s\n", asset.Entry.Description)
 		_, _ = fmt.Fprintln(w)
+		_, _ = colorDim.Fprint(w, "Description:")
+		_, _ = fmt.Fprintf(w, " %s\n", asset.Entry.Description)
 	}
 
 	if len(asset.Entry.Tags) > 0 {
-		_, _ = fmt.Fprintf(w, "Tags: %s\n", strings.Join(asset.Entry.Tags, ", "))
-		_, _ = fmt.Fprintln(w)
-	}
-
-	_, _ = fmt.Fprintln(w, "Status:")
-	if installed {
-		_, _ = fmt.Fprintf(w, "  Installed: Yes (%s)\n", scope)
-	} else {
-		_, _ = fmt.Fprintln(w, "  Installed: No")
-	}
-
-	if asset.Entry.Version != "" {
-		_, _ = fmt.Fprintf(w, "  Version: %s\n", asset.Entry.Version)
+		_, _ = colorDim.Fprint(w, "Tags:")
+		_, _ = fmt.Fprintf(w, " %s\n", strings.Join(asset.Entry.Tags, ", "))
 	}
 
 	_, _ = fmt.Fprintln(w)
+	if installed {
+		_, _ = colorInstalled.Fprint(w, "✓")
+		_, _ = fmt.Fprint(w, " Installed ")
+		_, _ = colorCyan.Fprint(w, "(")
+		_, _ = colorDim.Fprint(w, scope)
+		_, _ = colorCyan.Fprint(w, ")")
+		_, _ = fmt.Fprintln(w)
+	} else {
+		_, _ = fmt.Fprintln(w, "  Not installed")
+	}
+
+	if asset.Entry.Version != "" {
+		_, _ = colorDim.Fprint(w, "Version:")
+		_, _ = fmt.Fprintf(w, " %s\n", asset.Entry.Version)
+	}
+
+	PrintSeparator(w)
 
 	if !installed {
-		_, _ = fmt.Fprintf(w, "Use 'start assets add %s' to install.\n", asset.Name)
+		_, _ = fmt.Fprintf(w, "\nUse 'start assets add %s' to install.\n", asset.Name)
 	}
 }

@@ -39,8 +39,6 @@ Results are grouped by source (local, global, registry) and category.`,
 		RunE: runSearch,
 	}
 
-	searchCmd.Flags().BoolP("verbose", "v", false, "Show tags and module paths")
-
 	parent.AddCommand(searchCmd)
 }
 
@@ -158,8 +156,8 @@ func runSearch(cmd *cobra.Command, args []string) error {
 	}
 
 	installed := collectInstalledNames()
-	verbose, _ := cmd.Flags().GetBool("verbose")
-	printSearchSections(cmd.OutOrStdout(), sections, verbose, installed)
+	flags := getFlags(cmd)
+	printSearchSections(cmd.OutOrStdout(), sections, flags.Verbose, installed)
 
 	if registryErr != nil {
 		_, _ = fmt.Fprintln(cmd.OutOrStdout())
