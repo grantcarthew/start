@@ -449,7 +449,7 @@ func printTaskExecutionInfo(w io.Writer, agent orchestration.Agent, model string
 	}
 
 	if instructions != "" {
-		_, _ = fmt.Fprintf(w, "Instructions: %s\n", instructions)
+		_, _ = fmt.Fprintf(w, "Instructions:\n%s\n", instructions)
 	}
 
 	_, _ = fmt.Fprintln(w)
@@ -477,7 +477,7 @@ func printTaskDryRunSummary(w io.Writer, agent orchestration.Agent, model string
 	PrintRoleTable(w, result.RoleResolutions)
 
 	if instructions != "" {
-		_, _ = fmt.Fprintf(w, "Instructions: %s\n", instructions)
+		_, _ = fmt.Fprintf(w, "Instructions:\n%s\n", instructions)
 		_, _ = fmt.Fprintln(w)
 	}
 
