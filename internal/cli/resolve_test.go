@@ -618,7 +618,10 @@ func TestSearchInstalled(t *testing.T) {
 		}
 	}`)
 
-	matches := searchInstalled(cfg.Value, "agents", "agents", "claude")
+	matches, err := searchInstalled(cfg.Value, "agents", "agents", "claude")
+	if err != nil {
+		t.Fatalf("searchInstalled() error: %v", err)
+	}
 	if len(matches) != 1 {
 		t.Fatalf("searchInstalled() returned %d matches, want 1", len(matches))
 	}
@@ -641,7 +644,10 @@ func TestSearchRegistryCategory(t *testing.T) {
 		},
 	}
 
-	matches := searchRegistryCategory(entries, "agents", "claude")
+	matches, err := searchRegistryCategory(entries, "agents", "claude")
+	if err != nil {
+		t.Fatalf("searchRegistryCategory() error: %v", err)
+	}
 	if len(matches) != 1 {
 		t.Fatalf("searchRegistryCategory() returned %d matches, want 1", len(matches))
 	}

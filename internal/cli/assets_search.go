@@ -24,6 +24,7 @@ func addAssetsSearchCommand(parent *cobra.Command) {
 Searches asset names, descriptions, and tags. Multiple words are combined
 with AND logic - all terms must match. Terms can be space-separated or
 comma-separated. Total query must be at least 3 characters.
+Terms support regex patterns (e.g. ^home, expert$, go.*review).
 Results are grouped by type (agents, roles, tasks, contexts).`,
 		Args: cobra.MinimumNArgs(1),
 		RunE: runAssetsSearch,
@@ -38,7 +39,7 @@ Results are grouped by type (agents, roles, tasks, contexts).`,
 func runAssetsSearch(cmd *cobra.Command, args []string) error {
 	query := strings.Join(args, " ")
 
-	terms := assets.ParseSearchTerms(query)
+	terms := assets.ParseSearchPatterns(query)
 	totalLen := 0
 	for _, t := range terms {
 		totalLen += len(t)
@@ -61,7 +62,10 @@ func runAssetsSearch(cmd *cobra.Command, args []string) error {
 	}
 
 	// Search index
-	results := assets.SearchIndex(index, query)
+	results, err := assets.SearchIndex(index, query)
+	if err != nil {
+		return err
+	}
 
 	if len(results) == 0 {
 		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "No matches found for %q\n", query)

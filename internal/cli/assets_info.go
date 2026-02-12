@@ -54,7 +54,10 @@ func runAssetsInfo(cmd *cobra.Command, args []string) error {
 	}
 
 	// Search for matching assets
-	results := assets.SearchIndex(index, query)
+	results, err := assets.SearchIndex(index, query)
+	if err != nil {
+		return err
+	}
 
 	if len(results) == 0 {
 		return fmt.Errorf("no assets found matching %q", query)

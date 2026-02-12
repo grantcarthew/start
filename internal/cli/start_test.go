@@ -427,7 +427,10 @@ func TestTaskResolution(t *testing.T) {
 	})
 
 	t.Run("substring match", func(t *testing.T) {
-		matches := findInstalledTasks(cfg, "test")
+		matches, err := findInstalledTasks(cfg, "test")
+		if err != nil {
+			t.Fatalf("findInstalledTasks() error: %v", err)
+		}
 		if len(matches) != 1 {
 			t.Fatalf("findInstalledTasks() returned %d results, want 1", len(matches))
 		}
@@ -437,7 +440,10 @@ func TestTaskResolution(t *testing.T) {
 	})
 
 	t.Run("no match", func(t *testing.T) {
-		matches := findInstalledTasks(cfg, "nonexistent")
+		matches, err := findInstalledTasks(cfg, "nonexistent")
+		if err != nil {
+			t.Fatalf("findInstalledTasks() error: %v", err)
+		}
 		if len(matches) != 0 {
 			t.Errorf("findInstalledTasks() returned %d results, want 0", len(matches))
 		}
@@ -502,7 +508,10 @@ settings: {
 	}
 
 	// Ambiguous prefix should return multiple matches
-	matches := findInstalledTasks(cfg, "review")
+	matches, err := findInstalledTasks(cfg, "review")
+	if err != nil {
+		t.Fatalf("findInstalledTasks() error: %v", err)
+	}
 	if len(matches) != 3 {
 		t.Fatalf("expected 3 matches, got %d: %v", len(matches), matches)
 	}
@@ -519,7 +528,10 @@ settings: {
 	}
 
 	// Multi-term AND should narrow results
-	matches = findInstalledTasks(cfg, "review,code")
+	matches, err = findInstalledTasks(cfg, "review,code")
+	if err != nil {
+		t.Fatalf("findInstalledTasks() error: %v", err)
+	}
 	if len(matches) != 1 {
 		t.Fatalf("expected 1 match for 'review,code', got %d: %v", len(matches), matches)
 	}
@@ -577,7 +589,10 @@ settings: {
 		t.Error("hasExactInstalledTask() = true, want false for missing tasks")
 	}
 
-	matches := findInstalledTasks(cfg, "anything")
+	matches, err := findInstalledTasks(cfg, "anything")
+	if err != nil {
+		t.Fatalf("findInstalledTasks() error: %v", err)
+	}
 	if len(matches) != 0 {
 		t.Errorf("findInstalledTasks() returned %d results, want 0", len(matches))
 	}
@@ -1024,7 +1039,10 @@ settings: {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			matches := findInstalledTasks(cfg, tt.searchTerm)
+			matches, err := findInstalledTasks(cfg, tt.searchTerm)
+			if err != nil {
+				t.Fatalf("findInstalledTasks() error: %v", err)
+			}
 			if len(matches) != tt.wantCount {
 				t.Errorf("findInstalledTasks(%q) returned %d matches, want %d", tt.searchTerm, len(matches), tt.wantCount)
 			}
@@ -1100,7 +1118,10 @@ func TestFindRegistryTasks(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			matches := findRegistryTasks(index, tt.searchTerm)
+			matches, err := findRegistryTasks(index, tt.searchTerm)
+			if err != nil {
+				t.Fatalf("findRegistryTasks() error: %v", err)
+			}
 			if len(matches) != tt.wantCount {
 				t.Errorf("findRegistryTasks(%q) returned %d matches, want %d", tt.searchTerm, len(matches), tt.wantCount)
 			}

@@ -1,6 +1,8 @@
 package assets
 
 import (
+	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -19,6 +21,7 @@ type SearchResult struct {
 // ParseSearchTerms splits an input string into unique, lowercased search terms.
 // It splits on both whitespace and commas, removes empty strings and duplicates.
 // Returns nil if no valid terms remain.
+// Use ParseSearchPatterns instead when terms will be compiled as regex patterns.
 func ParseSearchTerms(input string) []string {
 	normalized := strings.ReplaceAll(input, ",", " ")
 	parts := strings.Fields(normalized)
@@ -35,26 +38,68 @@ func ParseSearchTerms(input string) []string {
 	return terms
 }
 
+// ParseSearchPatterns splits an input string into unique search patterns,
+// preserving original case. Deduplication is case-insensitive but the
+// first occurrence's casing is kept. This avoids corrupting case-sensitive
+// regex escape sequences like \S, \D, \W, and \B.
+// Returns nil if no valid patterns remain.
+func ParseSearchPatterns(input string) []string {
+	normalized := strings.ReplaceAll(input, ",", " ")
+	parts := strings.Fields(normalized)
+
+	seen := make(map[string]bool, len(parts))
+	var patterns []string
+	for _, p := range parts {
+		lower := strings.ToLower(p)
+		if !seen[lower] {
+			seen[lower] = true
+			patterns = append(patterns, p)
+		}
+	}
+	return patterns
+}
+
+// CompileSearchTerms compiles search terms into case-insensitive regular expressions.
+// Each term is treated as a regex pattern, allowing operators like ^ $ . + * etc.
+// Returns an error if any term contains an invalid regex pattern.
+func CompileSearchTerms(terms []string) ([]*regexp.Regexp, error) {
+	patterns := make([]*regexp.Regexp, len(terms))
+	for i, term := range terms {
+		re, err := regexp.Compile("(?i)" + term)
+		if err != nil {
+			return nil, fmt.Errorf("invalid search pattern %q: %w", term, err)
+		}
+		patterns[i] = re
+	}
+	return patterns, nil
+}
+
 // SearchIndex searches all categories in the index for matching entries.
 // The query is split into terms (by whitespace and commas) and all terms
 // must match for an entry to be included (AND semantics).
-func SearchIndex(index *registry.Index, query string) []SearchResult {
+// Terms are treated as regex patterns for flexible matching.
+func SearchIndex(index *registry.Index, query string) ([]SearchResult, error) {
 	if index == nil {
-		return nil
+		return nil, nil
 	}
 
-	terms := ParseSearchTerms(query)
+	terms := ParseSearchPatterns(query)
 	if len(terms) == 0 {
-		return nil
+		return nil, nil
+	}
+
+	patterns, err := CompileSearchTerms(terms)
+	if err != nil {
+		return nil, err
 	}
 
 	var results []SearchResult
 
 	// Search each category
-	results = append(results, searchCategory("agents", index.Agents, terms)...)
-	results = append(results, searchCategory("roles", index.Roles, terms)...)
-	results = append(results, searchCategory("tasks", index.Tasks, terms)...)
-	results = append(results, searchCategory("contexts", index.Contexts, terms)...)
+	results = append(results, searchCategory("agents", index.Agents, patterns)...)
+	results = append(results, searchCategory("roles", index.Roles, patterns)...)
+	results = append(results, searchCategory("tasks", index.Tasks, patterns)...)
+	results = append(results, searchCategory("contexts", index.Contexts, patterns)...)
 
 	// Sort by match score (descending), then by category, then by name
 	sort.Slice(results, func(i, j int) bool {
@@ -67,15 +112,15 @@ func SearchIndex(index *registry.Index, query string) []SearchResult {
 		return results[i].Name < results[j].Name
 	})
 
-	return results
+	return results, nil
 }
 
 // searchCategory searches a single category map for matching entries.
-func searchCategory(category string, entries map[string]registry.IndexEntry, terms []string) []SearchResult {
+func searchCategory(category string, entries map[string]registry.IndexEntry, patterns []*regexp.Regexp) []SearchResult {
 	var results []SearchResult
 
 	for name, entry := range entries {
-		score := matchScoreTerms(name, entry, terms)
+		score := matchScorePatterns(name, entry, patterns)
 		if score > 0 {
 			results = append(results, SearchResult{
 				Category:   category,
@@ -89,37 +134,35 @@ func searchCategory(category string, entries map[string]registry.IndexEntry, ter
 	return results
 }
 
-// matchScoreTerms calculates how well an entry matches ALL search terms.
-// Returns 0 if any term fails to match at least one field (AND semantics).
-// Score is the sum of per-term field scores.
+// matchScorePatterns calculates how well an entry matches ALL search patterns.
+// Returns 0 if any pattern fails to match at least one field (AND semantics).
+// Score is the sum of per-pattern field scores.
 // Field weights: name (3) > description (1) > tags (1)
-func matchScoreTerms(name string, entry registry.IndexEntry, terms []string) int {
-	if len(terms) == 0 {
+// Patterns must be compiled with (?i) for case-insensitive matching.
+func matchScorePatterns(name string, entry registry.IndexEntry, patterns []*regexp.Regexp) int {
+	if len(patterns) == 0 {
 		return 0
 	}
 
-	nameLower := strings.ToLower(name)
-	descLower := strings.ToLower(entry.Description)
-
 	totalScore := 0
-	for _, term := range terms {
+	for _, pattern := range patterns {
 		termScore := 0
 
-		if strings.Contains(nameLower, term) {
+		if pattern.MatchString(name) {
 			termScore += 3
 		}
-		if strings.Contains(descLower, term) {
+		if pattern.MatchString(entry.Description) {
 			termScore += 1
 		}
 		for _, tag := range entry.Tags {
-			if strings.Contains(strings.ToLower(tag), term) {
+			if pattern.MatchString(tag) {
 				termScore += 1
 				break
 			}
 		}
 
 		if termScore == 0 {
-			return 0 // AND: every term must match something
+			return 0 // AND: every pattern must match something
 		}
 		totalScore += termScore
 	}
@@ -129,13 +172,20 @@ func matchScoreTerms(name string, entry registry.IndexEntry, terms []string) int
 
 // SearchCategoryEntries searches a single category's registry entries with scoring.
 // The query is split into terms and all must match (AND semantics).
+// Terms are treated as regex patterns for flexible matching.
 // Returns results sorted by score descending, then by name ascending.
-func SearchCategoryEntries(category string, entries map[string]registry.IndexEntry, query string) []SearchResult {
-	terms := ParseSearchTerms(query)
+func SearchCategoryEntries(category string, entries map[string]registry.IndexEntry, query string) ([]SearchResult, error) {
+	terms := ParseSearchPatterns(query)
 	if len(terms) == 0 {
-		return nil
+		return nil, nil
 	}
-	results := searchCategory(category, entries, terms)
+
+	patterns, err := CompileSearchTerms(terms)
+	if err != nil {
+		return nil, err
+	}
+
+	results := searchCategory(category, entries, patterns)
 
 	sort.Slice(results, func(i, j int) bool {
 		if results[i].MatchScore != results[j].MatchScore {
@@ -144,27 +194,33 @@ func SearchCategoryEntries(category string, entries map[string]registry.IndexEnt
 		return results[i].Name < results[j].Name
 	})
 
-	return results
+	return results, nil
 }
 
 // SearchInstalledConfig searches installed CUE config entries for a category.
 // It iterates entries under the given CUE key (e.g. "agents"), extracts
 // description/tags into IndexEntry structs, applies scoring, and returns
 // scored results. The query is split into terms with AND semantics.
-func SearchInstalledConfig(cfg cue.Value, cueKey, category, query string) []SearchResult {
+// Terms are treated as regex patterns for flexible matching.
+func SearchInstalledConfig(cfg cue.Value, cueKey, category, query string) ([]SearchResult, error) {
 	catVal := cfg.LookupPath(cue.ParsePath(cueKey))
 	if !catVal.Exists() {
-		return nil
+		return nil, nil
 	}
 
 	iter, err := catVal.Fields()
 	if err != nil {
-		return nil
+		return nil, fmt.Errorf("iterating %s fields: %w", cueKey, err)
 	}
 
-	terms := ParseSearchTerms(query)
+	terms := ParseSearchPatterns(query)
 	if len(terms) == 0 {
-		return nil
+		return nil, nil
+	}
+
+	patterns, err := CompileSearchTerms(terms)
+	if err != nil {
+		return nil, err
 	}
 
 	var results []SearchResult
@@ -172,7 +228,7 @@ func SearchInstalledConfig(cfg cue.Value, cueKey, category, query string) []Sear
 	for iter.Next() {
 		name := iter.Selector().Unquoted()
 		entry := extractIndexEntryFromCUE(iter.Value())
-		score := matchScoreTerms(name, entry, terms)
+		score := matchScorePatterns(name, entry, patterns)
 		if score > 0 {
 			results = append(results, SearchResult{
 				Category:   category,
@@ -190,7 +246,7 @@ func SearchInstalledConfig(cfg cue.Value, cueKey, category, query string) []Sear
 		return results[i].Name < results[j].Name
 	})
 
-	return results
+	return results, nil
 }
 
 // extractIndexEntryFromCUE extracts description, tags, and origin from a CUE value
