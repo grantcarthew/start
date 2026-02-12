@@ -6,7 +6,6 @@ import (
 	"io"
 	"strings"
 
-	"github.com/fatih/color"
 	"github.com/grantcarthew/start/internal/assets"
 	"github.com/grantcarthew/start/internal/config"
 	internalcue "github.com/grantcarthew/start/internal/cue"
@@ -125,7 +124,7 @@ func printSearchResults(w io.Writer, results []assets.SearchResult, verbose bool
 		for _, r := range catResults {
 			marker := ""
 			if installed[r.Category+"/"+r.Name] {
-				marker = " " + color.HiGreenString("*")
+				marker = " " + colorInstalled.Sprint("*")
 			}
 
 			if verbose {

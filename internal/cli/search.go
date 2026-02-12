@@ -7,7 +7,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/fatih/color"
 	"github.com/grantcarthew/start/internal/assets"
 	"github.com/grantcarthew/start/internal/config"
 	internalcue "github.com/grantcarthew/start/internal/cue"
@@ -190,7 +189,7 @@ func printSearchSections(w io.Writer, sections []searchSection, verbose bool, in
 			for _, r := range catResults {
 				marker := ""
 				if section.ShowInstalled && installed[r.Category+"/"+r.Name] {
-					marker = " " + color.HiGreenString("*")
+					marker = " " + colorInstalled.Sprint("*")
 				}
 
 				_, _ = fmt.Fprintf(w, "    %-25s %s%s\n", r.Name, colorDim.Sprint(r.Entry.Description), marker)

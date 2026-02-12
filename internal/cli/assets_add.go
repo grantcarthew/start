@@ -104,10 +104,46 @@ func installAsset(ctx context.Context, cmd *cobra.Command, client *registry.Clie
 		selected = results[0]
 	} else {
 		var err error
-		selected, err = promptAssetSelection(w, cmd.InOrStdin(), results)
+		selected, err = promptAssetSelection(w, cmd.InOrStdin(), results, configDir)
 		if err != nil {
 			return err
 		}
+	}
+
+	// Check if already installed
+	if assets.AssetExists(configDir, selected.Category, selected.Name) {
+		if !flags.Quiet {
+			origin := assets.GetInstalledOrigin(configDir, selected.Category, selected.Name)
+			installedVer := assets.VersionFromOrigin(origin)
+			latestVer := selected.Entry.Version
+			outdated := latestVer != "" && installedVer != "" && latestVer != installedVer
+
+			if outdated {
+				_, _ = fmt.Fprint(w, "○ ")
+			} else {
+				_, _ = colorSuccess.Fprint(w, "✓ ")
+			}
+			_, _ = colorDim.Fprint(w, "Already installed: ")
+			_, _ = categoryColor(selected.Category).Fprint(w, selected.Category)
+			_, _ = fmt.Fprintf(w, "/%s ", selected.Name)
+			_, _ = colorCyan.Fprint(w, "(")
+			if installedVer != "" {
+				_, _ = colorDim.Fprint(w, installedVer)
+			}
+			if outdated {
+				_, _ = fmt.Fprint(w, " ")
+				_, _ = colorBlue.Fprint(w, "->")
+				_, _ = fmt.Fprint(w, " ")
+				_, _ = colorWarning.Fprint(w, latestVer)
+			} else {
+				_, _ = fmt.Fprint(w, " ")
+				_, _ = colorBlue.Fprint(w, "->")
+				_, _ = fmt.Fprint(w, " ")
+				_, _ = colorDim.Fprint(w, "current")
+			}
+			_, _ = colorCyan.Fprintln(w, ")")
+		}
+		return nil
 	}
 
 	// Install the asset
@@ -137,7 +173,7 @@ func installAsset(ctx context.Context, cmd *cobra.Command, client *registry.Clie
 }
 
 // promptAssetSelection prompts the user to select an asset from multiple matches.
-func promptAssetSelection(w io.Writer, r io.Reader, results []assets.SearchResult) (assets.SearchResult, error) {
+func promptAssetSelection(w io.Writer, r io.Reader, results []assets.SearchResult, configDir string) (assets.SearchResult, error) {
 	// Check if stdin is a TTY
 	isTTY := false
 	if f, ok := r.(*os.File); ok {
@@ -158,11 +194,23 @@ func promptAssetSelection(w io.Writer, r io.Reader, results []assets.SearchResul
 	_, _ = fmt.Fprintf(w, "Found %d matches:\n\n", len(results))
 
 	for i, res := range results {
-		_, _ = fmt.Fprintf(w, "  %d. %s/%s - %s\n", i+1, res.Category, res.Name, res.Entry.Description)
+		marker := ""
+		if assets.AssetExists(configDir, res.Category, res.Name) {
+			marker = " " + colorInstalled.Sprint("*")
+		}
+		_, _ = fmt.Fprintf(w, "  %d. ", i+1)
+		_, _ = categoryColor(res.Category).Fprint(w, res.Category)
+		_, _ = fmt.Fprintf(w, "/%s ", res.Name)
+		_, _ = colorDim.Fprintf(w, "- %s", res.Entry.Description)
+		_, _ = fmt.Fprintln(w, marker)
 	}
 
 	_, _ = fmt.Fprintln(w)
-	_, _ = fmt.Fprint(w, "Select asset (number or name): ")
+	_, _ = fmt.Fprint(w, "Select asset ")
+	_, _ = colorCyan.Fprint(w, "(")
+	_, _ = colorDim.Fprint(w, "number or name")
+	_, _ = colorCyan.Fprint(w, ")")
+	_, _ = fmt.Fprint(w, ": ")
 
 	reader := bufio.NewReader(r)
 	input, err := reader.ReadString('\n')
