@@ -296,6 +296,25 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 		if !flags.NoRole && roleName == "" {
 			roleName = orchestration.GetTaskRole(env.Cfg.Value, resolvedName)
 			if roleName != "" {
+				// If the task's role is not installed, resolve through three-tier
+				// search which may auto-install from registry (same as --role flag).
+				if !hasExactInstalled(env.Cfg.Value, internalcue.KeyRoles, roleName) {
+					beforeInstall := r.didInstall
+					roleName, err = r.resolveRole(roleName)
+					if err != nil {
+						return err
+					}
+					if r.didInstall && !beforeInstall {
+						reloadedCfg, reloadErr := loadMergedConfigFromDirWithDebug(workingDir, flags)
+						if reloadErr != nil {
+							return fmt.Errorf("reloading configuration: %w", reloadErr)
+						}
+						env, err = buildExecutionEnv(reloadedCfg, workingDir, agentName, flags, stdout, stdin)
+						if err != nil {
+							return err
+						}
+					}
+				}
 				debugf(flags, "role", "Selected %q (from task)", roleName)
 			}
 		}

@@ -210,6 +210,70 @@ func TestExecuteTask_NoRole(t *testing.T) {
 	}
 }
 
+func TestExecuteTask_MissingTaskRole(t *testing.T) {
+	tmpDir := t.TempDir()
+	configDir := filepath.Join(tmpDir, ".start")
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		t.Fatalf("creating config dir: %v", err)
+	}
+
+	// Config with a task referencing a role that does NOT exist
+	config := `
+agents: {
+	echo: {
+		bin: "echo"
+		command: "{{.bin}} 'Agent executed'"
+		default_model: "default"
+		models: {
+			default: "echo-model"
+		}
+	}
+}
+
+roles: {}
+
+tasks: {
+	"test-task": {
+		role: "missing-role"
+		prompt: "Test task prompt."
+	}
+}
+
+settings: {
+	default_agent: "echo"
+}
+`
+	configFile := filepath.Join(configDir, "settings.cue")
+	if err := os.WriteFile(configFile, []byte(config), 0644); err != nil {
+		t.Fatalf("writing config: %v", err)
+	}
+
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getting working dir: %v", err)
+	}
+	defer func() { _ = os.Chdir(origDir) }()
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("changing to temp dir: %v", err)
+	}
+
+	flags := &Flags{DryRun: true}
+
+	stdout := new(bytes.Buffer)
+	stderr := new(bytes.Buffer)
+
+	err = executeTask(stdout, stderr, strings.NewReader(""), flags, "test-task", "")
+	if err == nil {
+		t.Fatal("Expected error for missing task role, got nil")
+	}
+
+	// The resolver should have been invoked and failed (no registry in tests).
+	// Error should mention the role name.
+	if !strings.Contains(err.Error(), "missing-role") {
+		t.Errorf("Expected error to mention %q, got: %v", "missing-role", err)
+	}
+}
+
 func TestExecuteStart_ContextSelection(t *testing.T) {
 	tmpDir := setupStartTestConfig(t)
 	origDir, err := os.Getwd()
