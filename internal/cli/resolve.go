@@ -94,11 +94,17 @@ func (r *resolver) resolveAgent(name string) (string, error) {
 		}
 	}
 
-	// Tier 3: Substring search across installed + registry
-	installedMatches := searchInstalled(r.cfg.Value, internalcue.KeyAgents, "agents", name)
+	// Tier 3: Regex search across installed + registry
+	installedMatches, err := searchInstalled(r.cfg.Value, internalcue.KeyAgents, "agents", name)
+	if err != nil {
+		return "", err
+	}
 	var registryMatches []AssetMatch
 	if index != nil {
-		registryMatches = searchRegistryCategory(index.Agents, "agents", name)
+		registryMatches, err = searchRegistryCategory(index.Agents, "agents", name)
+		if err != nil {
+			return "", err
+		}
 	}
 	allMatches := mergeAssetMatches(installedMatches, registryMatches)
 
@@ -153,11 +159,17 @@ func (r *resolver) resolveRole(name string) (string, error) {
 		}
 	}
 
-	// Tier 3: Substring search across installed + registry
-	installedMatches := searchInstalled(r.cfg.Value, internalcue.KeyRoles, "roles", name)
+	// Tier 3: Regex search across installed + registry
+	installedMatches, err := searchInstalled(r.cfg.Value, internalcue.KeyRoles, "roles", name)
+	if err != nil {
+		return "", err
+	}
 	var registryMatches []AssetMatch
 	if index != nil {
-		registryMatches = searchRegistryCategory(index.Roles, "roles", name)
+		registryMatches, err = searchRegistryCategory(index.Roles, "roles", name)
+		if err != nil {
+			return "", err
+		}
 	}
 	allMatches := mergeAssetMatches(installedMatches, registryMatches)
 
@@ -278,10 +290,21 @@ func (r *resolver) resolveContexts(terms []string) []string {
 		}
 
 		// Search across installed + registry (all matches above threshold)
-		installedMatches := searchInstalled(r.cfg.Value, internalcue.KeyContexts, "contexts", term)
+		installedMatches, err := searchInstalled(r.cfg.Value, internalcue.KeyContexts, "contexts", term)
+		if err != nil {
+			// Invalid regex in context term - pass through as-is
+			debugf(r.flags, "resolve", "Context %q: invalid pattern, passing through", term)
+			resolved = append(resolved, term)
+			continue
+		}
 		var registryMatches []AssetMatch
 		if index != nil {
-			registryMatches = searchRegistryCategory(index.Contexts, "contexts", term)
+			registryMatches, err = searchRegistryCategory(index.Contexts, "contexts", term)
+			if err != nil {
+				debugf(r.flags, "resolve", "Context %q: invalid pattern, passing through", term)
+				resolved = append(resolved, term)
+				continue
+			}
 		}
 		allMatches := mergeAssetMatches(installedMatches, registryMatches)
 
@@ -355,8 +378,11 @@ func findExactInRegistry(entries map[string]registry.IndexEntry, category, name 
 }
 
 // searchInstalled searches installed config entries and returns AssetMatch results.
-func searchInstalled(cfg cue.Value, cueKey, category, query string) []AssetMatch {
-	results := assets.SearchInstalledConfig(cfg, cueKey, category, query)
+func searchInstalled(cfg cue.Value, cueKey, category, query string) ([]AssetMatch, error) {
+	results, err := assets.SearchInstalledConfig(cfg, cueKey, category, query)
+	if err != nil {
+		return nil, err
+	}
 	var matches []AssetMatch
 	for _, r := range results {
 		matches = append(matches, AssetMatch{
@@ -367,12 +393,15 @@ func searchInstalled(cfg cue.Value, cueKey, category, query string) []AssetMatch
 			Score:    r.MatchScore,
 		})
 	}
-	return matches
+	return matches, nil
 }
 
 // searchRegistryCategory searches registry entries and returns AssetMatch results.
-func searchRegistryCategory(entries map[string]registry.IndexEntry, category, query string) []AssetMatch {
-	results := assets.SearchCategoryEntries(category, entries, query)
+func searchRegistryCategory(entries map[string]registry.IndexEntry, category, query string) ([]AssetMatch, error) {
+	results, err := assets.SearchCategoryEntries(category, entries, query)
+	if err != nil {
+		return nil, err
+	}
 	var matches []AssetMatch
 	for _, r := range results {
 		matches = append(matches, AssetMatch{
@@ -383,7 +412,7 @@ func searchRegistryCategory(entries map[string]registry.IndexEntry, category, qu
 			Score:    r.MatchScore,
 		})
 	}
-	return matches
+	return matches, nil
 }
 
 // mergeAssetMatches combines installed and registry matches, deduplicating by name.

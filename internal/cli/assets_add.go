@@ -93,7 +93,10 @@ func installAsset(ctx context.Context, cmd *cobra.Command, client *registry.Clie
 	w := cmd.OutOrStdout()
 
 	// Search for matching assets
-	results := assets.SearchIndex(index, query)
+	results, err := assets.SearchIndex(index, query)
+	if err != nil {
+		return err
+	}
 	if len(results) == 0 {
 		return fmt.Errorf("no assets found matching %q", query)
 	}

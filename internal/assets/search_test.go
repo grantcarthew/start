@@ -1,6 +1,7 @@
 package assets
 
 import (
+	"regexp"
 	"slices"
 	"testing"
 
@@ -42,8 +43,40 @@ func TestParseSearchTerms(t *testing.T) {
 	}
 }
 
-// TestMatchScoreTerms tests multi-term AND scoring.
-func TestMatchScoreTerms(t *testing.T) {
+// TestParseSearchPatterns tests splitting input into search patterns with case preserved.
+func TestParseSearchPatterns(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		input string
+		want  []string
+	}{
+		{"single term", "golang", []string{"golang"}},
+		{"preserves case", "Go Expert", []string{"Go", "Expert"}},
+		{"csv terms", "Go,Expert", []string{"Go", "Expert"}},
+		{"mixed delimiters", "Go Expert,Review", []string{"Go", "Expert", "Review"}},
+		{"empty string", "", nil},
+		{"only commas", ",,,", nil},
+		{"only spaces", "   ", nil},
+		{"dedup case insensitive keeps first", "Go go GO", []string{"Go"}},
+		{"preserves regex escapes", `\Stest \Dfoo`, []string{`\Stest`, `\Dfoo`}},
+		{"preserves anchors", "^Home expert$", []string{"^Home", "expert$"}},
+		{"preserves character class", "[A-Z]test", []string{"[A-Z]test"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := ParseSearchPatterns(tt.input)
+			if !slices.Equal(got, tt.want) {
+				t.Errorf("ParseSearchPatterns(%q) = %v, want %v", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestMatchScorePatterns tests multi-pattern AND scoring.
+func TestMatchScorePatterns(t *testing.T) {
 	t.Parallel()
 
 	entry := registry.IndexEntry{
@@ -92,9 +125,17 @@ func TestMatchScoreTerms(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			score := matchScoreTerms(tt.assetName, entry, tt.terms)
+			var patterns []*regexp.Regexp
+			if tt.terms != nil {
+				var err error
+				patterns, err = CompileSearchTerms(tt.terms)
+				if err != nil {
+					t.Fatalf("CompileSearchTerms() error: %v", err)
+				}
+			}
+			score := matchScorePatterns(tt.assetName, entry, patterns)
 			if score != tt.wantScore {
-				t.Errorf("matchScoreTerms() = %d, want %d", score, tt.wantScore)
+				t.Errorf("matchScorePatterns() = %d, want %d", score, tt.wantScore)
 			}
 		})
 	}
@@ -207,7 +248,10 @@ func TestSearchIndex(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			results := SearchIndex(index, tt.query)
+			results, err := SearchIndex(index, tt.query)
+			if err != nil {
+				t.Fatalf("SearchIndex() error: %v", err)
+			}
 
 			if len(results) != tt.wantCount {
 				t.Errorf("SearchIndex() returned %d results, want %d", len(results), tt.wantCount)
@@ -229,6 +273,178 @@ func TestSearchIndex(t *testing.T) {
 						t.Errorf("SearchIndex() first result = %q, want %q", first, tt.wantFirst)
 					}
 				}
+			}
+		})
+	}
+}
+
+// TestCompileSearchTerms tests regex compilation of search terms.
+func TestCompileSearchTerms(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		terms   []string
+		wantErr bool
+	}{
+		{"plain terms", []string{"golang", "expert"}, false},
+		{"starts with anchor", []string{"^golang"}, false},
+		{"ends with anchor", []string{"expert$"}, false},
+		{"dot wildcard", []string{"go.ang"}, false},
+		{"star quantifier", []string{"go.*expert"}, false},
+		{"plus quantifier", []string{"go.+expert"}, false},
+		{"character class", []string{"[gG]olang"}, false},
+		{"invalid regex - unclosed bracket", []string{"[unclosed"}, true},
+		{"invalid regex - bad repetition", []string{"*invalid"}, true},
+		{"mixed valid and invalid", []string{"golang", "[bad"}, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			patterns, err := CompileSearchTerms(tt.terms)
+			if tt.wantErr {
+				if err == nil {
+					t.Error("expected error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if len(patterns) != len(tt.terms) {
+				t.Errorf("got %d patterns, want %d", len(patterns), len(tt.terms))
+			}
+		})
+	}
+}
+
+// TestSearchIndex_Regex tests regex pattern matching in SearchIndex.
+func TestSearchIndex_Regex(t *testing.T) {
+	t.Parallel()
+
+	index := &registry.Index{
+		Agents: map[string]registry.IndexEntry{
+			"ai/claude": {
+				Module:      "github.com/test/agents/ai/claude@v0",
+				Description: "Anthropic Claude AI",
+				Tags:        []string{"ai", "llm"},
+			},
+		},
+		Roles: map[string]registry.IndexEntry{
+			"golang/assistant": {
+				Module:      "github.com/test/roles/golang/assistant@v0",
+				Description: "Go programming expert",
+				Tags:        []string{"golang", "programming"},
+			},
+			"golang/code-review": {
+				Module:      "github.com/test/roles/golang/code-review@v0",
+				Description: "Review Go code for quality",
+				Tags:        []string{"golang", "review"},
+			},
+			"python/assistant": {
+				Module:      "github.com/test/roles/python/assistant@v0",
+				Description: "Python programming expert",
+				Tags:        []string{"python", "programming"},
+			},
+		},
+		Tasks: map[string]registry.IndexEntry{
+			"start/commit": {
+				Module:      "github.com/test/tasks/start/commit@v0",
+				Description: "Create git commit",
+				Tags:        []string{"git", "commit"},
+			},
+		},
+		Contexts: map[string]registry.IndexEntry{
+			"cwd/agents-md": {
+				Module:      "github.com/test/contexts/cwd/agents-md@v0",
+				Description: "Read AGENTS.md file",
+				Tags:        []string{"repository", "guidelines"},
+			},
+			"home/environment": {
+				Module:      "github.com/test/contexts/home/environment@v0",
+				Description: "Home environment context",
+				Tags:        []string{"home", "environment"},
+			},
+		},
+	}
+
+	tests := []struct {
+		name      string
+		query     string
+		wantCount int
+		wantErr   bool
+	}{
+		{
+			name:      "starts with anchor",
+			query:     "^golang",
+			wantCount: 2, // golang/assistant and golang/code-review
+		},
+		{
+			name:      "ends with anchor",
+			query:     "assistant$",
+			wantCount: 2, // golang/assistant and python/assistant
+		},
+		{
+			name:      "dot as any character",
+			query:     "go.ang",
+			wantCount: 2, // golang in name matches
+		},
+		{
+			name:      "star quantifier",
+			query:     "go.*review",
+			wantCount: 1, // golang/code-review
+		},
+		{
+			name:      "plus quantifier in description",
+			query:     "Go.+expert",
+			wantCount: 1, // "Go programming expert" matches
+		},
+		{
+			name:      "anchor no match",
+			query:     "^assistant",
+			wantCount: 0, // no name starts with "assistant"
+		},
+		{
+			name:      "context starts with home",
+			query:     "^home",
+			wantCount: 1, // home/environment
+		},
+		{
+			name:      "plain terms still work",
+			query:     "claude",
+			wantCount: 1,
+		},
+		{
+			name:      "case insensitive regex",
+			query:     "^GOLANG",
+			wantCount: 2,
+		},
+		{
+			name:    "invalid regex returns error",
+			query:   "[unclosed",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			results, err := SearchIndex(index, tt.query)
+			if tt.wantErr {
+				if err == nil {
+					t.Error("expected error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("SearchIndex() error: %v", err)
+			}
+
+			if len(results) != tt.wantCount {
+				var names []string
+				for _, r := range results {
+					names = append(names, r.Category+"/"+r.Name)
+				}
+				t.Errorf("SearchIndex(%q) returned %d results %v, want %d", tt.query, len(results), names, tt.wantCount)
 			}
 		})
 	}
@@ -310,7 +526,11 @@ func TestSearchCategory(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			results := searchCategory("roles", entries, tt.terms)
+			patterns, err := CompileSearchTerms(tt.terms)
+			if err != nil {
+				t.Fatalf("CompileSearchTerms() error: %v", err)
+			}
+			results := searchCategory("roles", entries, patterns)
 
 			if len(results) != tt.wantCount {
 				t.Errorf("searchCategory() returned %d results, want %d", len(results), tt.wantCount)
@@ -330,7 +550,10 @@ func TestSearchCategory(t *testing.T) {
 func TestSearchIndex_NilIndex(t *testing.T) {
 	t.Parallel()
 
-	results := SearchIndex(nil, "test")
+	results, err := SearchIndex(nil, "test")
+	if err != nil {
+		t.Fatalf("SearchIndex() error: %v", err)
+	}
 	if len(results) != 0 {
 		t.Errorf("SearchIndex(nil, ...) returned %d results, want 0", len(results))
 	}
@@ -341,7 +564,10 @@ func TestSearchIndex_EmptyIndex(t *testing.T) {
 	t.Parallel()
 
 	index := &registry.Index{}
-	results := SearchIndex(index, "test")
+	results, err := SearchIndex(index, "test")
+	if err != nil {
+		t.Fatalf("SearchIndex() error: %v", err)
+	}
 
 	if len(results) != 0 {
 		t.Errorf("SearchIndex(empty, ...) returned %d results, want 0", len(results))
@@ -358,7 +584,10 @@ func TestSearchIndex_NilMaps(t *testing.T) {
 		Tasks:    nil,
 		Contexts: nil,
 	}
-	results := SearchIndex(index, "test")
+	results, err := SearchIndex(index, "test")
+	if err != nil {
+		t.Fatalf("SearchIndex() error: %v", err)
+	}
 
 	if len(results) != 0 {
 		t.Errorf("SearchIndex(nil maps, ...) returned %d results, want 0", len(results))
@@ -391,7 +620,10 @@ func TestSearchResultOrdering(t *testing.T) {
 		},
 	}
 
-	results := SearchIndex(index, "golang")
+	results, err := SearchIndex(index, "golang")
+	if err != nil {
+		t.Fatalf("SearchIndex() error: %v", err)
+	}
 
 	// Should have 3 results
 	if len(results) != 3 {
@@ -483,7 +715,10 @@ func TestSearchCategoryEntries(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			results := SearchCategoryEntries("roles", entries, tt.query)
+			results, err := SearchCategoryEntries("roles", entries, tt.query)
+			if err != nil {
+				t.Fatalf("SearchCategoryEntries() error: %v", err)
+			}
 
 			if len(results) != tt.wantCount {
 				t.Errorf("SearchCategoryEntries() returned %d results, want %d", len(results), tt.wantCount)
@@ -602,7 +837,10 @@ func TestSearchInstalledConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			results := SearchInstalledConfig(cfg, tt.cueKey, tt.category, tt.query)
+			results, err := SearchInstalledConfig(cfg, tt.cueKey, tt.category, tt.query)
+			if err != nil {
+				t.Fatalf("SearchInstalledConfig() error: %v", err)
+			}
 
 			if len(results) != tt.wantCount {
 				t.Errorf("SearchInstalledConfig() returned %d results, want %d", len(results), tt.wantCount)

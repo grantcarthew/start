@@ -188,9 +188,15 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 				}
 				resolvedName = exactRegistry.Name
 			} else {
-				// Step 3: Substring match across installed + registry
-				installedMatches := findInstalledTasks(env.Cfg, taskName)
-				registryMatches := findRegistryTasks(index, taskName)
+				// Step 3: Regex match across installed + registry
+				installedMatches, err := findInstalledTasks(env.Cfg, taskName)
+				if err != nil {
+					return err
+				}
+				registryMatches, err := findRegistryTasks(index, taskName)
+				if err != nil {
+					return err
+				}
 				allMatches := mergeTaskMatches(installedMatches, registryMatches)
 
 				debugf(flags, "task", "Found %d installed matches, %d registry matches, %d total",
@@ -505,8 +511,11 @@ func hasExactInstalledTask(cfg internalcue.LoadResult, name string) bool {
 // findInstalledTasks finds tasks in the config that match the search term.
 // Uses the scoring system to match against name, description, and tags.
 // Multiple terms (space or comma separated) use AND logic - all must match.
-func findInstalledTasks(cfg internalcue.LoadResult, searchTerm string) []TaskMatch {
-	results := assets.SearchInstalledConfig(cfg.Value, internalcue.KeyTasks, "tasks", searchTerm)
+func findInstalledTasks(cfg internalcue.LoadResult, searchTerm string) ([]TaskMatch, error) {
+	results, err := assets.SearchInstalledConfig(cfg.Value, internalcue.KeyTasks, "tasks", searchTerm)
+	if err != nil {
+		return nil, err
+	}
 	var matches []TaskMatch
 	for _, r := range results {
 		matches = append(matches, TaskMatch{
@@ -514,14 +523,17 @@ func findInstalledTasks(cfg internalcue.LoadResult, searchTerm string) []TaskMat
 			Source: TaskSourceInstalled,
 		})
 	}
-	return matches
+	return matches, nil
 }
 
 // findRegistryTasks finds tasks in the registry that match the search term.
 // Uses the scoring system to match against name, description, and tags.
 // Multiple terms (space or comma separated) use AND logic - all must match.
-func findRegistryTasks(index *registry.Index, searchTerm string) []TaskMatch {
-	results := assets.SearchCategoryEntries("tasks", index.Tasks, searchTerm)
+func findRegistryTasks(index *registry.Index, searchTerm string) ([]TaskMatch, error) {
+	results, err := assets.SearchCategoryEntries("tasks", index.Tasks, searchTerm)
+	if err != nil {
+		return nil, err
+	}
 	var matches []TaskMatch
 	for _, r := range results {
 		matches = append(matches, TaskMatch{
@@ -530,7 +542,7 @@ func findRegistryTasks(index *registry.Index, searchTerm string) []TaskMatch {
 			Entry:  r.Entry,
 		})
 	}
-	return matches
+	return matches, nil
 }
 
 // mergeTaskMatches combines installed and registry matches, deduplicating by name.

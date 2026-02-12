@@ -33,6 +33,7 @@ func addSearchCommand(parent *cobra.Command) {
 Searches asset names, descriptions, and tags. Multiple words are combined
 with AND logic - all terms must match. Terms can be space-separated or
 comma-separated. Total query must be at least 3 characters.
+Terms support regex patterns (e.g. ^home, expert$, go.*review).
 Results are grouped by source (local, global, registry) and category.`,
 		Args: cobra.MinimumNArgs(1),
 		RunE: runSearch,
@@ -47,13 +48,18 @@ Results are grouped by source (local, global, registry) and category.`,
 func runSearch(cmd *cobra.Command, args []string) error {
 	query := strings.Join(args, " ")
 
-	terms := assets.ParseSearchTerms(query)
+	terms := assets.ParseSearchPatterns(query)
 	totalLen := 0
 	for _, t := range terms {
 		totalLen += len(t)
 	}
 	if totalLen < 3 {
 		return fmt.Errorf("query must be at least 3 characters")
+	}
+
+	// Validate regex patterns before searching
+	if _, err := assets.CompileSearchTerms(terms); err != nil {
+		return err
 	}
 
 	paths, err := config.ResolvePaths("")
@@ -80,7 +86,11 @@ func runSearch(cmd *cobra.Command, args []string) error {
 		if err == nil {
 			var results []assets.SearchResult
 			for _, cat := range categories {
-				results = append(results, assets.SearchInstalledConfig(cfg, cat.cueKey, cat.category, query)...)
+				catResults, err := assets.SearchInstalledConfig(cfg, cat.cueKey, cat.category, query)
+				if err != nil {
+					return err
+				}
+				results = append(results, catResults...)
 			}
 			if len(results) > 0 {
 				sections = append(sections, searchSection{
@@ -98,7 +108,11 @@ func runSearch(cmd *cobra.Command, args []string) error {
 		if err == nil {
 			var results []assets.SearchResult
 			for _, cat := range categories {
-				results = append(results, assets.SearchInstalledConfig(cfg, cat.cueKey, cat.category, query)...)
+				catResults, err := assets.SearchInstalledConfig(cfg, cat.cueKey, cat.category, query)
+				if err != nil {
+					return err
+				}
+				results = append(results, catResults...)
 			}
 			if len(results) > 0 {
 				sections = append(sections, searchSection{
@@ -121,7 +135,10 @@ func runSearch(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			registryErr = err
 		} else {
-			results := assets.SearchIndex(index, query)
+			results, err := assets.SearchIndex(index, query)
+			if err != nil {
+				return err
+			}
 			if len(results) > 0 {
 				sections = append(sections, searchSection{
 					Label:         "registry",
