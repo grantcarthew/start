@@ -76,21 +76,21 @@ Review each command by running it, checking output against DR-042, adjusting cod
 - [x] `./start show`
 - [x] `./start show agent`
 - [x] `./start show agent <name>`
-- [ ] `./start show role`
-- [ ] `./start show role <name>`
-- [ ] `./start show context`
-- [ ] `./start show context <name>`
-- [ ] `./start show task`
-- [ ] `./start show task <name>`
+- [x] `./start show role`
+- [x] `./start show role <name>`
+- [x] `./start show context`
+- [x] `./start show context <name>`
+- [x] `./start show task`
+- [x] `./start show task <name>`
 
 ### Asset Commands
 
-- [ ] `./start assets list`
-- [ ] `./start assets list --verbose`
-- [ ] `./start assets search <query>`
-- [ ] `./start assets search <query> --verbose`
-- [ ] `./start assets info <query>`
-- [ ] `./start assets info <query> --verbose`
+- [x] `./start assets list`
+- [x] `./start assets list --verbose`
+- [x] `./start assets search <query>`
+- [x] `./start assets search <query> --verbose`
+- [x] `./start assets info <query>`
+- [x] `./start assets info <query> --verbose`
 - [ ] `./start assets add <query>`
 - [ ] `./start assets update`
 - [ ] `./start assets update <query>`

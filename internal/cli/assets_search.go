@@ -30,8 +30,6 @@ Results are grouped by type (agents, roles, tasks, contexts).`,
 		RunE: runAssetsSearch,
 	}
 
-	searchCmd.Flags().BoolP("verbose", "v", false, "Show tags and module paths")
-
 	parent.AddCommand(searchCmd)
 }
 
@@ -76,8 +74,8 @@ func runAssetsSearch(cmd *cobra.Command, args []string) error {
 	installed := collectInstalledNames()
 
 	// Print results
-	verbose, _ := cmd.Flags().GetBool("verbose")
-	printSearchResults(cmd.OutOrStdout(), results, verbose, installed)
+	flags := getFlags(cmd)
+	printSearchResults(cmd.OutOrStdout(), results, flags.Verbose, installed)
 
 	return nil
 }

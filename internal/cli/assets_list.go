@@ -44,7 +44,6 @@ and whether updates are available.`,
 	}
 
 	listCmd.Flags().String("type", "", "Filter by type (agents, roles, tasks, contexts)")
-	listCmd.Flags().BoolP("verbose", "v", false, "Show detailed output")
 
 	parent.AddCommand(listCmd)
 }
@@ -98,8 +97,8 @@ func runAssetsList(cmd *cobra.Command, args []string) error {
 	}
 
 	// Check for updates if verbose
-	verbose, _ := cmd.Flags().GetBool("verbose")
-	if verbose {
+	flags := getFlags(cmd)
+	if flags.Verbose {
 		client, err := registry.NewClient()
 		if err == nil {
 			checkForUpdates(ctx, client, installed)
@@ -107,7 +106,7 @@ func runAssetsList(cmd *cobra.Command, args []string) error {
 	}
 
 	// Print results
-	printInstalledAssets(cmd.OutOrStdout(), installed, verbose)
+	printInstalledAssets(cmd.OutOrStdout(), installed, flags.Verbose)
 
 	return nil
 }
@@ -229,8 +228,7 @@ func checkForUpdates(ctx context.Context, client *registry.Client, installed []I
 		entry := findInIndex(index, installed[i].Category, installed[i].Name)
 		if entry != nil && entry.Version != "" {
 			installed[i].LatestVer = entry.Version
-			// Version comparison would go here
-			// For now, just note we have version info
+			installed[i].UpdateAvail = installed[i].InstalledVer != entry.Version
 		}
 	}
 }
@@ -278,11 +276,17 @@ func printInstalledAssets(w io.Writer, installed []InstalledAsset, verbose bool)
 		_, _ = fmt.Fprintln(w, "/")
 		for _, a := range assets {
 			if verbose && a.LatestVer != "" {
+				_, _ = fmt.Fprintf(w, "  %-25s ", a.Name)
 				if a.UpdateAvail {
-					_, _ = fmt.Fprintf(w, "  %-25s %s (update available: %s)\n", a.Name, a.InstalledVer, a.LatestVer)
+					_, _ = colorCyan.Fprint(w, "(")
+					_, _ = colorDim.Fprintf(w, "update available: %s", a.LatestVer)
+					_, _ = colorCyan.Fprint(w, ")")
 				} else {
-					_, _ = fmt.Fprintf(w, "  %-25s %s (latest)\n", a.Name, a.LatestVer)
+					_, _ = colorCyan.Fprint(w, "(")
+					_, _ = colorDim.Fprint(w, "latest")
+					_, _ = colorCyan.Fprint(w, ")")
 				}
+				_, _ = fmt.Fprintln(w)
 			} else {
 				scopeIndicator := ""
 				if verbose {

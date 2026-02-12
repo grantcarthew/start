@@ -18,11 +18,6 @@ type ShowResult struct {
 	Content    string   // Formatted content
 	AllNames   []string // All available items of this type
 	ShowReason string   // Why this item is shown (e.g., "first in config", "default")
-	ListOnly   bool     // True when showing list without content
-	// Context-specific fields
-	DefaultContexts  []string // Contexts with default: true
-	RequiredContexts []string // Contexts with required: true
-	AllTags          []string // All unique tags across items
 }
 
 // addShowCommand adds the show command and its subcommands to the parent command.
@@ -228,16 +223,33 @@ func prepareShowRole(name, scope string) (ShowResult, error) {
 		showReason = "first in config"
 	}
 
+	resolvedName := name
 	role := roles.LookupPath(cue.MakePath(cue.Str(name)))
 	if !role.Exists() {
-		return ShowResult{}, fmt.Errorf("role %q not found", name)
+		// Try substring match
+		var matches []string
+		for _, roleName := range allNames {
+			if strings.Contains(roleName, name) {
+				matches = append(matches, roleName)
+			}
+		}
+
+		switch len(matches) {
+		case 0:
+			return ShowResult{}, fmt.Errorf("role %q not found", name)
+		case 1:
+			resolvedName = matches[0]
+			role = roles.LookupPath(cue.MakePath(cue.Str(resolvedName)))
+		default:
+			return ShowResult{}, fmt.Errorf("ambiguous role name %q matches: %s", name, strings.Join(matches, ", "))
+		}
 	}
 
 	content := formatShowContent(role, "role")
 
 	return ShowResult{
 		ItemType:   "Role",
-		Name:       name,
+		Name:       resolvedName,
 		Content:    content,
 		AllNames:   allNames,
 		ShowReason: showReason,
@@ -256,83 +268,59 @@ func prepareShowContext(name, scope string) (ShowResult, error) {
 		return ShowResult{}, fmt.Errorf("no contexts defined in configuration")
 	}
 
-	// Collect all context info
+	// Collect all context names in config order
 	var allNames []string
-	var defaultContexts []string
-	var requiredContexts []string
-	tagSet := make(map[string]bool)
+	showReason := ""
 
 	iter, err := contexts.Fields()
 	if err != nil {
 		return ShowResult{}, fmt.Errorf("reading contexts: %w", err)
 	}
 	for iter.Next() {
-		ctxName := iter.Selector().Unquoted()
-		ctx := iter.Value()
-		allNames = append(allNames, ctxName)
-
-		// Check default flag
-		if def := ctx.LookupPath(cue.ParsePath("default")); def.Exists() {
-			if b, err := def.Bool(); err == nil && b {
-				defaultContexts = append(defaultContexts, ctxName)
-			}
-		}
-
-		// Check required flag
-		if req := ctx.LookupPath(cue.ParsePath("required")); req.Exists() {
-			if b, err := req.Bool(); err == nil && b {
-				requiredContexts = append(requiredContexts, ctxName)
-			}
-		}
-
-		// Collect tags
-		if tags := ctx.LookupPath(cue.ParsePath("tags")); tags.Exists() {
-			tagIter, err := tags.List()
-			if err == nil {
-				for tagIter.Next() {
-					if s, err := tagIter.Value().String(); err == nil {
-						tagSet[s] = true
-					}
-				}
-			}
-		}
+		allNames = append(allNames, iter.Selector().Unquoted())
 	}
 
 	if len(allNames) == 0 {
 		return ShowResult{}, fmt.Errorf("no contexts defined in configuration")
 	}
 
-	// Convert tag set to sorted slice
-	var allTags []string
-	for tag := range tagSet {
-		allTags = append(allTags, tag)
-	}
-
-	// If no name specified, return list only
+	// If no name specified, show first context
 	if name == "" {
-		return ShowResult{
-			ItemType:         "Context",
-			AllNames:         allNames,
-			DefaultContexts:  defaultContexts,
-			RequiredContexts: requiredContexts,
-			AllTags:          allTags,
-			ListOnly:         true,
-		}, nil
+		name = allNames[0]
+		showReason = "first in config"
 	}
 
 	// Show single context
+	resolvedName := name
 	ctx := contexts.LookupPath(cue.MakePath(cue.Str(name)))
 	if !ctx.Exists() {
-		return ShowResult{}, fmt.Errorf("context %q not found", name)
+		// Try substring match
+		var matches []string
+		for _, ctxName := range allNames {
+			if strings.Contains(ctxName, name) {
+				matches = append(matches, ctxName)
+			}
+		}
+
+		switch len(matches) {
+		case 0:
+			return ShowResult{}, fmt.Errorf("context %q not found", name)
+		case 1:
+			resolvedName = matches[0]
+			ctx = contexts.LookupPath(cue.MakePath(cue.Str(resolvedName)))
+		default:
+			return ShowResult{}, fmt.Errorf("ambiguous context name %q matches: %s", name, strings.Join(matches, ", "))
+		}
 	}
 
 	content := formatShowContent(ctx, "context")
 
 	return ShowResult{
-		ItemType: "Context",
-		Name:     name,
-		Content:  content,
-		AllNames: allNames,
+		ItemType:   "Context",
+		Name:       resolvedName,
+		Content:    content,
+		AllNames:   allNames,
+		ShowReason: showReason,
 	}, nil
 }
 
@@ -368,16 +356,33 @@ func prepareShowAgent(name, scope string) (ShowResult, error) {
 		showReason = "first in config"
 	}
 
+	resolvedName := name
 	agent := agents.LookupPath(cue.MakePath(cue.Str(name)))
 	if !agent.Exists() {
-		return ShowResult{}, fmt.Errorf("agent %q not found", name)
+		// Try substring match
+		var matches []string
+		for _, agentName := range allNames {
+			if strings.Contains(agentName, name) {
+				matches = append(matches, agentName)
+			}
+		}
+
+		switch len(matches) {
+		case 0:
+			return ShowResult{}, fmt.Errorf("agent %q not found", name)
+		case 1:
+			resolvedName = matches[0]
+			agent = agents.LookupPath(cue.MakePath(cue.Str(resolvedName)))
+		default:
+			return ShowResult{}, fmt.Errorf("ambiguous agent name %q matches: %s", name, strings.Join(matches, ", "))
+		}
 	}
 
 	content := formatShowContent(agent, "agent")
 
 	return ShowResult{
 		ItemType:   "Agent",
-		Name:       name,
+		Name:       resolvedName,
 		Content:    content,
 		AllNames:   allNames,
 		ShowReason: showReason,
@@ -409,13 +414,11 @@ func prepareShowTask(name, scope string) (ShowResult, error) {
 		return ShowResult{}, fmt.Errorf("no tasks defined in configuration")
 	}
 
-	// If no name specified, return list only
+	// Determine which task to show and why
+	showReason := ""
 	if name == "" {
-		return ShowResult{
-			ItemType: "Task",
-			AllNames: allNames,
-			ListOnly: true,
-		}, nil
+		name = allNames[0]
+		showReason = "first in config"
 	}
 
 	// Try exact match first
@@ -444,10 +447,11 @@ func prepareShowTask(name, scope string) (ShowResult, error) {
 	content := formatShowContent(task, "task")
 
 	return ShowResult{
-		ItemType: "Task",
-		Name:     resolvedName,
-		Content:  content,
-		AllNames: allNames,
+		ItemType:   "Task",
+		Name:       resolvedName,
+		Content:    content,
+		AllNames:   allNames,
+		ShowReason: showReason,
 	}, nil
 }
 
@@ -550,7 +554,7 @@ func formatShowContent(v cue.Value, itemType string) string {
 		}
 		if prompt := v.LookupPath(cue.ParsePath("prompt")); prompt.Exists() {
 			if s, err := prompt.String(); err == nil {
-				sb.WriteString(fmt.Sprintf("\n%s\n", s))
+				sb.WriteString(fmt.Sprintf("\n%s %s\n", label("Prompt:"), s))
 			}
 		}
 
@@ -611,12 +615,6 @@ func itemTypeToCategory(itemType string) string {
 
 // printPreview writes the ShowResult to the given writer.
 func printPreview(w io.Writer, r ShowResult) {
-	// Handle list-only output
-	if r.ListOnly {
-		printListOnly(w, r)
-		return
-	}
-
 	cat := itemTypeToCategory(r.ItemType)
 	_, _ = fmt.Fprintln(w)
 
@@ -647,28 +645,3 @@ func printPreview(w io.Writer, r ShowResult) {
 	PrintSeparator(w)
 }
 
-// printListOnly prints a list-only result without content preview.
-func printListOnly(w io.Writer, r ShowResult) {
-	cat := itemTypeToCategory(r.ItemType)
-
-	_, _ = categoryColor(cat).Fprint(w, r.ItemType+"s")
-	_, _ = fmt.Fprintf(w, ": %s\n", strings.Join(r.AllNames, ", "))
-
-	// Context-specific fields
-	if r.ItemType == "Context" {
-		if len(r.DefaultContexts) > 0 {
-			_, _ = fmt.Fprint(w, "\n")
-			_, _ = colorDim.Fprint(w, "Default")
-			_, _ = fmt.Fprintf(w, ": %s\n", strings.Join(r.DefaultContexts, ", "))
-		}
-		if len(r.RequiredContexts) > 0 {
-			_, _ = colorDim.Fprint(w, "Required")
-			_, _ = fmt.Fprintf(w, ": %s\n", strings.Join(r.RequiredContexts, ", "))
-		}
-		if len(r.AllTags) > 0 {
-			_, _ = fmt.Fprint(w, "\n")
-			_, _ = colorDim.Fprint(w, "Tags")
-			_, _ = fmt.Fprintf(w, ": %s\n", strings.Join(r.AllTags, ", "))
-		}
-	}
-}

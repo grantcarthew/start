@@ -137,6 +137,17 @@ func TestPrepareShowAgent(t *testing.T) {
 			wantErr:      false,
 		},
 		{
+			name:      "substring match",
+			agentName: "clau",
+			scope:     "",
+			wantType:  "Agent",
+			wantName:  "claude",
+			wantContent: []string{
+				"Claude by Anthropic",
+			},
+			wantErr: false,
+		},
+		{
 			name:      "nonexistent agent",
 			agentName: "nonexistent",
 			scope:     "",
@@ -225,6 +236,16 @@ func TestPrepareShowRole(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name:     "substring match",
+			roleName: "code",
+			wantType: "Role",
+			wantName: "code-reviewer",
+			wantContent: []string{
+				"Description: Code reviewer",
+			},
+			wantErr: false,
+		},
+		{
 			name:     "nonexistent role",
 			roleName: "nonexistent",
 			wantErr:  true,
@@ -275,26 +296,23 @@ func TestPrepareShowContext(t *testing.T) {
 	defer cleanup()
 
 	tests := []struct {
-		name                 string
-		contextName          string
-		wantType             string
-		wantName             string
-		wantContent          []string
-		wantAllNames         []string
-		wantDefaultContexts  []string
-		wantRequiredContexts []string
-		wantListOnly         bool
-		wantErr              bool
+		name           string
+		contextName    string
+		wantType       string
+		wantName       string
+		wantContent    []string
+		wantAllNames   []string
+		wantShowReason string
+		wantErr        bool
 	}{
 		{
-			name:                 "no name returns list only",
-			contextName:          "",
-			wantType:             "Context",
-			wantAllNames:         []string{"environment", "git-status"},
-			wantDefaultContexts:  []string{"git-status"},
-			wantRequiredContexts: []string{"environment"},
-			wantListOnly:         true,
-			wantErr:              false,
+			name:           "no name shows first context",
+			contextName:    "",
+			wantType:       "Context",
+			wantName:       "environment",
+			wantAllNames:   []string{"environment", "git-status"},
+			wantShowReason: "first in config",
+			wantErr:        false,
 		},
 		{
 			name:        "context with file and required",
@@ -307,8 +325,7 @@ func TestPrepareShowContext(t *testing.T) {
 				"Required: true",
 				"Tags: system, environment",
 			},
-			wantListOnly: false,
-			wantErr:      false,
+			wantErr: false,
 		},
 		{
 			name:        "context with command and default",
@@ -321,8 +338,17 @@ func TestPrepareShowContext(t *testing.T) {
 				"Default: true",
 				"Tags: git, vcs",
 			},
-			wantListOnly: false,
-			wantErr:      false,
+			wantErr: false,
+		},
+		{
+			name:        "substring match",
+			contextName: "git",
+			wantType:    "Context",
+			wantName:    "git-status",
+			wantContent: []string{
+				"Command: git status --short",
+			},
+			wantErr: false,
 		},
 		{
 			name:        "nonexistent context",
@@ -349,27 +375,20 @@ func TestPrepareShowContext(t *testing.T) {
 			if result.ItemType != tt.wantType {
 				t.Errorf("ItemType = %q, want %q", result.ItemType, tt.wantType)
 			}
-			if result.ListOnly != tt.wantListOnly {
-				t.Errorf("ListOnly = %v, want %v", result.ListOnly, tt.wantListOnly)
+			if result.Name != tt.wantName {
+				t.Errorf("Name = %q, want %q", result.Name, tt.wantName)
 			}
-			if tt.wantListOnly {
+			for _, want := range tt.wantContent {
+				if !strings.Contains(result.Content, want) {
+					t.Errorf("Content missing %q\ngot: %s", want, result.Content)
+				}
+			}
+			if tt.wantShowReason != "" && result.ShowReason != tt.wantShowReason {
+				t.Errorf("ShowReason = %q, want %q", result.ShowReason, tt.wantShowReason)
+			}
+			if len(tt.wantAllNames) > 0 {
 				if len(result.AllNames) != len(tt.wantAllNames) {
-					t.Errorf("AllNames = %v, want %v", result.AllNames, tt.wantAllNames)
-				}
-				if len(result.DefaultContexts) != len(tt.wantDefaultContexts) {
-					t.Errorf("DefaultContexts = %v, want %v", result.DefaultContexts, tt.wantDefaultContexts)
-				}
-				if len(result.RequiredContexts) != len(tt.wantRequiredContexts) {
-					t.Errorf("RequiredContexts = %v, want %v", result.RequiredContexts, tt.wantRequiredContexts)
-				}
-			} else {
-				if result.Name != tt.wantName {
-					t.Errorf("Name = %q, want %q", result.Name, tt.wantName)
-				}
-				for _, want := range tt.wantContent {
-					if !strings.Contains(result.Content, want) {
-						t.Errorf("Content missing %q\ngot: %s", want, result.Content)
-					}
+					t.Errorf("AllNames length = %d, want %d", len(result.AllNames), len(tt.wantAllNames))
 				}
 			}
 		})
@@ -382,22 +401,23 @@ func TestPrepareShowTask(t *testing.T) {
 	defer cleanup()
 
 	tests := []struct {
-		name         string
-		taskName     string
-		wantType     string
-		wantName     string
-		wantContent  []string
-		wantAllNames []string
-		wantListOnly bool
-		wantErr      bool
+		name           string
+		taskName       string
+		wantType       string
+		wantName       string
+		wantContent    []string
+		wantAllNames   []string
+		wantShowReason string
+		wantErr        bool
 	}{
 		{
-			name:         "no name returns list only",
-			taskName:     "",
-			wantType:     "Task",
-			wantAllNames: []string{"review"},
-			wantListOnly: true,
-			wantErr:      false,
+			name:           "no name shows first task",
+			taskName:       "",
+			wantType:       "Task",
+			wantName:       "review",
+			wantAllNames:   []string{"review"},
+			wantShowReason: "first in config",
+			wantErr:        false,
 		},
 		{
 			name:     "task with all fields",
@@ -410,8 +430,7 @@ func TestPrepareShowTask(t *testing.T) {
 				"Review: {{.command_output}}",
 				"Role: code-reviewer",
 			},
-			wantListOnly: false,
-			wantErr:      false,
+			wantErr: false,
 		},
 		{
 			name:     "nonexistent task",
@@ -426,8 +445,7 @@ func TestPrepareShowTask(t *testing.T) {
 			wantContent: []string{
 				"Description: Review changes",
 			},
-			wantListOnly: false,
-			wantErr:      false,
+			wantErr: false,
 		},
 	}
 
@@ -449,21 +467,20 @@ func TestPrepareShowTask(t *testing.T) {
 			if result.ItemType != tt.wantType {
 				t.Errorf("ItemType = %q, want %q", result.ItemType, tt.wantType)
 			}
-			if result.ListOnly != tt.wantListOnly {
-				t.Errorf("ListOnly = %v, want %v", result.ListOnly, tt.wantListOnly)
+			if result.Name != tt.wantName {
+				t.Errorf("Name = %q, want %q", result.Name, tt.wantName)
 			}
-			if tt.wantListOnly {
+			for _, want := range tt.wantContent {
+				if !strings.Contains(result.Content, want) {
+					t.Errorf("Content missing %q\ngot: %s", want, result.Content)
+				}
+			}
+			if tt.wantShowReason != "" && result.ShowReason != tt.wantShowReason {
+				t.Errorf("ShowReason = %q, want %q", result.ShowReason, tt.wantShowReason)
+			}
+			if len(tt.wantAllNames) > 0 {
 				if len(result.AllNames) != len(tt.wantAllNames) {
-					t.Errorf("AllNames = %v, want %v", result.AllNames, tt.wantAllNames)
-				}
-			} else {
-				if result.Name != tt.wantName {
-					t.Errorf("Name = %q, want %q", result.Name, tt.wantName)
-				}
-				for _, want := range tt.wantContent {
-					if !strings.Contains(result.Content, want) {
-						t.Errorf("Content missing %q\ngot: %s", want, result.Content)
-					}
+					t.Errorf("AllNames length = %d, want %d", len(result.AllNames), len(tt.wantAllNames))
 				}
 			}
 		})
@@ -491,8 +508,11 @@ func TestPrintPreview(t *testing.T) {
 	}
 
 	// Check header with show reason
-	if !strings.Contains(output, "Showing: claude (first in config)") {
-		t.Errorf("output should contain 'Showing: claude (first in config)', got: %s", output)
+	if !strings.Contains(output, "Agent: claude") {
+		t.Errorf("output should contain 'Agent: claude', got: %s", output)
+	}
+	if !strings.Contains(output, "first in config") {
+		t.Errorf("output should contain 'first in config', got: %s", output)
 	}
 
 	// Check separator line
@@ -506,36 +526,6 @@ func TestPrintPreview(t *testing.T) {
 	}
 	if !strings.Contains(output, "Line 3") {
 		t.Error("output should contain Line 3")
-	}
-}
-
-// TestPrintListOnly tests list-only output.
-func TestPrintListOnly(t *testing.T) {
-	result := ShowResult{
-		ItemType:         "Context",
-		AllNames:         []string{"environment", "project", "git-status"},
-		DefaultContexts:  []string{"project"},
-		RequiredContexts: []string{"environment"},
-		AllTags:          []string{"git", "system"},
-		ListOnly:         true,
-	}
-
-	var buf bytes.Buffer
-	printPreview(&buf, result)
-
-	output := buf.String()
-
-	if !strings.Contains(output, "Contexts: environment, project, git-status") {
-		t.Errorf("output should contain contexts list, got: %s", output)
-	}
-	if !strings.Contains(output, "Default: project") {
-		t.Errorf("output should contain default contexts, got: %s", output)
-	}
-	if !strings.Contains(output, "Required: environment") {
-		t.Errorf("output should contain required contexts, got: %s", output)
-	}
-	if !strings.Contains(output, "Tags: git, system") {
-		t.Errorf("output should contain tags, got: %s", output)
 	}
 }
 
@@ -553,7 +543,7 @@ func TestShowCommandIntegration(t *testing.T) {
 		{
 			name:       "show agent no name shows first agent",
 			args:       []string{"show", "agent"},
-			wantOutput: []string{"Agents:", "Showing:", "claude", "first in config"},
+			wantOutput: []string{"Agents:", "Agent:", "claude", "first in config"},
 			wantErr:    false,
 		},
 		{
@@ -565,13 +555,13 @@ func TestShowCommandIntegration(t *testing.T) {
 		{
 			name:       "show role no name shows first role",
 			args:       []string{"show", "role"},
-			wantOutput: []string{"Roles:", "Showing:", "assistant", "first in config"},
+			wantOutput: []string{"Roles:", "Role:", "assistant", "first in config"},
 			wantErr:    false,
 		},
 		{
-			name:       "show context no name lists contexts",
+			name:       "show context no name shows first context",
 			args:       []string{"show", "context"},
-			wantOutput: []string{"Contexts:", "environment", "git-status"},
+			wantOutput: []string{"Contexts:", "Context:", "environment", "first in config"},
 			wantErr:    false,
 		},
 		{
@@ -587,9 +577,9 @@ func TestShowCommandIntegration(t *testing.T) {
 			wantErr:    false,
 		},
 		{
-			name:       "show task no name lists tasks",
+			name:       "show task no name shows first task",
 			args:       []string{"show", "task"},
-			wantOutput: []string{"Tasks:", "review"},
+			wantOutput: []string{"Tasks:", "Task:", "review", "first in config"},
 			wantErr:    false,
 		},
 	}
