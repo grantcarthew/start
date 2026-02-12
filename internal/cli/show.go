@@ -96,45 +96,33 @@ func runShow(cmd *cobra.Command, args []string) error {
 	w := cmd.OutOrStdout()
 	scope, _ := cmd.Flags().GetString("scope")
 
-	// Show agents
+	type section struct {
+		category string
+		names    []string
+	}
+
+	var sections []section
+
 	if result, err := prepareShowAgent("", scope); err == nil {
-		_, _ = fmt.Fprintln(w, "Agents:")
-		for _, name := range result.AllNames {
-			_, _ = fmt.Fprintf(w, "  %s\n", name)
-		}
-		_, _ = fmt.Fprintln(w)
+		sections = append(sections, section{"agents", result.AllNames})
 	}
-
-	// Show roles
 	if result, err := prepareShowRole("", scope); err == nil {
-		_, _ = fmt.Fprintln(w, "Roles:")
-		for _, name := range result.AllNames {
-			_, _ = fmt.Fprintf(w, "  %s\n", name)
-		}
-		_, _ = fmt.Fprintln(w)
+		sections = append(sections, section{"roles", result.AllNames})
 	}
-
-	// Show contexts
 	if result, err := prepareShowContext("", scope); err == nil {
-		_, _ = fmt.Fprintln(w, "Contexts:")
-		for _, name := range result.AllNames {
-			_, _ = fmt.Fprintf(w, "  %s\n", name)
-		}
-		if len(result.RequiredContexts) > 0 {
-			_, _ = fmt.Fprintf(w, "  Required: %v\n", result.RequiredContexts)
-		}
-		if len(result.DefaultContexts) > 0 {
-			_, _ = fmt.Fprintf(w, "  Default: %v\n", result.DefaultContexts)
-		}
-		_, _ = fmt.Fprintln(w)
+		sections = append(sections, section{"contexts", result.AllNames})
+	}
+	if result, err := prepareShowTask("", scope); err == nil {
+		sections = append(sections, section{"tasks", result.AllNames})
 	}
 
-	// Show tasks
-	if result, err := prepareShowTask("", scope); err == nil {
-		_, _ = fmt.Fprintln(w, "Tasks:")
-		for _, name := range result.AllNames {
+	for _, s := range sections {
+		_, _ = categoryColor(s.category).Fprint(w, s.category)
+		_, _ = fmt.Fprintln(w, "/")
+		for _, name := range s.names {
 			_, _ = fmt.Fprintf(w, "  %s\n", name)
 		}
+		_, _ = fmt.Fprintln(w)
 	}
 
 	return nil
@@ -492,36 +480,38 @@ func loadConfig(scope string) (internalcue.LoadResult, error) {
 func formatShowContent(v cue.Value, itemType string) string {
 	var sb strings.Builder
 
+	label := colorDim.Sprint
+
 	switch itemType {
 	case "agent":
 		if desc := v.LookupPath(cue.ParsePath("description")); desc.Exists() {
 			if s, err := desc.String(); err == nil {
-				sb.WriteString(fmt.Sprintf("Description: %s\n\n", s))
+				sb.WriteString(fmt.Sprintf("%s %s\n\n", label("Description:"), s))
 			}
 		}
 		if bin := v.LookupPath(cue.ParsePath("bin")); bin.Exists() {
 			if s, err := bin.String(); err == nil {
-				sb.WriteString(fmt.Sprintf("Binary: %s\n", s))
+				sb.WriteString(fmt.Sprintf("%s %s\n", label("Binary:"), s))
 			}
 		}
 		if cmd := v.LookupPath(cue.ParsePath("command")); cmd.Exists() {
 			if s, err := cmd.String(); err == nil {
-				sb.WriteString(fmt.Sprintf("Command: %s\n", s))
+				sb.WriteString(fmt.Sprintf("%s %s\n", label("Command:"), s))
 			}
 		}
 		if dm := v.LookupPath(cue.ParsePath("default_model")); dm.Exists() {
 			if s, err := dm.String(); err == nil {
-				sb.WriteString(fmt.Sprintf("Default Model: %s\n", s))
+				sb.WriteString(fmt.Sprintf("%s %s\n", label("Default Model:"), s))
 			}
 		}
 		if models := v.LookupPath(cue.ParsePath("models")); models.Exists() {
-			sb.WriteString("\nModels:\n")
+			sb.WriteString(fmt.Sprintf("\n%s\n", label("Models:")))
 			iter, err := models.Fields()
 			if err == nil {
 				for iter.Next() {
 					modelName := iter.Selector().Unquoted()
 					if s, err := iter.Value().String(); err == nil {
-						sb.WriteString(fmt.Sprintf("  %s: %s\n", modelName, s))
+						sb.WriteString(fmt.Sprintf("  %s %s\n", label(modelName+":"), s))
 					}
 				}
 			}
@@ -536,7 +526,7 @@ func formatShowContent(v cue.Value, itemType string) string {
 					}
 				}
 				if len(tagList) > 0 {
-					sb.WriteString(fmt.Sprintf("\nTags: %s\n", strings.Join(tagList, ", ")))
+					sb.WriteString(fmt.Sprintf("\n%s %s\n", label("Tags:"), strings.Join(tagList, ", ")))
 				}
 			}
 		}
@@ -544,18 +534,18 @@ func formatShowContent(v cue.Value, itemType string) string {
 	case "role", "context", "task":
 		if desc := v.LookupPath(cue.ParsePath("description")); desc.Exists() {
 			if s, err := desc.String(); err == nil {
-				sb.WriteString(fmt.Sprintf("Description: %s\n\n", s))
+				sb.WriteString(fmt.Sprintf("%s %s\n\n", label("Description:"), s))
 			}
 		}
 
 		if file := v.LookupPath(cue.ParsePath("file")); file.Exists() {
 			if s, err := file.String(); err == nil {
-				sb.WriteString(fmt.Sprintf("File: %s\n", s))
+				sb.WriteString(fmt.Sprintf("%s %s\n", label("File:"), s))
 			}
 		}
 		if cmd := v.LookupPath(cue.ParsePath("command")); cmd.Exists() {
 			if s, err := cmd.String(); err == nil {
-				sb.WriteString(fmt.Sprintf("Command: %s\n", s))
+				sb.WriteString(fmt.Sprintf("%s %s\n", label("Command:"), s))
 			}
 		}
 		if prompt := v.LookupPath(cue.ParsePath("prompt")); prompt.Exists() {
@@ -567,12 +557,12 @@ func formatShowContent(v cue.Value, itemType string) string {
 		if itemType == "context" {
 			if req := v.LookupPath(cue.ParsePath("required")); req.Exists() {
 				if b, err := req.Bool(); err == nil {
-					sb.WriteString(fmt.Sprintf("Required: %t\n", b))
+					sb.WriteString(fmt.Sprintf("%s %t\n", label("Required:"), b))
 				}
 			}
 			if def := v.LookupPath(cue.ParsePath("default")); def.Exists() {
 				if b, err := def.Bool(); err == nil {
-					sb.WriteString(fmt.Sprintf("Default: %t\n", b))
+					sb.WriteString(fmt.Sprintf("%s %t\n", label("Default:"), b))
 				}
 			}
 			if tags := v.LookupPath(cue.ParsePath("tags")); tags.Exists() {
@@ -585,7 +575,7 @@ func formatShowContent(v cue.Value, itemType string) string {
 						}
 					}
 					if len(tagList) > 0 {
-						sb.WriteString(fmt.Sprintf("Tags: %s\n", strings.Join(tagList, ", ")))
+						sb.WriteString(fmt.Sprintf("%s %s\n", label("Tags:"), strings.Join(tagList, ", ")))
 					}
 				}
 			}
@@ -594,13 +584,29 @@ func formatShowContent(v cue.Value, itemType string) string {
 		if itemType == "task" {
 			if role := v.LookupPath(cue.ParsePath("role")); role.Exists() {
 				if s, err := role.String(); err == nil {
-					sb.WriteString(fmt.Sprintf("Role: %s\n", s))
+					sb.WriteString(fmt.Sprintf("%s %s\n", label("Role:"), s))
 				}
 			}
 		}
 	}
 
 	return sb.String()
+}
+
+// itemTypeToCategory maps ShowResult.ItemType to the category string for categoryColor().
+func itemTypeToCategory(itemType string) string {
+	switch itemType {
+	case "Agent":
+		return "agents"
+	case "Role":
+		return "roles"
+	case "Context":
+		return "contexts"
+	case "Task":
+		return "tasks"
+	default:
+		return ""
+	}
 }
 
 // printPreview writes the ShowResult to the given writer.
@@ -611,45 +617,58 @@ func printPreview(w io.Writer, r ShowResult) {
 		return
 	}
 
+	cat := itemTypeToCategory(r.ItemType)
+	_, _ = fmt.Fprintln(w)
+
 	// Show list of all items if available (for agent/role)
 	if len(r.AllNames) > 0 {
-		_, _ = fmt.Fprintf(w, "%ss: %s\n", r.ItemType, strings.Join(r.AllNames, ", "))
+		_, _ = categoryColor(cat).Fprint(w, r.ItemType+"s")
+		_, _ = fmt.Fprintf(w, ": %s\n", strings.Join(r.AllNames, ", "))
 		_, _ = fmt.Fprintln(w)
 	}
 
 	// Show which item and why
+	_, _ = categoryColor(cat).Fprint(w, r.ItemType)
+	_, _ = fmt.Fprintf(w, ": %s", r.Name)
 	if r.ShowReason != "" {
-		_, _ = fmt.Fprintf(w, "Showing: %s (%s)\n", r.Name, r.ShowReason)
-	} else {
-		_, _ = fmt.Fprintf(w, "%s: %s\n", r.ItemType, r.Name)
+		_, _ = fmt.Fprint(w, " ")
+		_, _ = colorCyan.Fprint(w, "(")
+		_, _ = colorDim.Fprint(w, r.ShowReason)
+		_, _ = colorCyan.Fprint(w, ")")
 	}
-	_, _ = fmt.Fprintln(w, strings.Repeat("─", 79))
+	_, _ = fmt.Fprintln(w)
+	PrintSeparator(w)
 
 	// Show full content
 	_, _ = fmt.Fprint(w, r.Content)
 	if !strings.HasSuffix(r.Content, "\n") {
 		_, _ = fmt.Fprintln(w)
 	}
-	_, _ = fmt.Fprintln(w, strings.Repeat("─", 79))
+	PrintSeparator(w)
 }
 
 // printListOnly prints a list-only result without content preview.
 func printListOnly(w io.Writer, r ShowResult) {
-	// Pluralize item type for header
-	plural := r.ItemType + "s"
+	cat := itemTypeToCategory(r.ItemType)
 
-	_, _ = fmt.Fprintf(w, "%s: %s\n", plural, strings.Join(r.AllNames, ", "))
+	_, _ = categoryColor(cat).Fprint(w, r.ItemType+"s")
+	_, _ = fmt.Fprintf(w, ": %s\n", strings.Join(r.AllNames, ", "))
 
 	// Context-specific fields
 	if r.ItemType == "Context" {
 		if len(r.DefaultContexts) > 0 {
-			_, _ = fmt.Fprintf(w, "\nDefault: %s\n", strings.Join(r.DefaultContexts, ", "))
+			_, _ = fmt.Fprint(w, "\n")
+			_, _ = colorDim.Fprint(w, "Default")
+			_, _ = fmt.Fprintf(w, ": %s\n", strings.Join(r.DefaultContexts, ", "))
 		}
 		if len(r.RequiredContexts) > 0 {
-			_, _ = fmt.Fprintf(w, "Required: %s\n", strings.Join(r.RequiredContexts, ", "))
+			_, _ = colorDim.Fprint(w, "Required")
+			_, _ = fmt.Fprintf(w, ": %s\n", strings.Join(r.RequiredContexts, ", "))
 		}
 		if len(r.AllTags) > 0 {
-			_, _ = fmt.Fprintf(w, "\nTags: %s\n", strings.Join(r.AllTags, ", "))
+			_, _ = fmt.Fprint(w, "\n")
+			_, _ = colorDim.Fprint(w, "Tags")
+			_, _ = fmt.Fprintf(w, ": %s\n", strings.Join(r.AllTags, ", "))
 		}
 	}
 }
