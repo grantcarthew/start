@@ -123,11 +123,12 @@ func (r Report) WarnCount() int {
 
 // BuildInfo holds version and build information.
 type BuildInfo struct {
-	Version   string
-	Commit    string
-	BuildDate string
-	GoVersion string
-	Platform  string
+	Version      string
+	Commit       string
+	BuildDate    string
+	GoVersion    string
+	Platform     string
+	IndexVersion string // Registry index version (empty if unavailable)
 }
 
 // DefaultBuildInfo returns build info with runtime defaults.

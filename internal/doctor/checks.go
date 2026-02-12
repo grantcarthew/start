@@ -26,7 +26,7 @@ func CheckIntro() SectionResult {
 
 // CheckVersion returns the version section with build info.
 func CheckVersion(info BuildInfo) SectionResult {
-	return SectionResult{
+	section := SectionResult{
 		Name:    "Version",
 		NoIcons: true,
 		Results: []CheckResult{
@@ -37,6 +37,18 @@ func CheckVersion(info BuildInfo) SectionResult {
 			{Status: StatusInfo, Label: "Platform", Message: info.Platform},
 		},
 	}
+
+	if info.IndexVersion != "" {
+		section.Results = append(section.Results, CheckResult{
+			Status: StatusInfo, Label: "Index", Message: info.IndexVersion,
+		})
+	} else {
+		section.Results = append(section.Results, CheckResult{
+			Status: StatusWarn, Label: "Index", Message: "unavailable",
+		})
+	}
+
+	return section
 }
 
 // CheckConfiguration validates CUE configuration files.
@@ -81,13 +93,12 @@ func checkConfigDir(dir, scope string, exists bool) []CheckResult {
 
 	// Create scope label
 	shortDir := shortenPath(dir)
-	scopeLabel := fmt.Sprintf("%s (%s)", scope, shortDir)
 
 	if !exists {
 		results = append(results, CheckResult{
 			Status:  StatusInfo,
-			Label:   scopeLabel,
-			Message: "Not found",
+			Label:   scope,
+			Message: fmt.Sprintf("(%s) - Not found", shortDir),
 		})
 		return results
 	}
@@ -97,8 +108,8 @@ func checkConfigDir(dir, scope string, exists bool) []CheckResult {
 	if err != nil {
 		results = append(results, CheckResult{
 			Status:  StatusFail,
-			Label:   scopeLabel,
-			Message: fmt.Sprintf("Cannot read: %v", err),
+			Label:   scope,
+			Message: fmt.Sprintf("(%s) - Cannot read: %v", shortDir, err),
 		})
 		return results
 	}
@@ -113,8 +124,8 @@ func checkConfigDir(dir, scope string, exists bool) []CheckResult {
 	if len(cueFiles) == 0 {
 		results = append(results, CheckResult{
 			Status:  StatusInfo,
-			Label:   scopeLabel,
-			Message: "No CUE files",
+			Label:   scope,
+			Message: fmt.Sprintf("(%s) - No CUE files", shortDir),
 		})
 		return results
 	}
@@ -126,15 +137,16 @@ func checkConfigDir(dir, scope string, exists bool) []CheckResult {
 		// Report the directory as having errors
 		results = append(results, CheckResult{
 			Status:  StatusFail,
-			Label:   scopeLabel,
-			Message: fmt.Sprintf("Invalid: %v", err),
+			Label:   scope,
+			Message: fmt.Sprintf("(%s) - Invalid: %v", shortDir, err),
 			Fix:     "Fix CUE syntax errors in this directory",
 		})
 	} else {
-		// Add header first (with colon), then list each file as valid
+		// Add header first, then list each file as valid
 		results = append(results, CheckResult{
-			Status: StatusInfo,
-			Label:  scopeLabel + ":",
+			Status:  StatusInfo,
+			Label:   scope,
+			Message: fmt.Sprintf("(%s):", shortDir),
 		})
 		for _, f := range cueFiles {
 			results = append(results, CheckResult{
@@ -318,6 +330,49 @@ func CheckRoles(cfgValue cue.Value) SectionResult {
 	return section
 }
 
+// CheckTasks validates configured task files exist.
+func CheckTasks(cfgValue cue.Value) SectionResult {
+	section := SectionResult{Name: "Tasks"}
+
+	tasks := cfgValue.LookupPath(cue.ParsePath(internalcue.KeyTasks))
+	if !tasks.Exists() {
+		section.Results = append(section.Results, CheckResult{
+			Status:  StatusInfo,
+			Label:   "None configured",
+			Message: "",
+		})
+		return section
+	}
+
+	iter, err := tasks.Fields()
+	if err != nil {
+		section.Results = append(section.Results, CheckResult{
+			Status:  StatusFail,
+			Label:   "Error",
+			Message: fmt.Sprintf("Cannot read tasks: %v", err),
+		})
+		return section
+	}
+
+	count := 0
+	for iter.Next() {
+		count++
+		name := iter.Selector().Unquoted()
+		task := iter.Value()
+
+		result := checkFileField(task, name)
+		if result != nil {
+			section.Results = append(section.Results, *result)
+		}
+	}
+
+	if count > 0 {
+		section.Summary = fmt.Sprintf("%d configured", count)
+	}
+
+	return section
+}
+
 // checkFileField checks if a config item has a valid file field.
 func checkFileField(v cue.Value, name string) *CheckResult {
 	fileVal := v.LookupPath(cue.ParsePath("file"))
@@ -350,6 +405,15 @@ func checkFileField(v cue.Value, name string) *CheckResult {
 			Status:  StatusWarn,
 			Label:   name,
 			Message: "Invalid file field",
+		}
+	}
+
+	// @module/ paths are resolved at runtime via the CUE module cache
+	if strings.HasPrefix(filePath, "@module/") {
+		return &CheckResult{
+			Status:  StatusPass,
+			Label:   name,
+			Message: "(registry module)",
 		}
 	}
 

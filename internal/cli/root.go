@@ -11,6 +11,18 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// IsSilentError returns true if the error should not be printed to stderr.
+// Used by main.go to suppress output for errors that only set the exit code.
+func IsSilentError(err error) bool {
+	type silent interface {
+		Silent() bool
+	}
+	if s, ok := err.(silent); ok {
+		return s.Silent()
+	}
+	return false
+}
+
 // Version information set via ldflags at build time
 var (
 	cliVersion = "dev"
