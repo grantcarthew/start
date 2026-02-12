@@ -3,6 +3,7 @@ package doctor
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"cuelang.org/go/cue/cuecontext"
@@ -33,11 +34,12 @@ func TestCheckIntro(t *testing.T) {
 func TestCheckVersion(t *testing.T) {
 	t.Parallel()
 	info := BuildInfo{
-		Version:   "v1.0.0",
-		Commit:    "abc123",
-		BuildDate: "2025-01-01",
-		GoVersion: "go1.23.0",
-		Platform:  "linux/amd64",
+		Version:      "v1.0.0",
+		Commit:       "abc123",
+		BuildDate:    "2025-01-01",
+		GoVersion:    "go1.23.0",
+		Platform:     "linux/amd64",
+		IndexVersion: "v0.3.2",
 	}
 
 	section := CheckVersion(info)
@@ -48,13 +50,50 @@ func TestCheckVersion(t *testing.T) {
 	if !section.NoIcons {
 		t.Error("CheckVersion().NoIcons should be true")
 	}
-	if len(section.Results) != 5 {
-		t.Fatalf("CheckVersion() should have 5 results, got %d", len(section.Results))
+	if len(section.Results) != 6 {
+		t.Fatalf("CheckVersion() should have 6 results, got %d", len(section.Results))
 	}
 
 	// Check version label includes version
 	if section.Results[0].Label != "start v1.0.0" {
 		t.Errorf("Version label = %q, want %q", section.Results[0].Label, "start v1.0.0")
+	}
+
+	// Check index version
+	indexResult := section.Results[5]
+	if indexResult.Label != "Index" {
+		t.Errorf("Index label = %q, want %q", indexResult.Label, "Index")
+	}
+	if indexResult.Message != "v0.3.2" {
+		t.Errorf("Index message = %q, want %q", indexResult.Message, "v0.3.2")
+	}
+	if indexResult.Status != StatusInfo {
+		t.Errorf("Index status = %v, want StatusInfo", indexResult.Status)
+	}
+}
+
+func TestCheckVersion_IndexUnavailable(t *testing.T) {
+	t.Parallel()
+	info := BuildInfo{
+		Version:   "v1.0.0",
+		Commit:    "abc123",
+		BuildDate: "2025-01-01",
+		GoVersion: "go1.23.0",
+		Platform:  "linux/amd64",
+	}
+
+	section := CheckVersion(info)
+
+	if len(section.Results) != 6 {
+		t.Fatalf("CheckVersion() should have 6 results, got %d", len(section.Results))
+	}
+
+	indexResult := section.Results[5]
+	if indexResult.Status != StatusWarn {
+		t.Errorf("Index status = %v, want StatusWarn", indexResult.Status)
+	}
+	if indexResult.Message != "unavailable" {
+		t.Errorf("Index message = %q, want %q", indexResult.Message, "unavailable")
 	}
 }
 
@@ -79,13 +118,13 @@ func TestCheckConfiguration_NoConfig(t *testing.T) {
 		t.Fatalf("CheckConfiguration() should have 2 results, got %d", len(section.Results))
 	}
 
-	// Both should be info status with "Not found" message
+	// Both should be info status with message containing "Not found"
 	for _, r := range section.Results {
 		if r.Status != StatusInfo {
 			t.Errorf("Result status should be StatusInfo, got %v", r.Status)
 		}
-		if r.Message != "Not found" {
-			t.Errorf("Result message should be 'Not found', got %q", r.Message)
+		if !strings.Contains(r.Message, "Not found") {
+			t.Errorf("Result message should contain 'Not found', got %q", r.Message)
 		}
 	}
 }
@@ -522,5 +561,99 @@ func TestCheckRoles_NoFileOrPrompt(t *testing.T) {
 	}
 	if section.Results[0].Message != "No file, prompt, or command" {
 		t.Errorf("message = %q, want %q", section.Results[0].Message, "No file, prompt, or command")
+	}
+}
+
+// --- CheckTasks tests ---
+
+func TestCheckTasks_NoneConfigured(t *testing.T) {
+	t.Parallel()
+	cctx := cuecontext.New()
+	v := cctx.CompileString("{}")
+
+	section := CheckTasks(v)
+
+	if section.Name != "Tasks" {
+		t.Errorf("Name = %q, want %q", section.Name, "Tasks")
+	}
+	if len(section.Results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(section.Results))
+	}
+	if section.Results[0].Label != "None configured" {
+		t.Errorf("label = %q, want %q", section.Results[0].Label, "None configured")
+	}
+}
+
+func TestCheckTasks_FileExists(t *testing.T) {
+	t.Parallel()
+	tmpFile := filepath.Join(t.TempDir(), "task.md")
+	if err := os.WriteFile(tmpFile, []byte("task content"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cctx := cuecontext.New()
+	v := cctx.CompileString(`tasks: { mytask: { file: "` + tmpFile + `" } }`)
+
+	section := CheckTasks(v)
+
+	if len(section.Results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(section.Results))
+	}
+	if section.Results[0].Status != StatusPass {
+		t.Errorf("status = %v, want StatusPass", section.Results[0].Status)
+	}
+	if section.Summary != "1 configured" {
+		t.Errorf("summary = %q, want %q", section.Summary, "1 configured")
+	}
+}
+
+func TestCheckTasks_InlinePrompt(t *testing.T) {
+	t.Parallel()
+	cctx := cuecontext.New()
+	v := cctx.CompileString(`tasks: { prompttask: { prompt: "Do the thing" } }`)
+
+	section := CheckTasks(v)
+
+	if len(section.Results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(section.Results))
+	}
+	if section.Results[0].Status != StatusPass {
+		t.Errorf("status = %v, want StatusPass", section.Results[0].Status)
+	}
+	if section.Results[0].Message != "(inline prompt)" {
+		t.Errorf("message = %q, want %q", section.Results[0].Message, "(inline prompt)")
+	}
+}
+
+func TestCheckTasks_ModulePath(t *testing.T) {
+	t.Parallel()
+	cctx := cuecontext.New()
+	v := cctx.CompileString(`tasks: { modtask: { file: "@module/task.md" } }`)
+
+	section := CheckTasks(v)
+
+	if len(section.Results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(section.Results))
+	}
+	if section.Results[0].Status != StatusPass {
+		t.Errorf("status = %v, want StatusPass", section.Results[0].Status)
+	}
+	if section.Results[0].Message != "(registry module)" {
+		t.Errorf("message = %q, want %q", section.Results[0].Message, "(registry module)")
+	}
+}
+
+func TestCheckTasks_FileMissing(t *testing.T) {
+	t.Parallel()
+	cctx := cuecontext.New()
+	v := cctx.CompileString(`tasks: { badtask: { file: "/nonexistent/path/task.md" } }`)
+
+	section := CheckTasks(v)
+
+	if len(section.Results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(section.Results))
+	}
+	if section.Results[0].Status != StatusFail {
+		t.Errorf("status = %v, want StatusFail", section.Results[0].Status)
 	}
 }

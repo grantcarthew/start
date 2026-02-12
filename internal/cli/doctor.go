@@ -1,9 +1,14 @@
 package cli
 
 import (
+	"context"
+	"strings"
+	"time"
+
 	"github.com/grantcarthew/start/internal/config"
 	internalcue "github.com/grantcarthew/start/internal/cue"
 	"github.com/grantcarthew/start/internal/doctor"
+	"github.com/grantcarthew/start/internal/registry"
 	"github.com/spf13/cobra"
 )
 
@@ -60,11 +65,13 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 }
 
 // errDoctorIssuesFound is returned when doctor finds issues.
+// It implements SilentError so main.go skips printing it.
 var errDoctorIssuesFound = &doctorError{}
 
 type doctorError struct{}
 
 func (e *doctorError) Error() string { return "issues found" }
+func (e *doctorError) Silent() bool  { return true }
 
 // prepareDoctor runs all checks and builds the report.
 func prepareDoctor() (doctor.Report, error) {
@@ -75,11 +82,12 @@ func prepareDoctor() (doctor.Report, error) {
 
 	// Version section
 	buildInfo := doctor.BuildInfo{
-		Version:   version,
-		Commit:    commit,
-		BuildDate: buildDate,
-		GoVersion: doctor.DefaultBuildInfo().GoVersion,
-		Platform:  doctor.DefaultBuildInfo().Platform,
+		Version:      version,
+		Commit:       commit,
+		BuildDate:    buildDate,
+		GoVersion:    doctor.DefaultBuildInfo().GoVersion,
+		Platform:     doctor.DefaultBuildInfo().Platform,
+		IndexVersion: resolveIndexVersion(),
 	}
 	report.Sections = append(report.Sections, doctor.CheckVersion(buildInfo))
 
@@ -141,8 +149,43 @@ func prepareDoctor() (doctor.Report, error) {
 		})
 	}
 
+	// Task checks
+	if cfgLoaded {
+		report.Sections = append(report.Sections, doctor.CheckTasks(cfgResult.Value))
+	} else {
+		report.Sections = append(report.Sections, doctor.SectionResult{
+			Name: "Tasks",
+			Results: []doctor.CheckResult{
+				{Status: doctor.StatusInfo, Label: "Skipped", Message: "no valid config"},
+			},
+		})
+	}
+
 	// Environment checks
 	report.Sections = append(report.Sections, doctor.CheckEnvironment(paths))
 
 	return report, nil
+}
+
+// resolveIndexVersion queries the registry for the latest index version.
+// Returns the version string (e.g., "v0.3.2") or empty string on failure.
+func resolveIndexVersion() string {
+	client, err := registry.NewClient()
+	if err != nil {
+		return ""
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	resolved, err := client.ResolveLatestVersion(ctx, registry.IndexModulePath)
+	if err != nil {
+		return ""
+	}
+
+	// Extract version from "github.com/.../index@v0.3.2"
+	if idx := strings.LastIndex(resolved, "@"); idx != -1 {
+		return resolved[idx+1:]
+	}
+	return ""
 }
