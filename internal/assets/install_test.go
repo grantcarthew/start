@@ -590,6 +590,7 @@ func TestWriteAssetToConfig(t *testing.T) {
 		assetContent    string
 		wantErr         bool
 		wantContains    []string
+		wantExcludes    []string
 	}{
 		{
 			name:         "new file",
@@ -644,11 +645,12 @@ contexts: {
 			},
 		},
 		{
-			name:         "duplicate asset",
+			name:         "duplicate asset updates in place",
 			existingFile: "contexts.cue",
 			existingContent: `contexts: {
 	"cwd/agents-md": {
-		origin: "test"
+		origin: "old-origin"
+		description: "Old description"
 	}
 }
 `,
@@ -657,9 +659,20 @@ contexts: {
 				Name:     "cwd/agents-md",
 			},
 			assetContent: `{
-	origin: "test"
+	origin: "new-origin"
+	description: "New description"
 }`,
-			wantErr: true,
+			wantErr: false,
+			wantContains: []string{
+				"contexts: {",
+				`"cwd/agents-md":`,
+				"new-origin",
+				"New description",
+			},
+			wantExcludes: []string{
+				"old-origin",
+				"Old description",
+			},
 		},
 	}
 
@@ -705,6 +718,11 @@ contexts: {
 			for _, want := range tt.wantContains {
 				if !strings.Contains(content, want) {
 					t.Errorf("writeAssetToConfig() result missing %q\nGot:\n%s", want, content)
+				}
+			}
+			for _, exclude := range tt.wantExcludes {
+				if strings.Contains(content, exclude) {
+					t.Errorf("writeAssetToConfig() result should not contain %q\nGot:\n%s", exclude, content)
 				}
 			}
 		})
@@ -1015,6 +1033,97 @@ func TestFormatAssetStruct_RoleNameOverride(t *testing.T) {
 				if strings.Contains(result, exclude) {
 					t.Errorf("result should not contain %q\nGot:\n%s", exclude, result)
 				}
+			}
+		})
+	}
+}
+
+// TestGetInstalledOrigin tests the GetInstalledOrigin function.
+func TestGetInstalledOrigin(t *testing.T) {
+	t.Parallel()
+
+	configDir := t.TempDir()
+
+	// Write a contexts.cue file with an asset that has an origin
+	contextsFile := filepath.Join(configDir, "contexts.cue")
+	content := `// start configuration
+contexts: {
+	"cwd/agents-md": {
+		origin: "github.com/test/contexts/cwd/agents-md@v0.1.0"
+		description: "Read AGENTS.md file"
+		file: "AGENTS.md"
+	}
+	"cwd/env": {
+		description: "No origin field"
+		file: ".env"
+	}
+}
+`
+	if err := os.WriteFile(contextsFile, []byte(content), 0644); err != nil {
+		t.Fatalf("Failed to write test file: %v", err)
+	}
+
+	tests := []struct {
+		name      string
+		category  string
+		assetName string
+		want      string
+	}{
+		{
+			name:      "asset with origin",
+			category:  "contexts",
+			assetName: "cwd/agents-md",
+			want:      "github.com/test/contexts/cwd/agents-md@v0.1.0",
+		},
+		{
+			name:      "asset without origin",
+			category:  "contexts",
+			assetName: "cwd/env",
+			want:      "",
+		},
+		{
+			name:      "non-existent asset",
+			category:  "contexts",
+			assetName: "does/not-exist",
+			want:      "",
+		},
+		{
+			name:      "non-existent config file",
+			category:  "roles",
+			assetName: "cwd/agents-md",
+			want:      "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := GetInstalledOrigin(configDir, tt.category, tt.assetName)
+			if got != tt.want {
+				t.Errorf("GetInstalledOrigin() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+// TestVersionFromOrigin tests the VersionFromOrigin function.
+func TestVersionFromOrigin(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		origin string
+		want   string
+	}{
+		{"github.com/test/asset@v0.1.1", "v0.1.1"},
+		{"github.com/test/asset@v0", "v0"},
+		{"no-version", ""},
+		{"", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.origin, func(t *testing.T) {
+			got := VersionFromOrigin(tt.origin)
+			if got != tt.want {
+				t.Errorf("VersionFromOrigin(%q) = %q, want %q", tt.origin, got, tt.want)
 			}
 		})
 	}

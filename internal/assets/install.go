@@ -22,7 +22,7 @@ import (
 // For tasks with role dependencies, the role is installed as a separate asset and the task
 // references it by name. The index parameter enables role dependency resolution; pass nil
 // to skip role dependency handling.
-// Returns an error if the asset is already installed or if any step fails.
+// If the asset is already installed, it is updated in place.
 func InstallAsset(ctx context.Context, client *registry.Client, index *registry.Index, selected SearchResult, configDir string) error {
 	// Ensure config directory exists
 	if err := os.MkdirAll(configDir, 0755); err != nil {
@@ -369,7 +369,72 @@ func ResolveRoleName(index *registry.Index, depPath string) (name string, entry 
 	return "", registry.IndexEntry{}, false
 }
 
+// GetInstalledOrigin reads the config file and returns the origin field value
+// for the named asset. Returns an empty string if the asset is not found or
+// has no origin field.
+func GetInstalledOrigin(configDir, category, name string) string {
+	configFile := assetTypeToConfigFile(category)
+	configPath := filepath.Join(configDir, configFile)
+
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return ""
+	}
+
+	content := string(data)
+	assetKey := getAssetKey(name)
+
+	// Find the asset key using context-aware search
+	keyStart, keyLen, err := FindAssetKey(content, assetKey)
+	if err != nil {
+		return ""
+	}
+
+	// Find the asset's opening brace
+	openBrace, err := FindOpeningBrace(content, keyStart+keyLen)
+	if err != nil {
+		return ""
+	}
+
+	// Find the matching closing brace
+	closeBrace, err := FindMatchingBrace(content, openBrace)
+	if err != nil {
+		return ""
+	}
+
+	// Extract the asset block and find the origin field using context-aware search
+	block := content[openBrace:closeBrace]
+	keyStart, keyLen, err = FindAssetKey(block, "origin")
+	if err != nil {
+		return ""
+	}
+
+	// Find the quoted value after "origin:"
+	rest := block[keyStart+keyLen:]
+	quoteStart := strings.IndexByte(rest, '"')
+	if quoteStart == -1 {
+		return ""
+	}
+	quoteEnd := strings.IndexByte(rest[quoteStart+1:], '"')
+	if quoteEnd == -1 {
+		return ""
+	}
+
+	return rest[quoteStart+1 : quoteStart+1+quoteEnd]
+}
+
+// VersionFromOrigin extracts the version string from an origin path.
+// For example, "github.com/test/asset@v0.1.1" returns "v0.1.1".
+// Returns an empty string if no version is found.
+func VersionFromOrigin(origin string) string {
+	if idx := strings.Index(origin, "@"); idx != -1 {
+		return origin[idx+1:]
+	}
+	return ""
+}
+
 // writeAssetToConfig writes the asset content to the config file.
+// If the asset already exists, it is updated in place (upsert).
 func writeAssetToConfig(configPath string, asset SearchResult, content, modulePath string) error {
 	// Read existing content if file exists
 	var existingContent string
@@ -379,10 +444,12 @@ func writeAssetToConfig(configPath string, asset SearchResult, content, modulePa
 
 	assetKey := getAssetKey(asset.Name)
 
-	// Check if already installed
-	if strings.Contains(existingContent, fmt.Sprintf("%q:", assetKey)) ||
-		strings.Contains(existingContent, assetKey+":") {
-		return fmt.Errorf("asset %q already installed", assetKey)
+	// If the asset already exists, update it in place rather than appending a duplicate
+	if existingContent != "" {
+		_, _, err := FindAssetKey(existingContent, assetKey)
+		if err == nil {
+			return UpdateAssetInConfig(configPath, asset.Category, asset.Name, content)
+		}
 	}
 
 	// Build new content

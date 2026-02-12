@@ -22,10 +22,11 @@ var (
 	colorBlue      = color.New(color.FgBlue)
 
 	// Asset category colours
-	colorAgents   = color.New(color.FgBlue)
-	colorRoles    = color.New(color.FgGreen)
-	colorContexts = color.New(color.FgCyan)
-	colorTasks    = color.New(color.FgHiYellow)
+	colorAgents    = color.New(color.FgBlue)
+	colorRoles     = color.New(color.FgGreen)
+	colorContexts  = color.New(color.FgCyan)
+	colorTasks     = color.New(color.FgHiYellow)
+	colorInstalled = color.New(color.FgHiGreen)
 )
 
 // categoryColor returns the colour for an asset category.
