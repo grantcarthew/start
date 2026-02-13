@@ -98,7 +98,6 @@ settings: {
 // Local
 settings: {
     default_agent: "gemini"
-    default_role: "reviewer"
 }
 
 // Result: Fields merge, same fields replaced
@@ -106,7 +105,6 @@ settings: {
     timeout: 120            // from global
     shell: "/bin/bash"      // from global
     default_agent: "gemini" // local overrides
-    default_role: "reviewer" // from local
 }
 ```
 

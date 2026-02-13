@@ -32,7 +32,6 @@ Each role specifies a prompt via inline text, file reference, or command.`,
 	addConfigRoleInfoCommand(roleCmd)
 	addConfigRoleEditCommand(roleCmd)
 	addConfigRoleRemoveCommand(roleCmd)
-	addConfigRoleDefaultCommand(roleCmd)
 	addConfigRoleOrderCommand(roleCmd)
 
 	parent.AddCommand(roleCmd)
@@ -78,12 +77,6 @@ func runConfigRoleList(cmd *cobra.Command, _ []string) error {
 		return nil
 	}
 
-	// Get default role
-	defaultRole := ""
-	if cfg, err := loadConfigForScope(local); err == nil {
-		defaultRole = getDefaultRoleFromConfig(cfg)
-	}
-
 	w := cmd.OutOrStdout()
 	_, _ = colorRoles.Fprint(w, "roles")
 	_, _ = fmt.Fprintln(w, "/")
@@ -91,22 +84,18 @@ func runConfigRoleList(cmd *cobra.Command, _ []string) error {
 
 	for _, name := range order {
 		role := roles[name]
-		marker := "  "
-		if name == defaultRole {
-			marker = colorInstalled.Sprint("→") + " "
-		}
 		source := role.Source
 		if role.Origin != "" {
 			source += ", registry"
 		}
 		if role.Description != "" {
-			_, _ = fmt.Fprintf(w, "%s%s ", marker, name)
+			_, _ = fmt.Fprintf(w, "  %s ", name)
 			_, _ = colorDim.Fprint(w, "- "+role.Description+" ")
 			_, _ = colorCyan.Fprint(w, "(")
 			_, _ = colorDim.Fprint(w, source)
 			_, _ = colorCyan.Fprintln(w, ")")
 		} else {
-			_, _ = fmt.Fprintf(w, "%s%s ", marker, name)
+			_, _ = fmt.Fprintf(w, "  %s ", name)
 			_, _ = colorCyan.Fprint(w, "(")
 			_, _ = colorDim.Fprint(w, source)
 			_, _ = colorCyan.Fprintln(w, ")")
@@ -694,122 +683,6 @@ func runConfigRoleRemove(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-// addConfigRoleDefaultCommand adds the default subcommand.
-func addConfigRoleDefaultCommand(parent *cobra.Command) {
-	defaultCmd := &cobra.Command{
-		Use:   "default [name]",
-		Short: "Set, show, or unset default role",
-		Long: `Set, show, or unset the default role.
-
-Without a name, shows the current default role.
-With a name, sets that role as the default.
-With --unset, removes the default role setting.`,
-		Args: cobra.MaximumNArgs(1),
-		RunE: runConfigRoleDefault,
-	}
-
-	defaultCmd.Flags().Bool("unset", false, "Remove the default role setting")
-
-	parent.AddCommand(defaultCmd)
-}
-
-// runConfigRoleDefault sets, shows, or unsets the default role.
-func runConfigRoleDefault(cmd *cobra.Command, args []string) error {
-	stdout := cmd.OutOrStdout()
-	local := getFlags(cmd).Local
-	unset, _ := cmd.Flags().GetBool("unset")
-
-	// Validate: --unset and name are mutually exclusive
-	if unset && len(args) > 0 {
-		return fmt.Errorf("cannot use --unset with a role name")
-	}
-
-	paths, err := config.ResolvePaths("")
-	if err != nil {
-		return fmt.Errorf("resolving config paths: %w", err)
-	}
-
-	var configDir string
-	if local {
-		configDir = paths.Local
-	} else {
-		configDir = paths.Global
-	}
-
-	// Unset default
-	if unset {
-		settings, _ := loadSettingsFromDir(configDir)
-		if settings == nil {
-			settings = make(map[string]string)
-		}
-		delete(settings, "default_role")
-
-		settingsPath := filepath.Join(configDir, "settings.cue")
-		if err := writeSettingsFile(settingsPath, settings); err != nil {
-			return fmt.Errorf("writing settings file: %w", err)
-		}
-
-		flags := getFlags(cmd)
-		if !flags.Quiet {
-			_, _ = fmt.Fprintln(stdout, "Unset default role")
-		}
-		return nil
-	}
-
-	// Show current default
-	if len(args) == 0 {
-		cfg, err := loadConfigForScope(local)
-		if err != nil {
-			_, _ = fmt.Fprintln(stdout, "No default role set.")
-			return nil
-		}
-		defaultRole := getDefaultRoleFromConfig(cfg)
-		if defaultRole == "" {
-			_, _ = fmt.Fprintln(stdout, "No default role set.")
-		} else {
-			_, _ = fmt.Fprintf(stdout, "Default role: %s\n", defaultRole)
-		}
-		return nil
-	}
-
-	// Set default
-	name := args[0]
-
-	// Verify role exists
-	roles, _, err := loadRolesForScope(local)
-	if err != nil {
-		return err
-	}
-	resolvedName, _, err := resolveInstalledName(roles, "role", name)
-	if err != nil {
-		return err
-	}
-
-	// Ensure directory exists
-	if err := os.MkdirAll(configDir, 0755); err != nil {
-		return fmt.Errorf("creating config directory: %w", err)
-	}
-
-	// Load existing settings, set default_role, write back
-	settings, _ := loadSettingsFromDir(configDir)
-	if settings == nil {
-		settings = make(map[string]string)
-	}
-	settings["default_role"] = resolvedName
-
-	settingsPath := filepath.Join(configDir, "settings.cue")
-	if err := writeSettingsFile(settingsPath, settings); err != nil {
-		return fmt.Errorf("writing settings file: %w", err)
-	}
-
-	flags := getFlags(cmd)
-	if !flags.Quiet {
-		_, _ = fmt.Fprintf(stdout, "Set default role to %q\n", resolvedName)
-	}
-
-	return nil
-}
-
 // RoleConfig represents a role configuration for editing.
 type RoleConfig struct {
 	Name        string
@@ -1016,15 +889,5 @@ func writeRolesFile(path string, roles map[string]RoleConfig, order []string) er
 	sb.WriteString("}\n")
 
 	return os.WriteFile(path, []byte(sb.String()), 0644)
-}
-
-// getDefaultRoleFromConfig extracts default_role from config value.
-func getDefaultRoleFromConfig(cfg cue.Value) string {
-	val := cfg.LookupPath(cue.ParsePath("settings.default_role"))
-	if val.Exists() {
-		s, _ := val.String()
-		return s
-	}
-	return ""
 }
 

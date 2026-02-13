@@ -17,6 +17,11 @@ import (
 func setupStartTestConfig(t *testing.T) string {
 	t.Helper()
 	tmpDir := t.TempDir()
+
+	// Isolate from global config
+	t.Setenv("HOME", tmpDir)
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
 	configDir := filepath.Join(tmpDir, ".start")
 	if err := os.MkdirAll(configDir, 0755); err != nil {
 		t.Fatalf("creating config dir: %v", err)
@@ -56,14 +61,13 @@ tasks: {
 		role: "assistant"
 		prompt: """
 			Test task prompt.
-			Instructions: {{.Instructions}}
+			Instructions: {{.instructions}}
 			"""
 	}
 }
 
 settings: {
 	default_agent: "echo"
-	default_role: "assistant"
 }
 `
 	configFile := filepath.Join(configDir, "settings.cue")

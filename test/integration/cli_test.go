@@ -63,7 +63,7 @@ tasks: {
 		role: "reviewer"
 		prompt: """
 			Review the code.
-			Instructions: {{.Instructions}}
+			Instructions: {{.instructions}}
 			"""
 	}
 	"simple-task": {
@@ -73,7 +73,6 @@ tasks: {
 
 settings: {
 	default_agent: "echo"
-	default_role: "assistant"
 }
 `
 	configFile := filepath.Join(configDir, "settings.cue")

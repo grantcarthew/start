@@ -111,8 +111,7 @@ Select (1-20):
 4. Select role
    - `--role` flag if provided
    - Else task's `role` field (required for packaged tasks)
-   - Else `default_role` from config
-   - Else first role in config
+   - Else first role in config (definition order, skipping optional roles with missing files)
 
 5. Select contexts
    - Required contexts only (same as `start prompt`)

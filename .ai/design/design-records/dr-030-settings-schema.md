@@ -48,7 +48,6 @@ CLI management:
 ```cue
 #Settings: {
     default_agent?: string & !=""
-    default_role?:  string & !=""
     shell?:         string & !=""
     timeout?:       int & >0
 }
@@ -59,7 +58,6 @@ All fields are optional. Schema is closed (no unknown fields).
 | Field | Type | Description |
 |-------|------|-------------|
 | `default_agent` | string | Agent when `--agent` not specified |
-| `default_role` | string | Role when `--role` not specified |
 | `shell` | string | Shell for command execution (default: auto-detect) |
 | `timeout` | int | Command timeout in seconds |
 
@@ -78,11 +76,11 @@ The `edit` keyword is reserved and cannot be used as a setting name.
 
 To clear a setting, set to empty string or use `edit`.
 
-The existing `start config agent default` and `start config role default` subcommands remain unchanged. Both approaches work:
+The existing `start config agent default` subcommand remains unchanged. Both approaches work:
 
 ```bash
-start config agent default claude        # Via agent command
-start config settings default_agent claude  # Via settings command
+start config agent default claude          # Via agent command
+start config settings default_agent claude # Via settings command
 ```
 
 ## Trade-offs
@@ -91,7 +89,7 @@ Accept:
 
 - Breaking change for existing users (must rename config.cue)
 - `edit` is a reserved keyword
-- Two ways to set default_agent/default_role
+- Two ways to set default_agent
 
 Gain:
 
@@ -128,4 +126,4 @@ mv .start/config.cue .start/settings.cue
 
 ## Updates
 
-None yet.
+2026-02-13: Removed `default_role` field (GitHub issue #36). Role resolution uses definition order with `start config role reorder` to control the default. The `default_role` setting was redundant and strictly less capable than the definition-order fallback chain (it bypassed optional role skipping).

@@ -1161,7 +1161,7 @@ agents: {
 	stdout := &bytes.Buffer{}
 	cmd.SetOut(stdout)
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"config", "settings", "default_role", "dev"})
+	cmd.SetArgs([]string{"config", "settings", "default_agent", "gemini"})
 
 	err = cmd.Execute()
 	if err == nil {

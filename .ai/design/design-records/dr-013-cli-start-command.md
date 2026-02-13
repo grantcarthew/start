@@ -52,8 +52,7 @@ Flexible when needed:
 
 3. Select role
    - `--role` flag if provided
-   - Else `default_role` from config
-   - Else first role in config (definition order)
+   - Else first role in config (definition order, skipping optional roles with missing files)
 
 4. Select contexts
    - If `--context` flag provided: required + tagged contexts

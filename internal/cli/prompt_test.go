@@ -72,7 +72,6 @@ contexts: {
 
 settings: {
 	default_agent: "echo"
-	default_role: "assistant"
 }
 `
 	configFile := filepath.Join(configDir, "settings.cue")

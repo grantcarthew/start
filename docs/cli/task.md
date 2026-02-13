@@ -39,7 +39,7 @@ start task ~/prompts/analyze.md "Focus on security"
 
 ## Instructions
 
-Instructions are passed to task templates via the `{{.Instructions}}` placeholder. This allows tasks to be parameterised:
+Instructions are passed to task templates via the `{{.instructions}}` placeholder. This allows tasks to be parameterised:
 
 ```bash
 # Code review with specific focus
