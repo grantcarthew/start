@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -71,8 +70,16 @@ func runAssetsList(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("loading configuration: %w", err)
 	}
 
+	// Load local config separately for scope detection
+	var localCfg cue.Value
+	if paths.LocalExists {
+		if v, loadErr := loader.LoadSingle(paths.Local); loadErr == nil {
+			localCfg = v
+		}
+	}
+
 	// Collect installed assets from config
-	installed := collectInstalledAssets(cfg.Value, paths)
+	installed := collectInstalledAssets(cfg.Value, paths, localCfg)
 
 	if len(installed) == 0 {
 		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "No assets installed from registry.")
@@ -112,7 +119,7 @@ func runAssetsList(cmd *cobra.Command, args []string) error {
 }
 
 // collectInstalledAssets extracts installed assets from the config.
-func collectInstalledAssets(v cue.Value, paths config.Paths) []InstalledAsset {
+func collectInstalledAssets(v cue.Value, paths config.Paths, localCfg cue.Value) []InstalledAsset {
 	var installed []InstalledAsset
 
 	categories := []string{"agents", "roles", "tasks", "contexts"}
@@ -150,7 +157,7 @@ func collectInstalledAssets(v cue.Value, paths config.Paths) []InstalledAsset {
 				installedVer = origin[idx+1:]
 			}
 
-			scope, configFile := determineScopeAndFile(paths, cat, name)
+			scope, configFile := determineScopeAndFile(localCfg, paths, cat, name)
 			asset := InstalledAsset{
 				Category:     cat,
 				Name:         name,
@@ -176,44 +183,17 @@ func collectInstalledAssets(v cue.Value, paths config.Paths) []InstalledAsset {
 
 // determineScopeAndFile determines whether an asset is from global or local config
 // and returns the path to the config file.
-func determineScopeAndFile(paths config.Paths, category, name string) (scope, configFile string) {
+func determineScopeAndFile(localCfg cue.Value, paths config.Paths, category, name string) (scope, configFile string) {
 	configFileName := assetTypeToConfigFile(category)
-	assetKey := getAssetKey(name)
 
 	// Check local first (takes precedence)
-	if paths.LocalExists {
-		localFile := filepath.Join(paths.Local, configFileName)
-		if fileContainsAsset(localFile, assetKey) {
-			return "local", localFile
-		}
+	if paths.LocalExists && assets.AssetExists(localCfg, category, name) {
+		return "local", filepath.Join(paths.Local, configFileName)
 	}
 
-	// Check global
-	globalFile := filepath.Join(paths.Global, configFileName)
-	if fileContainsAsset(globalFile, assetKey) {
-		return "global", globalFile
-	}
-
-	// Default to global if not found
-	// NOTE: This shouldn't happen for valid assets from collectInstalledAssets,
-	// since they came from CUE evaluation of these same files. But we return
-	// a sensible default rather than erroring, as the caller may use this for
-	// informational purposes (e.g., display to user).
-	return "global", globalFile
-}
-
-// fileContainsAsset checks if a config file contains an asset key.
-// Uses context-aware search (via findAssetKey) to avoid false positives from
-// comments and strings. Returns false if file doesn't exist or can't be read.
-func fileContainsAsset(filePath, assetKey string) bool {
-	data, err := os.ReadFile(filePath)
-	if err != nil {
-		return false
-	}
-	content := string(data)
-	// Use context-aware search (ignores keys in comments/strings)
-	_, _, err = findAssetKey(content, assetKey)
-	return err == nil
+	// Default to global. Assets from collectInstalledAssets came from CUE evaluation
+	// of these same files, so this fallback is for informational display purposes.
+	return "global", filepath.Join(paths.Global, configFileName)
 }
 
 // checkForUpdates checks registry for available updates.
@@ -344,9 +324,4 @@ func assetTypeToConfigFile(category string) string {
 // getAssetKey returns the asset key name for use in config.
 func getAssetKey(name string) string {
 	return name
-}
-
-// findAssetKey finds the position of an asset key in CUE content.
-func findAssetKey(content, assetKey string) (keyStart, keyLen int, err error) {
-	return assets.FindAssetKey(content, assetKey)
 }

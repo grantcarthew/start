@@ -6,6 +6,7 @@ import (
 	"io"
 	"strings"
 
+	"cuelang.org/go/cue"
 	"github.com/grantcarthew/start/internal/assets"
 	"github.com/grantcarthew/start/internal/config"
 	internalcue "github.com/grantcarthew/start/internal/cue"
@@ -94,7 +95,14 @@ func collectInstalledNames() map[string]bool {
 		return nil
 	}
 
-	installedAssets := collectInstalledAssets(cfg.Value, paths)
+	var localCfg cue.Value
+	if paths.LocalExists {
+		if v, loadErr := loader.LoadSingle(paths.Local); loadErr == nil {
+			localCfg = v
+		}
+	}
+
+	installedAssets := collectInstalledAssets(cfg.Value, paths, localCfg)
 	names := make(map[string]bool, len(installedAssets))
 	for _, a := range installedAssets {
 		names[a.Category+"/"+a.Name] = true

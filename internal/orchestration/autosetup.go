@@ -424,9 +424,22 @@ func (a *AutoSetup) installDefaultAssets(ctx context.Context, client *registry.C
 		{category: "contexts", name: "cwd/agents-md"},
 	}
 
+	// Load CUE config once for existence checks.
+	// On error with no CUE files (fresh install), cfg is a zero-value cue.Value;
+	// LookupPath on it returns non-existent, so AssetExists correctly returns false.
+	loader := internalcue.NewLoader()
+	cfg, err := loader.LoadSingle(configDir)
+	if err != nil {
+		if matches, _ := filepath.Glob(filepath.Join(configDir, "*.cue")); len(matches) > 0 {
+			_, _ = fmt.Fprintf(a.stderr, "Warning: invalid config in %s:\n%s\n",
+				configDir, internalcue.IdentifyBrokenFiles(matches))
+			return
+		}
+	}
+
 	for _, asset := range defaultAssets {
 		// Check if already installed (skip silently)
-		if assets.AssetExists(configDir, asset.category, asset.name) {
+		if assets.AssetExists(cfg, asset.category, asset.name) {
 			continue
 		}
 

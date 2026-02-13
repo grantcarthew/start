@@ -6,6 +6,7 @@ import (
 	"io"
 	"strings"
 
+	"cuelang.org/go/cue"
 	"github.com/grantcarthew/start/internal/assets"
 	"github.com/grantcarthew/start/internal/config"
 	internalcue "github.com/grantcarthew/start/internal/cue"
@@ -95,8 +96,16 @@ func checkIfInstalled(asset assets.SearchResult) (bool, string) {
 		return false, ""
 	}
 
+	// Load local config separately for scope detection
+	var localCfg cue.Value
+	if paths.LocalExists {
+		if v, loadErr := loader.LoadSingle(paths.Local); loadErr == nil {
+			localCfg = v
+		}
+	}
+
 	// Check if asset exists in config
-	installed := collectInstalledAssets(cfg.Value, paths)
+	installed := collectInstalledAssets(cfg.Value, paths, localCfg)
 	for _, a := range installed {
 		if a.Category == asset.Category && a.Name == asset.Name {
 			return true, a.Scope
