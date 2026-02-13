@@ -123,7 +123,7 @@ func resolveAgentName(cfg internalcue.LoadResult, flags *Flags, stdout io.Writer
 		name := choices[0].Name
 		debugf(flags, "agent", "Selected %q (first agent, non-TTY)", name)
 		if !flags.Quiet {
-			_, _ = fmt.Fprintf(stdout, "Using agent %q (set default_agent or use --agent to specify)\n", name)
+			_, _ = fmt.Fprintf(stdout, "Using agent %q %s%s%s\n", name, colorCyan.Sprint("("), colorDim.Sprint("set default_agent or use --agent to specify"), colorCyan.Sprint(")"))
 		}
 		return name, nil
 	}
@@ -230,7 +230,7 @@ func promptAgentSelection(w io.Writer, reader *bufio.Reader, choices []agentChoi
 	}
 
 	_, _ = fmt.Fprintln(w)
-	_, _ = fmt.Fprintf(w, "Select (1-%d): ", len(choices))
+	_, _ = fmt.Fprintf(w, "Select %s%s%s: ", colorCyan.Sprint("("), colorDim.Sprintf("1-%d", len(choices)), colorCyan.Sprint(")"))
 
 	input, err := reader.ReadString('\n')
 	if err != nil {

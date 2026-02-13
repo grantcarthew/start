@@ -227,7 +227,7 @@ func runConfigTaskAdd(cmd *cobra.Command, _ []string) error {
 				return err
 			}
 		case "3":
-			prompt, err = promptString(stdout, stdin, "Prompt text", "")
+			prompt, err = promptText(stdout, stdin, "Prompt text", "")
 			if err != nil {
 				return err
 			}
@@ -553,7 +553,7 @@ func runConfigTaskEdit(cmd *cobra.Command, args []string) error {
 		_, _ = fmt.Fprintln(stdout, "  1. File path")
 		_, _ = fmt.Fprintln(stdout, "  2. Command")
 		_, _ = fmt.Fprintln(stdout, "  3. Inline prompt")
-		_, _ = fmt.Fprint(stdout, "Choice [3]: ")
+		_, _ = fmt.Fprintf(stdout, "Choice %s%s%s: ", colorCyan.Sprint("["), colorDim.Sprint("3"), colorCyan.Sprint("]"))
 
 		choice, err := reader.ReadString('\n')
 		if err != nil {
@@ -576,7 +576,7 @@ func runConfigTaskEdit(cmd *cobra.Command, args []string) error {
 				return err
 			}
 		case "3":
-			newPrompt, err = promptString(stdout, stdin, "Prompt text", "")
+			newPrompt, err = promptText(stdout, stdin, "Prompt text", task.Prompt)
 			if err != nil {
 				return err
 			}

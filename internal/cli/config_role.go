@@ -232,7 +232,7 @@ func runConfigRoleAdd(cmd *cobra.Command, _ []string) error {
 				return err
 			}
 		case "3":
-			prompt, err = promptString(stdout, stdin, "Prompt text", "")
+			prompt, err = promptText(stdout, stdin, "Prompt text", "")
 			if err != nil {
 				return err
 			}
@@ -569,7 +569,7 @@ func runConfigRoleEdit(cmd *cobra.Command, args []string) error {
 				return err
 			}
 		case "3":
-			newPrompt, err = promptString(stdout, stdin, "Prompt text", "")
+			newPrompt, err = promptText(stdout, stdin, "Prompt text", role.Prompt)
 			if err != nil {
 				return err
 			}
@@ -1001,14 +1001,4 @@ func writeDefaultRoleSetting(path string, roleName string) error {
 	sb.WriteString("}\n")
 
 	return os.WriteFile(path, []byte(sb.String()), 0644)
-}
-
-// truncatePrompt truncates a prompt for display.
-func truncatePrompt(s string, max int) string {
-	// Replace newlines with spaces
-	s = strings.ReplaceAll(s, "\n", " ")
-	if len(s) <= max {
-		return s
-	}
-	return s[:max-3] + "..."
 }

@@ -287,7 +287,7 @@ func runReorderLoop(w io.Writer, r io.Reader, heading string, order []string, fo
 		}
 
 		if num < 1 || num > len(current) {
-			_, _ = fmt.Fprintf(w, "Invalid number: %d (must be 1-%d)\n", num, len(current))
+			_, _ = fmt.Fprintf(w, "Invalid number: %d %s%s%s\n", num, colorCyan.Sprint("("), colorDim.Sprintf("must be 1-%d", len(current)), colorCyan.Sprint(")"))
 			continue
 		}
 
