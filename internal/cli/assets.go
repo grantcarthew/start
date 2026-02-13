@@ -26,6 +26,7 @@ Use these commands to discover, install, and update assets.`,
 
 	// Add subcommands
 	addAssetsBrowseCommand(assetsCmd)
+	addAssetsIndexCommand(assetsCmd)
 	addAssetsSearchCommand(assetsCmd)
 	addAssetsAddCommand(assetsCmd)
 	addAssetsListCommand(assetsCmd)

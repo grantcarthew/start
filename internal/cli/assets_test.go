@@ -360,7 +360,7 @@ func TestAssetsCommandExists(t *testing.T) {
 	}
 
 	// Check subcommands
-	subcommands := []string{"browse", "search", "add", "list", "info", "update"}
+	subcommands := []string{"browse", "index", "search", "add", "list", "info", "update"}
 	for _, name := range subcommands {
 		found := false
 		for _, c := range assetsCmd.Commands() {
@@ -372,6 +372,149 @@ func TestAssetsCommandExists(t *testing.T) {
 		if !found {
 			t.Errorf("subcommand %q not found", name)
 		}
+	}
+}
+
+// TestPrintIndex tests the printIndex function.
+func TestPrintIndex(t *testing.T) {
+	t.Parallel()
+	index := &registry.Index{
+		Agents: map[string]registry.IndexEntry{
+			"ai/claude": {
+				Module:      "github.com/test/agents/ai/claude@v0",
+				Description: "Claude by Anthropic",
+				Tags:        []string{"anthropic", "ai", "llm"},
+			},
+			"ai/gemini": {
+				Module:      "github.com/test/agents/ai/gemini@v0",
+				Description: "Gemini by Google",
+				Tags:        []string{"google", "ai"},
+			},
+		},
+		Roles: map[string]registry.IndexEntry{
+			"golang/assistant": {
+				Module:      "github.com/test/roles/golang/assistant@v0",
+				Description: "Go programming expert",
+				Tags:        []string{"golang"},
+			},
+		},
+		Tasks:    map[string]registry.IndexEntry{},
+		Contexts: map[string]registry.IndexEntry{},
+	}
+
+	t.Run("default output", func(t *testing.T) {
+		var buf bytes.Buffer
+		printIndex(&buf, index, "v0.2.3", false, nil)
+		output := buf.String()
+
+		if !strings.Contains(output, "Index: v0.2.3 (3 assets)") {
+			t.Errorf("output missing header, got: %s", output)
+		}
+		if !strings.Contains(output, "agents/") {
+			t.Errorf("output missing agents category, got: %s", output)
+		}
+		if !strings.Contains(output, "roles/") {
+			t.Errorf("output missing roles category, got: %s", output)
+		}
+		if !strings.Contains(output, "ai/claude") {
+			t.Errorf("output missing ai/claude, got: %s", output)
+		}
+		if !strings.Contains(output, "ai/gemini") {
+			t.Errorf("output missing ai/gemini, got: %s", output)
+		}
+		if !strings.Contains(output, "golang/assistant") {
+			t.Errorf("output missing golang/assistant, got: %s", output)
+		}
+		// Verify alphabetical ordering: ai/claude before ai/gemini
+		claudeIdx := strings.Index(output, "ai/claude")
+		geminiIdx := strings.Index(output, "ai/gemini")
+		if claudeIdx > geminiIdx {
+			t.Errorf("ai/claude should appear before ai/gemini, got claude at %d, gemini at %d", claudeIdx, geminiIdx)
+		}
+	})
+
+	t.Run("verbose output", func(t *testing.T) {
+		var buf bytes.Buffer
+		printIndex(&buf, index, "v0.2.3", true, nil)
+		output := buf.String()
+
+		if !strings.Contains(output, "Module:") {
+			t.Errorf("verbose output missing Module, got: %s", output)
+		}
+		if !strings.Contains(output, "Tags:") {
+			t.Errorf("verbose output missing Tags, got: %s", output)
+		}
+	})
+
+	t.Run("installed marker", func(t *testing.T) {
+		var buf bytes.Buffer
+		installed := map[string]bool{
+			"agents/ai/claude": true,
+		}
+		printIndex(&buf, index, "v0.2.3", false, installed)
+		output := buf.String()
+
+		if !strings.Contains(output, "★") {
+			t.Errorf("output missing installed marker, got: %s", output)
+		}
+	})
+
+	t.Run("category count", func(t *testing.T) {
+		var buf bytes.Buffer
+		printIndex(&buf, index, "v0.2.3", false, nil)
+		output := buf.String()
+
+		if !strings.Contains(output, "(2)") {
+			t.Errorf("output missing agents count (2), got: %s", output)
+		}
+		if !strings.Contains(output, "(1)") {
+			t.Errorf("output missing roles count (1), got: %s", output)
+		}
+	})
+}
+
+// TestAssetsIndexCommandExists tests that the index command is properly registered.
+func TestAssetsIndexCommandExists(t *testing.T) {
+	t.Parallel()
+	cmd := NewRootCmd()
+
+	// Find assets command
+	var assetsCmd *cobra.Command
+	for _, c := range cmd.Commands() {
+		if c.Use == "assets" {
+			assetsCmd = c
+			break
+		}
+	}
+	if assetsCmd == nil {
+		t.Fatal("assets command not found")
+	}
+
+	// Find index subcommand
+	var indexCmd *cobra.Command
+	for _, c := range assetsCmd.Commands() {
+		if c.Use == "index" {
+			indexCmd = c
+			break
+		}
+	}
+	if indexCmd == nil {
+		t.Fatal("index subcommand not found")
+	}
+
+	// Check alias
+	if len(indexCmd.Aliases) == 0 || indexCmd.Aliases[0] != "idx" {
+		t.Errorf("expected alias 'idx', got %v", indexCmd.Aliases)
+	}
+
+	// Check flags
+	jsonFlag := indexCmd.Flags().Lookup("json")
+	if jsonFlag == nil {
+		t.Error("--json flag not found")
+	}
+	rawFlag := indexCmd.Flags().Lookup("raw")
+	if rawFlag == nil {
+		t.Error("--raw flag not found")
 	}
 }
 
