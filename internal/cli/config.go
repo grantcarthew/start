@@ -22,8 +22,9 @@ func anyFlagChanged(cmd *cobra.Command, names ...string) bool {
 // addConfigCommand adds the config command group and its subcommands to the parent.
 func addConfigCommand(parent *cobra.Command) {
 	configCmd := &cobra.Command{
-		Use:   "config",
-		Short: "Manage start configuration",
+		Use:     "config",
+		GroupID: "commands",
+		Short:   "Manage start configuration",
 		Long: `Manage configuration for agents, roles, contexts, and tasks.
 
 Configuration can be stored globally (~/.config/start/) or locally (./.start/).

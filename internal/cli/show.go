@@ -25,6 +25,7 @@ func addShowCommand(parent *cobra.Command) {
 	showCmd := &cobra.Command{
 		Use:     "show",
 		Aliases: []string{"view"},
+		GroupID: "commands",
 		Short:   "Display resolved configuration content",
 		Long:  `Display resolved configuration content after UTD processing and config merging.`,
 		RunE:  runShow,

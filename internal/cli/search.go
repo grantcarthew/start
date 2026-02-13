@@ -25,9 +25,10 @@ type searchSection struct {
 // addSearchCommand adds the top-level search command.
 func addSearchCommand(parent *cobra.Command) {
 	searchCmd := &cobra.Command{
-		Use:   "search <query>...",
+		Use:     "search <query>...",
 		Aliases: []string{"find"},
-		Short: "Search configs and registry for assets",
+		GroupID: "commands",
+		Short:   "Search configs and registry for assets",
 		Long: `Search local config, global config, and the asset registry by keyword.
 
 Searches asset names, descriptions, and tags. Multiple words are combined

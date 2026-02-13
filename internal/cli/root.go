@@ -100,6 +100,12 @@ It manages prompt composition, context injection, and workflow automation.`,
 	// Set RunE on root command for `start` execution
 	cmd.RunE = runStart
 
+	// Define command groups for help output
+	cmd.AddGroup(
+		&cobra.Group{ID: "commands", Title: "Commands:"},
+		&cobra.Group{ID: "utilities", Title: "Utilities:"},
+	)
+
 	// Add subcommands
 	addShowCommand(cmd)
 	addPromptCommand(cmd)
@@ -109,6 +115,15 @@ It manages prompt composition, context injection, and workflow automation.`,
 	addSearchCommand(cmd)
 	addDoctorCommand(cmd)
 	addCompletionCommand(cmd)
+
+	// Move built-in help command into utilities group
+	cmd.InitDefaultHelpCmd()
+	for _, c := range cmd.Commands() {
+		if c.Name() == "help" {
+			c.GroupID = "utilities"
+			break
+		}
+	}
 
 	return cmd
 }
