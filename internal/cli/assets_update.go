@@ -282,4 +282,3 @@ func printUpdateResults(w io.Writer, results []UpdateResult, dryRun bool) {
 	}
 	_, _ = fmt.Fprintln(w)
 }
-

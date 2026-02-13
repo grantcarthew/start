@@ -27,8 +27,8 @@ func addShowCommand(parent *cobra.Command) {
 		Aliases: []string{"view"},
 		GroupID: "commands",
 		Short:   "Display resolved configuration content",
-		Long:  `Display resolved configuration content after UTD processing and config merging.`,
-		RunE:  runShow,
+		Long:    `Display resolved configuration content after UTD processing and config merging.`,
+		RunE:    runShow,
 	}
 
 	showRoleCmd := &cobra.Command{
@@ -645,4 +645,3 @@ func printPreview(w io.Writer, r ShowResult) {
 	}
 	PrintSeparator(w)
 }
-

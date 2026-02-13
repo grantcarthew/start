@@ -781,7 +781,6 @@ func TestUpdateAssetInConfig(t *testing.T) {
 	}
 }
 
-
 // TestFindOpeningBrace tests the assets.FindOpeningBrace function.
 func TestFindOpeningBrace(t *testing.T) {
 	t.Parallel()

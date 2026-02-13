@@ -120,7 +120,6 @@ func runConfigAgentList(cmd *cobra.Command, _ []string) error {
 		}
 	}
 
-
 	return nil
 }
 
@@ -1014,5 +1013,3 @@ func getDefaultAgentFromConfig(cfg cue.Value) string {
 	}
 	return ""
 }
-
-

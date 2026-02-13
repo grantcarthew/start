@@ -7,19 +7,19 @@ import (
 
 func TestResolveInstalledName(t *testing.T) {
 	items := map[string]string{
-		"cwd/dotai/create-role":          "Create a role",
-		"golang/review/architecture":     "Architecture review",
-		"golang/review/code":             "Code review",
-		"confluence/read-doc":            "Read Confluence doc",
-		"gitlab/review-pipeline":         "Review pipeline",
+		"cwd/dotai/create-role":      "Create a role",
+		"golang/review/architecture": "Architecture review",
+		"golang/review/code":         "Code review",
+		"confluence/read-doc":        "Read Confluence doc",
+		"gitlab/review-pipeline":     "Review pipeline",
 	}
 
 	tests := []struct {
-		name      string
-		query     string
-		wantKey   string
-		wantVal   string
-		wantErr   string
+		name    string
+		query   string
+		wantKey string
+		wantVal string
+		wantErr string
 	}{
 		{
 			name:    "exact match",
