@@ -483,7 +483,7 @@ func printExecutionInfo(w io.Writer, agent orchestration.Agent, model, modelSour
 	PrintSeparator(w)
 
 	PrintAgentModel(w, agent, model, modelSource)
-	PrintContextTable(w, result.Contexts)
+	PrintContextTable(w, result.Contexts, result.Selection)
 	PrintRoleTable(w, result.RoleResolutions)
 
 	_, _ = fmt.Fprintf(w, "Starting %s - awaiting response...\n", agent.Name)
@@ -495,7 +495,7 @@ func printDryRunSummary(w io.Writer, agent orchestration.Agent, model, modelSour
 	PrintSeparator(w)
 
 	PrintAgentModel(w, agent, model, modelSource)
-	PrintContextTable(w, result.Contexts)
+	PrintContextTable(w, result.Contexts, result.Selection)
 	PrintRoleTable(w, result.RoleResolutions)
 
 	// Show role preview
@@ -527,7 +527,7 @@ func printComposeError(w io.Writer, agent orchestration.Agent, result orchestrat
 	_, _ = fmt.Fprintf(w, " %s\n", agent.Name)
 	_, _ = fmt.Fprintln(w)
 
-	PrintContextTable(w, result.Contexts)
+	PrintContextTable(w, result.Contexts, result.Selection)
 
 	PrintRoleTable(w, result.RoleResolutions)
 }

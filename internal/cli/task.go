@@ -458,7 +458,7 @@ func printTaskExecutionInfo(w io.Writer, agent orchestration.Agent, model, model
 	PrintSeparator(w)
 
 	PrintAgentModel(w, agent, model, modelSource)
-	PrintContextTable(w, result.Contexts)
+	PrintContextTable(w, result.Contexts, result.Selection)
 	PrintRoleTable(w, result.RoleResolutions)
 
 	if taskResult.CommandExecuted {
@@ -479,7 +479,7 @@ func printTaskDryRunSummary(w io.Writer, agent orchestration.Agent, model, model
 	PrintSeparator(w)
 
 	PrintAgentModel(w, agent, model, modelSource)
-	PrintContextTable(w, result.Contexts)
+	PrintContextTable(w, result.Contexts, result.Selection)
 	PrintRoleTable(w, result.RoleResolutions)
 
 	if instructions != "" {

@@ -16,13 +16,14 @@ func TestComposer_Compose(t *testing.T) {
 	ctx := cuecontext.New()
 
 	tests := []struct {
-		name        string
-		config      string
-		selection   ContextSelection
-		customText  string
-		wantPrompt  string
-		wantCtxs    []string
-		wantWarning bool
+		name         string
+		config       string
+		selection    ContextSelection
+		customText   string
+		wantPrompt   string
+		wantCtxs     []string
+		wantStatuses map[string]string
+		wantWarning  bool
 	}{
 		{
 			name: "required contexts only",
@@ -42,8 +43,9 @@ func TestComposer_Compose(t *testing.T) {
 				IncludeRequired: true,
 				IncludeDefaults: false,
 			},
-			wantPrompt: "Environment info",
-			wantCtxs:   []string{"env"},
+			wantPrompt:   "Environment info",
+			wantCtxs:     []string{"env", "project"},
+			wantStatuses: map[string]string{"env": "loaded", "project": "skipped"},
 		},
 		{
 			name: "required and default contexts",
@@ -115,6 +117,33 @@ func TestComposer_Compose(t *testing.T) {
 			},
 			wantPrompt: "Environment\n\nProject\n\nDebug",
 			wantCtxs:   []string{"env", "project", "debug"},
+		},
+		{
+			name: "excluded defaults shown when tags specified",
+			config: `
+				contexts: {
+					env: {
+						required: true
+						prompt: "Environment"
+					}
+					project: {
+						default: true
+						prompt: "Project"
+					}
+					security: {
+						tags: ["security"]
+						prompt: "Security context"
+					}
+				}
+			`,
+			selection: ContextSelection{
+				IncludeRequired: true,
+				IncludeDefaults: true,
+				Tags:            []string{"security"},
+			},
+			wantPrompt:   "Environment\n\nSecurity context",
+			wantCtxs:     []string{"env", "security", "project"},
+			wantStatuses: map[string]string{"env": "loaded", "security": "loaded", "project": "skipped"},
 		},
 		{
 			name: "custom text appended",
@@ -255,6 +284,17 @@ func TestComposer_Compose(t *testing.T) {
 				for i, name := range tt.wantCtxs {
 					if gotCtxs[i] != name {
 						t.Errorf("Contexts[%d] = %q, want %q", i, gotCtxs[i], name)
+					}
+				}
+			}
+
+			// Check statuses
+			if tt.wantStatuses != nil {
+				for _, ctx := range result.Contexts {
+					if want, ok := tt.wantStatuses[ctx.Name]; ok {
+						if ctx.Status != want {
+							t.Errorf("Context %q Status = %q, want %q", ctx.Name, ctx.Status, want)
+						}
 					}
 				}
 			}

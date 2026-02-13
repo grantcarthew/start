@@ -30,6 +30,7 @@ type Context struct {
 	Default     bool
 	Tags        []string
 	File        string // Source file path (if file-based)
+	Status      string // "loaded", "skipped", "error"
 	Error       string // Error message if resolution failed
 }
 
@@ -110,6 +111,8 @@ type ComposeResult struct {
 	Prompt string
 	// Contexts is the list of contexts that were included.
 	Contexts []Context
+	// Selection is the context selection criteria used.
+	Selection ContextSelection
 	// Role is the resolved role content.
 	Role string
 	// RoleFile is the path to the role file (original for cwd files, temp for external/inline).
@@ -125,6 +128,7 @@ type ComposeResult struct {
 // Compose builds the final prompt from configuration.
 func (c *Composer) Compose(cfg cue.Value, selection ContextSelection, customText, instructions string) (ComposeResult, error) {
 	var result ComposeResult
+	result.Selection = selection
 	var promptParts []string
 	addedContexts := make(map[string]bool)
 
@@ -137,8 +141,10 @@ func (c *Composer) Compose(cfg cue.Value, selection ContextSelection, customText
 
 		resolved, err := c.resolveContext(cfg, ctx.Name)
 		if err != nil {
+			ctx.Status = "error"
 			ctx.Error = err.Error()
 		} else {
+			ctx.Status = "loaded"
 			ctx.Content = resolved.Content
 			if resolved.Content != "" {
 				promptParts = append(promptParts, strings.TrimRight(resolved.Content, "\n"))
@@ -181,8 +187,10 @@ func (c *Composer) Compose(cfg cue.Value, selection ContextSelection, customText
 			}
 			content, err := ReadFilePath(tag)
 			if err != nil {
+				ctx.Status = "error"
 				ctx.Error = err.Error()
 			} else {
+				ctx.Status = "loaded"
 				ctx.Content = content
 				if content != "" {
 					promptParts = append(promptParts, strings.TrimRight(content, "\n"))
@@ -219,6 +227,17 @@ func (c *Composer) Compose(cfg cue.Value, selection ContextSelection, customText
 	// Append custom text or task instructions
 	if customText != "" {
 		promptParts = append(promptParts, strings.TrimRight(customText, "\n"))
+	}
+
+	// Append excluded default contexts with "skipped" status for visibility.
+	// Get all default contexts and add any not already included.
+	defaultSelection := ContextSelection{IncludeDefaults: true}
+	allDefaults, _ := c.selectContexts(cfg, defaultSelection)
+	for _, ctx := range allDefaults {
+		if !addedContexts[ctx.Name] {
+			ctx.Status = "skipped"
+			result.Contexts = append(result.Contexts, ctx)
+		}
 	}
 
 	result.Prompt = strings.Join(promptParts, "\n\n")
