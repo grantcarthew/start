@@ -204,11 +204,11 @@ func runConfigRoleAdd(cmd *cobra.Command, _ []string) error {
 	}
 
 	if sourceCount == 0 && interactive {
-		_, _ = fmt.Fprintln(stdout, "\nContent source (choose one):")
+		_, _ = fmt.Fprintf(stdout, "\nContent source %s%s%s:\n", colorCyan.Sprint("("), colorDim.Sprint("choose one"), colorCyan.Sprint(")"))
 		_, _ = fmt.Fprintln(stdout, "  1. File path")
 		_, _ = fmt.Fprintln(stdout, "  2. Command")
 		_, _ = fmt.Fprintln(stdout, "  3. Inline prompt")
-		_, _ = fmt.Fprint(stdout, "Choice [1]: ")
+		_, _ = fmt.Fprintf(stdout, "Choice %s%s%s: ", colorCyan.Sprint("["), colorDim.Sprint("1"), colorCyan.Sprint("]"))
 
 		reader := bufio.NewReader(stdin)
 		choice, err := reader.ReadString('\n')
@@ -354,25 +354,39 @@ func runConfigRoleInfo(cmd *cobra.Command, args []string) error {
 	}
 
 	w := cmd.OutOrStdout()
-	_, _ = fmt.Fprintf(w, "Role: %s\n", name)
-	_, _ = fmt.Fprintln(w, strings.Repeat("─", 40))
-	_, _ = fmt.Fprintf(w, "Source: %s\n", role.Source)
+	_, _ = fmt.Fprintln(w)
+	_, _ = colorRoles.Fprint(w, "roles")
+	_, _ = fmt.Fprintf(w, "/%s\n", name)
+	PrintSeparator(w)
 
+	_, _ = colorDim.Fprint(w, "Source:")
+	_, _ = fmt.Fprintf(w, " %s\n", role.Source)
+	if role.Origin != "" {
+		_, _ = colorDim.Fprint(w, "Origin:")
+		_, _ = fmt.Fprintf(w, " %s\n", role.Origin)
+	}
 	if role.Description != "" {
-		_, _ = fmt.Fprintf(w, "Description: %s\n", role.Description)
+		_, _ = fmt.Fprintln(w)
+		_, _ = colorDim.Fprint(w, "Description:")
+		_, _ = fmt.Fprintf(w, " %s\n", role.Description)
 	}
 	if role.File != "" {
-		_, _ = fmt.Fprintf(w, "File: %s\n", role.File)
+		_, _ = colorDim.Fprint(w, "File:")
+		_, _ = fmt.Fprintf(w, " %s\n", role.File)
 	}
 	if role.Command != "" {
-		_, _ = fmt.Fprintf(w, "Command: %s\n", role.Command)
+		_, _ = colorDim.Fprint(w, "Command:")
+		_, _ = fmt.Fprintf(w, " %s\n", role.Command)
 	}
 	if role.Prompt != "" {
-		_, _ = fmt.Fprintf(w, "Prompt: %s\n", truncatePrompt(role.Prompt, 100))
+		_, _ = colorDim.Fprint(w, "Prompt:")
+		_, _ = fmt.Fprintf(w, " %s\n", truncatePrompt(role.Prompt, 100))
 	}
 	if len(role.Tags) > 0 {
-		_, _ = fmt.Fprintf(w, "Tags: %s\n", strings.Join(role.Tags, ", "))
+		_, _ = colorDim.Fprint(w, "Tags:")
+		_, _ = fmt.Fprintf(w, " %s\n", strings.Join(role.Tags, ", "))
 	}
+	PrintSeparator(w)
 
 	return nil
 }
@@ -491,7 +505,7 @@ func runConfigRoleEdit(cmd *cobra.Command, args []string) error {
 	}
 
 	// Prompt for each field with current value as default
-	_, _ = fmt.Fprintf(stdout, "Editing role %q (press Enter to keep current value)\n\n", name)
+	_, _ = fmt.Fprintf(stdout, "Editing role %q %s%s%s\n\n", name, colorCyan.Sprint("("), colorDim.Sprint("press Enter to keep current value"), colorCyan.Sprint(")"))
 
 	newDescription, err := promptString(stdout, stdin, "Description", role.Description)
 	if err != nil {
@@ -510,7 +524,7 @@ func runConfigRoleEdit(cmd *cobra.Command, args []string) error {
 		_, _ = fmt.Fprintf(stdout, "  Prompt: %s\n", truncatePrompt(role.Prompt, 50))
 	}
 
-	_, _ = fmt.Fprint(stdout, "Keep current? [Y/n] ")
+	_, _ = fmt.Fprintf(stdout, "Keep current? %s%s%s ", colorCyan.Sprint("["), colorDim.Sprint("Y/n"), colorCyan.Sprint("]"))
 	reader := bufio.NewReader(stdin)
 	input, err := reader.ReadString('\n')
 	if err != nil {
@@ -532,7 +546,7 @@ func runConfigRoleEdit(cmd *cobra.Command, args []string) error {
 		_, _ = fmt.Fprintln(stdout, "  1. File path")
 		_, _ = fmt.Fprintln(stdout, "  2. Command")
 		_, _ = fmt.Fprintln(stdout, "  3. Inline prompt")
-		_, _ = fmt.Fprint(stdout, "Choice [1]: ")
+		_, _ = fmt.Fprintf(stdout, "Choice %s%s%s: ", colorCyan.Sprint("["), colorDim.Sprint("1"), colorCyan.Sprint("]"))
 
 		choice, err := reader.ReadString('\n')
 		if err != nil {
@@ -642,7 +656,7 @@ func runConfigRoleRemove(cmd *cobra.Command, args []string) error {
 		}
 
 		if isTTY {
-			_, _ = fmt.Fprintf(stdout, "Remove role %q from %s config? [y/N] ", name, scopeString(local))
+			_, _ = fmt.Fprintf(stdout, "Remove role %q from %s config? %s%s%s ", name, scopeString(local), colorCyan.Sprint("["), colorDim.Sprint("y/N"), colorCyan.Sprint("]"))
 			reader := bufio.NewReader(stdin)
 			input, err := reader.ReadString('\n')
 			if err != nil {

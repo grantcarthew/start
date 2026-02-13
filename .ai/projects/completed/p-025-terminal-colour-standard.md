@@ -110,60 +110,60 @@ Review each command by running it, checking output against DR-042, adjusting cod
 ### Config Agent
 
 - [x] `./start config agent list`
-- [ ] `./start config agent info <name>`
-- [ ] `./start config agent add` (interactive)
-- [ ] `./start config agent edit <name>` (interactive)
-- [ ] `./start config agent remove <name>`
-- [ ] `./start config agent default`
-- [ ] `./start config agent default <name>`
+- [x] `./start config agent info <name>`
+- [x] `./start config agent add` (interactive)
+- [x] `./start config agent edit <name>` (interactive)
+- [x] `./start config agent remove <name>`
+- [x] `./start config agent default`
+- [x] `./start config agent default <name>`
 
 ### Config Role
 
 - [x] `./start config role list`
-- [ ] `./start config role info <name>`
-- [ ] `./start config role add` (interactive)
-- [ ] `./start config role edit <name>` (interactive)
-- [ ] `./start config role remove <name>`
-- [ ] `./start config role default`
-- [ ] `./start config role default <name>`
-- [ ] `./start config role order` (interactive)
+- [x] `./start config role info <name>`
+- [x] `./start config role add` (interactive)
+- [x] `./start config role edit <name>` (interactive)
+- [x] `./start config role remove <name>`
+- [x] `./start config role default`
+- [x] `./start config role default <name>`
+- [x] `./start config role order` (interactive)
 
 ### Config Context
 
 - [x] `./start config context list`
-- [ ] `./start config context info <name>`
-- [ ] `./start config context add` (interactive)
-- [ ] `./start config context edit <name>` (interactive)
-- [ ] `./start config context remove <name>`
-- [ ] `./start config context order` (interactive)
+- [x] `./start config context info <name>`
+- [x] `./start config context add` (interactive)
+- [x] `./start config context edit <name>` (interactive)
+- [x] `./start config context remove <name>`
+- [x] `./start config context order` (interactive)
 
 ### Config Task
 
 - [x] `./start config task list`
-- [ ] `./start config task info <name>`
-- [ ] `./start config task add` (interactive)
-- [ ] `./start config task edit <name>` (interactive)
-- [ ] `./start config task remove <name>`
+- [x] `./start config task info <name>`
+- [x] `./start config task add` (interactive)
+- [x] `./start config task edit <name>` (interactive)
+- [x] `./start config task remove <name>`
 
 ### Config Settings
 
 - [x] `./start config settings`
-- [ ] `./start config settings <key> <value>`
+- [x] `./start config settings <key> <value>`
 
 ### Config Order
 
-- [ ] `./start config order`
+- [x] `./start config order`
 
 ### Doctor
 
-- [ ] `./start doctor`
+- [x] `./start doctor`
 
 ### Execution Commands
 
-- [ ] `./start --dry-run`
-- [ ] `./start task <name> --dry-run`
-- [ ] `./start` (live launch - visual check of header/separator/tables)
-- [ ] `./start task <name>` (live launch - visual check)
+- [x] `./start --dry-run`
+- [x] `./start task <name> --dry-run`
+- [x] `./start` (live launch - visual check of header/separator/tables)
+- [x] `./start task <name>` (live launch - visual check)
 
 ## Files Reference
 

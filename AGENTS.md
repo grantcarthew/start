@@ -184,5 +184,6 @@ start-assets/
 - p-021: Auto-Setup Default Assets (internal/assets package, default context installation)
 - p-023: CLI Config Reorder (interactive reordering, definition order preservation)
 - p-024: CLI Flag Asset Search (three-tier resolution for --agent, --role, --model, --context flags)
+- p-025: Terminal Colour Standard (DR-042 applied across all CLI output, added prompt colour)
 
 The prototype validated that this tool solves a real problem. This version will implement it properly.

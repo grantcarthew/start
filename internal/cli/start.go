@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"cuelang.org/go/cue"
+	"github.com/fatih/color"
 	"github.com/grantcarthew/start/internal/config"
 	internalcue "github.com/grantcarthew/start/internal/cue"
 	"github.com/grantcarthew/start/internal/orchestration"
@@ -273,7 +274,7 @@ func promptAgentSelection(w io.Writer, reader *bufio.Reader, choices []agentChoi
 // promptSetDefault asks the user whether to set the selected agent as default.
 // The caller is responsible for TTY detection; this function assumes interactive input.
 func promptSetDefault(w io.Writer, reader *bufio.Reader, agentName string) bool {
-	_, _ = fmt.Fprintf(w, "Set %q as default agent? [y/N]: ", agentName)
+	_, _ = fmt.Fprintf(w, "Set %q as default agent? %s%s%s: ", agentName, colorCyan.Sprint("["), colorDim.Sprint("y/N"), colorCyan.Sprint("]"))
 
 	input, err := reader.ReadString('\n')
 	if err != nil {
@@ -481,11 +482,13 @@ func printExecutionInfo(w io.Writer, agent orchestration.Agent, model, modelSour
 	PrintHeader(w, "Starting AI Agent")
 	PrintSeparator(w)
 
-	_, _ = fmt.Fprintf(w, "Agent: %s\n", agent.Name)
+	_, _ = colorAgents.Fprint(w, "Agent:")
+	_, _ = fmt.Fprintf(w, " %s\n", agent.Name)
+	_, _ = colorAgents.Fprint(w, "Model:")
 	if model != "" {
-		_, _ = fmt.Fprintf(w, "Model: %s (via %s)\n", model, modelSource)
+		_, _ = fmt.Fprintf(w, " %s %s%s%s\n", model, colorCyan.Sprint("("), colorDim.Sprintf("via %s", modelSource), colorCyan.Sprint(")"))
 	} else {
-		_, _ = fmt.Fprintf(w, "Model: -\n")
+		_, _ = fmt.Fprintln(w, " -")
 	}
 	_, _ = fmt.Fprintln(w)
 
@@ -501,11 +504,13 @@ func printDryRunSummary(w io.Writer, agent orchestration.Agent, model, modelSour
 	PrintHeader(w, "Dry Run - Agent Not Executed")
 	PrintSeparator(w)
 
-	_, _ = fmt.Fprintf(w, "Agent: %s\n", agent.Name)
+	_, _ = colorAgents.Fprint(w, "Agent:")
+	_, _ = fmt.Fprintf(w, " %s\n", agent.Name)
+	_, _ = colorAgents.Fprint(w, "Model:")
 	if model != "" {
-		_, _ = fmt.Fprintf(w, "Model: %s (via %s)\n", model, modelSource)
+		_, _ = fmt.Fprintf(w, " %s %s%s%s\n", model, colorCyan.Sprint("("), colorDim.Sprintf("via %s", modelSource), colorCyan.Sprint(")"))
 	} else {
-		_, _ = fmt.Fprintf(w, "Model: -\n")
+		_, _ = fmt.Fprintln(w, " -")
 	}
 	_, _ = fmt.Fprintln(w)
 
@@ -515,17 +520,18 @@ func printDryRunSummary(w io.Writer, agent orchestration.Agent, model, modelSour
 
 	// Show role preview
 	if result.Role != "" {
-		printContentPreview(w, "Role", result.Role, 5)
+		printContentPreview(w, "Role", colorRoles, result.Role, 5)
 		_, _ = fmt.Fprintln(w)
 	}
 
 	// Show prompt preview
 	if result.Prompt != "" {
-		printContentPreview(w, "Prompt", result.Prompt, 5)
+		printContentPreview(w, "Prompt", colorPrompts, result.Prompt, 5)
 		_, _ = fmt.Fprintln(w)
 	}
 
-	_, _ = fmt.Fprintf(w, "Files: %s/\n", dir)
+	_, _ = colorDim.Fprint(w, "Files:")
+	_, _ = fmt.Fprintf(w, " %s\n", dir)
 	_, _ = fmt.Fprintln(w, "  role.md")
 	_, _ = fmt.Fprintln(w, "  prompt.md")
 	_, _ = fmt.Fprintln(w, "  command.txt")
@@ -537,7 +543,8 @@ func printComposeError(w io.Writer, agent orchestration.Agent, result orchestrat
 	PrintHeader(w, "Starting AI Agent")
 	PrintSeparator(w)
 
-	_, _ = fmt.Fprintf(w, "Agent: %s\n", agent.Name)
+	_, _ = colorAgents.Fprint(w, "Agent:")
+	_, _ = fmt.Fprintf(w, " %s\n", agent.Name)
 	_, _ = fmt.Fprintln(w)
 
 	PrintContextTable(w, result.Contexts)
@@ -546,25 +553,29 @@ func printComposeError(w io.Writer, agent orchestration.Agent, result orchestrat
 }
 
 // printContentPreview prints content with a header showing line count only when truncated.
-func printContentPreview(w io.Writer, label, text string, maxLines int) {
+// Shows all content if total lines <= 2*maxLines, otherwise truncates to maxLines.
+func printContentPreview(w io.Writer, label string, labelColor *color.Color, text string, maxLines int) {
 	lines := strings.Split(text, "\n")
-	truncated := len(lines) > maxLines
+	threshold := maxLines * 2
+	truncated := len(lines) > threshold
 
 	if truncated {
-		_, _ = fmt.Fprintf(w, "%s (%d lines):\n", label, maxLines)
+		_, _ = labelColor.Fprint(w, label)
+		_, _ = fmt.Fprintf(w, " %s%s%s:\n", colorCyan.Sprint("("), colorDim.Sprintf("%d lines", maxLines), colorCyan.Sprint(")"))
 	} else {
-		_, _ = fmt.Fprintf(w, "%s:\n", label)
+		_, _ = labelColor.Fprint(w, label)
+		_, _ = fmt.Fprintln(w, ":")
 	}
 
-	shown := maxLines
-	if len(lines) < shown {
-		shown = len(lines)
-	}
-	for i := 0; i < shown; i++ {
-		_, _ = fmt.Fprintf(w, "  %s\n", lines[i])
-	}
 	if truncated {
-		_, _ = fmt.Fprintf(w, "  ... (%d more lines)\n", len(lines)-maxLines)
+		for i := 0; i < maxLines; i++ {
+			_, _ = fmt.Fprintf(w, "  %s\n", lines[i])
+		}
+		_, _ = fmt.Fprintf(w, "  ... %s%s%s\n", colorCyan.Sprint("("), colorDim.Sprintf("%d more lines", len(lines)-maxLines), colorCyan.Sprint(")"))
+	} else {
+		for _, line := range lines {
+			_, _ = fmt.Fprintf(w, "  %s\n", line)
+		}
 	}
 }
 

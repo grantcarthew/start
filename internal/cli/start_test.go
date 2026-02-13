@@ -396,7 +396,7 @@ func TestPrintDryRunSummary(t *testing.T) {
 		"Dry Run",
 		"test-agent",
 		"test-role",
-		"Context documents:",
+		"Context:",
 		"ctx1",
 		"ctx2",
 		"/tmp/test-dir",
@@ -426,8 +426,14 @@ func TestPrintContentPreview(t *testing.T) {
 			wantTruncated: false,
 		},
 		{
-			name:          "more lines than limit shows count",
+			name:          "lines within threshold shows all",
 			text:          "line1\nline2\nline3\nline4\nline5\nline6",
+			maxLines:      3,
+			wantTruncated: false,
+		},
+		{
+			name:          "lines beyond threshold truncates",
+			text:          "line1\nline2\nline3\nline4\nline5\nline6\nline7",
 			maxLines:      3,
 			wantTruncated: true,
 		},
@@ -436,7 +442,7 @@ func TestPrintContentPreview(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			buf := new(bytes.Buffer)
-			printContentPreview(buf, "Test", tt.text, tt.maxLines)
+			printContentPreview(buf, "Test", colorDim, tt.text, tt.maxLines)
 			output := buf.String()
 
 			if tt.wantTruncated {

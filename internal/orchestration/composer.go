@@ -299,9 +299,7 @@ func (c *Composer) ComposeWithRole(cfg cue.Value, selection ContextSelection, ro
 				// Explicit --role or settings.default_role: always error (per DR-039)
 				return result, fmt.Errorf("role %q: %w", roleName, roleErr)
 			}
-			// This shouldn't happen for default selection (selectDefaultRole already checked)
-			// but handle it defensively
-			result.Warnings = append(result.Warnings, fmt.Sprintf("role %q: %v", roleName, roleErr))
+			// Non-explicit role failure is shown in the role table via ○ status
 		} else {
 			result.Role = roleContent
 			result.RoleFile = roleFilePath
