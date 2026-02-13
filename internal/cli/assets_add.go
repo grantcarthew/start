@@ -115,38 +115,47 @@ func installAsset(ctx context.Context, cmd *cobra.Command, client *registry.Clie
 
 	// Check if already installed
 	if assets.AssetExists(configDir, selected.Category, selected.Name) {
-		if !flags.Quiet {
-			origin := assets.GetInstalledOrigin(configDir, selected.Category, selected.Name)
-			installedVer := assets.VersionFromOrigin(origin)
-			latestVer := selected.Entry.Version
-			outdated := latestVer != "" && installedVer != "" && latestVer != installedVer
+		origin := assets.GetInstalledOrigin(configDir, selected.Category, selected.Name)
 
-			if outdated {
-				_, _ = fmt.Fprint(w, "○ ")
-			} else {
-				_, _ = colorSuccess.Fprint(w, "✓ ")
+		// Manually-added asset (no origin) — warn and proceed with install
+		if origin == "" {
+			if !flags.Quiet {
+				PrintWarning(w, "replacing manually-added %s/%s with registry version",
+					selected.Category, selected.Name)
 			}
-			_, _ = colorDim.Fprint(w, "Already installed: ")
-			_, _ = categoryColor(selected.Category).Fprint(w, selected.Category)
-			_, _ = fmt.Fprintf(w, "/%s ", selected.Name)
-			_, _ = colorCyan.Fprint(w, "(")
-			if installedVer != "" {
-				_, _ = colorDim.Fprint(w, installedVer)
+		} else {
+			if !flags.Quiet {
+				installedVer := assets.VersionFromOrigin(origin)
+				latestVer := selected.Entry.Version
+				outdated := latestVer != "" && installedVer != "" && latestVer != installedVer
+
+				if outdated {
+					_, _ = fmt.Fprint(w, "○ ")
+				} else {
+					_, _ = colorSuccess.Fprint(w, "✓ ")
+				}
+				_, _ = colorDim.Fprint(w, "Already installed: ")
+				_, _ = categoryColor(selected.Category).Fprint(w, selected.Category)
+				_, _ = fmt.Fprintf(w, "/%s ", selected.Name)
+				_, _ = colorCyan.Fprint(w, "(")
+				if installedVer != "" {
+					_, _ = colorDim.Fprint(w, installedVer)
+				}
+				if outdated {
+					_, _ = fmt.Fprint(w, " ")
+					_, _ = colorBlue.Fprint(w, "->")
+					_, _ = fmt.Fprint(w, " ")
+					_, _ = colorWarning.Fprint(w, latestVer)
+				} else {
+					_, _ = fmt.Fprint(w, " ")
+					_, _ = colorBlue.Fprint(w, "->")
+					_, _ = fmt.Fprint(w, " ")
+					_, _ = colorDim.Fprint(w, "current")
+				}
+				_, _ = colorCyan.Fprintln(w, ")")
 			}
-			if outdated {
-				_, _ = fmt.Fprint(w, " ")
-				_, _ = colorBlue.Fprint(w, "->")
-				_, _ = fmt.Fprint(w, " ")
-				_, _ = colorWarning.Fprint(w, latestVer)
-			} else {
-				_, _ = fmt.Fprint(w, " ")
-				_, _ = colorBlue.Fprint(w, "->")
-				_, _ = fmt.Fprint(w, " ")
-				_, _ = colorDim.Fprint(w, "current")
-			}
-			_, _ = colorCyan.Fprintln(w, ")")
+			return nil
 		}
-		return nil
 	}
 
 	// Install the asset
