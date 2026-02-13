@@ -129,17 +129,9 @@ func runConfigList(cmd *cobra.Command, args []string) error {
 	_, _ = colorCyan.Fprint(w, ")")
 	_, _ = colorDim.Fprintf(w, ": %d\n", len(roles))
 	if len(roles) > 0 {
-		defaultRole := ""
-		if cfg, err := loadConfigForScope(local); err == nil {
-			defaultRole = getDefaultRoleFromConfig(cfg)
-		}
 		for _, name := range roleOrder {
 			role := roles[name]
-			marker := "  "
-			if name == defaultRole {
-				marker = colorInstalled.Sprint("→") + " "
-			}
-			_, _ = fmt.Fprintf(w, "  %s%s ", marker, name)
+			_, _ = fmt.Fprintf(w, "    %s ", name)
 			_, _ = colorCyan.Fprint(w, "(")
 			_, _ = colorDim.Fprint(w, role.Source)
 			_, _ = colorCyan.Fprintln(w, ")")

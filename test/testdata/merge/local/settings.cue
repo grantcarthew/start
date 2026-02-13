@@ -35,5 +35,4 @@ roles: {
 // Override settings (deep merge - same keys get replaced)
 settings: {
 	default_agent: "gemini"
-	default_role:  "reviewer"
 }

@@ -475,15 +475,6 @@ func TestLoader_MergeWithTestdataFixtures(t *testing.T) {
 	if agent != "gemini" {
 		t.Errorf("settings.default_agent = %q, want %q (local override)", agent, "gemini")
 	}
-
-	// Local should override default_role
-	role, err := result.Value.LookupPath(parsePath("settings.default_role")).String()
-	if err != nil {
-		t.Fatalf("settings.default_role error = %v", err)
-	}
-	if role != "reviewer" {
-		t.Errorf("settings.default_role = %q, want %q (local override)", role, "reviewer")
-	}
 }
 
 func TestLoader_MergeSemantics(t *testing.T) {
@@ -601,7 +592,6 @@ func TestLoader_MergeSemantics(t *testing.T) {
 		writeCUEFile(t, localDir, "settings.cue", `
 			settings: {
 				default_agent: "gemini"
-				default_role: "reviewer"
 			}
 		`)
 
@@ -636,15 +626,6 @@ func TestLoader_MergeSemantics(t *testing.T) {
 		}
 		if agent != "gemini" {
 			t.Errorf("settings.default_agent = %q, want %q", agent, "gemini")
-		}
-
-		// Local-only field should exist
-		role, err := result.Value.LookupPath(parsePath("settings.default_role")).String()
-		if err != nil {
-			t.Fatalf("LookupPath(settings.default_role) error = %v", err)
-		}
-		if role != "reviewer" {
-			t.Errorf("settings.default_role = %q, want %q", role, "reviewer")
 		}
 	})
 

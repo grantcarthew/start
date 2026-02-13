@@ -32,7 +32,6 @@ roles: {
 // Global default settings
 settings: {
 	default_agent: "claude"
-	default_role:  "assistant"
 	shell:         "/bin/bash"
 	timeout:       120
 }

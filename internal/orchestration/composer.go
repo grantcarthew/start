@@ -296,7 +296,7 @@ func (c *Composer) ComposeWithRole(cfg cue.Value, selection ContextSelection, ro
 
 		if roleErr != nil {
 			if explicitRole {
-				// Explicit --role or settings.default_role: always error (per DR-039)
+				// Explicit --role: always error (per DR-039)
 				return result, fmt.Errorf("role %q: %w", roleName, roleErr)
 			}
 			// Non-explicit role failure is shown in the role table via ○ status
@@ -522,23 +522,13 @@ func (c *Composer) resolveRole(cfg cue.Value, name string) (content, filePath st
 }
 
 // selectDefaultRole returns the default role name and resolution tracking.
-// When settings.default_role is set, that role is used (no fallback).
-// Otherwise, roles are checked in definition order:
+// Roles are checked in definition order:
 // - Optional roles with missing files are skipped
 // - Required roles with missing files cause an error
 // - First available role is selected
 // Returns empty roleName with nil error if no roles are defined.
 // Returns error if all roles fail or a required role fails.
 func (c *Composer) selectDefaultRole(cfg cue.Value) (roleName string, resolutions []RoleResolution, err error) {
-	// Check settings.default_role
-	if def := cfg.LookupPath(cue.ParsePath(internalcue.KeySettings + ".default_role")); def.Exists() {
-		if s, err := def.String(); err == nil && s != "" {
-			// Explicit default_role - return it directly (no fallback)
-			// The caller will handle errors (per DR-039)
-			return s, nil, nil
-		}
-	}
-
 	// Iterate through roles in definition order
 	roles := cfg.LookupPath(cue.ParsePath(internalcue.KeyRoles))
 	if !roles.Exists() {

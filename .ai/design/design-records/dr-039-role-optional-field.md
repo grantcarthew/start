@@ -34,7 +34,6 @@ Behaviour:
 | File missing | true | Skip, try next role in order |
 | File missing | false | Error, stop execution |
 | Explicit --role + missing | any | Error (user explicitly requested it) |
-| settings.default_role + missing | any | Error (user explicitly configured it) |
 | All roles missing | n/a | Error: no valid roles found |
 
 ## Why
@@ -95,12 +94,6 @@ When explicit --role flag provided:
 1. Resolve specified role
 2. If resolution fails → error (regardless of optional)
 3. User asked for it, must work
-
-When settings.default_role is configured:
-
-1. Use that specific role
-2. If resolution fails → error (regardless of optional)
-3. User configured it explicitly, must work
 
 When no explicit role selection (automatic fallback):
 
@@ -205,20 +198,6 @@ Always check file existence, skip missing roles automatically:
 - Con: Can't distinguish "this should exist" from "this might exist"
 - Con: Silent fallback to potentially inappropriate role (golang on JS project)
 - Rejected: Users need control over which roles are strict
-
-Fallback list in settings:
-
-```cue
-settings: {
-    default_role: ["dotai-cwd", "dotai-home", "golang"]
-}
-```
-
-- Pro: Explicit fallback chain
-- Con: Schema change to settings
-- Con: Separates fallback logic from role definition
-- Con: Duplicates role ordering already in config
-- Rejected: optional field is simpler, keeps logic with role
 
 Role-level fallback field:
 

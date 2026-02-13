@@ -273,9 +273,6 @@ func TestComposer_ComposeWithRole(t *testing.T) {
 	ctx := cuecontext.New()
 
 	config := `
-		settings: {
-			default_role: "assistant"
-		}
 		contexts: {
 			env: {
 				required: true
@@ -532,20 +529,7 @@ func TestGetDefaultRole(t *testing.T) {
 		wantRole string
 	}{
 		{
-			name: "uses settings.default_role",
-			config: `
-				settings: {
-					default_role: "expert"
-				}
-				roles: {
-					assistant: { prompt: "You are an assistant." }
-					expert: { prompt: "You are an expert." }
-				}
-			`,
-			wantRole: "expert",
-		},
-		{
-			name: "falls back to first role when no default",
+			name: "returns first role in definition order",
 			config: `
 				roles: {
 					first: { prompt: "First role." }
@@ -560,7 +544,7 @@ func TestGetDefaultRole(t *testing.T) {
 			wantRole: "",
 		},
 		{
-			name: "returns empty when settings exists but no default_role",
+			name: "returns empty when settings exists but no roles",
 			config: `
 				settings: {
 					default_agent: "claude"
@@ -739,45 +723,6 @@ func TestSelectDefaultRole(t *testing.T) {
 		}
 		if !strings.Contains(err.Error(), "no roles available") {
 			t.Errorf("error = %q, want containing 'no roles available'", err.Error())
-		}
-	})
-
-	t.Run("settings default_role bypasses optional fallback", func(t *testing.T) {
-		config := `
-			settings: {
-				default_role: "explicit"
-			}
-			roles: {
-				"optional": {
-					file: "/nonexistent/optional.md"
-					optional: true
-				}
-				"explicit": {
-					prompt: "Explicit default"
-				}
-			}
-		`
-		cfg := ctx.CompileString(config)
-		if err := cfg.Err(); err != nil {
-			t.Fatalf("compile config: %v", err)
-		}
-
-		processor := NewTemplateProcessor(nil, nil, "")
-		composer := NewComposer(processor, "")
-
-		roleName, resolutions, err := composer.selectDefaultRole(cfg)
-		if err != nil {
-			t.Fatalf("selectDefaultRole() error = %v", err)
-		}
-
-		// When default_role is set, it's returned directly without fallback logic
-		if roleName != "explicit" {
-			t.Errorf("roleName = %q, want 'explicit'", roleName)
-		}
-
-		// No resolutions because default_role bypasses the chain
-		if len(resolutions) != 0 {
-			t.Errorf("expected 0 resolutions for default_role, got %d", len(resolutions))
 		}
 	})
 

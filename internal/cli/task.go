@@ -50,7 +50,7 @@ func addTaskCommand(parent *cobra.Command) {
 
 The name can be a config task name or a file path (starting with ./, /, or ~).
 Tasks are reusable workflows defined in configuration.
-Instructions are passed to the task template via the {{.Instructions}} placeholder.`,
+Instructions are passed to the task template via the {{.instructions}} placeholder.`,
 		Args: cobra.RangeArgs(1, 2),
 		RunE: runTask,
 	}

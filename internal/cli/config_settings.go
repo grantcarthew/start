@@ -19,7 +19,6 @@ import (
 // Valid settings keys
 var validSettingsKeys = map[string]string{
 	"default_agent": "string",
-	"default_role":  "string",
 	"shell":         "string",
 	"timeout":       "int",
 }
@@ -34,7 +33,6 @@ func addConfigSettingsCommand(parent *cobra.Command) {
 
 Available settings:
   default_agent  Agent to use when --agent not specified
-  default_role   Role to use when --role not specified
   shell          Shell for command execution (default: auto-detect)
   timeout        Command timeout in seconds`,
 		Example: `  start config settings              List all settings
@@ -115,7 +113,7 @@ func listSettings(w io.Writer, localOnly bool) error {
 func showSetting(w io.Writer, key string, localOnly bool) error {
 	// Validate key
 	if _, valid := validSettingsKeys[key]; !valid {
-		return fmt.Errorf("unknown setting %q\n\nValid settings: default_agent, default_role, shell, timeout", key)
+		return fmt.Errorf("unknown setting %q\n\nValid settings: default_agent, shell, timeout", key)
 	}
 
 	settings, err := loadSettingsForScope(localOnly)
@@ -148,7 +146,7 @@ func setSetting(w io.Writer, flags *Flags, key, value string, localOnly bool) er
 	// Validate key
 	keyType, valid := validSettingsKeys[key]
 	if !valid {
-		return fmt.Errorf("unknown setting %q\n\nValid settings: default_agent, default_role, shell, timeout", key)
+		return fmt.Errorf("unknown setting %q\n\nValid settings: default_agent, shell, timeout", key)
 	}
 
 	// Validate value type
