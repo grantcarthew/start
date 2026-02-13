@@ -615,7 +615,7 @@ func promptTaskSelection(w io.Writer, reader *bufio.Reader, matches []TaskMatch,
 	}
 
 	_, _ = fmt.Fprintln(w)
-	_, _ = fmt.Fprintf(w, "Select (1-%d): ", displayCount)
+	_, _ = fmt.Fprintf(w, "Select %s%s%s: ", colorCyan.Sprint("("), colorDim.Sprintf("1-%d", displayCount), colorCyan.Sprint(")"))
 
 	input, err := reader.ReadString('\n')
 	if err != nil {

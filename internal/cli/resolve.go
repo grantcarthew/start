@@ -510,7 +510,7 @@ func (r *resolver) promptAssetSelection(matches []AssetMatch, assetType, query s
 	}
 
 	_, _ = fmt.Fprintln(r.stdout)
-	_, _ = fmt.Fprintf(r.stdout, "Select (1-%d): ", displayCount)
+	_, _ = fmt.Fprintf(r.stdout, "Select %s%s%s: ", colorCyan.Sprint("("), colorDim.Sprintf("1-%d", displayCount), colorCyan.Sprint(")"))
 
 	reader := bufio.NewReader(r.stdin)
 	input, err := reader.ReadString('\n')

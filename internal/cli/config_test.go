@@ -1603,3 +1603,114 @@ func TestPromptModels_Edit_InvalidFormat(t *testing.T) {
 		t.Errorf("expected valid model added despite earlier invalid input, got: %v", result)
 	}
 }
+
+func TestPromptText_MultiLine(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	stdin := strings.NewReader("line one\nline two\nline three\n\n")
+
+	result, err := promptText(stdout, stdin, "Prompt text", "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	expected := "line one\nline two\nline three"
+	if result != expected {
+		t.Errorf("expected %q, got %q", expected, result)
+	}
+
+	output := stdout.String()
+	if !strings.Contains(output, "Prompt text") {
+		t.Errorf("expected label in output, got: %s", output)
+	}
+	if !strings.Contains(output, "blank line to finish") {
+		t.Errorf("expected instructions in output, got: %s", output)
+	}
+}
+
+func TestPromptText_SingleLine(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	stdin := strings.NewReader("just one line\n\n")
+
+	result, err := promptText(stdout, stdin, "Prompt text", "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if result != "just one line" {
+		t.Errorf("expected %q, got %q", "just one line", result)
+	}
+}
+
+func TestPromptText_EmptyOpensEditor_FallsBackToDefault(t *testing.T) {
+	// When first line is empty, promptText tries to open $EDITOR.
+	// With an invalid editor, it falls back to returning defaultVal.
+	t.Setenv("EDITOR", "/nonexistent-editor")
+	t.Setenv("VISUAL", "")
+
+	stdout := &bytes.Buffer{}
+	stdin := strings.NewReader("\n")
+
+	result, err := promptText(stdout, stdin, "Prompt text", "fallback value")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if result != "fallback value" {
+		t.Errorf("expected %q, got %q", "fallback value", result)
+	}
+}
+
+func TestPromptText_EmptyNoDefault(t *testing.T) {
+	// Empty input with no default returns empty string
+	t.Setenv("EDITOR", "/nonexistent-editor")
+	t.Setenv("VISUAL", "")
+
+	stdout := &bytes.Buffer{}
+	stdin := strings.NewReader("\n")
+
+	result, err := promptText(stdout, stdin, "Prompt text", "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if result != "" {
+		t.Errorf("expected empty string, got %q", result)
+	}
+}
+
+func TestPromptText_ShowsMultiLineDefault(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	stdin := strings.NewReader("new text\n\n")
+
+	_, err := promptText(stdout, stdin, "Prompt text", "line 1\nline 2")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := stdout.String()
+	if !strings.Contains(output, "Current value:") {
+		t.Errorf("expected 'Current value:' for multi-line default, got: %s", output)
+	}
+	if !strings.Contains(output, "line 1\nline 2") {
+		t.Errorf("expected default value shown, got: %s", output)
+	}
+}
+
+func TestPromptText_ShowsSingleLineDefault(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	stdin := strings.NewReader("new text\n\n")
+
+	_, err := promptText(stdout, stdin, "Prompt text", "short default")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := stdout.String()
+	if !strings.Contains(output, "short default") {
+		t.Errorf("expected single-line default in brackets, got: %s", output)
+	}
+	// Should NOT show "Current value:" for single-line defaults
+	if strings.Contains(output, "Current value:") {
+		t.Errorf("single-line default should not show 'Current value:', got: %s", output)
+	}
+}
