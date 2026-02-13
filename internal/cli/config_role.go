@@ -85,30 +85,34 @@ func runConfigRoleList(cmd *cobra.Command, _ []string) error {
 	}
 
 	w := cmd.OutOrStdout()
-	_, _ = fmt.Fprintln(w, "Roles:")
+	_, _ = colorRoles.Fprint(w, "roles")
+	_, _ = fmt.Fprintln(w, "/")
 	_, _ = fmt.Fprintln(w)
 
 	for _, name := range order {
 		role := roles[name]
 		marker := "  "
 		if name == defaultRole {
-			marker = "* "
+			marker = colorInstalled.Sprint("→") + " "
 		}
 		source := role.Source
 		if role.Origin != "" {
 			source += ", registry"
 		}
 		if role.Description != "" {
-			_, _ = fmt.Fprintf(w, "%s%s - %s (%s)\n", marker, name, role.Description, source)
+			_, _ = fmt.Fprintf(w, "%s%s ", marker, name)
+			_, _ = colorDim.Fprint(w, "- "+role.Description+" ")
+			_, _ = colorCyan.Fprint(w, "(")
+			_, _ = colorDim.Fprint(w, source)
+			_, _ = colorCyan.Fprintln(w, ")")
 		} else {
-			_, _ = fmt.Fprintf(w, "%s%s (%s)\n", marker, name, source)
+			_, _ = fmt.Fprintf(w, "%s%s ", marker, name)
+			_, _ = colorCyan.Fprint(w, "(")
+			_, _ = colorDim.Fprint(w, source)
+			_, _ = colorCyan.Fprintln(w, ")")
 		}
 	}
 
-	if defaultRole != "" {
-		_, _ = fmt.Fprintln(w)
-		_, _ = fmt.Fprintf(w, "* = default role\n")
-	}
 
 	return nil
 }

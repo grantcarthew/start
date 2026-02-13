@@ -1,8 +1,8 @@
 # p-024: CLI Flag Asset Search
 
-- Status: Pending
-- Started: (not yet started)
-- Completed: (not yet completed)
+- Status: Complete
+- Started: 2026-02-08
+- Completed: 2026-02-13
 - Issues: #5
 
 ## Overview
@@ -49,25 +49,25 @@ Out of Scope:
 
 ## Success Criteria
 
-- [ ] `start --agent <substring>` resolves via search when exact match fails
-- [ ] `start --role <substring>` resolves via search when exact match fails
-- [ ] `start --model <substring>` resolves via substring match in agent's models map
-- [ ] `start --model <unknown>` still passes through to agent binary
-- [ ] `start --context <term>` searches across name, description, and tags
-- [ ] `start -c golang` still works (backward compatible with tag-based usage)
-- [ ] `start -c golang,security` performs two searches, unions results
-- [ ] Context results filtered by minimum match score threshold
-- [ ] Single match auto-selects for agent/role/model
-- [ ] Multiple matches prompt in TTY for agent/role/model
-- [ ] Multiple matches error with list in non-TTY for agent/role/model
-- [ ] Registry match auto-installs to config
-- [ ] Registry index fetched once when multiple flags need it
-- [ ] `--role ./path/to/file.md` bypasses search (file path detection)
-- [ ] `--context ./path/to/file.md` bypasses search (file path detection)
-- [ ] `--no-role` skips role resolution entirely
-- [ ] Registry unavailable: falls back to installed config search only
-- [ ] All existing tests pass
-- [ ] New tests cover each resolution chain
+- [x] `start --agent <substring>` resolves via search when exact match fails
+- [x] `start --role <substring>` resolves via search when exact match fails
+- [x] `start --model <substring>` resolves via substring match in agent's models map
+- [x] `start --model <unknown>` still passes through to agent binary
+- [x] `start --context <term>` searches across name, description, and tags
+- [x] `start -c golang` still works (backward compatible with tag-based usage)
+- [x] `start -c golang,security` performs two searches, unions results
+- [x] Context results filtered by minimum match score threshold
+- [x] Single match auto-selects for agent/role/model
+- [x] Multiple matches prompt in TTY for agent/role/model
+- [x] Multiple matches error with list in non-TTY for agent/role/model
+- [x] Registry match auto-installs to config
+- [x] Registry index fetched once when multiple flags need it
+- [x] `--role ./path/to/file.md` bypasses search (file path detection)
+- [x] `--context ./path/to/file.md` bypasses search (file path detection)
+- [x] `--no-role` skips role resolution entirely
+- [x] Registry unavailable: falls back to installed config search only
+- [x] All existing tests pass
+- [x] New tests cover each resolution chain
 
 ## Current State
 

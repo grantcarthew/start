@@ -202,12 +202,12 @@ func printSearchSections(w io.Writer, sections []searchSection, verbose bool, in
 			_, _ = fmt.Fprintln(w, "/")
 
 			for _, r := range catResults {
-				marker := ""
+				marker := "  "
 				if section.ShowInstalled && installed[r.Category+"/"+r.Name] {
-					marker = " " + colorInstalled.Sprint("*")
+					marker = colorInstalled.Sprint("★") + " "
 				}
 
-				_, _ = fmt.Fprintf(w, "    %-25s %s%s\n", r.Name, colorDim.Sprint(r.Entry.Description), marker)
+				_, _ = fmt.Fprintf(w, "    %s%-25s %s\n", marker, r.Name, colorDim.Sprint(r.Entry.Description))
 				if verbose {
 					if r.Entry.Module != "" {
 						_, _ = fmt.Fprintf(w, "      Module: %s\n", colorDim.Sprint(r.Entry.Module))

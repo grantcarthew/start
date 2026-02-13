@@ -124,19 +124,19 @@ func printSearchResults(w io.Writer, results []assets.SearchResult, verbose bool
 		_, _ = categoryColor(cat).Fprint(w, cat)
 		_, _ = fmt.Fprintln(w, "/")
 		for _, r := range catResults {
-			marker := ""
+			marker := "  "
 			if installed[r.Category+"/"+r.Name] {
-				marker = " " + colorInstalled.Sprint("*")
+				marker = colorInstalled.Sprint("★") + " "
 			}
 
 			if verbose {
-				_, _ = fmt.Fprintf(w, "  %-25s %s%s\n", r.Name, colorDim.Sprint(r.Entry.Description), marker)
-				_, _ = fmt.Fprintf(w, "    Module: %s\n", colorDim.Sprint(r.Entry.Module))
+				_, _ = fmt.Fprintf(w, "  %s%-25s %s\n", marker, r.Name, colorDim.Sprint(r.Entry.Description))
+				_, _ = fmt.Fprintf(w, "      Module: %s\n", colorDim.Sprint(r.Entry.Module))
 				if len(r.Entry.Tags) > 0 {
-					_, _ = fmt.Fprintf(w, "    Tags: %s\n", colorDim.Sprint(strings.Join(r.Entry.Tags, ", ")))
+					_, _ = fmt.Fprintf(w, "      Tags: %s\n", colorDim.Sprint(strings.Join(r.Entry.Tags, ", ")))
 				}
 			} else {
-				_, _ = fmt.Fprintf(w, "  %-25s %s%s\n", r.Name, colorDim.Sprint(r.Entry.Description), marker)
+				_, _ = fmt.Fprintf(w, "  %s%-25s %s\n", marker, r.Name, colorDim.Sprint(r.Entry.Description))
 			}
 		}
 		_, _ = fmt.Fprintln(w)

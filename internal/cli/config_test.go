@@ -455,8 +455,8 @@ func TestConfigContextList_WithContexts(t *testing.T) {
 	if !strings.Contains(output, "project") {
 		t.Errorf("expected output to contain 'project', got: %s", output)
 	}
-	if !strings.Contains(output, "[R]") {
-		t.Errorf("expected output to contain '[R]' for required, got: %s", output)
+	if !strings.Contains(output, "[required]") {
+		t.Errorf("expected output to contain '[required]' marker, got: %s", output)
 	}
 }
 

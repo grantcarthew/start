@@ -397,11 +397,11 @@ func TestConfigContext_FullWorkflow(t *testing.T) {
 		}
 
 		output := stdout.String()
-		if !strings.Contains(output, "[R]") {
-			t.Errorf("list missing [R] marker: %s", output)
+		if !strings.Contains(output, "[required]") {
+			t.Errorf("list missing [required] marker: %s", output)
 		}
-		if !strings.Contains(output, "[D]") {
-			t.Errorf("list missing [D] marker: %s", output)
+		if !strings.Contains(output, "[default]") {
+			t.Errorf("list missing [default] marker: %s", output)
 		}
 	})
 }

@@ -64,6 +64,9 @@ func executeConfigSettings(cmd *cobra.Command, args []string) error {
 		// List all settings
 		return listSettings(stdout, local)
 	case 1:
+		if args[0] == "list" || args[0] == "ls" {
+			return listSettings(stdout, local)
+		}
 		if args[0] == "edit" {
 			return editSettings(local)
 		}
@@ -102,7 +105,8 @@ func listSettings(w io.Writer, localOnly bool) error {
 	sort.Strings(keys)
 
 	for _, k := range keys {
-		_, _ = fmt.Fprintf(w, "%s: %s\n", k, settings[k])
+		_, _ = colorDim.Fprintf(w, "%s: ", k)
+		_, _ = fmt.Fprintln(w, settings[k])
 	}
 
 	return nil
@@ -118,16 +122,23 @@ func showSetting(w io.Writer, key string, localOnly bool) error {
 	settings, err := loadSettingsForScope(localOnly)
 	if err != nil {
 		if strings.Contains(err.Error(), "no config found") {
-			_, _ = fmt.Fprintf(w, "%s: (not set)\n", key)
+			_, _ = colorDim.Fprintf(w, "%s: ", key)
+			_, _ = colorCyan.Fprint(w, "(")
+			_, _ = colorDim.Fprint(w, "not set")
+			_, _ = colorCyan.Fprintln(w, ")")
 			return nil
 		}
 		return err
 	}
 
 	if val, exists := settings[key]; exists {
-		_, _ = fmt.Fprintf(w, "%s: %s\n", key, val)
+		_, _ = colorDim.Fprintf(w, "%s: ", key)
+		_, _ = fmt.Fprintln(w, val)
 	} else {
-		_, _ = fmt.Fprintf(w, "%s: (not set)\n", key)
+		_, _ = colorDim.Fprintf(w, "%s: ", key)
+		_, _ = colorCyan.Fprint(w, "(")
+		_, _ = colorDim.Fprint(w, "not set")
+		_, _ = colorCyan.Fprintln(w, ")")
 	}
 
 	return nil

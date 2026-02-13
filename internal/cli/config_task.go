@@ -78,7 +78,8 @@ func runConfigTaskList(cmd *cobra.Command, _ []string) error {
 	}
 
 	w := cmd.OutOrStdout()
-	_, _ = fmt.Fprintln(w, "Tasks:")
+	_, _ = colorTasks.Fprint(w, "tasks")
+	_, _ = fmt.Fprintln(w, "/")
 	_, _ = fmt.Fprintln(w)
 
 	// Sort task names for consistent output
@@ -95,9 +96,16 @@ func runConfigTaskList(cmd *cobra.Command, _ []string) error {
 			source += ", registry"
 		}
 		if task.Description != "" {
-			_, _ = fmt.Fprintf(w, "  %s - %s (%s)\n", name, task.Description, source)
+			_, _ = fmt.Fprintf(w, "  %s ", name)
+			_, _ = colorDim.Fprint(w, "- "+task.Description+" ")
+			_, _ = colorCyan.Fprint(w, "(")
+			_, _ = colorDim.Fprint(w, source)
+			_, _ = colorCyan.Fprintln(w, ")")
 		} else {
-			_, _ = fmt.Fprintf(w, "  %s (%s)\n", name, source)
+			_, _ = fmt.Fprintf(w, "  %s ", name)
+			_, _ = colorCyan.Fprint(w, "(")
+			_, _ = colorDim.Fprint(w, source)
+			_, _ = colorCyan.Fprintln(w, ")")
 		}
 	}
 

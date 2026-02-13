@@ -78,35 +78,42 @@ func runConfigContextList(cmd *cobra.Command, _ []string) error {
 	}
 
 	w := cmd.OutOrStdout()
-	_, _ = fmt.Fprintln(w, "Contexts:")
+	_, _ = colorContexts.Fprint(w, "contexts")
+	_, _ = fmt.Fprintln(w, "/")
 	_, _ = fmt.Fprintln(w)
 
 	for _, name := range order {
 		ctx := contexts[name]
-		markers := ""
-		if ctx.Required {
-			markers += "R"
-		}
-		if ctx.Default {
-			markers += "D"
-		}
-		if markers != "" {
-			markers = "[" + markers + "] "
-		}
-
 		source := ctx.Source
 		if ctx.Origin != "" {
 			source += ", registry"
 		}
 		if ctx.Description != "" {
-			_, _ = fmt.Fprintf(w, "  %s%s - %s (%s)\n", markers, name, ctx.Description, source)
+			_, _ = fmt.Fprintf(w, "  %s ", name)
+			_, _ = colorDim.Fprint(w, "- "+ctx.Description+" ")
+			_, _ = colorCyan.Fprint(w, "(")
+			_, _ = colorDim.Fprint(w, source)
+			_, _ = colorCyan.Fprint(w, ")")
 		} else {
-			_, _ = fmt.Fprintf(w, "  %s%s (%s)\n", markers, name, source)
+			_, _ = fmt.Fprintf(w, "  %s ", name)
+			_, _ = colorCyan.Fprint(w, "(")
+			_, _ = colorDim.Fprint(w, source)
+			_, _ = colorCyan.Fprint(w, ")")
 		}
+		if ctx.Required {
+			_, _ = fmt.Fprint(w, " ")
+			_, _ = colorCyan.Fprint(w, "[")
+			_, _ = colorDim.Fprint(w, "required")
+			_, _ = colorCyan.Fprint(w, "]")
+		}
+		if ctx.Default {
+			_, _ = fmt.Fprint(w, " ")
+			_, _ = colorCyan.Fprint(w, "[")
+			_, _ = colorDim.Fprint(w, "default")
+			_, _ = colorCyan.Fprint(w, "]")
+		}
+		_, _ = fmt.Fprintln(w)
 	}
-
-	_, _ = fmt.Fprintln(w)
-	_, _ = fmt.Fprintln(w, "R = required, D = default")
 
 	return nil
 }

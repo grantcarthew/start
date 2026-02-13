@@ -109,10 +109,10 @@ func TestPrintSearchSections(t *testing.T) {
 		localPart := out[:registryIdx]
 		registryPart := out[registryIdx:]
 
-		if strings.Contains(localPart, "*") {
+		if strings.Contains(localPart, "★") {
 			t.Error("local section should not have installed markers")
 		}
-		if !strings.Contains(registryPart, "*") {
+		if !strings.Contains(registryPart, "★") {
 			t.Error("registry section should have installed marker for golang")
 		}
 	})

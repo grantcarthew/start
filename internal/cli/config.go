@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/grantcarthew/start/internal/config"
 	"github.com/spf13/cobra"
@@ -60,7 +61,7 @@ func runConfigList(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("resolving config paths: %w", err)
 	}
 
-	_, _ = fmt.Fprintln(w, "Configuration Paths:")
+	_, _ = colorHeader.Fprintln(w, "Configuration Paths:")
 	_, _ = fmt.Fprintln(w)
 	globalStatus := "not found"
 	if paths.GlobalExists {
@@ -70,8 +71,14 @@ func runConfigList(cmd *cobra.Command, args []string) error {
 	if paths.LocalExists {
 		localStatus = "exists"
 	}
-	_, _ = fmt.Fprintf(w, "  Global: %s (%s)\n", paths.Global, globalStatus)
-	_, _ = fmt.Fprintf(w, "  Local:  %s (%s)\n", paths.Local, localStatus)
+	_, _ = fmt.Fprintf(w, "  Global: %s ", paths.Global)
+	_, _ = colorCyan.Fprint(w, "(")
+	_, _ = colorDim.Fprint(w, globalStatus)
+	_, _ = colorCyan.Fprintln(w, ")")
+	_, _ = fmt.Fprintf(w, "  Local:  %s ", paths.Local)
+	_, _ = colorCyan.Fprint(w, "(")
+	_, _ = colorDim.Fprint(w, localStatus)
+	_, _ = colorCyan.Fprintln(w, ")")
 
 	// Determine scope for listing
 	scopeLabel := "merged"
@@ -82,7 +89,12 @@ func runConfigList(cmd *cobra.Command, args []string) error {
 	// Agents
 	agents, _ := loadAgentsForScope(local)
 	_, _ = fmt.Fprintln(w)
-	_, _ = fmt.Fprintf(w, "Agents (%s): %d\n", scopeLabel, len(agents))
+	_, _ = colorAgents.Fprint(w, "agents")
+	_, _ = fmt.Fprint(w, "/ ")
+	_, _ = colorCyan.Fprint(w, "(")
+	_, _ = colorDim.Fprintf(w, "%s", scopeLabel)
+	_, _ = colorCyan.Fprint(w, ")")
+	_, _ = colorDim.Fprintf(w, ": %d\n", len(agents))
 	if len(agents) > 0 {
 		defaultAgent := ""
 		if cfg, err := loadConfigForScope(local); err == nil {
@@ -97,16 +109,24 @@ func runConfigList(cmd *cobra.Command, args []string) error {
 			agent := agents[name]
 			marker := "  "
 			if name == defaultAgent {
-				marker = "* "
+				marker = colorInstalled.Sprint("→") + " "
 			}
-			_, _ = fmt.Fprintf(w, "  %s%s (%s)\n", marker, name, agent.Source)
+			_, _ = fmt.Fprintf(w, "  %s%s ", marker, name)
+			_, _ = colorCyan.Fprint(w, "(")
+			_, _ = colorDim.Fprint(w, agent.Source)
+			_, _ = colorCyan.Fprintln(w, ")")
 		}
 	}
 
 	// Roles
 	roles, roleOrder, _ := loadRolesForScope(local)
 	_, _ = fmt.Fprintln(w)
-	_, _ = fmt.Fprintf(w, "Roles (%s): %d\n", scopeLabel, len(roles))
+	_, _ = colorRoles.Fprint(w, "roles")
+	_, _ = fmt.Fprint(w, "/ ")
+	_, _ = colorCyan.Fprint(w, "(")
+	_, _ = colorDim.Fprintf(w, "%s", scopeLabel)
+	_, _ = colorCyan.Fprint(w, ")")
+	_, _ = colorDim.Fprintf(w, ": %d\n", len(roles))
 	if len(roles) > 0 {
 		defaultRole := ""
 		if cfg, err := loadConfigForScope(local); err == nil {
@@ -116,37 +136,63 @@ func runConfigList(cmd *cobra.Command, args []string) error {
 			role := roles[name]
 			marker := "  "
 			if name == defaultRole {
-				marker = "* "
+				marker = colorInstalled.Sprint("→") + " "
 			}
-			_, _ = fmt.Fprintf(w, "  %s%s (%s)\n", marker, name, role.Source)
+			_, _ = fmt.Fprintf(w, "  %s%s ", marker, name)
+			_, _ = colorCyan.Fprint(w, "(")
+			_, _ = colorDim.Fprint(w, role.Source)
+			_, _ = colorCyan.Fprintln(w, ")")
 		}
 	}
 
 	// Contexts
 	contexts, contextOrder, _ := loadContextsForScope(local)
 	_, _ = fmt.Fprintln(w)
-	_, _ = fmt.Fprintf(w, "Contexts (%s): %d\n", scopeLabel, len(contexts))
+	_, _ = colorContexts.Fprint(w, "contexts")
+	_, _ = fmt.Fprint(w, "/ ")
+	_, _ = colorCyan.Fprint(w, "(")
+	_, _ = colorDim.Fprintf(w, "%s", scopeLabel)
+	_, _ = colorCyan.Fprint(w, ")")
+	_, _ = colorDim.Fprintf(w, ": %d\n", len(contexts))
 	if len(contexts) > 0 {
 		for _, name := range contextOrder {
 			ctx := contexts[name]
-			flags := ""
+			_, _ = fmt.Fprintf(w, "    %s ", name)
+			_, _ = colorCyan.Fprint(w, "(")
+			_, _ = colorDim.Fprint(w, ctx.Source)
+			_, _ = colorCyan.Fprint(w, ")")
 			if ctx.Required {
-				flags += " [required]"
+				_, _ = fmt.Fprint(w, " ")
+				_, _ = colorCyan.Fprint(w, "[")
+				_, _ = colorDim.Fprint(w, "required")
+				_, _ = colorCyan.Fprint(w, "]")
 			}
 			if ctx.Default {
-				flags += " [default]"
+				_, _ = fmt.Fprint(w, " ")
+				_, _ = colorCyan.Fprint(w, "[")
+				_, _ = colorDim.Fprint(w, "default")
+				_, _ = colorCyan.Fprint(w, "]")
 			}
 			if len(ctx.Tags) > 0 {
-				flags += fmt.Sprintf(" tags:%v", ctx.Tags)
+				_, _ = fmt.Fprint(w, " ")
+				_, _ = colorDim.Fprint(w, "tags:")
+				_, _ = colorCyan.Fprint(w, "[")
+				_, _ = colorDim.Fprintf(w, "%s", strings.Join(ctx.Tags, ", "))
+				_, _ = colorCyan.Fprint(w, "]")
 			}
-			_, _ = fmt.Fprintf(w, "    %s (%s)%s\n", name, ctx.Source, flags)
+			_, _ = fmt.Fprintln(w)
 		}
 	}
 
 	// Tasks
 	tasks, _ := loadTasksForScope(local)
 	_, _ = fmt.Fprintln(w)
-	_, _ = fmt.Fprintf(w, "Tasks (%s): %d\n", scopeLabel, len(tasks))
+	_, _ = colorTasks.Fprint(w, "tasks")
+	_, _ = fmt.Fprint(w, "/ ")
+	_, _ = colorCyan.Fprint(w, "(")
+	_, _ = colorDim.Fprintf(w, "%s", scopeLabel)
+	_, _ = colorCyan.Fprint(w, ")")
+	_, _ = colorDim.Fprintf(w, ": %d\n", len(tasks))
 	if len(tasks) > 0 {
 		var names []string
 		for name := range tasks {
@@ -155,7 +201,10 @@ func runConfigList(cmd *cobra.Command, args []string) error {
 		sort.Strings(names)
 		for _, name := range names {
 			task := tasks[name]
-			_, _ = fmt.Fprintf(w, "    %s (%s)\n", name, task.Source)
+			_, _ = fmt.Fprintf(w, "    %s ", name)
+			_, _ = colorCyan.Fprint(w, "(")
+			_, _ = colorDim.Fprint(w, task.Source)
+			_, _ = colorCyan.Fprintln(w, ")")
 		}
 	}
 

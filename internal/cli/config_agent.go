@@ -88,7 +88,8 @@ func runConfigAgentList(cmd *cobra.Command, _ []string) error {
 	}
 
 	w := cmd.OutOrStdout()
-	_, _ = fmt.Fprintln(w, "Agents:")
+	_, _ = colorAgents.Fprint(w, "agents")
+	_, _ = fmt.Fprintln(w, "/")
 	_, _ = fmt.Fprintln(w)
 
 	// Sort agent names for consistent output
@@ -102,23 +103,26 @@ func runConfigAgentList(cmd *cobra.Command, _ []string) error {
 		agent := agents[name]
 		marker := "  "
 		if name == defaultAgent {
-			marker = "* "
+			marker = colorInstalled.Sprint("→") + " "
 		}
 		source := agent.Source
 		if agent.Origin != "" {
 			source += ", registry"
 		}
 		if agent.Description != "" {
-			_, _ = fmt.Fprintf(w, "%s%s - %s (%s)\n", marker, name, agent.Description, source)
+			_, _ = fmt.Fprintf(w, "%s%s ", marker, name)
+			_, _ = colorDim.Fprint(w, "- "+agent.Description+" ")
+			_, _ = colorCyan.Fprint(w, "(")
+			_, _ = colorDim.Fprint(w, source)
+			_, _ = colorCyan.Fprintln(w, ")")
 		} else {
-			_, _ = fmt.Fprintf(w, "%s%s (%s)\n", marker, name, source)
+			_, _ = fmt.Fprintf(w, "%s%s ", marker, name)
+			_, _ = colorCyan.Fprint(w, "(")
+			_, _ = colorDim.Fprint(w, source)
+			_, _ = colorCyan.Fprintln(w, ")")
 		}
 	}
 
-	if defaultAgent != "" {
-		_, _ = fmt.Fprintln(w)
-		_, _ = fmt.Fprintf(w, "* = default agent\n")
-	}
 
 	return nil
 }

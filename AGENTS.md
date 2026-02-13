@@ -12,7 +12,7 @@ Avoid references to the prototype in new documentation. This is a new design.
 
 Projects are stored in `.ai/projects/`. Continue by reading the active project.
 
-Active Project: [p-024 CLI Flag Asset Search](.ai/projects/p-024-cli-flag-asset-search.md)
+Active Project: None
 
 Other Projects (paused):
 - None
@@ -183,7 +183,6 @@ start-assets/
 - p-020: Role Optional Field (optional field for discovery-based roles, graceful fallback)
 - p-021: Auto-Setup Default Assets (internal/assets package, default context installation)
 - p-023: CLI Config Reorder (interactive reordering, definition order preservation)
-
-**Current:** p-024 CLI Flag Asset Search
+- p-024: CLI Flag Asset Search (three-tier resolution for --agent, --role, --model, --context flags)
 
 The prototype validated that this tool solves a real problem. This version will implement it properly.

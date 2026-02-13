@@ -43,9 +43,10 @@ Apply to: category headers in search results, list output, and any command that 
 
 | Marker | Colour | Usage |
 |--------|--------|-------|
-| Installed `*` | HiGreen | Suffix on search results for installed assets |
+| Installed `★` | HiGreen | Left-side prefix on installed assets |
+| Default `→` | HiGreen | Left-side prefix on default agent/role |
 | Version arrows `->` | Blue | Version transition in update output |
-| Parenthetical delimiters | Cyan | Bracketing metadata (version info, status) |
+| Delimiters `()` `[]` | Cyan | Bracketing metadata (version info, status, flags) |
 
 ### General Utility
 
@@ -110,18 +111,19 @@ Search output:
 Found 5 matches:
 
 roles/                    <- green "roles", default "/"
-  cwd/dotai/default         Project-specific default role *
-  cwd/role-md               Project-specific role from role.md
+  ★ cwd/dotai/default       Project-specific default role
+    cwd/role-md              Project-specific role from role.md
 
 contexts/                 <- cyan "contexts", default "/"
-  cwd/agents-md             Repository-specific AI agent guidelines *
-  cwd/project               Project-specific documentation
+  ★ cwd/agents-md           Repository-specific AI agent guidelines
+    cwd/project              Project-specific documentation
 ```
 
 - Category names: coloured per asset type
 - Asset names: default terminal colour
 - Descriptions: dim/faint
-- Installed `*`: HiGreen
+- Installed `★`: HiGreen, left-side prefix
+- Default `→`: Green, left-side prefix
 
 ## Implementation Notes
 

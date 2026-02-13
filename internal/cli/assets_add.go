@@ -197,15 +197,15 @@ func promptAssetSelection(w io.Writer, r io.Reader, results []assets.SearchResul
 	_, _ = fmt.Fprintf(w, "Found %d matches:\n\n", len(results))
 
 	for i, res := range results {
-		marker := ""
+		marker := "  "
 		if assets.AssetExists(configDir, res.Category, res.Name) {
-			marker = " " + colorInstalled.Sprint("*")
+			marker = colorInstalled.Sprint("★") + " "
 		}
-		_, _ = fmt.Fprintf(w, "  %d. ", i+1)
+		_, _ = fmt.Fprintf(w, "  %s%d. ", marker, i+1)
 		_, _ = categoryColor(res.Category).Fprint(w, res.Category)
 		_, _ = fmt.Fprintf(w, "/%s ", res.Name)
 		_, _ = colorDim.Fprintf(w, "- %s", res.Entry.Description)
-		_, _ = fmt.Fprintln(w, marker)
+		_, _ = fmt.Fprintln(w)
 	}
 
 	_, _ = fmt.Fprintln(w)
