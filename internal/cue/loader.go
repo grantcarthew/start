@@ -353,3 +353,27 @@ func hasCUEFiles(dir string) (bool, error) {
 func (l *Loader) Context() *cue.Context {
 	return l.ctx
 }
+
+// IdentifyBrokenFiles compiles each CUE file individually and returns a
+// summary of which files have errors. This is used to provide actionable
+// diagnostics when a directory fails to load.
+func IdentifyBrokenFiles(paths []string) string {
+	ctx := cuecontext.New()
+	var lines []string
+
+	for _, path := range paths {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			lines = append(lines, fmt.Sprintf("  %s: %v", path, err))
+			continue
+		}
+		if v := ctx.CompileBytes(data, cue.Filename(path)); v.Err() != nil {
+			lines = append(lines, fmt.Sprintf("  %s: %v", path, v.Err()))
+		}
+	}
+
+	if len(lines) == 0 {
+		return "  (files parse individually but fail when combined)"
+	}
+	return strings.Join(lines, "\n")
+}

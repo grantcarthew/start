@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"cuelang.org/go/cue/cuecontext"
+	internalcue "github.com/grantcarthew/start/internal/cue"
 	"github.com/grantcarthew/start/internal/registry"
 )
 
@@ -34,6 +35,13 @@ contexts: {
 		t.Fatalf("Failed to write test file: %v", err)
 	}
 
+	// Load config via CUE
+	loader := internalcue.NewLoader()
+	cfg, err := loader.LoadSingle(configDir)
+	if err != nil {
+		t.Fatalf("Failed to load CUE config: %v", err)
+	}
+
 	tests := []struct {
 		name      string
 		category  string
@@ -53,7 +61,7 @@ contexts: {
 			want:      false,
 		},
 		{
-			name:      "different category file doesn't exist",
+			name:      "different category not found",
 			category:  "roles",
 			assetName: "cwd/agents-md",
 			want:      false,
@@ -62,7 +70,7 @@ contexts: {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := AssetExists(configDir, tt.category, tt.assetName)
+			got := AssetExists(cfg, tt.category, tt.assetName)
 			if got != tt.want {
 				t.Errorf("AssetExists() = %v, want %v", got, tt.want)
 			}
@@ -1063,6 +1071,13 @@ contexts: {
 		t.Fatalf("Failed to write test file: %v", err)
 	}
 
+	// Load config via CUE
+	loader := internalcue.NewLoader()
+	cfg, err := loader.LoadSingle(configDir)
+	if err != nil {
+		t.Fatalf("Failed to load CUE config: %v", err)
+	}
+
 	tests := []struct {
 		name      string
 		category  string
@@ -1088,7 +1103,7 @@ contexts: {
 			want:      "",
 		},
 		{
-			name:      "non-existent config file",
+			name:      "non-existent category",
 			category:  "roles",
 			assetName: "cwd/agents-md",
 			want:      "",
@@ -1097,7 +1112,7 @@ contexts: {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := GetInstalledOrigin(configDir, tt.category, tt.assetName)
+			got := GetInstalledOrigin(cfg, tt.category, tt.assetName)
 			if got != tt.want {
 				t.Errorf("GetInstalledOrigin() = %q, want %q", got, tt.want)
 			}

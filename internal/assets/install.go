@@ -14,6 +14,7 @@ import (
 	"cuelang.org/go/cue/load"
 	"cuelang.org/go/mod/modconfig"
 	"cuelang.org/go/mod/modfile"
+	internalcue "github.com/grantcarthew/start/internal/cue"
 	"github.com/grantcarthew/start/internal/registry"
 )
 
@@ -92,7 +93,9 @@ func InstallRoleDependency(ctx context.Context, client *registry.Client, index *
 	}
 
 	// Skip if the role is already installed
-	if AssetExists(configDir, "roles", roleName) {
+	loader := internalcue.NewLoader()
+	cfg, err := loader.LoadSingle(configDir)
+	if err == nil && AssetExists(cfg, "roles", roleName) {
 		return roleName, nil
 	}
 
@@ -110,23 +113,11 @@ func InstallRoleDependency(ctx context.Context, client *registry.Client, index *
 	return roleName, nil
 }
 
-// AssetExists checks if an asset with the given name already exists in the config file.
+// AssetExists checks if an asset with the given name exists in a loaded CUE config.
 // Returns true if the asset is found, false otherwise.
-func AssetExists(configDir, category, name string) bool {
-	configFile := assetTypeToConfigFile(category)
-	configPath := filepath.Join(configDir, configFile)
-
-	data, err := os.ReadFile(configPath)
-	if err != nil {
-		return false
-	}
-
-	existingContent := string(data)
-	assetKey := getAssetKey(name)
-
-	// Check if already installed
-	return strings.Contains(existingContent, fmt.Sprintf("%q:", assetKey)) ||
-		strings.Contains(existingContent, assetKey+":")
+func AssetExists(cfg cue.Value, category, name string) bool {
+	return cfg.LookupPath(cue.ParsePath(category)).
+		LookupPath(cue.MakePath(cue.Str(name))).Exists()
 }
 
 // assetTypeToConfigFile returns the config file name for an asset type.
@@ -369,58 +360,18 @@ func ResolveRoleName(index *registry.Index, depPath string) (name string, entry 
 	return "", registry.IndexEntry{}, false
 }
 
-// GetInstalledOrigin reads the config file and returns the origin field value
-// for the named asset. Returns an empty string if the asset is not found or
-// has no origin field.
-func GetInstalledOrigin(configDir, category, name string) string {
-	configFile := assetTypeToConfigFile(category)
-	configPath := filepath.Join(configDir, configFile)
-
-	data, err := os.ReadFile(configPath)
-	if err != nil {
+// GetInstalledOrigin returns the origin field value for the named asset
+// in a loaded CUE config. Returns an empty string if the asset is not found
+// or has no origin field.
+func GetInstalledOrigin(cfg cue.Value, category, name string) string {
+	originVal := cfg.LookupPath(cue.ParsePath(category)).
+		LookupPath(cue.MakePath(cue.Str(name))).
+		LookupPath(cue.ParsePath("origin"))
+	if !originVal.Exists() {
 		return ""
 	}
-
-	content := string(data)
-	assetKey := getAssetKey(name)
-
-	// Find the asset key using context-aware search
-	keyStart, keyLen, err := FindAssetKey(content, assetKey)
-	if err != nil {
-		return ""
-	}
-
-	// Find the asset's opening brace
-	openBrace, err := FindOpeningBrace(content, keyStart+keyLen)
-	if err != nil {
-		return ""
-	}
-
-	// Find the matching closing brace
-	closeBrace, err := FindMatchingBrace(content, openBrace)
-	if err != nil {
-		return ""
-	}
-
-	// Extract the asset block and find the origin field using context-aware search
-	block := content[openBrace:closeBrace]
-	keyStart, keyLen, err = FindAssetKey(block, "origin")
-	if err != nil {
-		return ""
-	}
-
-	// Find the quoted value after "origin:"
-	rest := block[keyStart+keyLen:]
-	quoteStart := strings.IndexByte(rest, '"')
-	if quoteStart == -1 {
-		return ""
-	}
-	quoteEnd := strings.IndexByte(rest[quoteStart+1:], '"')
-	if quoteEnd == -1 {
-		return ""
-	}
-
-	return rest[quoteStart+1 : quoteStart+1+quoteEnd]
+	s, _ := originVal.String()
+	return s
 }
 
 // VersionFromOrigin extracts the version string from an origin path.

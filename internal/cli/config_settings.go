@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"cuelang.org/go/cue"
+	"cuelang.org/go/cue/cuecontext"
 	"github.com/grantcarthew/start/internal/config"
 	internalcue "github.com/grantcarthew/start/internal/cue"
 	"github.com/spf13/cobra"
@@ -320,11 +321,18 @@ func loadSettingsFromDir(dir string) (map[string]string, error) {
 // hasNonSettingsContent checks if CUE content has non-settings top-level keys.
 // This prevents accidental data loss when overwriting settings.cue.
 func hasNonSettingsContent(content string) bool {
-	// Top-level keys that indicate non-settings content
-	nonSettingsKeys := []string{"agents:", "roles:", "contexts:", "tasks:"}
+	ctx := cuecontext.New()
+	v := ctx.CompileString(content)
+	if v.Err() != nil {
+		return false
+	}
 
+	nonSettingsKeys := []string{
+		internalcue.KeyAgents, internalcue.KeyContexts,
+		internalcue.KeyRoles, internalcue.KeyTasks,
+	}
 	for _, key := range nonSettingsKeys {
-		if strings.Contains(content, key) {
+		if v.LookupPath(cue.ParsePath(key)).Exists() {
 			return true
 		}
 	}

@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"cuelang.org/go/cue"
 	"github.com/grantcarthew/start/internal/assets"
 	"github.com/grantcarthew/start/internal/config"
 	internalcue "github.com/grantcarthew/start/internal/cue"
@@ -74,8 +75,16 @@ func runAssetsUpdate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("loading configuration: %w", err)
 	}
 
+	// Load local config separately for scope detection
+	var localCfg cue.Value
+	if paths.LocalExists {
+		if v, loadErr := loader.LoadSingle(paths.Local); loadErr == nil {
+			localCfg = v
+		}
+	}
+
 	// Collect installed assets
-	installed := collectInstalledAssets(cfg.Value, paths)
+	installed := collectInstalledAssets(cfg.Value, paths, localCfg)
 
 	if len(installed) == 0 {
 		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "No assets installed from registry.")

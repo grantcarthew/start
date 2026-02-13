@@ -7,11 +7,14 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
+	"cuelang.org/go/cue"
 	"github.com/grantcarthew/start/internal/assets"
 	"github.com/grantcarthew/start/internal/config"
+	internalcue "github.com/grantcarthew/start/internal/cue"
 	"github.com/grantcarthew/start/internal/registry"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
@@ -76,10 +79,22 @@ func runAssetsAdd(cmd *cobra.Command, args []string) error {
 		scopeName = "global"
 	}
 
+	// Load CUE config once for existence checks across all queries.
+	// On error with no CUE files (fresh install), cfg is a zero-value cue.Value;
+	// LookupPath on it returns non-existent, so AssetExists correctly returns false.
+	loader := internalcue.NewLoader()
+	cfg, err := loader.LoadSingle(configDir)
+	if err != nil {
+		if matches, _ := filepath.Glob(filepath.Join(configDir, "*.cue")); len(matches) > 0 {
+			return fmt.Errorf("invalid config in %s:\n%s\nRun 'start doctor' to diagnose",
+				configDir, internalcue.IdentifyBrokenFiles(matches))
+		}
+	}
+
 	// Install each queried asset
 	var errs []error
 	for _, query := range args {
-		if err := installAsset(ctx, cmd, client, index, query, configDir, scopeName, flags); err != nil {
+		if err := installAsset(ctx, cmd, client, index, query, configDir, scopeName, flags, cfg); err != nil {
 			errs = append(errs, fmt.Errorf("%s: %w", query, err))
 			_, _ = fmt.Fprintf(w, "Error installing %q: %v\n", query, err)
 		}
@@ -89,7 +104,7 @@ func runAssetsAdd(cmd *cobra.Command, args []string) error {
 }
 
 // installAsset searches for, selects, and installs a single asset.
-func installAsset(ctx context.Context, cmd *cobra.Command, client *registry.Client, index *registry.Index, query, configDir, scopeName string, flags *Flags) error {
+func installAsset(ctx context.Context, cmd *cobra.Command, client *registry.Client, index *registry.Index, query, configDir, scopeName string, flags *Flags, cfg cue.Value) error {
 	w := cmd.OutOrStdout()
 
 	// Search for matching assets
@@ -107,15 +122,15 @@ func installAsset(ctx context.Context, cmd *cobra.Command, client *registry.Clie
 		selected = results[0]
 	} else {
 		var err error
-		selected, err = promptAssetSelection(w, cmd.InOrStdin(), results, configDir)
+		selected, err = promptAssetSelection(w, cmd.InOrStdin(), results, cfg)
 		if err != nil {
 			return err
 		}
 	}
 
 	// Check if already installed
-	if assets.AssetExists(configDir, selected.Category, selected.Name) {
-		origin := assets.GetInstalledOrigin(configDir, selected.Category, selected.Name)
+	if assets.AssetExists(cfg, selected.Category, selected.Name) {
+		origin := assets.GetInstalledOrigin(cfg, selected.Category, selected.Name)
 
 		// Manually-added asset (no origin) — warn and proceed with install
 		if origin == "" {
@@ -185,7 +200,7 @@ func installAsset(ctx context.Context, cmd *cobra.Command, client *registry.Clie
 }
 
 // promptAssetSelection prompts the user to select an asset from multiple matches.
-func promptAssetSelection(w io.Writer, r io.Reader, results []assets.SearchResult, configDir string) (assets.SearchResult, error) {
+func promptAssetSelection(w io.Writer, r io.Reader, results []assets.SearchResult, cfg cue.Value) (assets.SearchResult, error) {
 	// Check if stdin is a TTY
 	isTTY := false
 	if f, ok := r.(*os.File); ok {
@@ -207,7 +222,7 @@ func promptAssetSelection(w io.Writer, r io.Reader, results []assets.SearchResul
 
 	for i, res := range results {
 		marker := "  "
-		if assets.AssetExists(configDir, res.Category, res.Name) {
+		if assets.AssetExists(cfg, res.Category, res.Name) {
 			marker = colorInstalled.Sprint("★") + " "
 		}
 		_, _ = fmt.Fprintf(w, "  %s%d. ", marker, i+1)
