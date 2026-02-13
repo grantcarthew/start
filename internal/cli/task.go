@@ -155,16 +155,16 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 		} else {
 			// Step 2: No exact match - fetch registry and combine results
 			debugf(flags, "task", "No exact installed match, fetching registry index...")
-
-			ctx := context.Background()
-			client, err := registry.NewClient()
-			if err != nil {
-				return fmt.Errorf("creating registry client: %w", err)
+			if !flags.Quiet {
+				_, _ = fmt.Fprintf(stdout, "Task not found in configuration\n")
 			}
 
-			index, err := client.FetchIndex(ctx)
+			index, client, err := r.ensureIndex()
 			if err != nil {
 				return fmt.Errorf("fetching registry index: %w", err)
+			}
+			if index == nil {
+				return fmt.Errorf("task %q not found and registry is unavailable", taskName)
 			}
 
 			// Check for exact match in registry

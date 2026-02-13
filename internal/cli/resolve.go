@@ -83,6 +83,9 @@ func (r *resolver) resolveAgent(name string) (string, error) {
 	}
 
 	// Tier 2: Exact match in registry
+	if !r.flags.Quiet {
+		_, _ = fmt.Fprintf(r.stdout, "Agent %q not found in configuration\n", name)
+	}
 	index, client, err := r.ensureIndex()
 	if err == nil && index != nil {
 		if result := findExactInRegistry(index.Agents, "agents", name); result != nil {
@@ -148,6 +151,9 @@ func (r *resolver) resolveRole(name string) (string, error) {
 	}
 
 	// Tier 2: Exact match in registry
+	if !r.flags.Quiet {
+		_, _ = fmt.Fprintf(r.stdout, "Role %q not found in configuration\n", name)
+	}
 	index, client, err := r.ensureIndex()
 	if err == nil && index != nil {
 		if result := findExactInRegistry(index.Roles, "roles", name); result != nil {
@@ -278,6 +284,9 @@ func (r *resolver) resolveContexts(terms []string) []string {
 		}
 
 		// Exact name match in registry
+		if !r.flags.Quiet {
+			_, _ = fmt.Fprintf(r.stdout, "Context %q not found in configuration\n", term)
+		}
 		index, client, _ := r.ensureIndex()
 		if index != nil {
 			if result := findExactInRegistry(index.Contexts, "contexts", term); result != nil {
@@ -580,6 +589,10 @@ func (r *resolver) ensureIndex() (*registry.Index, *registry.Client, error) {
 		return r.index, r.client, r.indexErr
 	}
 	r.didFetch = true
+
+	if !r.flags.Quiet {
+		_, _ = fmt.Fprintf(r.stdout, "Fetching registry index...\n")
+	}
 
 	client, err := registry.NewClient()
 	if err != nil {
