@@ -348,15 +348,15 @@ func runConfigRoleInfo(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	role, exists := roles[name]
-	if !exists {
-		return fmt.Errorf("role %q not found", name)
+	resolvedName, role, err := resolveInstalledName(roles, "role", name)
+	if err != nil {
+		return err
 	}
 
 	w := cmd.OutOrStdout()
 	_, _ = fmt.Fprintln(w)
 	_, _ = colorRoles.Fprint(w, "roles")
-	_, _ = fmt.Fprintf(w, "/%s\n", name)
+	_, _ = fmt.Fprintf(w, "/%s\n", resolvedName)
 	PrintSeparator(w)
 
 	_, _ = colorDim.Fprint(w, "Source:")
@@ -453,9 +453,9 @@ func runConfigRoleEdit(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("loading roles: %w", err)
 	}
 
-	role, exists := roles[name]
-	if !exists {
-		return fmt.Errorf("role %q not found in %s config", name, scopeString(local))
+	resolvedName, role, err := resolveInstalledName(roles, "role", name)
+	if err != nil {
+		return err
 	}
 
 	// Check if any edit flags are provided
@@ -482,7 +482,7 @@ func runConfigRoleEdit(cmd *cobra.Command, args []string) error {
 			role.Optional, _ = cmd.Flags().GetBool("optional")
 		}
 
-		roles[name] = role
+		roles[resolvedName] = role
 
 		if err := writeRolesFile(rolePath, roles, order); err != nil {
 			return fmt.Errorf("writing roles file: %w", err)
@@ -490,7 +490,7 @@ func runConfigRoleEdit(cmd *cobra.Command, args []string) error {
 
 		flags := getFlags(cmd)
 		if !flags.Quiet {
-			_, _ = fmt.Fprintf(stdout, "Updated role %q\n", name)
+			_, _ = fmt.Fprintf(stdout, "Updated role %q\n", resolvedName)
 		}
 		return nil
 	}
@@ -505,7 +505,7 @@ func runConfigRoleEdit(cmd *cobra.Command, args []string) error {
 	}
 
 	// Prompt for each field with current value as default
-	_, _ = fmt.Fprintf(stdout, "Editing role %q %s%s%s\n\n", name, colorCyan.Sprint("("), colorDim.Sprint("press Enter to keep current value"), colorCyan.Sprint(")"))
+	_, _ = fmt.Fprintf(stdout, "Editing role %q %s%s%s\n\n", resolvedName, colorCyan.Sprint("("), colorDim.Sprint("press Enter to keep current value"), colorCyan.Sprint(")"))
 
 	newDescription, err := promptString(stdout, stdin, "Description", role.Description)
 	if err != nil {
@@ -589,14 +589,14 @@ func runConfigRoleEdit(cmd *cobra.Command, args []string) error {
 	role.Command = newCommand
 	role.Prompt = newPrompt
 	role.Tags = newTags
-	roles[name] = role
+	roles[resolvedName] = role
 
 	// Write updated file
 	if err := writeRolesFile(rolePath, roles, order); err != nil {
 		return fmt.Errorf("writing roles file: %w", err)
 	}
 
-	_, _ = fmt.Fprintf(stdout, "\nUpdated role %q\n", name)
+	_, _ = fmt.Fprintf(stdout, "\nUpdated role %q\n", resolvedName)
 	return nil
 }
 
@@ -643,8 +643,9 @@ func runConfigRoleRemove(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("loading roles: %w", err)
 	}
 
-	if _, exists := roles[name]; !exists {
-		return fmt.Errorf("role %q not found in %s config", name, scopeString(local))
+	resolvedName, _, err := resolveInstalledName(roles, "role", name)
+	if err != nil {
+		return err
 	}
 
 	// Confirm removal unless --yes flag is set
@@ -656,7 +657,7 @@ func runConfigRoleRemove(cmd *cobra.Command, args []string) error {
 		}
 
 		if isTTY {
-			_, _ = fmt.Fprintf(stdout, "Remove role %q from %s config? %s%s%s ", name, scopeString(local), colorCyan.Sprint("["), colorDim.Sprint("y/N"), colorCyan.Sprint("]"))
+			_, _ = fmt.Fprintf(stdout, "Remove role %q from %s config? %s%s%s ", resolvedName, scopeString(local), colorCyan.Sprint("["), colorDim.Sprint("y/N"), colorCyan.Sprint("]"))
 			reader := bufio.NewReader(stdin)
 			input, err := reader.ReadString('\n')
 			if err != nil {
@@ -671,10 +672,10 @@ func runConfigRoleRemove(cmd *cobra.Command, args []string) error {
 	}
 
 	// Remove role and its order entry
-	delete(roles, name)
+	delete(roles, resolvedName)
 	newOrder := make([]string, 0, len(order))
 	for _, n := range order {
-		if n != name {
+		if n != resolvedName {
 			newOrder = append(newOrder, n)
 		}
 	}
@@ -687,7 +688,7 @@ func runConfigRoleRemove(cmd *cobra.Command, args []string) error {
 
 	flags := getFlags(cmd)
 	if !flags.Quiet {
-		_, _ = fmt.Fprintf(stdout, "Removed role %q\n", name)
+		_, _ = fmt.Fprintf(stdout, "Removed role %q\n", resolvedName)
 	}
 
 	return nil
@@ -697,22 +698,31 @@ func runConfigRoleRemove(cmd *cobra.Command, args []string) error {
 func addConfigRoleDefaultCommand(parent *cobra.Command) {
 	defaultCmd := &cobra.Command{
 		Use:   "default [name]",
-		Short: "Set or show default role",
-		Long: `Set or show the default role.
+		Short: "Set, show, or unset default role",
+		Long: `Set, show, or unset the default role.
 
 Without a name, shows the current default role.
-With a name, sets that role as the default.`,
+With a name, sets that role as the default.
+With --unset, removes the default role setting.`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: runConfigRoleDefault,
 	}
 
+	defaultCmd.Flags().Bool("unset", false, "Remove the default role setting")
+
 	parent.AddCommand(defaultCmd)
 }
 
-// runConfigRoleDefault sets or shows the default role.
+// runConfigRoleDefault sets, shows, or unsets the default role.
 func runConfigRoleDefault(cmd *cobra.Command, args []string) error {
 	stdout := cmd.OutOrStdout()
 	local := getFlags(cmd).Local
+	unset, _ := cmd.Flags().GetBool("unset")
+
+	// Validate: --unset and name are mutually exclusive
+	if unset && len(args) > 0 {
+		return fmt.Errorf("cannot use --unset with a role name")
+	}
 
 	paths, err := config.ResolvePaths("")
 	if err != nil {
@@ -724,6 +734,26 @@ func runConfigRoleDefault(cmd *cobra.Command, args []string) error {
 		configDir = paths.Local
 	} else {
 		configDir = paths.Global
+	}
+
+	// Unset default
+	if unset {
+		settings, _ := loadSettingsFromDir(configDir)
+		if settings == nil {
+			settings = make(map[string]string)
+		}
+		delete(settings, "default_role")
+
+		settingsPath := filepath.Join(configDir, "settings.cue")
+		if err := writeSettingsFile(settingsPath, settings); err != nil {
+			return fmt.Errorf("writing settings file: %w", err)
+		}
+
+		flags := getFlags(cmd)
+		if !flags.Quiet {
+			_, _ = fmt.Fprintln(stdout, "Unset default role")
+		}
+		return nil
 	}
 
 	// Show current default
@@ -750,8 +780,9 @@ func runConfigRoleDefault(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	if _, exists := roles[name]; !exists {
-		return fmt.Errorf("role %q not found", name)
+	resolvedName, _, err := resolveInstalledName(roles, "role", name)
+	if err != nil {
+		return err
 	}
 
 	// Ensure directory exists
@@ -759,15 +790,21 @@ func runConfigRoleDefault(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("creating config directory: %w", err)
 	}
 
-	// Update settings in settings.cue
-	configPath := filepath.Join(configDir, "settings.cue")
-	if err := writeDefaultRoleSetting(configPath, name); err != nil {
-		return fmt.Errorf("writing config file: %w", err)
+	// Load existing settings, set default_role, write back
+	settings, _ := loadSettingsFromDir(configDir)
+	if settings == nil {
+		settings = make(map[string]string)
+	}
+	settings["default_role"] = resolvedName
+
+	settingsPath := filepath.Join(configDir, "settings.cue")
+	if err := writeSettingsFile(settingsPath, settings); err != nil {
+		return fmt.Errorf("writing settings file: %w", err)
 	}
 
 	flags := getFlags(cmd)
 	if !flags.Quiet {
-		_, _ = fmt.Fprintf(stdout, "Set default role to %q\n", name)
+		_, _ = fmt.Fprintf(stdout, "Set default role to %q\n", resolvedName)
 	}
 
 	return nil
@@ -991,14 +1028,3 @@ func getDefaultRoleFromConfig(cfg cue.Value) string {
 	return ""
 }
 
-// writeDefaultRoleSetting writes or updates the default_role setting.
-func writeDefaultRoleSetting(path string, roleName string) error {
-	var sb strings.Builder
-	sb.WriteString("// Auto-generated by start config\n")
-	sb.WriteString("// Edit this file to customize your settings\n\n")
-	sb.WriteString("settings: {\n")
-	sb.WriteString(fmt.Sprintf("\tdefault_role: %q\n", roleName))
-	sb.WriteString("}\n")
-
-	return os.WriteFile(path, []byte(sb.String()), 0644)
-}

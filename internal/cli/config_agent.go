@@ -324,15 +324,15 @@ func runConfigAgentInfo(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	agent, exists := agents[name]
-	if !exists {
-		return fmt.Errorf("agent %q not found", name)
+	resolvedName, agent, err := resolveInstalledName(agents, "agent", name)
+	if err != nil {
+		return err
 	}
 
 	w := cmd.OutOrStdout()
 	_, _ = fmt.Fprintln(w)
 	_, _ = colorAgents.Fprint(w, "agents")
-	_, _ = fmt.Fprintf(w, "/%s\n", name)
+	_, _ = fmt.Fprintf(w, "/%s\n", resolvedName)
 	PrintSeparator(w)
 
 	_, _ = colorDim.Fprint(w, "Source:")
@@ -443,9 +443,9 @@ func runConfigAgentEdit(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("loading agents: %w", err)
 	}
 
-	agent, exists := agents[name]
-	if !exists {
-		return fmt.Errorf("agent %q not found in %s config", name, scopeString(local))
+	resolvedName, agent, err := resolveInstalledName(agents, "agent", name)
+	if err != nil {
+		return err
 	}
 
 	// Check if any edit flags are provided
@@ -481,7 +481,7 @@ func runConfigAgentEdit(cmd *cobra.Command, args []string) error {
 			agent.Tags, _ = cmd.Flags().GetStringSlice("tag")
 		}
 
-		agents[name] = agent
+		agents[resolvedName] = agent
 
 		if err := writeAgentsFile(agentPath, agents); err != nil {
 			return fmt.Errorf("writing agents file: %w", err)
@@ -489,7 +489,7 @@ func runConfigAgentEdit(cmd *cobra.Command, args []string) error {
 
 		flags := getFlags(cmd)
 		if !flags.Quiet {
-			_, _ = fmt.Fprintf(stdout, "Updated agent %q\n", name)
+			_, _ = fmt.Fprintf(stdout, "Updated agent %q\n", resolvedName)
 		}
 		return nil
 	}
@@ -504,7 +504,7 @@ func runConfigAgentEdit(cmd *cobra.Command, args []string) error {
 	}
 
 	// Prompt for each field with current value as default
-	_, _ = fmt.Fprintf(stdout, "Editing agent %q %s%s%s\n\n", name, colorCyan.Sprint("("), colorDim.Sprint("press Enter to keep current value"), colorCyan.Sprint(")"))
+	_, _ = fmt.Fprintf(stdout, "Editing agent %q %s%s%s\n\n", resolvedName, colorCyan.Sprint("("), colorDim.Sprint("press Enter to keep current value"), colorCyan.Sprint(")"))
 
 	newBin, err := promptString(stdout, stdin, "Binary", agent.Bin)
 	if err != nil {
@@ -554,14 +554,14 @@ func runConfigAgentEdit(cmd *cobra.Command, args []string) error {
 	agent.Description = newDescription
 	agent.Models = newModels
 	agent.Tags = newTags
-	agents[name] = agent
+	agents[resolvedName] = agent
 
 	// Write updated file
 	if err := writeAgentsFile(agentPath, agents); err != nil {
 		return fmt.Errorf("writing agents file: %w", err)
 	}
 
-	_, _ = fmt.Fprintf(stdout, "\nUpdated agent %q\n", name)
+	_, _ = fmt.Fprintf(stdout, "\nUpdated agent %q\n", resolvedName)
 	return nil
 }
 
@@ -608,8 +608,9 @@ func runConfigAgentRemove(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("loading agents: %w", err)
 	}
 
-	if _, exists := agents[name]; !exists {
-		return fmt.Errorf("agent %q not found in %s config", name, scopeString(local))
+	resolvedName, _, err := resolveInstalledName(agents, "agent", name)
+	if err != nil {
+		return err
 	}
 
 	// Confirm removal unless --yes flag is set
@@ -621,7 +622,7 @@ func runConfigAgentRemove(cmd *cobra.Command, args []string) error {
 		}
 
 		if isTTY {
-			_, _ = fmt.Fprintf(stdout, "Remove agent %q from %s config? %s%s%s ", name, scopeString(local), colorCyan.Sprint("["), colorDim.Sprint("y/N"), colorCyan.Sprint("]"))
+			_, _ = fmt.Fprintf(stdout, "Remove agent %q from %s config? %s%s%s ", resolvedName, scopeString(local), colorCyan.Sprint("["), colorDim.Sprint("y/N"), colorCyan.Sprint("]"))
 			reader := bufio.NewReader(stdin)
 			input, err := reader.ReadString('\n')
 			if err != nil {
@@ -636,7 +637,7 @@ func runConfigAgentRemove(cmd *cobra.Command, args []string) error {
 	}
 
 	// Remove agent
-	delete(agents, name)
+	delete(agents, resolvedName)
 
 	// Write updated file
 	agentPath := filepath.Join(configDir, "agents.cue")
@@ -646,7 +647,7 @@ func runConfigAgentRemove(cmd *cobra.Command, args []string) error {
 
 	flags := getFlags(cmd)
 	if !flags.Quiet {
-		_, _ = fmt.Fprintf(stdout, "Removed agent %q\n", name)
+		_, _ = fmt.Fprintf(stdout, "Removed agent %q\n", resolvedName)
 	}
 
 	return nil
@@ -656,22 +657,31 @@ func runConfigAgentRemove(cmd *cobra.Command, args []string) error {
 func addConfigAgentDefaultCommand(parent *cobra.Command) {
 	defaultCmd := &cobra.Command{
 		Use:   "default [name]",
-		Short: "Set or show default agent",
-		Long: `Set or show the default agent.
+		Short: "Set, show, or unset default agent",
+		Long: `Set, show, or unset the default agent.
 
 Without a name, shows the current default agent.
-With a name, sets that agent as the default.`,
+With a name, sets that agent as the default.
+With --unset, removes the default agent setting.`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: runConfigAgentDefault,
 	}
 
+	defaultCmd.Flags().Bool("unset", false, "Remove the default agent setting")
+
 	parent.AddCommand(defaultCmd)
 }
 
-// runConfigAgentDefault sets or shows the default agent.
+// runConfigAgentDefault sets, shows, or unsets the default agent.
 func runConfigAgentDefault(cmd *cobra.Command, args []string) error {
 	stdout := cmd.OutOrStdout()
 	local := getFlags(cmd).Local
+	unset, _ := cmd.Flags().GetBool("unset")
+
+	// Validate: --unset and name are mutually exclusive
+	if unset && len(args) > 0 {
+		return fmt.Errorf("cannot use --unset with an agent name")
+	}
 
 	paths, err := config.ResolvePaths("")
 	if err != nil {
@@ -683,6 +693,26 @@ func runConfigAgentDefault(cmd *cobra.Command, args []string) error {
 		configDir = paths.Local
 	} else {
 		configDir = paths.Global
+	}
+
+	// Unset default
+	if unset {
+		settings, _ := loadSettingsFromDir(configDir)
+		if settings == nil {
+			settings = make(map[string]string)
+		}
+		delete(settings, "default_agent")
+
+		settingsPath := filepath.Join(configDir, "settings.cue")
+		if err := writeSettingsFile(settingsPath, settings); err != nil {
+			return fmt.Errorf("writing settings file: %w", err)
+		}
+
+		flags := getFlags(cmd)
+		if !flags.Quiet {
+			_, _ = fmt.Fprintln(stdout, "Unset default agent")
+		}
+		return nil
 	}
 
 	// Show current default
@@ -709,8 +739,9 @@ func runConfigAgentDefault(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	if _, exists := agents[name]; !exists {
-		return fmt.Errorf("agent %q not found", name)
+	resolvedName, _, err := resolveInstalledName(agents, "agent", name)
+	if err != nil {
+		return err
 	}
 
 	// Ensure directory exists
@@ -718,15 +749,21 @@ func runConfigAgentDefault(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("creating config directory: %w", err)
 	}
 
-	// Update settings in settings.cue
-	configPath := filepath.Join(configDir, "settings.cue")
-	if err := writeDefaultAgentSetting(configPath, name); err != nil {
-		return fmt.Errorf("writing config file: %w", err)
+	// Load existing settings, set default_agent, write back
+	settings, _ := loadSettingsFromDir(configDir)
+	if settings == nil {
+		settings = make(map[string]string)
+	}
+	settings["default_agent"] = resolvedName
+
+	settingsPath := filepath.Join(configDir, "settings.cue")
+	if err := writeSettingsFile(settingsPath, settings); err != nil {
+		return fmt.Errorf("writing settings file: %w", err)
 	}
 
 	flags := getFlags(cmd)
 	if !flags.Quiet {
-		_, _ = fmt.Fprintf(stdout, "Set default agent to %q\n", name)
+		_, _ = fmt.Fprintf(stdout, "Set default agent to %q\n", resolvedName)
 	}
 
 	return nil
@@ -978,36 +1015,4 @@ func getDefaultAgentFromConfig(cfg cue.Value) string {
 	return ""
 }
 
-// writeDefaultAgentSetting writes or updates the default_agent setting.
-func writeDefaultAgentSetting(path string, agentName string) error {
-	// Read existing settings if file exists
-	settings := make(map[string]string)
-	if data, err := os.ReadFile(path); err == nil {
-		// Parse existing settings (simple approach)
-		// For now, we just overwrite the file with the setting
-		_ = data // Would parse existing settings here
-	}
-
-	settings["default_agent"] = agentName
-
-	var sb strings.Builder
-	sb.WriteString("// Auto-generated by start config\n")
-	sb.WriteString("// Edit this file to customize your settings\n\n")
-	sb.WriteString("settings: {\n")
-
-	// Sort keys for consistent output
-	var keys []string
-	for k := range settings {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-
-	for _, k := range keys {
-		sb.WriteString(fmt.Sprintf("\tdefault_agent: %q\n", settings[k]))
-	}
-
-	sb.WriteString("}\n")
-
-	return os.WriteFile(path, []byte(sb.String()), 0644)
-}
 

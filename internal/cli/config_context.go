@@ -374,15 +374,15 @@ func runConfigContextInfo(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	ctx, exists := contexts[name]
-	if !exists {
-		return fmt.Errorf("context %q not found", name)
+	resolvedName, ctx, err := resolveInstalledName(contexts, "context", name)
+	if err != nil {
+		return err
 	}
 
 	w := cmd.OutOrStdout()
 	_, _ = fmt.Fprintln(w)
 	_, _ = colorContexts.Fprint(w, "contexts")
-	_, _ = fmt.Fprintf(w, "/%s\n", name)
+	_, _ = fmt.Fprintf(w, "/%s\n", resolvedName)
 	PrintSeparator(w)
 
 	_, _ = colorDim.Fprint(w, "Source:")
@@ -484,9 +484,9 @@ func runConfigContextEdit(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("loading contexts: %w", err)
 	}
 
-	ctx, exists := contexts[name]
-	if !exists {
-		return fmt.Errorf("context %q not found in %s config", name, scopeString(local))
+	resolvedName, ctx, err := resolveInstalledName(contexts, "context", name)
+	if err != nil {
+		return err
 	}
 
 	// Check if any edit flags are provided
@@ -516,7 +516,7 @@ func runConfigContextEdit(cmd *cobra.Command, args []string) error {
 			ctx.Tags, _ = cmd.Flags().GetStringSlice("tag")
 		}
 
-		contexts[name] = ctx
+		contexts[resolvedName] = ctx
 
 		if err := writeContextsFile(contextPath, contexts, order); err != nil {
 			return fmt.Errorf("writing contexts file: %w", err)
@@ -524,7 +524,7 @@ func runConfigContextEdit(cmd *cobra.Command, args []string) error {
 
 		flags := getFlags(cmd)
 		if !flags.Quiet {
-			_, _ = fmt.Fprintf(stdout, "Updated context %q\n", name)
+			_, _ = fmt.Fprintf(stdout, "Updated context %q\n", resolvedName)
 		}
 		return nil
 	}
@@ -539,7 +539,7 @@ func runConfigContextEdit(cmd *cobra.Command, args []string) error {
 	}
 
 	// Prompt for each field with current value as default
-	_, _ = fmt.Fprintf(stdout, "Editing context %q %s%s%s\n\n", name, colorCyan.Sprint("("), colorDim.Sprint("press Enter to keep current value"), colorCyan.Sprint(")"))
+	_, _ = fmt.Fprintf(stdout, "Editing context %q %s%s%s\n\n", resolvedName, colorCyan.Sprint("("), colorDim.Sprint("press Enter to keep current value"), colorCyan.Sprint(")"))
 
 	newDescription, err := promptString(stdout, stdin, "Description", ctx.Description)
 	if err != nil {
@@ -644,14 +644,14 @@ func runConfigContextEdit(cmd *cobra.Command, args []string) error {
 	ctx.Required = newRequired
 	ctx.Default = newDefault
 	ctx.Tags = newTags
-	contexts[name] = ctx
+	contexts[resolvedName] = ctx
 
 	// Write updated file
 	if err := writeContextsFile(contextPath, contexts, order); err != nil {
 		return fmt.Errorf("writing contexts file: %w", err)
 	}
 
-	_, _ = fmt.Fprintf(stdout, "\nUpdated context %q\n", name)
+	_, _ = fmt.Fprintf(stdout, "\nUpdated context %q\n", resolvedName)
 	return nil
 }
 
@@ -698,8 +698,9 @@ func runConfigContextRemove(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("loading contexts: %w", err)
 	}
 
-	if _, exists := contexts[name]; !exists {
-		return fmt.Errorf("context %q not found in %s config", name, scopeString(local))
+	resolvedName, _, err := resolveInstalledName(contexts, "context", name)
+	if err != nil {
+		return err
 	}
 
 	// Confirm removal unless --yes flag is set
@@ -711,7 +712,7 @@ func runConfigContextRemove(cmd *cobra.Command, args []string) error {
 		}
 
 		if isTTY {
-			_, _ = fmt.Fprintf(stdout, "Remove context %q from %s config? %s%s%s ", name, scopeString(local), colorCyan.Sprint("["), colorDim.Sprint("y/N"), colorCyan.Sprint("]"))
+			_, _ = fmt.Fprintf(stdout, "Remove context %q from %s config? %s%s%s ", resolvedName, scopeString(local), colorCyan.Sprint("["), colorDim.Sprint("y/N"), colorCyan.Sprint("]"))
 			reader := bufio.NewReader(stdin)
 			input, err := reader.ReadString('\n')
 			if err != nil {
@@ -726,10 +727,10 @@ func runConfigContextRemove(cmd *cobra.Command, args []string) error {
 	}
 
 	// Remove context and its order entry
-	delete(contexts, name)
+	delete(contexts, resolvedName)
 	newOrder := make([]string, 0, len(order))
 	for _, n := range order {
-		if n != name {
+		if n != resolvedName {
 			newOrder = append(newOrder, n)
 		}
 	}
@@ -742,7 +743,7 @@ func runConfigContextRemove(cmd *cobra.Command, args []string) error {
 
 	flags := getFlags(cmd)
 	if !flags.Quiet {
-		_, _ = fmt.Fprintf(stdout, "Removed context %q\n", name)
+		_, _ = fmt.Fprintf(stdout, "Removed context %q\n", resolvedName)
 	}
 
 	return nil
