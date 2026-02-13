@@ -257,7 +257,7 @@ func TestPrintSearchResults(t *testing.T) {
 		printSearchResults(&buf, results, false, installed)
 		output := buf.String()
 
-		if !strings.Contains(output, "*") {
+		if !strings.Contains(output, "★") {
 			t.Errorf("output missing installed marker for ai/claude, got: %s", output)
 		}
 	})

@@ -46,9 +46,10 @@ Definitions: `internal/cli/output.go`
 
 | Marker | Colour | Usage |
 |--------|--------|-------|
-| Installed `*` | HiGreen | `colorInstalled` |
+| Installed `★` | HiGreen | `colorInstalled`, left-side prefix |
+| Default `→` | HiGreen | `colorInstalled`, left-side prefix |
 | Version arrows `->` | Blue | `colorBlue` |
-| Parenthetical delimiters | Cyan | `colorCyan` |
+| Delimiters `()` `[]` | Cyan | `colorCyan` |
 
 ### Formatting Rules
 
@@ -91,24 +92,24 @@ Review each command by running it, checking output against DR-042, adjusting cod
 - [x] `./start assets search <query> --verbose`
 - [x] `./start assets info <query>`
 - [x] `./start assets info <query> --verbose`
-- [ ] `./start assets add <query>`
-- [ ] `./start assets update`
-- [ ] `./start assets update <query>`
-- [ ] `./start assets browse`
+- [x] `./start assets add <query>`
+- [x] `./start assets update`
+- [x] `./start assets update <query>`
+- [x] `./start assets browse`
 
 ### Search
 
-- [ ] `./start search <query>`
-- [ ] `./start search <query> --verbose`
+- [x] `./start search <query>`
+- [x] `./start search <query> --verbose`
 
 ### Config Overview
 
-- [ ] `./start config`
-- [ ] `./start config --local`
+- [x] `./start config`
+- [x] `./start config --local`
 
 ### Config Agent
 
-- [ ] `./start config agent list`
+- [x] `./start config agent list`
 - [ ] `./start config agent info <name>`
 - [ ] `./start config agent add` (interactive)
 - [ ] `./start config agent edit <name>` (interactive)
@@ -118,7 +119,7 @@ Review each command by running it, checking output against DR-042, adjusting cod
 
 ### Config Role
 
-- [ ] `./start config role list`
+- [x] `./start config role list`
 - [ ] `./start config role info <name>`
 - [ ] `./start config role add` (interactive)
 - [ ] `./start config role edit <name>` (interactive)
@@ -129,7 +130,7 @@ Review each command by running it, checking output against DR-042, adjusting cod
 
 ### Config Context
 
-- [ ] `./start config context list`
+- [x] `./start config context list`
 - [ ] `./start config context info <name>`
 - [ ] `./start config context add` (interactive)
 - [ ] `./start config context edit <name>` (interactive)
@@ -138,7 +139,7 @@ Review each command by running it, checking output against DR-042, adjusting cod
 
 ### Config Task
 
-- [ ] `./start config task list`
+- [x] `./start config task list`
 - [ ] `./start config task info <name>`
 - [ ] `./start config task add` (interactive)
 - [ ] `./start config task edit <name>` (interactive)
@@ -146,7 +147,7 @@ Review each command by running it, checking output against DR-042, adjusting cod
 
 ### Config Settings
 
-- [ ] `./start config settings`
+- [x] `./start config settings`
 - [ ] `./start config settings <key> <value>`
 
 ### Config Order

@@ -13,7 +13,6 @@ See [p-writing-guide.md](./p-writing-guide.md) for guidelines on creating and ma
 | Project | Title | Started |
 |---------|-------|---------|
 | [p-022](./p-022-assets-ast-refactor.md) | Assets AST Refactor | Pending |
-| [p-024](./p-024-cli-flag-asset-search.md) | CLI Flag Asset Search | Pending |
 
 ### Completed Projects
 
@@ -41,6 +40,7 @@ See [p-writing-guide.md](./p-writing-guide.md) for guidelines on creating and ma
 | [p-020](./completed/p-020-role-optional-field.md) | Role Optional Field | 2026-01-31 |
 | [p-021](./completed/p-021-auto-setup-default-assets.md) | Auto-Setup Default Assets | 2026-02-08 |
 | [p-023](./completed/p-023-cli-config-reorder.md) | CLI Config Reorder | 2026-02-08 |
+| [p-024](./completed/p-024-cli-flag-asset-search.md) | CLI Flag Asset Search | 2026-02-13 |
 
 ---
 
@@ -56,15 +56,15 @@ Refactor asset installation code to use CUE's AST APIs instead of fragile string
 
 **Dependencies:** p-021
 
+### Completed
+
 #### p-024: CLI Flag Asset Search
 
-Extend substring search to `--agent`, `--role`, `--model`, and `--context` flags. Replace exact-match-only resolution with three-tier search (exact config, exact registry, substring search). Change `--context` from tag-only to unified search.
+Extended substring search to `--agent`, `--role`, `--model`, and `--context` flags. Three-tier resolution (exact config, exact registry, substring search) with auto-install. Changed `--context` from tag-only to unified search.
 
-**Key Deliverables:** Updated flag resolution in start.go/executor.go/composer.go, installed config search, DR-041
+**Key Deliverables:** `resolve.go` resolver, `SearchInstalledConfig()`, flag integration in start.go/task.go, DR-041
 
 **Dependencies:** p-021
-
-### Completed
 
 #### p-023: CLI Config Reorder
 
