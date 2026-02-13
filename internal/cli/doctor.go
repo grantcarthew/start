@@ -22,8 +22,9 @@ var (
 // addDoctorCommand adds the doctor command to the parent command.
 func addDoctorCommand(parent *cobra.Command) {
 	cmd := &cobra.Command{
-		Use:   "doctor",
-		Short: "Diagnose start installation and configuration",
+		Use:     "doctor",
+		GroupID: "utilities",
+		Short:   "Diagnose start installation and configuration",
 		Long: `Performs comprehensive health check of start installation, configuration,
 and environment. Reports issues, warnings, and suggestions.
 

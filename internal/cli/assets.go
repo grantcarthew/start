@@ -15,6 +15,7 @@ func addAssetsCommand(parent *cobra.Command) {
 	assetsCmd := &cobra.Command{
 		Use:     "assets",
 		Aliases: []string{"asset"},
+		GroupID: "commands",
 		Short:   "Manage assets from the CUE registry",
 		Long: `Manage assets (roles, tasks, contexts, agents) from the CUE Central Registry.
 

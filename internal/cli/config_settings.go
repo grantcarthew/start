@@ -31,17 +31,15 @@ func addConfigSettingsCommand(parent *cobra.Command) {
 		Short:   "Manage settings configuration",
 		Long: `Manage settings for start.
 
-Usage:
-  start config settings              List all settings
-  start config settings <key>        Show a setting value
-  start config settings <key> <val>  Set a setting value
-  start config settings edit         Open settings.cue in $EDITOR
-
 Available settings:
   default_agent  Agent to use when --agent not specified
   default_role   Role to use when --role not specified
   shell          Shell for command execution (default: auto-detect)
   timeout        Command timeout in seconds`,
+		Example: `  start config settings              List all settings
+  start config settings <key>        Show a setting value
+  start config settings <key> <val>  Set a setting value
+  start config settings edit         Open settings.cue in $EDITOR`,
 		Args: cobra.MaximumNArgs(2),
 		RunE: executeConfigSettings,
 	}

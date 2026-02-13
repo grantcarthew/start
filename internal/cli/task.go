@@ -44,6 +44,7 @@ func addTaskCommand(parent *cobra.Command) {
 	taskCmd := &cobra.Command{
 		Use:     "task [name] [instructions]",
 		Aliases: []string{"tasks"},
+		GroupID: "commands",
 		Short:   "Run a predefined task",
 		Long: `Run a predefined task with optional instructions.
 

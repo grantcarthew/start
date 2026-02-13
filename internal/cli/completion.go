@@ -9,6 +9,7 @@ func addCompletionCommand(parent *cobra.Command) {
 	completionCmd := &cobra.Command{
 		Use:     "completion",
 		Aliases: []string{"completions"},
+		GroupID: "utilities",
 		Short:   "Generate shell completion scripts",
 		Long: `Generate shell completion scripts for bash, zsh, or fish.
 

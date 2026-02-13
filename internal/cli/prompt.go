@@ -10,8 +10,9 @@ import (
 // addPromptCommand adds the prompt command to the parent command.
 func addPromptCommand(parent *cobra.Command) {
 	promptCmd := &cobra.Command{
-		Use:   "prompt [text]",
-		Short: "Launch AI agent with custom prompt",
+		Use:     "prompt [text]",
+		GroupID: "commands",
+		Short:   "Launch AI agent with custom prompt",
 		Long: `Launch AI agent with a custom prompt and only required contexts.
 
 The argument can be inline text or a file path (starting with ./, /, or ~).
