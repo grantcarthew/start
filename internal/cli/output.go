@@ -78,13 +78,30 @@ func PrintSeparator(w io.Writer) {
 }
 
 // PrintContextTable prints contexts in a table format.
-// Shows all contexts (loaded and failed) with status indicator.
-func PrintContextTable(w io.Writer, contexts []orchestration.Context) {
+// Shows all contexts (loaded, skipped, and failed) with status indicator.
+func PrintContextTable(w io.Writer, contexts []orchestration.Context, selection orchestration.ContextSelection) {
 	if len(contexts) == 0 {
 		return
 	}
 
+	// Build selection label from criteria (exclude file paths)
+	var parts []string
+	if selection.IncludeRequired {
+		parts = append(parts, "required")
+	}
+	if selection.IncludeDefaults && len(selection.Tags) == 0 {
+		parts = append(parts, "default")
+	}
+	for _, tag := range selection.Tags {
+		if !orchestration.IsFilePath(tag) {
+			parts = append(parts, tag)
+		}
+	}
+
 	_, _ = colorContexts.Fprint(w, "Context:")
+	if len(parts) > 0 {
+		_, _ = fmt.Fprintf(w, " %s%s%s", colorCyan.Sprint("("), colorDim.Sprint(strings.Join(parts, ", ")), colorCyan.Sprint(")"))
+	}
 	_, _ = fmt.Fprintln(w)
 
 	// Calculate column widths
@@ -101,9 +118,9 @@ func PrintContextTable(w io.Writer, contexts []orchestration.Context) {
 
 	rows := make([]row, len(contexts))
 	for i, ctx := range contexts {
-		// Status: ✓ for loaded, ○ for failed
+		// Status: ✓ for loaded, ○ for skipped/error
 		status := "✓"
-		if ctx.Error != "" {
+		if ctx.Status == "skipped" || ctx.Status == "error" {
 			status = "○"
 		}
 

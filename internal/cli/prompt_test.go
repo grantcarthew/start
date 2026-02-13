@@ -303,14 +303,32 @@ settings: {
 
 	output := stdout.String()
 
-	// Should include required context
+	// Should include required context with loaded status
 	if !strings.Contains(output, "required_context") {
 		t.Errorf("output should include required_context, got: %s", output)
 	}
 
-	// Should NOT include default-only context (per DR-014)
-	// The prompt command uses IncludeDefaults: false
-	if strings.Contains(output, "default_context") {
-		t.Errorf("output should NOT include default_context (only required), got: %s", output)
+	// Default context should appear in context table with skipped status (○)
+	// but should NOT appear in the prompt section
+	if !strings.Contains(output, "default_context") {
+		t.Errorf("output should show default_context (as skipped), got: %s", output)
+	}
+
+	// Verify it's shown as skipped (○), not loaded (✓)
+	// Find the default_context line and check it has ○
+	for _, line := range strings.Split(output, "\n") {
+		if strings.Contains(line, "default_context") {
+			if !strings.Contains(line, "○") {
+				t.Errorf("default_context should show skipped status (○), got line: %s", line)
+			}
+			if strings.Contains(line, "✓") {
+				t.Errorf("default_context should NOT show loaded status (✓), got line: %s", line)
+			}
+		}
+	}
+
+	// Verify default context content is NOT in the prompt
+	if strings.Contains(output, "This is default only") {
+		t.Errorf("prompt should NOT contain default context content, got: %s", output)
 	}
 }
