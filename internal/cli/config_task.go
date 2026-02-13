@@ -352,15 +352,15 @@ func runConfigTaskInfo(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	task, exists := tasks[name]
-	if !exists {
-		return fmt.Errorf("task %q not found", name)
+	resolvedName, task, err := resolveInstalledName(tasks, "task", name)
+	if err != nil {
+		return err
 	}
 
 	w := cmd.OutOrStdout()
 	_, _ = fmt.Fprintln(w)
 	_, _ = colorTasks.Fprint(w, "tasks")
-	_, _ = fmt.Fprintf(w, "/%s\n", name)
+	_, _ = fmt.Fprintf(w, "/%s\n", resolvedName)
 	PrintSeparator(w)
 
 	_, _ = colorDim.Fprint(w, "Source:")
@@ -461,9 +461,9 @@ func runConfigTaskEdit(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("loading tasks: %w", err)
 	}
 
-	task, exists := tasks[name]
-	if !exists {
-		return fmt.Errorf("task %q not found in %s config", name, scopeString(local))
+	resolvedName, task, err := resolveInstalledName(tasks, "task", name)
+	if err != nil {
+		return err
 	}
 
 	// Check if any edit flags are provided
@@ -490,7 +490,7 @@ func runConfigTaskEdit(cmd *cobra.Command, args []string) error {
 			task.Tags, _ = cmd.Flags().GetStringSlice("tag")
 		}
 
-		tasks[name] = task
+		tasks[resolvedName] = task
 
 		if err := writeTasksFile(taskPath, tasks); err != nil {
 			return fmt.Errorf("writing tasks file: %w", err)
@@ -498,7 +498,7 @@ func runConfigTaskEdit(cmd *cobra.Command, args []string) error {
 
 		flags := getFlags(cmd)
 		if !flags.Quiet {
-			_, _ = fmt.Fprintf(stdout, "Updated task %q\n", name)
+			_, _ = fmt.Fprintf(stdout, "Updated task %q\n", resolvedName)
 		}
 		return nil
 	}
@@ -513,7 +513,7 @@ func runConfigTaskEdit(cmd *cobra.Command, args []string) error {
 	}
 
 	// Prompt for each field with current value as default
-	_, _ = fmt.Fprintf(stdout, "Editing task %q %s%s%s\n\n", name, colorCyan.Sprint("("), colorDim.Sprint("press Enter to keep current value"), colorCyan.Sprint(")"))
+	_, _ = fmt.Fprintf(stdout, "Editing task %q %s%s%s\n\n", resolvedName, colorCyan.Sprint("("), colorDim.Sprint("press Enter to keep current value"), colorCyan.Sprint(")"))
 
 	newDescription, err := promptString(stdout, stdin, "Description", task.Description)
 	if err != nil {
@@ -603,14 +603,14 @@ func runConfigTaskEdit(cmd *cobra.Command, args []string) error {
 	task.Prompt = newPrompt
 	task.Role = newRole
 	task.Tags = newTags
-	tasks[name] = task
+	tasks[resolvedName] = task
 
 	// Write updated file
 	if err := writeTasksFile(taskPath, tasks); err != nil {
 		return fmt.Errorf("writing tasks file: %w", err)
 	}
 
-	_, _ = fmt.Fprintf(stdout, "\nUpdated task %q\n", name)
+	_, _ = fmt.Fprintf(stdout, "\nUpdated task %q\n", resolvedName)
 	return nil
 }
 
@@ -657,8 +657,9 @@ func runConfigTaskRemove(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("loading tasks: %w", err)
 	}
 
-	if _, exists := tasks[name]; !exists {
-		return fmt.Errorf("task %q not found in %s config", name, scopeString(local))
+	resolvedName, _, err := resolveInstalledName(tasks, "task", name)
+	if err != nil {
+		return err
 	}
 
 	// Confirm removal unless --yes flag is set
@@ -670,7 +671,7 @@ func runConfigTaskRemove(cmd *cobra.Command, args []string) error {
 		}
 
 		if isTTY {
-			_, _ = fmt.Fprintf(stdout, "Remove task %q from %s config? %s%s%s ", name, scopeString(local), colorCyan.Sprint("["), colorDim.Sprint("y/N"), colorCyan.Sprint("]"))
+			_, _ = fmt.Fprintf(stdout, "Remove task %q from %s config? %s%s%s ", resolvedName, scopeString(local), colorCyan.Sprint("["), colorDim.Sprint("y/N"), colorCyan.Sprint("]"))
 			reader := bufio.NewReader(stdin)
 			input, err := reader.ReadString('\n')
 			if err != nil {
@@ -685,7 +686,7 @@ func runConfigTaskRemove(cmd *cobra.Command, args []string) error {
 	}
 
 	// Remove task
-	delete(tasks, name)
+	delete(tasks, resolvedName)
 
 	// Write updated file
 	taskPath := filepath.Join(configDir, "tasks.cue")
@@ -695,7 +696,7 @@ func runConfigTaskRemove(cmd *cobra.Command, args []string) error {
 
 	flags := getFlags(cmd)
 	if !flags.Quiet {
-		_, _ = fmt.Fprintf(stdout, "Removed task %q\n", name)
+		_, _ = fmt.Fprintf(stdout, "Removed task %q\n", resolvedName)
 	}
 
 	return nil

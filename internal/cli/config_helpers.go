@@ -9,6 +9,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/grantcarthew/start/internal/assets"
 )
 
 // promptString prompts for a string value with a default.
@@ -372,4 +374,69 @@ func scopeString(local bool) string {
 		return "local"
 	}
 	return "global"
+}
+
+// resolveInstalledName resolves a name from a map using exact match first,
+// then regex-based search. Returns the resolved key and value.
+// On zero matches, returns a "not found" error.
+// On multiple matches, returns an "ambiguous" error listing the matches.
+func resolveInstalledName[T any](items map[string]T, typeName, query string) (string, T, error) {
+	var zero T
+
+	// Fast path: exact match
+	if val, ok := items[query]; ok {
+		return query, val, nil
+	}
+
+	// Regex-based search across map keys
+	terms := assets.ParseSearchPatterns(query)
+	if len(terms) == 0 {
+		return "", zero, fmt.Errorf("%s %q not found", typeName, query)
+	}
+
+	patterns, err := assets.CompileSearchTerms(terms)
+	if err != nil {
+		return "", zero, fmt.Errorf("%s %q not found (invalid pattern: %w)", typeName, query, err)
+	}
+
+	type match struct {
+		name  string
+		score int
+	}
+	var matches []match
+
+	for name := range items {
+		score := 0
+		for _, pattern := range patterns {
+			if pattern.MatchString(name) {
+				score += 3
+			}
+		}
+		if score > 0 {
+			matches = append(matches, match{name: name, score: score})
+		}
+	}
+
+	// Sort by score descending, then name ascending
+	sort.Slice(matches, func(i, j int) bool {
+		if matches[i].score != matches[j].score {
+			return matches[i].score > matches[j].score
+		}
+		return matches[i].name < matches[j].name
+	})
+
+	switch len(matches) {
+	case 0:
+		return "", zero, fmt.Errorf("%s %q not found", typeName, query)
+	case 1:
+		name := matches[0].name
+		return name, items[name], nil
+	default:
+		names := make([]string, len(matches))
+		for i, m := range matches {
+			names[i] = m.name
+		}
+		return "", zero, fmt.Errorf("ambiguous %s %q matches multiple entries: %s",
+			typeName, query, strings.Join(names, ", "))
+	}
 }
