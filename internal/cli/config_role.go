@@ -102,7 +102,6 @@ func runConfigRoleList(cmd *cobra.Command, _ []string) error {
 		}
 	}
 
-
 	return nil
 }
 
@@ -890,4 +889,3 @@ func writeRolesFile(path string, roles map[string]RoleConfig, order []string) er
 
 	return os.WriteFile(path, []byte(sb.String()), 0644)
 }
-
