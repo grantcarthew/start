@@ -169,6 +169,19 @@ func PrintContextTable(w io.Writer, contexts []orchestration.Context) {
 	_, _ = fmt.Fprintln(w)
 }
 
+// PrintAgentModel prints the Agent and Model lines with colour formatting.
+func PrintAgentModel(w io.Writer, agent orchestration.Agent, model, modelSource string) {
+	_, _ = colorAgents.Fprint(w, "Agent:")
+	_, _ = fmt.Fprintf(w, " %s\n", agent.Name)
+	_, _ = colorAgents.Fprint(w, "Model:")
+	if model != "" {
+		_, _ = fmt.Fprintf(w, " %s %s%s%s\n", model, colorCyan.Sprint("("), colorDim.Sprintf("via %s", modelSource), colorCyan.Sprint(")"))
+	} else {
+		_, _ = fmt.Fprintln(w, " -")
+	}
+	_, _ = fmt.Fprintln(w)
+}
+
 // PrintRoleTable prints the role resolution chain in a table format.
 // Shows status indicator: ✓ for loaded, ○ for skipped/error.
 func PrintRoleTable(w io.Writer, resolutions []orchestration.RoleResolution) {

@@ -482,18 +482,8 @@ func printExecutionInfo(w io.Writer, agent orchestration.Agent, model, modelSour
 	PrintHeader(w, "Starting AI Agent")
 	PrintSeparator(w)
 
-	_, _ = colorAgents.Fprint(w, "Agent:")
-	_, _ = fmt.Fprintf(w, " %s\n", agent.Name)
-	_, _ = colorAgents.Fprint(w, "Model:")
-	if model != "" {
-		_, _ = fmt.Fprintf(w, " %s %s%s%s\n", model, colorCyan.Sprint("("), colorDim.Sprintf("via %s", modelSource), colorCyan.Sprint(")"))
-	} else {
-		_, _ = fmt.Fprintln(w, " -")
-	}
-	_, _ = fmt.Fprintln(w)
-
+	PrintAgentModel(w, agent, model, modelSource)
 	PrintContextTable(w, result.Contexts)
-
 	PrintRoleTable(w, result.RoleResolutions)
 
 	_, _ = fmt.Fprintf(w, "Starting %s - awaiting response...\n", agent.Name)
@@ -504,18 +494,8 @@ func printDryRunSummary(w io.Writer, agent orchestration.Agent, model, modelSour
 	PrintHeader(w, "Dry Run - Agent Not Executed")
 	PrintSeparator(w)
 
-	_, _ = colorAgents.Fprint(w, "Agent:")
-	_, _ = fmt.Fprintf(w, " %s\n", agent.Name)
-	_, _ = colorAgents.Fprint(w, "Model:")
-	if model != "" {
-		_, _ = fmt.Fprintf(w, " %s %s%s%s\n", model, colorCyan.Sprint("("), colorDim.Sprintf("via %s", modelSource), colorCyan.Sprint(")"))
-	} else {
-		_, _ = fmt.Fprintln(w, " -")
-	}
-	_, _ = fmt.Fprintln(w)
-
+	PrintAgentModel(w, agent, model, modelSource)
 	PrintContextTable(w, result.Contexts)
-
 	PrintRoleTable(w, result.RoleResolutions)
 
 	// Show role preview

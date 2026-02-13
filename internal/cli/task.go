@@ -374,6 +374,14 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 	printWarnings(flags, stderr, taskResult.Warnings)
 	printWarnings(flags, stderr, composeResult.Warnings)
 
+	// Determine effective model and its source
+	model, modelSource := resolveModel(resolvedModel, env.Agent.DefaultModel)
+	if model != "" {
+		debugf(flags, "task", "Model: %s (%s)", model, modelSource)
+	} else {
+		debugf(flags, "task", "Model: agent default (none specified)")
+	}
+
 	// Build execution config
 	execConfig := orchestration.ExecuteConfig{
 		Agent:      env.Agent,
@@ -395,12 +403,12 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 
 	if flags.DryRun {
 		debugf(flags, "exec", "Dry-run mode, skipping execution")
-		return executeTaskDryRun(stdout, env.Executor, execConfig, composeResult, env.Agent, resolvedName, instructions)
+		return executeTaskDryRun(stdout, env.Executor, execConfig, composeResult, env.Agent, model, modelSource, resolvedName, instructions)
 	}
 
 	// Print execution info
 	if !flags.Quiet {
-		printTaskExecutionInfo(stdout, env.Agent, flags.Model, composeResult, resolvedName, instructions, taskResult)
+		printTaskExecutionInfo(stdout, env.Agent, model, modelSource, composeResult, resolvedName, instructions, taskResult)
 	}
 
 	debugf(flags, "exec", "Executing agent (process replacement)")
@@ -409,7 +417,7 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 }
 
 // executeTaskDryRun handles --dry-run mode for tasks.
-func executeTaskDryRun(w io.Writer, executor *orchestration.Executor, cfg orchestration.ExecuteConfig, result orchestration.ComposeResult, agent orchestration.Agent, taskName, instructions string) error {
+func executeTaskDryRun(w io.Writer, executor *orchestration.Executor, cfg orchestration.ExecuteConfig, result orchestration.ComposeResult, agent orchestration.Agent, model, modelSource, taskName, instructions string) error {
 	// Build command string
 	cmdStr, err := executor.BuildCommand(cfg)
 	if err != nil {
@@ -438,29 +446,18 @@ func executeTaskDryRun(w io.Writer, executor *orchestration.Executor, cfg orches
 	}
 
 	// Print summary
-	printTaskDryRunSummary(w, agent, cfg.Model, result, dir, taskName, instructions)
+	printTaskDryRunSummary(w, agent, model, modelSource, result, dir, taskName, instructions)
 
 	return nil
 }
 
 // printTaskExecutionInfo prints the task execution summary.
-func printTaskExecutionInfo(w io.Writer, agent orchestration.Agent, model string, result orchestration.ComposeResult, taskName, instructions string, taskResult orchestration.ProcessResult) {
+func printTaskExecutionInfo(w io.Writer, agent orchestration.Agent, model, modelSource string, result orchestration.ComposeResult, taskName, instructions string, taskResult orchestration.ProcessResult) {
 	PrintHeader(w, fmt.Sprintf("Starting Task: %s", taskName))
 	PrintSeparator(w)
 
-	modelStr := model
-	if modelStr == "" {
-		modelStr = agent.DefaultModel
-	}
-	if modelStr == "" {
-		modelStr = "-"
-	}
-	_, _ = fmt.Fprintf(w, "Agent: %s\n", agent.Name)
-	_, _ = fmt.Fprintf(w, "Model: %s\n", modelStr)
-	_, _ = fmt.Fprintln(w)
-
+	PrintAgentModel(w, agent, model, modelSource)
 	PrintContextTable(w, result.Contexts)
-
 	PrintRoleTable(w, result.RoleResolutions)
 
 	if taskResult.CommandExecuted {
@@ -476,23 +473,12 @@ func printTaskExecutionInfo(w io.Writer, agent orchestration.Agent, model string
 }
 
 // printTaskDryRunSummary prints the task dry-run summary.
-func printTaskDryRunSummary(w io.Writer, agent orchestration.Agent, model string, result orchestration.ComposeResult, dir, taskName, instructions string) {
+func printTaskDryRunSummary(w io.Writer, agent orchestration.Agent, model, modelSource string, result orchestration.ComposeResult, dir, taskName, instructions string) {
 	PrintHeader(w, fmt.Sprintf("Dry Run - Task: %s", taskName))
 	PrintSeparator(w)
 
-	modelStr := model
-	if modelStr == "" {
-		modelStr = agent.DefaultModel
-	}
-	if modelStr == "" {
-		modelStr = "-"
-	}
-	_, _ = fmt.Fprintf(w, "Agent: %s\n", agent.Name)
-	_, _ = fmt.Fprintf(w, "Model: %s\n", modelStr)
-	_, _ = fmt.Fprintln(w)
-
+	PrintAgentModel(w, agent, model, modelSource)
 	PrintContextTable(w, result.Contexts)
-
 	PrintRoleTable(w, result.RoleResolutions)
 
 	if instructions != "" {
@@ -512,7 +498,8 @@ func printTaskDryRunSummary(w io.Writer, agent orchestration.Agent, model string
 		_, _ = fmt.Fprintln(w)
 	}
 
-	_, _ = fmt.Fprintf(w, "Files: %s/\n", dir)
+	_, _ = colorDim.Fprint(w, "Files:")
+	_, _ = fmt.Fprintf(w, " %s/\n", dir)
 	_, _ = fmt.Fprintln(w, "  role.md")
 	_, _ = fmt.Fprintln(w, "  prompt.md")
 	_, _ = fmt.Fprintln(w, "  command.txt")
