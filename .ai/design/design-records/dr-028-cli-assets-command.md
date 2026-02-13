@@ -296,3 +296,4 @@ Single `list` command for both registry and config:
 - 2025-12-22: Aligned exit codes with unified policy (0 success, 1 failure)
 - 2026-02-08: `assets add` now accepts multiple queries (issue #2)
 - 2026-02-11: Removed `assets index` subcommand (asset repo maintainer tooling, not needed in CLI)
+- 2026-02-13: Re-added `assets index` subcommand (issue #29) to display full registry catalog
