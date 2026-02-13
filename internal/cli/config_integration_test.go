@@ -93,7 +93,7 @@ func TestConfigAgent_FullWorkflow(t *testing.T) {
 		}
 
 		output := stdout.String()
-		if !strings.Contains(output, "Agent: claude") {
+		if !strings.Contains(output, "agents/claude") {
 			t.Errorf("info output missing agent name: %s", output)
 		}
 		if !strings.Contains(output, "Default Model: sonnet") {
@@ -313,7 +313,7 @@ func TestConfigRole_FullWorkflow(t *testing.T) {
 		}
 
 		output := stdout.String()
-		if !strings.Contains(output, "Role: reviewer") {
+		if !strings.Contains(output, "roles/reviewer") {
 			t.Errorf("info missing role name: %s", output)
 		}
 		if !strings.Contains(output, "Prompt:") {
@@ -480,7 +480,7 @@ func TestConfigTask_FullWorkflow(t *testing.T) {
 		}
 
 		output := stdout.String()
-		if !strings.Contains(output, "Task: review") {
+		if !strings.Contains(output, "tasks/review") {
 			t.Errorf("info missing task name: %s", output)
 		}
 		if !strings.Contains(output, "Role: code-reviewer") {

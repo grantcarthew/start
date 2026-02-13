@@ -41,6 +41,7 @@ See [p-writing-guide.md](./p-writing-guide.md) for guidelines on creating and ma
 | [p-021](./completed/p-021-auto-setup-default-assets.md) | Auto-Setup Default Assets | 2026-02-08 |
 | [p-023](./completed/p-023-cli-config-reorder.md) | CLI Config Reorder | 2026-02-08 |
 | [p-024](./completed/p-024-cli-flag-asset-search.md) | CLI Flag Asset Search | 2026-02-13 |
+| [p-025](./completed/p-025-terminal-colour-standard.md) | Terminal Colour Standard | 2026-02-13 |
 
 ---
 
@@ -57,6 +58,14 @@ Refactor asset installation code to use CUE's AST APIs instead of fragile string
 **Dependencies:** p-021
 
 ### Completed
+
+#### p-025: Terminal Colour Standard
+
+Applied DR-042 terminal colour standard across all CLI output. Audited every command visually, added category colours to info commands, styled all interactive prompts with cyan delimiters and dim metadata, coloured execution output, and added magenta as the prompt category colour.
+
+**Key Deliverables:** Coloured info/add/edit/remove/default/order commands, styled execution output, `colorPrompts`, updated DR-042, content preview threshold
+
+**Dependencies:** p-004, p-008
 
 #### p-024: CLI Flag Asset Search
 

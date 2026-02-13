@@ -333,34 +333,53 @@ func runConfigAgentInfo(cmd *cobra.Command, args []string) error {
 	}
 
 	w := cmd.OutOrStdout()
-	_, _ = fmt.Fprintf(w, "Agent: %s\n", name)
-	_, _ = fmt.Fprintln(w, strings.Repeat("─", 40))
-	_, _ = fmt.Fprintf(w, "Source: %s\n", agent.Source)
-	if agent.Bin != "" {
-		_, _ = fmt.Fprintf(w, "Bin: %s\n", agent.Bin)
+	_, _ = fmt.Fprintln(w)
+	_, _ = colorAgents.Fprint(w, "agents")
+	_, _ = fmt.Fprintf(w, "/%s\n", name)
+	PrintSeparator(w)
+
+	_, _ = colorDim.Fprint(w, "Source:")
+	_, _ = fmt.Fprintf(w, " %s\n", agent.Source)
+	if agent.Origin != "" {
+		_, _ = colorDim.Fprint(w, "Origin:")
+		_, _ = fmt.Fprintf(w, " %s\n", agent.Origin)
 	}
-	_, _ = fmt.Fprintf(w, "Command: %s\n", agent.Command)
+	if agent.Bin != "" {
+		_, _ = colorDim.Fprint(w, "Bin:")
+		_, _ = fmt.Fprintf(w, " %s\n", agent.Bin)
+	}
+	_, _ = colorDim.Fprint(w, "Command:")
+	_, _ = fmt.Fprintf(w, " %s\n", agent.Command)
 
 	if agent.DefaultModel != "" {
-		_, _ = fmt.Fprintf(w, "Default Model: %s\n", agent.DefaultModel)
+		_, _ = colorDim.Fprint(w, "Default Model:")
+		_, _ = fmt.Fprintf(w, " %s\n", agent.DefaultModel)
 	}
 	if agent.Description != "" {
-		_, _ = fmt.Fprintf(w, "Description: %s\n", agent.Description)
+		_, _ = fmt.Fprintln(w)
+		_, _ = colorDim.Fprint(w, "Description:")
+		_, _ = fmt.Fprintf(w, " %s\n", agent.Description)
 	}
 	if len(agent.Tags) > 0 {
-		_, _ = fmt.Fprintf(w, "Tags: %s\n", strings.Join(agent.Tags, ", "))
+		_, _ = colorDim.Fprint(w, "Tags:")
+		_, _ = fmt.Fprintf(w, " %s\n", strings.Join(agent.Tags, ", "))
 	}
 	if len(agent.Models) > 0 {
-		_, _ = fmt.Fprintln(w, "Models:")
+		_, _ = fmt.Fprintln(w)
+		_, _ = colorDim.Fprintln(w, "Models:")
 		var aliases []string
 		for alias := range agent.Models {
 			aliases = append(aliases, alias)
 		}
 		sort.Strings(aliases)
 		for _, alias := range aliases {
-			_, _ = fmt.Fprintf(w, "  %s: %s\n", alias, agent.Models[alias])
+			_, _ = fmt.Fprintf(w, "  %s ", alias)
+			_, _ = colorBlue.Fprint(w, "->")
+			_, _ = fmt.Fprint(w, " ")
+			_, _ = colorDim.Fprintf(w, "%s\n", agent.Models[alias])
 		}
 	}
+	PrintSeparator(w)
 
 	return nil
 }
@@ -605,7 +624,7 @@ func runConfigAgentRemove(cmd *cobra.Command, args []string) error {
 		}
 
 		if isTTY {
-			_, _ = fmt.Fprintf(stdout, "Remove agent %q from %s config? [y/N] ", name, scopeString(local))
+			_, _ = fmt.Fprintf(stdout, "Remove agent %q from %s config? %s%s%s ", name, scopeString(local), colorCyan.Sprint("["), colorDim.Sprint("y/N"), colorCyan.Sprint("]"))
 			reader := bufio.NewReader(stdin)
 			input, err := reader.ReadString('\n')
 			if err != nil {
@@ -997,11 +1016,23 @@ func writeDefaultAgentSetting(path string, agentName string) error {
 
 // promptString prompts for a string value with a default.
 func promptString(w io.Writer, r io.Reader, label, defaultVal string) (string, error) {
-	if defaultVal != "" {
-		_, _ = fmt.Fprintf(w, "%s %s%s%s: ", label, colorCyan.Sprint("["), colorDim.Sprint(defaultVal), colorCyan.Sprint("]"))
+	// Print label with cyan () delimiters for "(optional)"
+	if base, found := strings.CutSuffix(label, " (optional)"); found {
+		_, _ = fmt.Fprint(w, base)
+		_, _ = fmt.Fprint(w, " ")
+		_, _ = colorCyan.Fprint(w, "(")
+		_, _ = colorDim.Fprint(w, "optional")
+		_, _ = colorCyan.Fprint(w, ")")
 	} else {
-		_, _ = fmt.Fprintf(w, "%s: ", label)
+		_, _ = fmt.Fprint(w, label)
 	}
+	if defaultVal != "" {
+		_, _ = fmt.Fprint(w, " ")
+		_, _ = colorCyan.Fprint(w, "[")
+		_, _ = colorDim.Fprint(w, defaultVal)
+		_, _ = colorCyan.Fprint(w, "]")
+	}
+	_, _ = fmt.Fprint(w, ": ")
 
 	reader := bufio.NewReader(r)
 	input, err := reader.ReadString('\n')
@@ -1034,7 +1065,7 @@ func promptDefaultModel(w io.Writer, r io.Reader, current string, models map[str
 	_, _ = fmt.Fprintln(w, "Default model:")
 	for i, alias := range aliases {
 		if alias == current {
-			_, _ = fmt.Fprintf(w, "  %d. %s - %s %s%s%s\n", i+1, alias, colorDim.Sprint(models[alias]), colorCyan.Sprint("("), colorSuccess.Sprint("current"), colorCyan.Sprint(")"))
+			_, _ = fmt.Fprintf(w, "  %d. %s - %s %s%s%s\n", i+1, alias, colorDim.Sprint(models[alias]), colorCyan.Sprint("("), colorInstalled.Sprint("current"), colorCyan.Sprint(")"))
 		} else {
 			_, _ = fmt.Fprintf(w, "  %d. %s - %s\n", i+1, alias, colorDim.Sprint(models[alias]))
 		}

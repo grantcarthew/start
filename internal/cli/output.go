@@ -10,7 +10,7 @@ import (
 	"github.com/grantcarthew/start/internal/orchestration"
 )
 
-// Color definitions per DR-036
+// Color definitions per DR-042
 var (
 	colorError     = color.New(color.FgRed)
 	colorWarning   = color.New(color.FgYellow)
@@ -26,6 +26,7 @@ var (
 	colorRoles     = color.New(color.FgGreen)
 	colorContexts  = color.New(color.FgCyan)
 	colorTasks     = color.New(color.FgHiYellow)
+	colorPrompts   = color.New(color.FgMagenta)
 	colorInstalled = color.New(color.FgHiGreen)
 )
 
@@ -83,7 +84,8 @@ func PrintContextTable(w io.Writer, contexts []orchestration.Context) {
 		return
 	}
 
-	_, _ = fmt.Fprintln(w, "Context documents:")
+	_, _ = colorContexts.Fprint(w, "Context:")
+	_, _ = fmt.Fprintln(w)
 
 	// Calculate column widths
 	nameWidth := 4 // "Name" header
@@ -150,7 +152,7 @@ func PrintContextTable(w io.Writer, contexts []orchestration.Context) {
 	}
 
 	// Print header
-	_, _ = fmt.Fprintf(w, "  %-*s  %s  %-*s  %s\n",
+	_, _ = colorDim.Fprintf(w, "  %-*s  %s  %-*s  %s\n",
 		nameWidth, "Name", "Status", tagsWidth, "Tags", "File")
 
 	// Print rows
@@ -160,7 +162,7 @@ func PrintContextTable(w io.Writer, contexts []orchestration.Context) {
 		if r.status == "✓" {
 			_, _ = colorSuccess.Fprintf(w, "%s", r.status)
 		} else {
-			_, _ = fmt.Fprint(w, r.status)
+			_, _ = colorTasks.Fprint(w, r.status)
 		}
 		_, _ = fmt.Fprintf(w, "       %-*s  %s\n", tagsWidth, r.tags, r.file)
 	}
@@ -174,7 +176,8 @@ func PrintRoleTable(w io.Writer, resolutions []orchestration.RoleResolution) {
 		return
 	}
 
-	_, _ = fmt.Fprintln(w, "Role:")
+	_, _ = colorRoles.Fprint(w, "Role:")
+	_, _ = fmt.Fprintln(w)
 
 	// Calculate column widths
 	nameWidth := 4 // "Name" header
@@ -185,7 +188,7 @@ func PrintRoleTable(w io.Writer, resolutions []orchestration.RoleResolution) {
 	}
 
 	// Print header
-	_, _ = fmt.Fprintf(w, "  %-*s  %s  %s\n", nameWidth, "Name", "Status", "File")
+	_, _ = colorDim.Fprintf(w, "  %-*s  %s  %s\n", nameWidth, "Name", "Status", "File")
 
 	// Print rows
 	for _, r := range resolutions {
@@ -219,7 +222,7 @@ func PrintRoleTable(w io.Writer, resolutions []orchestration.RoleResolution) {
 		if status == "✓" {
 			_, _ = colorSuccess.Fprintf(w, "%s", status)
 		} else {
-			_, _ = fmt.Fprint(w, status)
+			_, _ = colorTasks.Fprint(w, status)
 		}
 		_, _ = fmt.Fprintf(w, "       %s\n", file)
 	}

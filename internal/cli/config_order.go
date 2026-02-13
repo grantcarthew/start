@@ -43,7 +43,7 @@ func runConfigOrder(cmd *cobra.Command, _ []string) error {
 	_, _ = fmt.Fprintln(stdout, "Reorder:")
 	_, _ = fmt.Fprintln(stdout, "  1. Contexts")
 	_, _ = fmt.Fprintln(stdout, "  2. Roles")
-	_, _ = fmt.Fprint(stdout, "Choice [1]: ")
+	_, _ = fmt.Fprintf(stdout, "Choice %s%s%s: ", colorCyan.Sprint("["), colorDim.Sprint("1"), colorCyan.Sprint("]"))
 
 	reader := bufio.NewReader(stdin)
 	choice, err := reader.ReadString('\n')
@@ -117,16 +117,16 @@ func runConfigContextOrder(cmd *cobra.Command, _ []string) error {
 	}
 
 	contextPath := filepath.Join(configDir, "contexts.cue")
-	heading := fmt.Sprintf("Reorder Contexts (%s - %s):", scopeString(local), contextPath)
+	heading := fmt.Sprintf("Reorder Contexts %s%s%s:", colorCyan.Sprint("("), colorDim.Sprintf("%s - %s", scopeString(local), contextPath), colorCyan.Sprint(")"))
 
 	formatItem := func(i int, name string) string {
 		ctx := contexts[name]
 		markers := ""
 		if ctx.Required {
-			markers += " [required]"
+			markers += " " + colorCyan.Sprint("[") + colorDim.Sprint("required") + colorCyan.Sprint("]")
 		}
 		if ctx.Default {
-			markers += " [default]"
+			markers += " " + colorCyan.Sprint("[") + colorDim.Sprint("default") + colorCyan.Sprint("]")
 		}
 		return fmt.Sprintf("  %d. %s%s", i+1, name, markers)
 	}
@@ -201,13 +201,13 @@ func runConfigRoleOrder(cmd *cobra.Command, _ []string) error {
 	}
 
 	rolePath := filepath.Join(configDir, "roles.cue")
-	heading := fmt.Sprintf("Reorder Roles (%s - %s):", scopeString(local), rolePath)
+	heading := fmt.Sprintf("Reorder Roles %s%s%s:", colorCyan.Sprint("("), colorDim.Sprintf("%s - %s", scopeString(local), rolePath), colorCyan.Sprint(")"))
 
 	formatItem := func(i int, name string) string {
 		role := roles[name]
 		markers := ""
 		if role.Optional {
-			markers += " [optional]"
+			markers += " " + colorCyan.Sprint("[") + colorDim.Sprint("optional") + colorCyan.Sprint("]")
 		}
 		return fmt.Sprintf("  %d. %s%s", i+1, name, markers)
 	}
@@ -260,7 +260,7 @@ func runReorderLoop(w io.Writer, r io.Reader, heading string, order []string, fo
 
 	for {
 		_, _ = fmt.Fprintln(w)
-		_, _ = fmt.Fprint(w, "Move up (number), Enter to save, q to cancel: ")
+		_, _ = fmt.Fprintf(w, "Move up %s%s%s, Enter to save, q to cancel: ", colorCyan.Sprint("("), colorDim.Sprint("number"), colorCyan.Sprint(")"))
 
 		input, err := reader.ReadString('\n')
 		if err != nil {

@@ -34,6 +34,7 @@ All terminal colour usage follows the standard below. Colours are defined centra
 | roles | Green | `colorRoles` |
 | contexts | Cyan | `colorContexts` |
 | tasks | HiYellow | `colorTasks` |
+| prompts | Magenta | `colorPrompts` |
 
 Access via `categoryColor(category)` helper which returns the appropriate `*color.Color`.
 

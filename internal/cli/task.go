@@ -502,13 +502,13 @@ func printTaskDryRunSummary(w io.Writer, agent orchestration.Agent, model string
 
 	// Show role preview
 	if result.Role != "" {
-		printContentPreview(w, "Role", result.Role, 5)
+		printContentPreview(w, "Role", colorRoles, result.Role, 5)
 		_, _ = fmt.Fprintln(w)
 	}
 
 	// Show prompt preview
 	if result.Prompt != "" {
-		printContentPreview(w, "Prompt", result.Prompt, 5)
+		printContentPreview(w, "Prompt", colorPrompts, result.Prompt, 5)
 		_, _ = fmt.Fprintln(w)
 	}
 

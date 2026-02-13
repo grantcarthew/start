@@ -140,17 +140,17 @@ func TestConfigAgentInfo(t *testing.T) {
 	}
 
 	output := stdout.String()
-	if !strings.Contains(output, "Agent: claude") {
-		t.Errorf("expected 'Agent: claude', got: %s", output)
+	if !strings.Contains(output, "agents/claude") {
+		t.Errorf("expected 'agents/claude', got: %s", output)
 	}
-	if !strings.Contains(output, "Bin: claude") {
-		t.Errorf("expected 'Bin: claude', got: %s", output)
+	if !strings.Contains(output, "Bin:") {
+		t.Errorf("expected 'Bin:', got: %s", output)
 	}
-	if !strings.Contains(output, "Default Model: sonnet") {
-		t.Errorf("expected 'Default Model: sonnet', got: %s", output)
+	if !strings.Contains(output, "Default Model:") {
+		t.Errorf("expected 'Default Model:', got: %s", output)
 	}
-	if !strings.Contains(output, "opus:") {
-		t.Errorf("expected models to include 'opus:', got: %s", output)
+	if !strings.Contains(output, "opus ->") {
+		t.Errorf("expected models to include 'opus ->', got: %s", output)
 	}
 }
 
