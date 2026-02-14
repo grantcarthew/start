@@ -1311,6 +1311,324 @@ func TestMergeTaskMatches_Empty(t *testing.T) {
 	}
 }
 
+func TestFindExactTaskInRegistry_FullName(t *testing.T) {
+	t.Parallel()
+	index := &registry.Index{
+		Tasks: map[string]registry.IndexEntry{
+			"golang/debug": {
+				Module:      "github.com/example/golang-debug@v0",
+				Description: "Debug Go code",
+			},
+			"golang/review": {
+				Module:      "github.com/example/golang-review@v0",
+				Description: "Review Go code",
+			},
+		},
+	}
+
+	result, err := findExactTaskInRegistry(index, "golang/debug")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil {
+		t.Fatal("expected result, got nil")
+	}
+	if result.Name != "golang/debug" {
+		t.Errorf("expected name %q, got %q", "golang/debug", result.Name)
+	}
+	if result.Category != "tasks" {
+		t.Errorf("expected category %q, got %q", "tasks", result.Category)
+	}
+}
+
+func TestFindExactTaskInRegistry_ShortName(t *testing.T) {
+	t.Parallel()
+	index := &registry.Index{
+		Tasks: map[string]registry.IndexEntry{
+			"golang/debug": {
+				Module: "github.com/example/golang-debug@v0",
+			},
+			"golang/review": {
+				Module: "github.com/example/golang-review@v0",
+			},
+		},
+	}
+
+	result, err := findExactTaskInRegistry(index, "debug")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil {
+		t.Fatal("expected result, got nil")
+	}
+	if result.Name != "golang/debug" {
+		t.Errorf("expected name %q, got %q", "golang/debug", result.Name)
+	}
+}
+
+func TestFindExactTaskInRegistry_ShortNameAmbiguous(t *testing.T) {
+	t.Parallel()
+	index := &registry.Index{
+		Tasks: map[string]registry.IndexEntry{
+			"golang/debug": {
+				Module: "github.com/example/golang-debug@v0",
+			},
+			"python/debug": {
+				Module: "github.com/example/python-debug@v0",
+			},
+		},
+	}
+
+	result, err := findExactTaskInRegistry(index, "debug")
+	if err == nil {
+		t.Fatal("expected error for ambiguous short name")
+	}
+	if result != nil {
+		t.Errorf("expected nil result, got %v", result)
+	}
+	if !strings.Contains(err.Error(), "ambiguous") {
+		t.Errorf("expected 'ambiguous' in error, got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "golang/debug") || !strings.Contains(err.Error(), "python/debug") {
+		t.Errorf("expected both matching names in error, got: %v", err)
+	}
+}
+
+func TestFindExactTaskInRegistry_NoMatch(t *testing.T) {
+	t.Parallel()
+	index := &registry.Index{
+		Tasks: map[string]registry.IndexEntry{
+			"golang/debug": {
+				Module: "github.com/example/golang-debug@v0",
+			},
+		},
+	}
+
+	result, err := findExactTaskInRegistry(index, "nonexistent")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result != nil {
+		t.Errorf("expected nil result, got %v", result)
+	}
+}
+
+func TestFindExactTaskInRegistry_EmptyIndex(t *testing.T) {
+	t.Parallel()
+	index := &registry.Index{
+		Tasks: map[string]registry.IndexEntry{},
+	}
+
+	result, err := findExactTaskInRegistry(index, "anything")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result != nil {
+		t.Errorf("expected nil result, got %v", result)
+	}
+}
+
+func TestPromptTaskSelection_ByNumber(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	reader := bufio.NewReader(strings.NewReader("2\n"))
+
+	matches := []TaskMatch{
+		{Name: "golang/debug", Source: TaskSourceInstalled},
+		{Name: "golang/review", Source: TaskSourceRegistry},
+		{Name: "python/debug", Source: TaskSourceInstalled},
+	}
+
+	selected, err := promptTaskSelection(&buf, reader, matches, "debug")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if selected.Name != "golang/review" {
+		t.Errorf("expected %q, got %q", "golang/review", selected.Name)
+	}
+	if selected.Source != TaskSourceRegistry {
+		t.Errorf("expected source %q, got %q", TaskSourceRegistry, selected.Source)
+	}
+}
+
+func TestPromptTaskSelection_ByExactName(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	reader := bufio.NewReader(strings.NewReader("golang/review\n"))
+
+	matches := []TaskMatch{
+		{Name: "golang/debug", Source: TaskSourceInstalled},
+		{Name: "golang/review", Source: TaskSourceRegistry},
+	}
+
+	selected, err := promptTaskSelection(&buf, reader, matches, "golang")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if selected.Name != "golang/review" {
+		t.Errorf("expected %q, got %q", "golang/review", selected.Name)
+	}
+}
+
+func TestPromptTaskSelection_ByExactNameCaseInsensitive(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	reader := bufio.NewReader(strings.NewReader("GOLANG/DEBUG\n"))
+
+	matches := []TaskMatch{
+		{Name: "golang/debug", Source: TaskSourceInstalled},
+		{Name: "golang/review", Source: TaskSourceRegistry},
+	}
+
+	selected, err := promptTaskSelection(&buf, reader, matches, "golang")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if selected.Name != "golang/debug" {
+		t.Errorf("expected %q, got %q", "golang/debug", selected.Name)
+	}
+}
+
+func TestPromptTaskSelection_BySubstring(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	reader := bufio.NewReader(strings.NewReader("review\n"))
+
+	matches := []TaskMatch{
+		{Name: "golang/debug", Source: TaskSourceInstalled},
+		{Name: "golang/review", Source: TaskSourceRegistry},
+	}
+
+	selected, err := promptTaskSelection(&buf, reader, matches, "golang")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if selected.Name != "golang/review" {
+		t.Errorf("expected %q, got %q", "golang/review", selected.Name)
+	}
+}
+
+func TestPromptTaskSelection_InvalidNumber(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	reader := bufio.NewReader(strings.NewReader("5\n"))
+
+	matches := []TaskMatch{
+		{Name: "golang/debug", Source: TaskSourceInstalled},
+		{Name: "golang/review", Source: TaskSourceRegistry},
+	}
+
+	_, err := promptTaskSelection(&buf, reader, matches, "golang")
+	if err == nil {
+		t.Fatal("expected error for out-of-range number")
+	}
+	if !strings.Contains(err.Error(), "invalid selection") {
+		t.Errorf("expected 'invalid selection' in error, got: %v", err)
+	}
+}
+
+func TestPromptTaskSelection_AmbiguousSubstring(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	reader := bufio.NewReader(strings.NewReader("golang\n"))
+
+	matches := []TaskMatch{
+		{Name: "golang/debug", Source: TaskSourceInstalled},
+		{Name: "golang/review", Source: TaskSourceRegistry},
+	}
+
+	_, err := promptTaskSelection(&buf, reader, matches, "go")
+	if err == nil {
+		t.Fatal("expected error for ambiguous substring")
+	}
+	if !strings.Contains(err.Error(), "invalid selection") {
+		t.Errorf("expected 'invalid selection' in error, got: %v", err)
+	}
+}
+
+func TestPromptTaskSelection_Truncation(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	reader := bufio.NewReader(strings.NewReader("1\n"))
+
+	// Create more than maxTaskResults matches
+	matches := make([]TaskMatch, 25)
+	for i := range matches {
+		matches[i] = TaskMatch{
+			Name:   fmt.Sprintf("task-%02d", i+1),
+			Source: TaskSourceInstalled,
+		}
+	}
+
+	selected, err := promptTaskSelection(&buf, reader, matches, "task")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if selected.Name != "task-01" {
+		t.Errorf("expected %q, got %q", "task-01", selected.Name)
+	}
+
+	output := buf.String()
+	if !strings.Contains(output, "25 tasks") {
+		t.Errorf("expected total count in output, got:\n%s", output)
+	}
+	if !strings.Contains(output, "Showing 20 of 25") {
+		t.Errorf("expected truncation message, got:\n%s", output)
+	}
+}
+
+func TestPromptTaskSelection_TruncationRejectsOutOfRange(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	// Try to select item 21 when only 20 are displayed
+	reader := bufio.NewReader(strings.NewReader("21\n"))
+
+	matches := make([]TaskMatch, 25)
+	for i := range matches {
+		matches[i] = TaskMatch{
+			Name:   fmt.Sprintf("task-%02d", i+1),
+			Source: TaskSourceInstalled,
+		}
+	}
+
+	_, err := promptTaskSelection(&buf, reader, matches, "task")
+	if err == nil {
+		t.Fatal("expected error for selecting beyond displayed range")
+	}
+	if !strings.Contains(err.Error(), "invalid selection") {
+		t.Errorf("expected 'invalid selection' in error, got: %v", err)
+	}
+}
+
+func TestPromptTaskSelection_DisplayFormat(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	reader := bufio.NewReader(strings.NewReader("1\n"))
+
+	matches := []TaskMatch{
+		{Name: "golang/debug", Source: TaskSourceInstalled},
+		{Name: "python/review", Source: TaskSourceRegistry},
+	}
+
+	_, err := promptTaskSelection(&buf, reader, matches, "test")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := buf.String()
+	// Should show source labels
+	if !strings.Contains(output, string(TaskSourceInstalled)) {
+		t.Errorf("expected %q source label in output, got:\n%s", TaskSourceInstalled, output)
+	}
+	if !strings.Contains(output, string(TaskSourceRegistry)) {
+		t.Errorf("expected %q source label in output, got:\n%s", TaskSourceRegistry, output)
+	}
+	// Should show match count
+	if !strings.Contains(output, "2 tasks") {
+		t.Errorf("expected '2 tasks' in output, got:\n%s", output)
+	}
+}
+
 func TestGetConfiguredAgents(t *testing.T) {
 	t.Parallel()
 	cfg := buildTestCfg(t, `{

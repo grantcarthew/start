@@ -1341,21 +1341,17 @@ func TestComposer_isCwdPath(t *testing.T) {
 }
 
 func TestComposer_TildeExpansion_Context(t *testing.T) {
-	t.Parallel()
 	ctx := cuecontext.New()
 
-	// Get home directory and create a temp file there
-	home, err := os.UserHomeDir()
-	if err != nil {
-		t.Fatalf("getting home dir: %v", err)
-	}
+	// Use isolated home directory to avoid writing to real home
+	home := t.TempDir()
+	t.Setenv("HOME", home)
 
-	// Create a temp file in home directory
+	// Create a temp file in fake home directory
 	testFile := filepath.Join(home, ".start-test-context.md")
 	if err := os.WriteFile(testFile, []byte("Tilde context content"), 0644); err != nil {
 		t.Fatalf("writing test file: %v", err)
 	}
-	defer func() { _ = os.Remove(testFile) }()
 
 	workingDir := t.TempDir()
 
@@ -1388,21 +1384,17 @@ func TestComposer_TildeExpansion_Context(t *testing.T) {
 }
 
 func TestComposer_TildeExpansion_Role(t *testing.T) {
-	t.Parallel()
 	ctx := cuecontext.New()
 
-	// Get home directory and create a temp file there
-	home, err := os.UserHomeDir()
-	if err != nil {
-		t.Fatalf("getting home dir: %v", err)
-	}
+	// Use isolated home directory to avoid writing to real home
+	home := t.TempDir()
+	t.Setenv("HOME", home)
 
-	// Create a temp file in home directory
+	// Create a temp file in fake home directory
 	testFile := filepath.Join(home, ".start-test-role.md")
 	if err := os.WriteFile(testFile, []byte("Tilde role content"), 0644); err != nil {
 		t.Fatalf("writing test file: %v", err)
 	}
-	defer func() { _ = os.Remove(testFile) }()
 
 	workingDir := t.TempDir()
 
@@ -1435,21 +1427,17 @@ func TestComposer_TildeExpansion_Role(t *testing.T) {
 }
 
 func TestComposer_TildeExpansion_Task(t *testing.T) {
-	t.Parallel()
 	ctx := cuecontext.New()
 
-	// Get home directory and create a temp file there
-	home, err := os.UserHomeDir()
-	if err != nil {
-		t.Fatalf("getting home dir: %v", err)
-	}
+	// Use isolated home directory to avoid writing to real home
+	home := t.TempDir()
+	t.Setenv("HOME", home)
 
-	// Create a temp file in home directory
+	// Create a temp file in fake home directory
 	testFile := filepath.Join(home, ".start-test-task.md")
 	if err := os.WriteFile(testFile, []byte("Tilde task content"), 0644); err != nil {
 		t.Fatalf("writing test file: %v", err)
 	}
-	defer func() { _ = os.Remove(testFile) }()
 
 	workingDir := t.TempDir()
 
