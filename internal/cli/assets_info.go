@@ -120,7 +120,7 @@ func printAssetInfo(w io.Writer, asset assets.SearchResult, installed bool, scop
 	_, _ = fmt.Fprintln(w)
 	_, _ = categoryColor(asset.Category).Fprint(w, asset.Category)
 	_, _ = fmt.Fprintf(w, "/%s\n", asset.Name)
-	PrintSeparator(w)
+	printSeparator(w)
 
 	_, _ = colorDim.Fprint(w, "Type:")
 	_, _ = fmt.Fprintf(w, " %s\n", asset.Category)
@@ -155,7 +155,7 @@ func printAssetInfo(w io.Writer, asset assets.SearchResult, installed bool, scop
 		_, _ = fmt.Fprintf(w, " %s\n", asset.Entry.Version)
 	}
 
-	PrintSeparator(w)
+	printSeparator(w)
 
 	if !installed {
 		_, _ = fmt.Fprintf(w, "\nUse 'start assets add %s' to install.\n", asset.Name)

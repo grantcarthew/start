@@ -6,7 +6,6 @@ import (
 	"io"
 	"path/filepath"
 	"sort"
-	"strings"
 
 	"cuelang.org/go/cue"
 	"github.com/grantcarthew/start/internal/assets"
@@ -16,6 +15,11 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/mod/semver"
 )
+
+// NOTE(review): This file shares registry client creation, index fetching, and config
+// loading patterns with assets_add.go, assets_search.go, assets_update.go, and
+// assets_index.go. This duplication is accepted - each command uses the results
+// differently and a shared helper would couple them for modest line savings.
 
 // InstalledAsset represents an installed asset with version info.
 type InstalledAsset struct {
@@ -150,13 +154,7 @@ func collectInstalledAssets(v cue.Value, paths config.Paths, localCfg cue.Value)
 				continue
 			}
 
-			// Parse version from origin (e.g., "github.com/.../task@v0.1.1" -> "v0.1.1")
-			// Assumes origin format is "module/path@version" from registry.
-			// If '@' is missing, installedVer remains empty (legacy or malformed origin).
-			var installedVer string
-			if idx := strings.Index(origin, "@"); idx != -1 {
-				installedVer = origin[idx+1:]
-			}
+			installedVer := assets.VersionFromOrigin(origin)
 
 			scope, configFile := determineScopeAndFile(localCfg, paths, cat, name)
 			asset := InstalledAsset{

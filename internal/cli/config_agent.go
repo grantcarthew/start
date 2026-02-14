@@ -1,7 +1,13 @@
+// NOTE(design): This file shares structural patterns with config_role.go,
+// config_context.go, and config_task.go (CUE field extraction, scope-aware loading,
+// interactive prompting, CUE file generation). This duplication is accepted - each
+// entity has distinct fields and behaviours that make a generic abstraction more
+// complex than the repetition it would eliminate.
 package cli
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -332,7 +338,7 @@ func runConfigAgentInfo(cmd *cobra.Command, args []string) error {
 	_, _ = fmt.Fprintln(w)
 	_, _ = colorAgents.Fprint(w, "agents")
 	_, _ = fmt.Fprintf(w, "/%s\n", resolvedName)
-	PrintSeparator(w)
+	printSeparator(w)
 
 	_, _ = colorDim.Fprint(w, "Source:")
 	_, _ = fmt.Fprintf(w, " %s\n", agent.Source)
@@ -375,7 +381,7 @@ func runConfigAgentInfo(cmd *cobra.Command, args []string) error {
 			_, _ = colorDim.Fprintf(w, "%s\n", agent.Models[alias])
 		}
 	}
-	PrintSeparator(w)
+	printSeparator(w)
 
 	return nil
 }
@@ -837,7 +843,7 @@ func loadAgentsFromDir(dir string) (map[string]AgentConfig, error) {
 	cfg, err := loader.LoadSingle(dir)
 	if err != nil {
 		// If no CUE files exist, return empty map (not an error)
-		if strings.Contains(err.Error(), "no CUE files") {
+		if errors.Is(err, internalcue.ErrNoCUEFiles) {
 			return agents, nil
 		}
 		return agents, err

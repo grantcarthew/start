@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -15,6 +16,9 @@ import (
 	internalcue "github.com/grantcarthew/start/internal/cue"
 	"github.com/spf13/cobra"
 )
+
+// errNoConfig is returned by loadSettingsForScope when no configuration exists.
+var errNoConfig = errors.New("no config found")
 
 // Valid settings keys
 var validSettingsKeys = map[string]string{
@@ -82,7 +86,7 @@ func listSettings(w io.Writer, localOnly bool) error {
 	settings, err := loadSettingsForScope(localOnly)
 	if err != nil {
 		// No settings is fine, just show empty
-		if strings.Contains(err.Error(), "no config found") {
+		if errors.Is(err, errNoConfig) {
 			_, _ = fmt.Fprintln(w, "No settings configured")
 			return nil
 		}
@@ -118,7 +122,7 @@ func showSetting(w io.Writer, key string, localOnly bool) error {
 
 	settings, err := loadSettingsForScope(localOnly)
 	if err != nil {
-		if strings.Contains(err.Error(), "no config found") {
+		if errors.Is(err, errNoConfig) {
 			_, _ = colorDim.Fprintf(w, "%s: ", key)
 			_, _ = colorCyan.Fprint(w, "(")
 			_, _ = colorDim.Fprint(w, "not set")
@@ -270,7 +274,7 @@ func loadSettingsForScope(localOnly bool) (map[string]string, error) {
 	}
 
 	if len(settings) == 0 && !paths.GlobalExists && !paths.LocalExists {
-		return nil, fmt.Errorf("no config found")
+		return nil, errNoConfig
 	}
 
 	return settings, nil

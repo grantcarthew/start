@@ -636,12 +636,12 @@ func printPreview(w io.Writer, r ShowResult) {
 		_, _ = colorCyan.Fprint(w, ")")
 	}
 	_, _ = fmt.Fprintln(w)
-	PrintSeparator(w)
+	printSeparator(w)
 
 	// Show full content
 	_, _ = fmt.Fprint(w, r.Content)
 	if !strings.HasSuffix(r.Content, "\n") {
 		_, _ = fmt.Fprintln(w)
 	}
-	PrintSeparator(w)
+	printSeparator(w)
 }

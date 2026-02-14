@@ -454,12 +454,12 @@ func executeTaskDryRun(w io.Writer, executor *orchestration.Executor, cfg orches
 
 // printTaskExecutionInfo prints the task execution summary.
 func printTaskExecutionInfo(w io.Writer, agent orchestration.Agent, model, modelSource string, result orchestration.ComposeResult, taskName, instructions string, taskResult orchestration.ProcessResult) {
-	PrintHeader(w, fmt.Sprintf("Starting Task: %s", taskName))
-	PrintSeparator(w)
+	printHeader(w, fmt.Sprintf("Starting Task: %s", taskName))
+	printSeparator(w)
 
-	PrintAgentModel(w, agent, model, modelSource)
-	PrintContextTable(w, result.Contexts, result.Selection)
-	PrintRoleTable(w, result.RoleResolutions)
+	printAgentModel(w, agent, model, modelSource)
+	printContextTable(w, result.Contexts, result.Selection)
+	printRoleTable(w, result.RoleResolutions)
 
 	if taskResult.CommandExecuted {
 		_, _ = fmt.Fprintln(w, "Command: executed")
@@ -475,12 +475,12 @@ func printTaskExecutionInfo(w io.Writer, agent orchestration.Agent, model, model
 
 // printTaskDryRunSummary prints the task dry-run summary.
 func printTaskDryRunSummary(w io.Writer, agent orchestration.Agent, model, modelSource string, result orchestration.ComposeResult, dir, taskName, instructions string) {
-	PrintHeader(w, fmt.Sprintf("Dry Run - Task: %s", taskName))
-	PrintSeparator(w)
+	printHeader(w, fmt.Sprintf("Dry Run - Task: %s", taskName))
+	printSeparator(w)
 
-	PrintAgentModel(w, agent, model, modelSource)
-	PrintContextTable(w, result.Contexts, result.Selection)
-	PrintRoleTable(w, result.RoleResolutions)
+	printAgentModel(w, agent, model, modelSource)
+	printContextTable(w, result.Contexts, result.Selection)
+	printRoleTable(w, result.RoleResolutions)
 
 	if instructions != "" {
 		_, _ = fmt.Fprintf(w, "Instructions:\n%s\n", instructions)

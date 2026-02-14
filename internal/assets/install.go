@@ -1,3 +1,9 @@
+// NOTE(design): This file contains multiple concerns (install orchestration, role
+// dependency resolution, asset extraction, config file text manipulation). The Find*
+// functions implement character-by-character CUE syntax state machines which are the
+// most complex code in the repository. This complexity is inherent to text-level CUE
+// manipulation without an AST API. The state machines share structure and could be
+// unified behind a common scanner, but are well-tested (see install_test.go).
 package assets
 
 import (
@@ -378,7 +384,7 @@ func GetInstalledOrigin(cfg cue.Value, category, name string) string {
 // For example, "github.com/test/asset@v0.1.1" returns "v0.1.1".
 // Returns an empty string if no version is found.
 func VersionFromOrigin(origin string) string {
-	if idx := strings.Index(origin, "@"); idx != -1 {
+	if idx := strings.LastIndex(origin, "@"); idx != -1 {
 		return origin[idx+1:]
 	}
 	return ""
