@@ -17,6 +17,7 @@ import (
 	internalcue "github.com/grantcarthew/start/internal/cue"
 	"github.com/grantcarthew/start/internal/registry"
 	"github.com/spf13/cobra"
+	"golang.org/x/mod/semver"
 	"golang.org/x/term"
 )
 
@@ -142,7 +143,7 @@ func installAsset(ctx context.Context, cmd *cobra.Command, client *registry.Clie
 			if !flags.Quiet {
 				installedVer := assets.VersionFromOrigin(origin)
 				latestVer := selected.Entry.Version
-				outdated := latestVer != "" && installedVer != "" && latestVer != installedVer
+				outdated := latestVer != "" && installedVer != "" && semver.Compare(latestVer, installedVer) > 0
 
 				if outdated {
 					_, _ = fmt.Fprint(w, "○ ")

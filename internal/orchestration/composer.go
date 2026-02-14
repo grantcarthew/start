@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"cuelang.org/go/cue"
 	internalcue "github.com/grantcarthew/start/internal/cue"
 	"github.com/grantcarthew/start/internal/temp"
+	"golang.org/x/mod/semver"
 )
 
 // ContextSelection specifies which contexts to include.
@@ -738,45 +740,62 @@ func extractOrigin(v cue.Value) string {
 
 // resolveModulePath resolves an @module/ path to the CUE cache location.
 // Per DR-023, @module/ paths resolve relative to the cached module directory.
+// The origin field contains the exact versioned module path (e.g.,
+// "github.com/.../task@v0.1.2") which maps directly to a cache directory.
 func resolveModulePath(path, origin string) (string, error) {
 	if !strings.HasPrefix(path, "@module/") {
 		return path, nil
 	}
 
-	// Strip @module/ prefix
 	relativePath := strings.TrimPrefix(path, "@module/")
 
-	// Get CUE cache directory
 	cacheDir, err := getCUECacheDir()
 	if err != nil {
 		return "", fmt.Errorf("getting CUE cache dir: %w", err)
 	}
 
-	// Strip version from origin if present
-	// Origin format: "github.com/grantcarthew/start-assets/tasks/golang/code-review@v0.0.2"
-	// We need just: "github.com/grantcarthew/start-assets/tasks/golang/code-review"
+	// Build the exact cache path from the origin.
+	// Origin: "github.com/.../holistic@v0.1.2"
+	// Cache:  cacheDir/mod/extract/github.com/.../holistic@v0.1.2/
+	// The CUE cache stores the version as part of the leaf directory name.
+	if idx := strings.Index(origin, "@"); idx != -1 {
+		modulePath := origin[:idx]
+		version := origin[idx:]
+		versionedDir := filepath.Join(cacheDir, "mod", "extract",
+			filepath.Dir(modulePath),
+			filepath.Base(modulePath)+version)
+		if _, statErr := os.Stat(versionedDir); statErr == nil {
+			return filepath.Join(versionedDir, relativePath), nil
+		}
+	}
+
+	// Fallback: scan directory for matching version (origins without version
+	// or when the exact versioned directory is missing from cache).
 	originWithoutVersion := origin
 	if idx := strings.Index(origin, "@"); idx != -1 {
 		originWithoutVersion = origin[:idx]
 	}
-
-	// Module path in cache: cacheDir/mod/extract/github.com/grantcarthew/start-assets/tasks/golang/code-review@v0.x.x/
-	// We need to find the version directory
-	moduleBase := filepath.Join(cacheDir, "mod", "extract", originWithoutVersion)
-
-	// Find version directory (there should be one matching @v*)
-	entries, err := os.ReadDir(filepath.Dir(moduleBase))
+	parentDir := filepath.Join(cacheDir, "mod", "extract", filepath.Dir(originWithoutVersion))
+	entries, err := os.ReadDir(parentDir)
 	if err != nil {
 		return "", fmt.Errorf("reading cache directory: %w", err)
 	}
 
 	baseName := filepath.Base(originWithoutVersion)
-	var moduleDir string
+	prefix := baseName + "@" // used in sort lambda to extract version substring
+	var candidates []string
 	for _, entry := range entries {
 		if entry.IsDir() && strings.HasPrefix(entry.Name(), baseName+"@v") {
-			moduleDir = filepath.Join(filepath.Dir(moduleBase), entry.Name())
-			break
+			candidates = append(candidates, entry.Name())
 		}
+	}
+
+	var moduleDir string
+	if len(candidates) > 0 {
+		slices.SortFunc(candidates, func(a, b string) int {
+			return semver.Compare(a[len(prefix):], b[len(prefix):])
+		})
+		moduleDir = filepath.Join(parentDir, candidates[len(candidates)-1])
 	}
 
 	if moduleDir == "" {

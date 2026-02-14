@@ -1721,4 +1721,73 @@ func TestResolveModulePath(t *testing.T) {
 			t.Errorf("got %q, want %q", result, want)
 		}
 	})
+
+	t.Run("multiple cached versions uses exact origin version", func(t *testing.T) {
+		cacheDir := t.TempDir()
+		t.Setenv("CUE_CACHE_DIR", cacheDir)
+
+		// Create two cached versions — v0.1.1 (old) and v0.1.2 (new)
+		parentDir := filepath.Join(cacheDir, "mod", "extract", "github.com", "test", "tasks", "review")
+		oldDir := filepath.Join(parentDir, "holistic@v0.1.1")
+		newDir := filepath.Join(parentDir, "holistic@v0.1.2")
+		if err := os.MkdirAll(oldDir, 0755); err != nil {
+			t.Fatalf("creating old cache dir: %v", err)
+		}
+		if err := os.MkdirAll(newDir, 0755); err != nil {
+			t.Fatalf("creating new cache dir: %v", err)
+		}
+		if err := os.WriteFile(filepath.Join(oldDir, "task.md"), []byte("old"), 0644); err != nil {
+			t.Fatalf("writing old file: %v", err)
+		}
+		if err := os.WriteFile(filepath.Join(newDir, "task.md"), []byte("new"), 0644); err != nil {
+			t.Fatalf("writing new file: %v", err)
+		}
+
+		// Origin points to v0.1.2 — should resolve to the new version
+		origin := "github.com/test/tasks/review/holistic@v0.1.2"
+		result, err := resolveModulePath("@module/task.md", origin)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		want := filepath.Join(newDir, "task.md")
+		if result != want {
+			t.Errorf("got %q, want %q", result, want)
+		}
+
+		// Verify it reads the new content, not the old
+		content, err := os.ReadFile(result)
+		if err != nil {
+			t.Fatalf("reading resolved file: %v", err)
+		}
+		if string(content) != "new" {
+			t.Errorf("got content %q, want %q", string(content), "new")
+		}
+	})
+
+	t.Run("fallback scans for latest when exact version missing", func(t *testing.T) {
+		cacheDir := t.TempDir()
+		t.Setenv("CUE_CACHE_DIR", cacheDir)
+
+		// Create two cached versions but origin points to a version not in cache
+		parentDir := filepath.Join(cacheDir, "mod", "extract", "github.com", "test", "tasks")
+		v1Dir := filepath.Join(parentDir, "mytask@v0.1.0")
+		v2Dir := filepath.Join(parentDir, "mytask@v0.2.0")
+		if err := os.MkdirAll(v1Dir, 0755); err != nil {
+			t.Fatalf("creating v1 dir: %v", err)
+		}
+		if err := os.MkdirAll(v2Dir, 0755); err != nil {
+			t.Fatalf("creating v2 dir: %v", err)
+		}
+
+		// Origin points to v0.3.0 which isn't cached — fallback should pick v0.2.0 (latest)
+		origin := "github.com/test/tasks/mytask@v0.3.0"
+		result, err := resolveModulePath("@module/data.cue", origin)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		want := filepath.Join(v2Dir, "data.cue")
+		if result != want {
+			t.Errorf("got %q, want %q", result, want)
+		}
+	})
 }
