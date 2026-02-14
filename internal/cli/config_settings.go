@@ -303,7 +303,7 @@ func loadSettingsFromDir(dir string) (map[string]string, error) {
 	}
 
 	for iter.Next() {
-		key := iter.Selector().String()
+		key := iter.Selector().Unquoted()
 
 		switch iter.Value().Kind() {
 		case cue.StringKind:

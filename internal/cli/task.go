@@ -166,7 +166,10 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 			}
 
 			// Check for exact match in registry
-			exactRegistry := findExactTaskInRegistry(index, taskName)
+			exactRegistry, err := findExactTaskInRegistry(index, taskName)
+			if err != nil {
+				return err
+			}
 			if exactRegistry != nil {
 				debugf(flags, "task", "Exact match found in registry: %s", exactRegistry.Name)
 				// Install and run
@@ -675,17 +678,39 @@ func installTaskFromRegistry(stdout io.Writer, flags *Flags, client *registry.Cl
 }
 
 // findExactTaskInRegistry searches for an exact task match in the registry index.
-// Supports both "name" and "category/name" formats (e.g., "code-review" or "golang/code-review").
-func findExactTaskInRegistry(index *registry.Index, taskName string) *assets.SearchResult {
-	// Check if taskName includes a path prefix (e.g., "golang/code-review")
-	for name, entry := range index.Tasks {
-		if name == taskName {
-			return &assets.SearchResult{
-				Category: "tasks",
-				Name:     name,
-				Entry:    entry,
+// Supports both full name (e.g., "golang/code-review") and short name (e.g., "code-review").
+// Returns an error if multiple entries share the same short name.
+func findExactTaskInRegistry(index *registry.Index, taskName string) (*assets.SearchResult, error) {
+	// Full name match is always unambiguous
+	if entry, ok := index.Tasks[taskName]; ok {
+		return &assets.SearchResult{
+			Category: "tasks",
+			Name:     taskName,
+			Entry:    entry,
+		}, nil
+	}
+
+	// Short name match: collect all matches to detect ambiguity
+	var matches []string
+	for name := range index.Tasks {
+		if idx := strings.LastIndex(name, "/"); idx != -1 {
+			if name[idx+1:] == taskName {
+				matches = append(matches, name)
 			}
 		}
 	}
-	return nil
+
+	switch len(matches) {
+	case 0:
+		return nil, nil
+	case 1:
+		return &assets.SearchResult{
+			Category: "tasks",
+			Name:     matches[0],
+			Entry:    index.Tasks[matches[0]],
+		}, nil
+	default:
+		sort.Strings(matches)
+		return nil, fmt.Errorf("ambiguous task name %q matches multiple entries: %s", taskName, strings.Join(matches, ", "))
+	}
 }
