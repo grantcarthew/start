@@ -86,7 +86,11 @@ func (r *resolver) resolveAgent(name string) (string, error) {
 	}
 	index, client, err := r.ensureIndex()
 	if err == nil && index != nil {
-		if result := findExactInRegistry(index.Agents, "agents", name); result != nil {
+		result, err := findExactInRegistry(index.Agents, "agents", name)
+		if err != nil {
+			return "", err
+		}
+		if result != nil {
 			debugf(r.flags, "resolve", "Agent %q: exact registry match %q", name, result.Name)
 			if err := r.autoInstall(client, *result); err != nil {
 				return "", err
@@ -154,7 +158,11 @@ func (r *resolver) resolveRole(name string) (string, error) {
 	}
 	index, client, err := r.ensureIndex()
 	if err == nil && index != nil {
-		if result := findExactInRegistry(index.Roles, "roles", name); result != nil {
+		result, err := findExactInRegistry(index.Roles, "roles", name)
+		if err != nil {
+			return "", err
+		}
+		if result != nil {
 			debugf(r.flags, "resolve", "Role %q: exact registry match %q", name, result.Name)
 			if err := r.autoInstall(client, *result); err != nil {
 				return "", err
@@ -287,7 +295,15 @@ func (r *resolver) resolveContexts(terms []string) []string {
 		}
 		index, client, _ := r.ensureIndex()
 		if index != nil {
-			if result := findExactInRegistry(index.Contexts, "contexts", term); result != nil {
+			result, err := findExactInRegistry(index.Contexts, "contexts", term)
+			if err != nil {
+				if !r.flags.Quiet {
+					printWarning(r.stdout, "%s", err)
+				}
+				resolved = append(resolved, term)
+				continue
+			}
+			if result != nil {
 				debugf(r.flags, "resolve", "Context %q: exact registry match %q", term, result.Name)
 				if err := r.autoInstall(client, *result); err == nil {
 					resolved = append(resolved, result.Name)
@@ -361,27 +377,40 @@ func hasExactInstalled(cfg cue.Value, cueKey, name string) bool {
 
 // findExactInRegistry searches for an exact name match in registry entries.
 // Supports both full name (e.g., "golang/assistant") and short name match.
-func findExactInRegistry(entries map[string]registry.IndexEntry, category, name string) *assets.SearchResult {
-	for entryName, entry := range entries {
-		if entryName == name {
-			return &assets.SearchResult{
-				Category: category,
-				Name:     entryName,
-				Entry:    entry,
-			}
-		}
-		// Short name match (e.g., "assistant" matches "golang/assistant")
+// Returns an error if multiple entries share the same short name.
+func findExactInRegistry(entries map[string]registry.IndexEntry, category, name string) (*assets.SearchResult, error) {
+	// Full name match is always unambiguous
+	if entry, ok := entries[name]; ok {
+		return &assets.SearchResult{
+			Category: category,
+			Name:     name,
+			Entry:    entry,
+		}, nil
+	}
+
+	// Short name match: collect all matches to detect ambiguity
+	var matches []string
+	for entryName := range entries {
 		if idx := strings.LastIndex(entryName, "/"); idx != -1 {
 			if entryName[idx+1:] == name {
-				return &assets.SearchResult{
-					Category: category,
-					Name:     entryName,
-					Entry:    entry,
-				}
+				matches = append(matches, entryName)
 			}
 		}
 	}
-	return nil
+
+	switch len(matches) {
+	case 0:
+		return nil, nil
+	case 1:
+		return &assets.SearchResult{
+			Category: category,
+			Name:     matches[0],
+			Entry:    entries[matches[0]],
+		}, nil
+	default:
+		sort.Strings(matches)
+		return nil, fmt.Errorf("ambiguous %s name %q matches multiple entries: %s", category, name, strings.Join(matches, ", "))
+	}
 }
 
 // searchInstalled searches installed config entries and returns AssetMatch results.

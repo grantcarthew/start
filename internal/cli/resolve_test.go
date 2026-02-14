@@ -103,7 +103,10 @@ func TestFindExactInRegistry(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := findExactInRegistry(entries, "roles", tt.query)
+			result, err := findExactInRegistry(entries, "roles", tt.query)
+			if err != nil {
+				t.Fatalf("findExactInRegistry(%q) unexpected error: %v", tt.query, err)
+			}
 			if tt.wantNil {
 				if result != nil {
 					t.Errorf("findExactInRegistry(%q) = %v, want nil", tt.query, result)
@@ -117,6 +120,39 @@ func TestFindExactInRegistry(t *testing.T) {
 				t.Errorf("findExactInRegistry(%q).Name = %q, want %q", tt.query, result.Name, tt.wantName)
 			}
 		})
+	}
+}
+
+func TestFindExactInRegistryAmbiguous(t *testing.T) {
+	t.Parallel()
+
+	entries := map[string]registry.IndexEntry{
+		"golang/assistant": {
+			Module:      "github.com/test/roles/golang/assistant@v0",
+			Description: "Go programming expert",
+		},
+		"python/assistant": {
+			Module:      "github.com/test/roles/python/assistant@v0",
+			Description: "Python programming expert",
+		},
+	}
+
+	// Short name "assistant" matches both entries
+	result, err := findExactInRegistry(entries, "roles", "assistant")
+	if err == nil {
+		t.Fatal("findExactInRegistry(\"assistant\") expected ambiguity error, got nil")
+	}
+	if result != nil {
+		t.Errorf("findExactInRegistry(\"assistant\") result = %v, want nil", result)
+	}
+
+	// Full name is unambiguous
+	result, err = findExactInRegistry(entries, "roles", "golang/assistant")
+	if err != nil {
+		t.Fatalf("findExactInRegistry(\"golang/assistant\") unexpected error: %v", err)
+	}
+	if result == nil || result.Name != "golang/assistant" {
+		t.Errorf("findExactInRegistry(\"golang/assistant\") = %v, want golang/assistant", result)
 	}
 }
 
