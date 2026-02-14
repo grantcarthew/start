@@ -81,12 +81,12 @@ func promptText(w io.Writer, r io.Reader, label, defaultVal string) (string, err
 			return defaultVal, nil
 		}
 		tmpPath := tmpFile.Name()
-		defer os.Remove(tmpPath)
+		defer func() { _ = os.Remove(tmpPath) }()
 
 		if defaultVal != "" {
 			_, _ = tmpFile.WriteString(defaultVal)
 		}
-		tmpFile.Close()
+		_ = tmpFile.Close()
 
 		if err := openInEditor(tmpPath); err != nil {
 			return defaultVal, nil
