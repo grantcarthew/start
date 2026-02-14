@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -16,7 +15,6 @@ import (
 	internalcue "github.com/grantcarthew/start/internal/cue"
 	"github.com/grantcarthew/start/internal/orchestration"
 	"github.com/grantcarthew/start/internal/registry"
-	"golang.org/x/term"
 )
 
 // AssetSource indicates where an asset was found.
@@ -467,10 +465,7 @@ func (r *resolver) selectSingleMatch(matches []AssetMatch, assetType, query stri
 // promptAssetSelection prompts the user to select from multiple matches.
 // In non-TTY mode, returns an error with the match list.
 func (r *resolver) promptAssetSelection(matches []AssetMatch, assetType, query string) (AssetMatch, error) {
-	isTTY := false
-	if f, ok := r.stdin.(*os.File); ok {
-		isTTY = term.IsTerminal(int(f.Fd()))
-	}
+	isTTY := isTerminal(r.stdin)
 
 	if !isTTY {
 		var names []string

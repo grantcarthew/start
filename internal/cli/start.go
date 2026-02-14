@@ -17,7 +17,6 @@ import (
 	"github.com/grantcarthew/start/internal/shell"
 	"github.com/grantcarthew/start/internal/temp"
 	"github.com/spf13/cobra"
-	"golang.org/x/term"
 )
 
 // flagsKey is the context key for storing Flags.
@@ -114,10 +113,7 @@ func resolveAgentName(cfg internalcue.LoadResult, flags *Flags, stdout io.Writer
 	}
 
 	// Multiple agents - check if interactive selection is possible
-	isTTY := false
-	if f, ok := stdin.(*os.File); ok {
-		isTTY = term.IsTerminal(int(f.Fd()))
-	}
+	isTTY := isTerminal(stdin)
 	if !isTTY {
 		// Non-TTY fallback: use first agent
 		name := choices[0].Name
@@ -649,10 +645,7 @@ func loadMergedConfigWithIO(stdout, stderr io.Writer, stdin io.Reader, workingDi
 // runAutoSetup runs the auto-setup flow.
 func runAutoSetup(stdout, stderr io.Writer, stdin io.Reader) error {
 	// Check if stdin is a TTY
-	isTTY := false
-	if f, ok := stdin.(*os.File); ok {
-		isTTY = term.IsTerminal(int(f.Fd()))
-	}
+	isTTY := isTerminal(stdin)
 
 	autoSetup := orchestration.NewAutoSetup(stdout, stderr, stdin, isTTY)
 	ctx := context.Background()

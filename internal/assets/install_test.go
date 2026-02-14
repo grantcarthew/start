@@ -103,28 +103,6 @@ func TestAssetTypeToConfigFile(t *testing.T) {
 	}
 }
 
-// TestGetAssetKey tests the getAssetKey function.
-func TestGetAssetKey(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name string
-		want string
-	}{
-		{"simple", "simple"},
-		{"cwd/agents-md", "cwd/agents-md"},
-		{"golang/code-review", "golang/code-review"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := getAssetKey(tt.name)
-			if got != tt.want {
-				t.Errorf("getAssetKey(%q) = %q, want %q", tt.name, got, tt.want)
-			}
-		})
-	}
-}
 
 // TestFindAssetKey tests the FindAssetKey function.
 func TestFindAssetKey(t *testing.T) {

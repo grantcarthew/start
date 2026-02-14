@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -18,7 +17,6 @@ import (
 	"github.com/grantcarthew/start/internal/registry"
 	"github.com/spf13/cobra"
 	"golang.org/x/mod/semver"
-	"golang.org/x/term"
 )
 
 // NOTE(design): This file shares registry client creation, index fetching, and config
@@ -208,10 +206,7 @@ func installAsset(ctx context.Context, cmd *cobra.Command, client *registry.Clie
 // promptAssetSelection prompts the user to select an asset from multiple matches.
 func promptAssetSelection(w io.Writer, r io.Reader, results []assets.SearchResult, cfg cue.Value) (assets.SearchResult, error) {
 	// Check if stdin is a TTY
-	isTTY := false
-	if f, ok := r.(*os.File); ok {
-		isTTY = term.IsTerminal(int(f.Fd()))
-	}
+	isTTY := isTerminal(r)
 
 	if !isTTY {
 		var names []string

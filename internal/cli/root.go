@@ -3,12 +3,14 @@ package cli
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"runtime"
 
 	"github.com/fatih/color"
 	"github.com/grantcarthew/start/internal/orchestration"
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 )
 
 // IsSilentError returns true if the error should not be printed to stderr.
@@ -172,4 +174,13 @@ func resolveDirectory(path string) (string, error) {
 	}
 
 	return abs, nil
+}
+
+// isTerminal reports whether r is connected to a terminal.
+func isTerminal(r io.Reader) bool {
+	f, ok := r.(*os.File)
+	if !ok {
+		return false
+	}
+	return term.IsTerminal(int(f.Fd()))
 }

@@ -337,23 +337,25 @@ func escapeForShell(s string) string {
 
 // ExtractAgent extracts agent configuration from CUE value.
 func ExtractAgent(cfg cue.Value, name string) (Agent, error) {
+	agentVal := cfg.LookupPath(cue.ParsePath(internalcue.KeyAgents)).LookupPath(cue.MakePath(cue.Str(name)))
+	if !agentVal.Exists() {
+		return Agent{}, fmt.Errorf("agent %q not found", name)
+	}
+
+	return extractAgentFields(agentVal, name), nil
+}
+
+// extractAgentFields extracts agent fields from a resolved CUE value.
+func extractAgentFields(agentVal cue.Value, name string) Agent {
 	var agent Agent
 	agent.Name = name
 
-	agentVal := cfg.LookupPath(cue.ParsePath(internalcue.KeyAgents)).LookupPath(cue.MakePath(cue.Str(name)))
-	if !agentVal.Exists() {
-		return agent, fmt.Errorf("agent %q not found", name)
-	}
-
-	// Extract required fields
 	if bin := agentVal.LookupPath(cue.ParsePath("bin")); bin.Exists() {
 		agent.Bin, _ = bin.String()
 	}
 	if cmd := agentVal.LookupPath(cue.ParsePath("command")); cmd.Exists() {
 		agent.Command, _ = cmd.String()
 	}
-
-	// Extract optional fields
 	if dm := agentVal.LookupPath(cue.ParsePath("default_model")); dm.Exists() {
 		agent.DefaultModel, _ = dm.String()
 	}
@@ -361,7 +363,6 @@ func ExtractAgent(cfg cue.Value, name string) (Agent, error) {
 		agent.Description, _ = desc.String()
 	}
 
-	// Extract models map
 	if models := agentVal.LookupPath(cue.ParsePath("models")); models.Exists() {
 		agent.Models = make(map[string]string)
 		iter, err := models.Fields()
@@ -386,7 +387,7 @@ func ExtractAgent(cfg cue.Value, name string) (Agent, error) {
 		}
 	}
 
-	return agent, nil
+	return agent
 }
 
 // GenerateDryRunCommand generates the command.txt content for dry-run.
