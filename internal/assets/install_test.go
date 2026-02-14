@@ -1024,6 +1024,263 @@ func TestFormatAssetStruct_RoleNameOverride(t *testing.T) {
 	}
 }
 
+// createTestModule creates a minimal CUE module in a temp directory for testing.
+// The module has no external dependencies, making it self-contained.
+func createTestModule(t *testing.T, pkgName, cueContent string) string {
+	t.Helper()
+	moduleDir := t.TempDir()
+
+	// Create cue.mod/module.cue
+	modDir := filepath.Join(moduleDir, "cue.mod")
+	if err := os.MkdirAll(modDir, 0755); err != nil {
+		t.Fatalf("creating cue.mod dir: %v", err)
+	}
+	moduleCue := `module: "test.example/asset@v0"
+language: version: "v0.15.1"
+`
+	if err := os.WriteFile(filepath.Join(modDir, "module.cue"), []byte(moduleCue), 0644); err != nil {
+		t.Fatalf("writing module.cue: %v", err)
+	}
+
+	// Create the asset definition file
+	cueFile := filepath.Join(moduleDir, pkgName+".cue")
+	if err := os.WriteFile(cueFile, []byte(cueContent), 0644); err != nil {
+		t.Fatalf("writing %s.cue: %v", pkgName, err)
+	}
+
+	return moduleDir
+}
+
+func TestExtractAssetContent_Task(t *testing.T) {
+	t.Parallel()
+
+	moduleDir := createTestModule(t, "task", `package task
+
+task: {
+	description: "Debug Go code"
+	tags: ["golang", "debug"]
+	prompt: "Help me debug this Go code."
+}
+`)
+
+	asset := SearchResult{
+		Category: "tasks",
+		Name:     "golang/debug",
+	}
+
+	result, err := ExtractAssetContent(moduleDir, asset, nil, "test.example/asset@v0.1.0", "")
+	if err != nil {
+		t.Fatalf("ExtractAssetContent() error: %v", err)
+	}
+
+	// Should contain origin from originPath
+	if !strings.Contains(result, `origin: "test.example/asset@v0.1.0"`) {
+		t.Errorf("missing origin field\nGot:\n%s", result)
+	}
+	// Should contain description
+	if !strings.Contains(result, `description: "Debug Go code"`) {
+		t.Errorf("missing description\nGot:\n%s", result)
+	}
+	// Should contain tags
+	if !strings.Contains(result, `"golang"`) || !strings.Contains(result, `"debug"`) {
+		t.Errorf("missing tags\nGot:\n%s", result)
+	}
+	// Should contain prompt
+	if !strings.Contains(result, "Help me debug this Go code") {
+		t.Errorf("missing prompt\nGot:\n%s", result)
+	}
+}
+
+func TestExtractAssetContent_Role(t *testing.T) {
+	t.Parallel()
+
+	moduleDir := createTestModule(t, "role", `package role
+
+role: {
+	description: "Go programming expert"
+	tags: ["golang"]
+	prompt: "You are an expert in Go."
+}
+`)
+
+	asset := SearchResult{
+		Category: "roles",
+		Name:     "golang/expert",
+	}
+
+	result, err := ExtractAssetContent(moduleDir, asset, nil, "test.example/role@v0.2.0", "")
+	if err != nil {
+		t.Fatalf("ExtractAssetContent() error: %v", err)
+	}
+
+	if !strings.Contains(result, `origin: "test.example/role@v0.2.0"`) {
+		t.Errorf("missing origin\nGot:\n%s", result)
+	}
+	if !strings.Contains(result, `description: "Go programming expert"`) {
+		t.Errorf("missing description\nGot:\n%s", result)
+	}
+	if !strings.Contains(result, "You are an expert in Go") {
+		t.Errorf("missing prompt\nGot:\n%s", result)
+	}
+}
+
+func TestExtractAssetContent_Agent(t *testing.T) {
+	t.Parallel()
+
+	moduleDir := createTestModule(t, "agent", `package agent
+
+agent: {
+	description: "Claude AI assistant"
+	bin: "claude"
+	command: "{{.bin}} --model {{.model}}"
+	default_model: "sonnet"
+	models: {
+		sonnet: "claude-sonnet-4-20250514"
+		opus: "claude-opus-4-20250514"
+	}
+}
+`)
+
+	asset := SearchResult{
+		Category: "agents",
+		Name:     "claude",
+	}
+
+	result, err := ExtractAssetContent(moduleDir, asset, nil, "test.example/agent@v0.1.0", "")
+	if err != nil {
+		t.Fatalf("ExtractAssetContent() error: %v", err)
+	}
+
+	if !strings.Contains(result, `bin: "claude"`) {
+		t.Errorf("missing bin\nGot:\n%s", result)
+	}
+	if !strings.Contains(result, `default_model: "sonnet"`) {
+		t.Errorf("missing default_model\nGot:\n%s", result)
+	}
+	if !strings.Contains(result, "models: {") {
+		t.Errorf("missing models map\nGot:\n%s", result)
+	}
+}
+
+func TestExtractAssetContent_RoleNameOverride(t *testing.T) {
+	t.Parallel()
+
+	moduleDir := createTestModule(t, "task", `package task
+
+task: {
+	description: "Code review task"
+	role: {
+		description: "Inline reviewer role"
+		prompt: "You are a code reviewer."
+	}
+	prompt: "Review this code."
+}
+`)
+
+	asset := SearchResult{
+		Category: "tasks",
+		Name:     "review",
+	}
+
+	result, err := ExtractAssetContent(moduleDir, asset, nil, "test.example/task@v0.1.0", "golang/reviewer")
+	if err != nil {
+		t.Fatalf("ExtractAssetContent() error: %v", err)
+	}
+
+	// Role should be replaced with string reference
+	if !strings.Contains(result, `role: "golang/reviewer"`) {
+		t.Errorf("expected role name override\nGot:\n%s", result)
+	}
+	// Inline role content should not appear
+	if strings.Contains(result, "Inline reviewer role") {
+		t.Errorf("inline role should be replaced\nGot:\n%s", result)
+	}
+}
+
+func TestExtractAssetContent_NoAssetDefinition(t *testing.T) {
+	t.Parallel()
+
+	moduleDir := createTestModule(t, "other", `package other
+
+something: {
+	description: "Not an asset"
+}
+`)
+
+	asset := SearchResult{
+		Category: "tasks",
+		Name:     "missing",
+	}
+
+	_, err := ExtractAssetContent(moduleDir, asset, nil, "test.example/bad@v0", "")
+	if err == nil {
+		t.Fatal("expected error for missing asset definition")
+	}
+	if !strings.Contains(err.Error(), "not found") {
+		t.Errorf("expected 'not found' in error, got: %v", err)
+	}
+}
+
+func TestExtractAssetContent_MultilinePrompt(t *testing.T) {
+	t.Parallel()
+
+	moduleDir := createTestModule(t, "task", `package task
+
+task: {
+	description: "Multi-line task"
+	prompt: """
+		Line one.
+		Line two.
+		Line three.
+		"""
+}
+`)
+
+	asset := SearchResult{
+		Category: "tasks",
+		Name:     "multiline",
+	}
+
+	result, err := ExtractAssetContent(moduleDir, asset, nil, "test.example/task@v0.1.0", "")
+	if err != nil {
+		t.Fatalf("ExtractAssetContent() error: %v", err)
+	}
+
+	if !strings.Contains(result, "Line one") {
+		t.Errorf("missing multi-line content\nGot:\n%s", result)
+	}
+	if !strings.Contains(result, "Line three") {
+		t.Errorf("missing multi-line content\nGot:\n%s", result)
+	}
+}
+
+func TestExtractAssetContent_OptionalRoleField(t *testing.T) {
+	t.Parallel()
+
+	moduleDir := createTestModule(t, "role", `package role
+
+role: {
+	description: "Optional role"
+	prompt: "You might be needed."
+	optional: true
+}
+`)
+
+	asset := SearchResult{
+		Category: "roles",
+		Name:     "optional-role",
+	}
+
+	result, err := ExtractAssetContent(moduleDir, asset, nil, "test.example/role@v0.1.0", "")
+	if err != nil {
+		t.Fatalf("ExtractAssetContent() error: %v", err)
+	}
+
+	if !strings.Contains(result, "optional: true") {
+		t.Errorf("missing optional field\nGot:\n%s", result)
+	}
+}
+
 // TestGetInstalledOrigin tests the GetInstalledOrigin function.
 func TestGetInstalledOrigin(t *testing.T) {
 	t.Parallel()
