@@ -108,67 +108,6 @@ func TestSearchIndex(t *testing.T) {
 	}
 }
 
-// TestMatchScore tests the matchScore function (now in assets package).
-// TODO: Move to internal/assets/search_test.go
-/*
-func TestMatchScore(t *testing.T) {
-	t.Parallel()
-	entry := registry.IndexEntry{
-		Module:      "github.com/test/roles/golang/assistant@v0",
-		Description: "Go programming expert for code assistance",
-		Tags:        []string{"golang", "programming", "expert"},
-	}
-
-	tests := []struct {
-		name      string
-		assetName string
-		query     string
-		wantScore int
-	}{
-		{
-			name:      "exact name match scores highest",
-			assetName: "golang",
-			query:     "golang",
-			wantScore: 6, // name(3) + module(2) + tag(1)
-		},
-		{
-			name:      "module path match",
-			assetName: "assistant",
-			query:     "golang",
-			wantScore: 3, // module(2) + tag(1)
-		},
-		{
-			name:      "description only match",
-			assetName: "assistant",
-			query:     "programming",
-			wantScore: 2, // description(1) + tag(1)
-		},
-		{
-			name:      "tag only match",
-			assetName: "assistant",
-			query:     "expert",
-			wantScore: 2, // description(1) + tag(1)
-		},
-		{
-			name:      "no match",
-			assetName: "assistant",
-			query:     "nonexistent",
-			wantScore: 0,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			score := matchScore(tt.assetName, entry, strings.ToLower(tt.query))
-
-			if score != tt.wantScore {
-				t.Errorf("matchScore() = %d, want %d", score, tt.wantScore)
-			}
-		})
-	}
-}
-*/
-
 // TestCategoryOrder tests the categoryOrder function.
 func TestCategoryOrder(t *testing.T) {
 	t.Parallel()
@@ -286,60 +225,6 @@ func TestAssetTypeToConfigFile(t *testing.T) {
 		})
 	}
 }
-
-// TestGenerateAssetCUE tests the generateAssetCUE function.
-// NOTE: This function was removed as it was only used for testing.
-// TODO: Remove this test or rewrite to test the actual installation flow.
-/*
-func TestGenerateAssetCUE(t *testing.T) {
-	t.Parallel()
-	asset := assets.SearchResult{
-		Category: "roles",
-		Name:     "golang/assistant",
-		Entry: registry.IndexEntry{
-			Module:      "github.com/test/roles/golang/assistant",
-			Description: "Go programming expert",
-		},
-	}
-	modulePath := "github.com/test/roles/golang/assistant@v0"
-
-	t.Run("new file", func(t *testing.T) {
-		content := generateAssetCUE(asset, modulePath, "")
-
-		if !strings.Contains(content, "roles: {") {
-			t.Errorf("output missing roles struct, got: %s", content)
-		}
-		if !strings.Contains(content, "Added: roles/golang/assistant") {
-			t.Errorf("output missing added comment, got: %s", content)
-		}
-		if !strings.Contains(content, modulePath) {
-			t.Errorf("output missing module path, got: %s", content)
-		}
-	})
-
-	t.Run("existing file without module", func(t *testing.T) {
-		existing := "// existing config\nroles: {}\n"
-		content := generateAssetCUE(asset, modulePath, existing)
-
-		if !strings.Contains(content, existing) {
-			t.Error("should preserve existing content")
-		}
-		if !strings.Contains(content, modulePath) {
-			t.Error("should add module path comment")
-		}
-	})
-
-	t.Run("existing file with same module", func(t *testing.T) {
-		existing := "// Module: " + modulePath + "\nroles: {}\n"
-		content := generateAssetCUE(asset, modulePath, existing)
-
-		// Should return as-is since already imported
-		if content != existing {
-			t.Error("should return existing content unchanged when module already present")
-		}
-	})
-}
-*/
 
 // TestAssetsCommandExists tests that the assets command is registered.
 func TestAssetsCommandExists(t *testing.T) {
@@ -641,7 +526,7 @@ func TestUpdateAssetInConfig(t *testing.T) {
 		origin: "old/origin"
 		// Note: use { and } carefully
 		description: "old description"
-		// TODO: update prompt { needs work }
+		// NOTE: update prompt { revised version }
 	}
 }
 `,
@@ -660,7 +545,7 @@ func TestUpdateAssetInConfig(t *testing.T) {
 		{
 			name: "key in comment before actual definition",
 			initial: `tasks: {
-	// TODO: Configure "my/task": needs setup
+	// NOTE: Configure "my/task": see docs
 	// Also check "my/task": for updates
 	"my/task": {
 		origin: "old/origin"
@@ -675,7 +560,7 @@ func TestUpdateAssetInConfig(t *testing.T) {
 	description: "updated"
 }`,
 			wantContain: []string{
-				`// TODO: Configure "my/task": needs setup`,
+				`// NOTE: Configure "my/task": see docs`,
 				`"my/task": {`,
 				`origin: "new/origin"`,
 				`description: "updated"`,
@@ -684,7 +569,7 @@ func TestUpdateAssetInConfig(t *testing.T) {
 		{
 			name: "comment with braces between key and opening brace",
 			initial: `tasks: {
-	"my/task": // TODO: fix this { urgent }
+	"my/task": // NOTE: see details { v2 }
 	{
 		origin: "old/origin"
 		description: "old description"
@@ -816,10 +701,10 @@ func TestFindOpeningBrace(t *testing.T) {
 		},
 		{
 			name: "comment with brace before actual brace",
-			content: `"key": // TODO: fix this { urgent }
+			content: `"key": // NOTE: see details { v2 }
 {`,
 			startPos: 7,  // After ": "
-			wantPos:  36, // After newline, at the real {
+			wantPos:  35, // After newline, at the real {
 			wantErr:  false,
 		},
 		{
