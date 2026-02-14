@@ -21,6 +21,11 @@ import (
 	"golang.org/x/term"
 )
 
+// NOTE(design): This file shares registry client creation, index fetching, and config
+// loading patterns with assets_list.go, assets_search.go, assets_update.go, and
+// assets_index.go. This duplication is accepted - each command uses the results
+// differently and a shared helper would couple them for modest line savings.
+
 // addAssetsAddCommand adds the add subcommand to the assets command.
 func addAssetsAddCommand(parent *cobra.Command) {
 	addCmd := &cobra.Command{
@@ -136,7 +141,7 @@ func installAsset(ctx context.Context, cmd *cobra.Command, client *registry.Clie
 		// Manually-added asset (no origin) — warn and proceed with install
 		if origin == "" {
 			if !flags.Quiet {
-				PrintWarning(w, "replacing manually-added %s/%s with registry version",
+				printWarning(w, "replacing manually-added %s/%s with registry version",
 					selected.Category, selected.Name)
 			}
 		} else {

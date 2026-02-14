@@ -26,22 +26,16 @@ var singleBracePlaceholderPattern = regexp.MustCompile(`\{(bin|model|role|role_f
 
 // expandTilde expands a leading ~ to the user's home directory.
 // This is necessary because single-quoted strings in shell don't expand ~.
+// Falls back to the original path on error (non-fatal for shell arguments).
 func expandTilde(path string) string {
 	if path == "" {
 		return path
 	}
-	if path == "~" {
-		if home, err := os.UserHomeDir(); err == nil {
-			return home
-		}
+	expanded, err := ExpandTilde(path)
+	if err != nil {
 		return path
 	}
-	if len(path) > 1 && path[0] == '~' && path[1] == '/' {
-		if home, err := os.UserHomeDir(); err == nil {
-			return home + path[1:]
-		}
-	}
-	return path
+	return expanded
 }
 
 // Agent represents an agent configuration.

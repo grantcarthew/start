@@ -2,6 +2,7 @@
 package cue
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -11,6 +12,9 @@ import (
 	cueformat "cuelang.org/go/cue/format"
 	"cuelang.org/go/cue/load"
 )
+
+// ErrNoCUEFiles is returned by LoadSingle when the directory contains no CUE files.
+var ErrNoCUEFiles = errors.New("no CUE files found")
 
 // Loader loads and merges CUE configurations from directories.
 type Loader struct {
@@ -299,7 +303,7 @@ func (l *Loader) LoadSingle(dir string) (cue.Value, error) {
 		return cue.Value{}, fmt.Errorf("checking for CUE files: %w", err)
 	}
 	if !hasCUE {
-		return cue.Value{}, fmt.Errorf("no CUE files found in %s", dir)
+		return cue.Value{}, fmt.Errorf("%w in %s", ErrNoCUEFiles, dir)
 	}
 
 	return l.loadDir(dir)

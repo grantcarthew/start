@@ -758,7 +758,7 @@ func resolveModulePath(path, origin string) (string, error) {
 	// Origin: "github.com/.../holistic@v0.1.2"
 	// Cache:  cacheDir/mod/extract/github.com/.../holistic@v0.1.2/
 	// The CUE cache stores the version as part of the leaf directory name.
-	if idx := strings.Index(origin, "@"); idx != -1 {
+	if idx := strings.LastIndex(origin, "@"); idx != -1 {
 		modulePath := origin[:idx]
 		version := origin[idx:]
 		versionedDir := filepath.Join(cacheDir, "mod", "extract",
@@ -772,7 +772,7 @@ func resolveModulePath(path, origin string) (string, error) {
 	// Fallback: scan directory for matching version (origins without version
 	// or when the exact versioned directory is missing from cache).
 	originWithoutVersion := origin
-	if idx := strings.Index(origin, "@"); idx != -1 {
+	if idx := strings.LastIndex(origin, "@"); idx != -1 {
 		originWithoutVersion = origin[:idx]
 	}
 	parentDir := filepath.Join(cacheDir, "mod", "extract", filepath.Dir(originWithoutVersion))

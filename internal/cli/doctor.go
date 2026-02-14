@@ -2,9 +2,9 @@ package cli
 
 import (
 	"context"
-	"strings"
 	"time"
 
+	"github.com/grantcarthew/start/internal/assets"
 	"github.com/grantcarthew/start/internal/config"
 	internalcue "github.com/grantcarthew/start/internal/cue"
 	"github.com/grantcarthew/start/internal/doctor"
@@ -184,9 +184,5 @@ func resolveIndexVersion() string {
 		return ""
 	}
 
-	// Extract version from "github.com/.../index@v0.3.2"
-	if idx := strings.LastIndex(resolved, "@"); idx != -1 {
-		return resolved[idx+1:]
-	}
-	return ""
+	return assets.VersionFromOrigin(resolved)
 }

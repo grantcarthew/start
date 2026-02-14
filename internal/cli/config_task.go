@@ -1,7 +1,13 @@
+// NOTE(design): This file shares structural patterns with config_agent.go,
+// config_role.go, and config_context.go (CUE field extraction, scope-aware loading,
+// interactive prompting, CUE file generation). This duplication is accepted - each
+// entity has distinct fields and behaviours that make a generic abstraction more
+// complex than the repetition it would eliminate.
 package cli
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -361,7 +367,7 @@ func runConfigTaskInfo(cmd *cobra.Command, args []string) error {
 	_, _ = fmt.Fprintln(w)
 	_, _ = colorTasks.Fprint(w, "tasks")
 	_, _ = fmt.Fprintf(w, "/%s\n", resolvedName)
-	PrintSeparator(w)
+	printSeparator(w)
 
 	_, _ = colorDim.Fprint(w, "Source:")
 	_, _ = fmt.Fprintf(w, " %s\n", task.Source)
@@ -394,7 +400,7 @@ func runConfigTaskInfo(cmd *cobra.Command, args []string) error {
 		_, _ = colorDim.Fprint(w, "Tags:")
 		_, _ = fmt.Fprintf(w, " %s\n", strings.Join(task.Tags, ", "))
 	}
-	PrintSeparator(w)
+	printSeparator(w)
 
 	return nil
 }
@@ -769,7 +775,7 @@ func loadTasksFromDir(dir string) (map[string]TaskConfig, error) {
 	cfg, err := loader.LoadSingle(dir)
 	if err != nil {
 		// If no CUE files exist, return empty map (not an error)
-		if strings.Contains(err.Error(), "no CUE files") {
+		if errors.Is(err, internalcue.ErrNoCUEFiles) {
 			return tasks, nil
 		}
 		return tasks, err

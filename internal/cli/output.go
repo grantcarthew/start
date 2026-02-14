@@ -46,40 +46,27 @@ func categoryColor(category string) *color.Color {
 	}
 }
 
-// PrintError prints an error message in red.
-func PrintError(w io.Writer, format string, args ...interface{}) {
-	_, _ = colorError.Fprintf(w, "Error: ")
-	_, _ = fmt.Fprintf(w, format, args...)
-	_, _ = fmt.Fprintln(w)
-}
-
-// PrintWarning prints a warning message in yellow.
-func PrintWarning(w io.Writer, format string, args ...interface{}) {
+// printWarning prints a warning message in yellow.
+func printWarning(w io.Writer, format string, args ...interface{}) {
 	_, _ = colorWarning.Fprintf(w, "Warning: ")
 	_, _ = fmt.Fprintf(w, format, args...)
 	_, _ = fmt.Fprintln(w)
 }
 
-// PrintSuccess prints a success marker (checkmark) in green.
-func PrintSuccess(w io.Writer, text string) {
-	_, _ = colorSuccess.Fprintf(w, "✓")
-	_, _ = fmt.Fprintf(w, " %s\n", text)
-}
-
-// PrintHeader prints a header/title in green with a leading blank line.
-func PrintHeader(w io.Writer, text string) {
+// printHeader prints a header/title in green with a leading blank line.
+func printHeader(w io.Writer, text string) {
 	_, _ = fmt.Fprintln(w)
 	_, _ = colorHeader.Fprintln(w, text)
 }
 
-// PrintSeparator prints a separator line in magenta.
-func PrintSeparator(w io.Writer) {
+// printSeparator prints a separator line in magenta.
+func printSeparator(w io.Writer) {
 	_, _ = colorSeparator.Fprintln(w, strings.Repeat("─", 79))
 }
 
-// PrintContextTable prints contexts in a table format.
+// printContextTable prints contexts in a table format.
 // Shows all contexts (loaded, skipped, and failed) with status indicator.
-func PrintContextTable(w io.Writer, contexts []orchestration.Context, selection orchestration.ContextSelection) {
+func printContextTable(w io.Writer, contexts []orchestration.Context, selection orchestration.ContextSelection) {
 	if len(contexts) == 0 {
 		return
 	}
@@ -186,8 +173,8 @@ func PrintContextTable(w io.Writer, contexts []orchestration.Context, selection 
 	_, _ = fmt.Fprintln(w)
 }
 
-// PrintAgentModel prints the Agent and Model lines with colour formatting.
-func PrintAgentModel(w io.Writer, agent orchestration.Agent, model, modelSource string) {
+// printAgentModel prints the Agent and Model lines with colour formatting.
+func printAgentModel(w io.Writer, agent orchestration.Agent, model, modelSource string) {
 	_, _ = colorAgents.Fprint(w, "Agent:")
 	_, _ = fmt.Fprintf(w, " %s\n", agent.Name)
 	_, _ = colorAgents.Fprint(w, "Model:")
@@ -199,9 +186,9 @@ func PrintAgentModel(w io.Writer, agent orchestration.Agent, model, modelSource 
 	_, _ = fmt.Fprintln(w)
 }
 
-// PrintRoleTable prints the role resolution chain in a table format.
+// printRoleTable prints the role resolution chain in a table format.
 // Shows status indicator: ✓ for loaded, ○ for skipped/error.
-func PrintRoleTable(w io.Writer, resolutions []orchestration.RoleResolution) {
+func printRoleTable(w io.Writer, resolutions []orchestration.RoleResolution) {
 	if len(resolutions) == 0 {
 		return
 	}

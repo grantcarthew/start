@@ -151,7 +151,7 @@ func runSearch(cmd *cobra.Command, args []string) error {
 	if len(sections) == 0 {
 		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "No matches found for %q\n", query)
 		if registryErr != nil {
-			PrintWarning(cmd.ErrOrStderr(), "registry unavailable: %v\n", registryErr)
+			printWarning(cmd.ErrOrStderr(), "registry unavailable: %v\n", registryErr)
 		}
 		return nil
 	}
@@ -162,7 +162,7 @@ func runSearch(cmd *cobra.Command, args []string) error {
 
 	if registryErr != nil {
 		_, _ = fmt.Fprintln(cmd.OutOrStdout())
-		PrintWarning(cmd.ErrOrStderr(), "registry unavailable: %v\n", registryErr)
+		printWarning(cmd.ErrOrStderr(), "registry unavailable: %v\n", registryErr)
 	}
 
 	return nil

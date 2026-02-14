@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
 	"runtime"
 
 	"github.com/fatih/color"
+	"github.com/grantcarthew/start/internal/orchestration"
 	"github.com/spf13/cobra"
 )
 
@@ -153,17 +153,7 @@ func unknownCommandError(cmdPath, arg string) error {
 
 // resolveDirectory expands and validates the directory path.
 func resolveDirectory(path string) (string, error) {
-	// Expand tilde
-	if len(path) > 0 && path[0] == '~' {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return "", fmt.Errorf("expanding ~: %w", err)
-		}
-		path = filepath.Join(home, path[1:])
-	}
-
-	// Convert to absolute path
-	abs, err := filepath.Abs(path)
+	abs, err := orchestration.ExpandFilePath(path)
 	if err != nil {
 		return "", fmt.Errorf("resolving path: %w", err)
 	}

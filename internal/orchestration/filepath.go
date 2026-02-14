@@ -17,6 +17,23 @@ func IsFilePath(s string) bool {
 		strings.HasPrefix(s, "~")
 }
 
+// ExpandTilde expands a leading ~ or ~/ to the user's home directory.
+// Only handles bare ~ and ~/path, not ~user syntax.
+// Returns the path unchanged if it does not start with ~ or ~/.
+func ExpandTilde(path string) (string, error) {
+	if path == "~" {
+		return os.UserHomeDir()
+	}
+	if strings.HasPrefix(path, "~/") {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", err
+		}
+		return filepath.Join(home, path[2:]), nil
+	}
+	return path, nil
+}
+
 // ExpandFilePath expands tilde and converts to absolute path.
 // Returns the expanded path and any error.
 func ExpandFilePath(path string) (string, error) {
@@ -24,17 +41,13 @@ func ExpandFilePath(path string) (string, error) {
 		return "", nil
 	}
 
-	// Expand tilde
-	if strings.HasPrefix(path, "~") {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return "", err
-		}
-		path = filepath.Join(home, path[1:])
+	expanded, err := ExpandTilde(path)
+	if err != nil {
+		return "", err
 	}
 
 	// Convert to absolute path
-	return filepath.Abs(path)
+	return filepath.Abs(expanded)
 }
 
 // ReadFilePath reads the content of a file path, expanding tilde if present.

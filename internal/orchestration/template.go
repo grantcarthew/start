@@ -4,8 +4,6 @@ package orchestration
 import (
 	"bytes"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 	"text/template"
 	"time"
@@ -51,20 +49,7 @@ type DefaultFileReader struct{}
 
 // Read reads file contents from the filesystem.
 func (r *DefaultFileReader) Read(path string) (string, error) {
-	// Expand ~ to home directory
-	if strings.HasPrefix(path, "~/") {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return "", fmt.Errorf("expanding home directory: %w", err)
-		}
-		path = filepath.Join(home, path[2:])
-	}
-
-	content, err := os.ReadFile(path)
-	if err != nil {
-		return "", err
-	}
-	return string(content), nil
+	return ReadFilePath(path)
 }
 
 // TemplateProcessor handles UTD template resolution.

@@ -138,7 +138,7 @@ func resolveAgentName(cfg internalcue.LoadResult, flags *Flags, stdout io.Writer
 	debugf(flags, "agent", "Selected %q (interactive)", selected)
 	if promptSetDefault(stdout, reader, selected) {
 		if err := setSetting(stdout, flags, "default_agent", selected, false); err != nil {
-			PrintWarning(stdout, "could not save default: %v", err)
+			printWarning(stdout, "could not save default: %v", err)
 		}
 	}
 	return selected, nil
@@ -438,7 +438,7 @@ func printWarnings(flags *Flags, stderr io.Writer, warnings []string) {
 		return
 	}
 	for _, w := range warnings {
-		PrintWarning(stderr, "%s", w)
+		printWarning(stderr, "%s", w)
 	}
 }
 
@@ -479,24 +479,24 @@ func executeDryRun(w io.Writer, executor *orchestration.Executor, cfg orchestrat
 
 // printExecutionInfo prints the execution summary.
 func printExecutionInfo(w io.Writer, agent orchestration.Agent, model, modelSource string, result orchestration.ComposeResult) {
-	PrintHeader(w, "Starting AI Agent")
-	PrintSeparator(w)
+	printHeader(w, "Starting AI Agent")
+	printSeparator(w)
 
-	PrintAgentModel(w, agent, model, modelSource)
-	PrintContextTable(w, result.Contexts, result.Selection)
-	PrintRoleTable(w, result.RoleResolutions)
+	printAgentModel(w, agent, model, modelSource)
+	printContextTable(w, result.Contexts, result.Selection)
+	printRoleTable(w, result.RoleResolutions)
 
 	_, _ = fmt.Fprintf(w, "Starting %s - awaiting response...\n", agent.Name)
 }
 
 // printDryRunSummary prints the dry-run summary per DR-016.
 func printDryRunSummary(w io.Writer, agent orchestration.Agent, model, modelSource string, result orchestration.ComposeResult, dir string) {
-	PrintHeader(w, "Dry Run - Agent Not Executed")
-	PrintSeparator(w)
+	printHeader(w, "Dry Run - Agent Not Executed")
+	printSeparator(w)
 
-	PrintAgentModel(w, agent, model, modelSource)
-	PrintContextTable(w, result.Contexts, result.Selection)
-	PrintRoleTable(w, result.RoleResolutions)
+	printAgentModel(w, agent, model, modelSource)
+	printContextTable(w, result.Contexts, result.Selection)
+	printRoleTable(w, result.RoleResolutions)
 
 	// Show role preview
 	if result.Role != "" {
@@ -520,16 +520,16 @@ func printDryRunSummary(w io.Writer, agent orchestration.Agent, model, modelSour
 // printComposeError prints UI before a composition error.
 // Shows agent, contexts, and role resolutions so user understands what failed.
 func printComposeError(w io.Writer, agent orchestration.Agent, result orchestration.ComposeResult) {
-	PrintHeader(w, "Starting AI Agent")
-	PrintSeparator(w)
+	printHeader(w, "Starting AI Agent")
+	printSeparator(w)
 
 	_, _ = colorAgents.Fprint(w, "Agent:")
 	_, _ = fmt.Fprintf(w, " %s\n", agent.Name)
 	_, _ = fmt.Fprintln(w)
 
-	PrintContextTable(w, result.Contexts, result.Selection)
+	printContextTable(w, result.Contexts, result.Selection)
 
-	PrintRoleTable(w, result.RoleResolutions)
+	printRoleTable(w, result.RoleResolutions)
 }
 
 // printContentPreview prints content with a header showing line count only when truncated.

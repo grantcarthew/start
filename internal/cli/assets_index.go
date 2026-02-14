@@ -11,9 +11,15 @@ import (
 	"strings"
 
 	"cuelang.org/go/mod/modconfig"
+	"github.com/grantcarthew/start/internal/assets"
 	"github.com/grantcarthew/start/internal/registry"
 	"github.com/spf13/cobra"
 )
+
+// NOTE(design): This file shares registry client creation, index fetching, and config
+// loading patterns with assets_add.go, assets_list.go, assets_search.go, and
+// assets_update.go. This duplication is accepted - each command uses the results
+// differently and a shared helper would couple them for modest line savings.
 
 // addAssetsIndexCommand adds the index subcommand to the assets command.
 func addAssetsIndexCommand(parent *cobra.Command) {
@@ -58,9 +64,9 @@ func runAssetsIndex(cmd *cobra.Command, args []string) error {
 	}
 
 	// Extract version string (after @)
-	version := resolvedPath
-	if idx := strings.LastIndex(resolvedPath, "@"); idx != -1 {
-		version = resolvedPath[idx+1:]
+	version := assets.VersionFromOrigin(resolvedPath)
+	if version == "" {
+		version = resolvedPath
 	}
 
 	// Fetch module
