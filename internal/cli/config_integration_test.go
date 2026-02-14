@@ -9,6 +9,9 @@ import (
 )
 
 // Integration tests for config commands that test the full workflow.
+//
+// Note: Tests below use os.Chdir (process-global state). Do not add t.Parallel()
+// to any test that calls os.Chdir — it will cause data races on the working directory.
 
 func TestConfigAgent_FullWorkflow(t *testing.T) {
 	// Setup isolated environment

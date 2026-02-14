@@ -13,6 +13,9 @@ import (
 	"github.com/grantcarthew/start/internal/registry"
 )
 
+// Note: Tests below use os.Chdir (process-global state). Do not add t.Parallel()
+// to any test that calls os.Chdir — it will cause data races on the working directory.
+
 // TestIntegration_AssetsListWithConfig tests listing assets from config.
 func TestIntegration_AssetsListWithConfig(t *testing.T) {
 	tmpDir := t.TempDir()

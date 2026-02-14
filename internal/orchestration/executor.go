@@ -269,7 +269,11 @@ func (e *Executor) ExecuteCommand(cmdStr string, cfg ExecuteConfig) error {
 		}
 	}
 
-	// Set working directory
+	// Set working directory.
+	// Note: os.Chdir mutates process-global state. This is safe here because
+	// syscall.Exec below replaces the process. If Exec fails, the working
+	// directory remains changed with no rollback. This function must only be
+	// called as the final action before process replacement.
 	if cfg.WorkingDir != "" {
 		if err := os.Chdir(cfg.WorkingDir); err != nil {
 			return fmt.Errorf("changing directory: %w", err)

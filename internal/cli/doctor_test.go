@@ -26,6 +26,9 @@ func TestDoctorCommand_Exists(t *testing.T) {
 	}
 }
 
+// Note: Tests below use os.Chdir (process-global state). Do not add t.Parallel()
+// to any test that calls os.Chdir — it will cause data races on the working directory.
+
 func TestDoctorCommand_NoConfig(t *testing.T) {
 	// Create isolated temp directory with no config
 	tmpDir := t.TempDir()
