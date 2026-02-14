@@ -10,6 +10,9 @@ import (
 
 // setupTestConfig creates a temp directory with CUE config for testing.
 // Returns the directory path and a cleanup function.
+//
+// Note: Tests below use os.Chdir (process-global state). Do not add t.Parallel()
+// to any test that calls os.Chdir — it will cause data races on the working directory.
 func setupTestConfig(t *testing.T) (string, func()) {
 	t.Helper()
 

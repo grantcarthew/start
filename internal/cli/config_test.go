@@ -8,12 +8,14 @@ import (
 	"testing"
 )
 
+// Note: Tests below use os.Chdir (process-global state). Do not add t.Parallel()
+// to any test that calls os.Chdir — it will cause data races on the working directory.
+
 func TestConfigAgentList_NoConfig(t *testing.T) {
 	// Set up temp directory with no config
 	tmpDir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", tmpDir)
 
-	// Save and restore working directory
 	origWd, err := os.Getwd()
 	if err != nil {
 		t.Fatal(err)
