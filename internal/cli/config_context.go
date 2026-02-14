@@ -17,7 +17,6 @@ import (
 	"github.com/grantcarthew/start/internal/config"
 	internalcue "github.com/grantcarthew/start/internal/cue"
 	"github.com/spf13/cobra"
-	"golang.org/x/term"
 )
 
 // addConfigContextCommand adds the context subcommand group to the config command.
@@ -162,10 +161,7 @@ func runConfigContextAdd(cmd *cobra.Command, _ []string) error {
 	local := getFlags(cmd).Local
 
 	// Check if interactive - only prompt for optional fields if no flags provided
-	isTTY := false
-	if f, ok := stdin.(*os.File); ok {
-		isTTY = term.IsTerminal(int(f.Fd()))
-	}
+	isTTY := isTerminal(stdin)
 	// If any flags are set, skip prompts for optional fields
 	hasFlags := anyFlagChanged(cmd, "name", "description", "file", "command", "prompt", "required", "default", "tag")
 	interactive := isTTY && !hasFlags
@@ -536,10 +532,7 @@ func runConfigContextEdit(cmd *cobra.Command, args []string) error {
 	}
 
 	// No flags: require TTY for interactive editing
-	isTTY := false
-	if f, ok := stdin.(*os.File); ok {
-		isTTY = term.IsTerminal(int(f.Fd()))
-	}
+	isTTY := isTerminal(stdin)
 	if !isTTY {
 		return fmt.Errorf("interactive editing requires a terminal")
 	}
@@ -712,10 +705,7 @@ func runConfigContextRemove(cmd *cobra.Command, args []string) error {
 	// Confirm removal unless --yes flag is set
 	skipConfirm, _ := cmd.Flags().GetBool("yes")
 	if !skipConfirm {
-		isTTY := false
-		if f, ok := stdin.(*os.File); ok {
-			isTTY = term.IsTerminal(int(f.Fd()))
-		}
+		isTTY := isTerminal(stdin)
 
 		if isTTY {
 			_, _ = fmt.Fprintf(stdout, "Remove context %q from %s config? %s%s%s ", resolvedName, scopeString(local), colorCyan.Sprint("["), colorDim.Sprint("y/N"), colorCyan.Sprint("]"))

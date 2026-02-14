@@ -74,7 +74,7 @@ func (l *Loader) Load(dirs []string) (LoadResult, error) {
 		}
 
 		// Check if directory contains any CUE files
-		hasCUE, err := hasCUEFiles(dir)
+		hasCUE, err := HasCUEFiles(dir)
 		if err != nil {
 			return result, fmt.Errorf("checking for CUE files in %s: %w", dir, err)
 		}
@@ -298,7 +298,7 @@ func (l *Loader) LoadSingle(dir string) (cue.Value, error) {
 		return cue.Value{}, fmt.Errorf("%s is not a directory", dir)
 	}
 
-	hasCUE, err := hasCUEFiles(dir)
+	hasCUE, err := HasCUEFiles(dir)
 	if err != nil {
 		return cue.Value{}, fmt.Errorf("checking for CUE files: %w", err)
 	}
@@ -337,8 +337,8 @@ func (l *Loader) loadDir(dir string) (cue.Value, error) {
 	return v, nil
 }
 
-// hasCUEFiles checks if a directory contains any .cue files.
-func hasCUEFiles(dir string) (bool, error) {
+// HasCUEFiles checks if a directory contains any .cue files.
+func HasCUEFiles(dir string) (bool, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return false, err

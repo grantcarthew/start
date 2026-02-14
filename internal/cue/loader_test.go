@@ -370,12 +370,12 @@ func TestHasCUEFiles(t *testing.T) {
 				}
 			}
 
-			got, err := hasCUEFiles(dir)
+			got, err := HasCUEFiles(dir)
 			if err != nil {
-				t.Fatalf("hasCUEFiles() error = %v", err)
+				t.Fatalf("HasCUEFiles() error = %v", err)
 			}
 			if got != tt.want {
-				t.Errorf("hasCUEFiles() = %v, want %v", got, tt.want)
+				t.Errorf("HasCUEFiles() = %v, want %v", got, tt.want)
 			}
 		})
 	}

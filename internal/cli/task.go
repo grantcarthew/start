@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -18,7 +17,6 @@ import (
 	"github.com/grantcarthew/start/internal/registry"
 	"github.com/grantcarthew/start/internal/temp"
 	"github.com/spf13/cobra"
-	"golang.org/x/term"
 )
 
 // TaskSource indicates where a task comes from.
@@ -236,10 +234,7 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 				default:
 					// Multiple matches - interactive selection
 					debugf(flags, "task", "Multiple matches, prompting for selection")
-					isTTY := false
-					if f, ok := stdin.(*os.File); ok {
-						isTTY = term.IsTerminal(int(f.Fd()))
-					}
+					isTTY := isTerminal(stdin)
 					if !isTTY {
 						var names []string
 						for _, m := range allMatches {
@@ -684,17 +679,7 @@ func installTaskFromRegistry(stdout io.Writer, flags *Flags, client *registry.Cl
 func findExactTaskInRegistry(index *registry.Index, taskName string) *assets.SearchResult {
 	// Check if taskName includes a path prefix (e.g., "golang/code-review")
 	for name, entry := range index.Tasks {
-		// Exact match on full name (e.g., "golang/code-review" matches "golang/code-review")
 		if name == taskName {
-			return &assets.SearchResult{
-				Category: "tasks",
-				Name:     name,
-				Entry:    entry,
-			}
-		}
-		// Also match if the short name matches (e.g., "code-review" matches "golang/code-review")
-		shortName := getAssetKey(name)
-		if shortName == taskName {
 			return &assets.SearchResult{
 				Category: "tasks",
 				Name:     name,

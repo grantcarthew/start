@@ -65,7 +65,7 @@ func ValidateConfig(paths Paths) ValidationResult {
 //   - (false, error) if directory has CUE files but they are invalid
 func validateDirectory(dir string) (valid bool, err *internalcue.ValidationError) {
 	// First check if directory contains any CUE files
-	hasCUE, readErr := hasCUEFiles(dir)
+	hasCUE, readErr := internalcue.HasCUEFiles(dir)
 	if readErr != nil {
 		return false, &internalcue.ValidationError{
 			Filename: dir,
@@ -93,22 +93,6 @@ func validateDirectory(dir string) (valid bool, err *internalcue.ValidationError
 	}
 
 	return true, nil
-}
-
-// hasCUEFiles checks if a directory contains any .cue files.
-func hasCUEFiles(dir string) (bool, error) {
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return false, err
-	}
-
-	for _, entry := range entries {
-		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".cue") {
-			return true, nil
-		}
-	}
-
-	return false, nil
 }
 
 // CUEFilesInDir returns a list of .cue files in the directory.

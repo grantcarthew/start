@@ -319,8 +319,3 @@ func assetTypeToConfigFile(category string) string {
 		return "settings.cue"
 	}
 }
-
-// getAssetKey returns the asset key name for use in config.
-func getAssetKey(name string) string {
-	return name
-}

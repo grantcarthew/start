@@ -177,9 +177,8 @@ func ExtractAssetContent(moduleDir string, asset SearchResult, reg interface{}, 
 	singular := strings.TrimSuffix(asset.Category, "s")
 	assetVal := v.LookupPath(cue.ParsePath(singular))
 	if !assetVal.Exists() {
-		// Try the key name
-		assetKey := getAssetKey(asset.Name)
-		assetVal = v.LookupPath(cue.MakePath(cue.Str(assetKey)))
+		// Try the asset name as key
+		assetVal = v.LookupPath(cue.MakePath(cue.Str(asset.Name)))
 	}
 	if !assetVal.Exists() {
 		return "", fmt.Errorf("asset definition not found in module (tried %q)", singular)
@@ -309,13 +308,6 @@ func formatFieldValue(name string, v cue.Value) (string, error) {
 	return sb.String(), nil
 }
 
-// getAssetKey returns the asset key name for use in config.
-// Per DR-003, the full category/item path is preserved to avoid collisions.
-// e.g., "golang/code-review" -> "golang/code-review"
-func getAssetKey(name string) string {
-	return name
-}
-
 // findRoleDependency reads a task module's cue.mod/module.cue and returns
 // the role dependency module path, if one exists.
 // Returns an empty string if the module has no role dependency.
@@ -399,11 +391,9 @@ func writeAssetToConfig(configPath string, asset SearchResult, content, modulePa
 		existingContent = string(data)
 	}
 
-	assetKey := getAssetKey(asset.Name)
-
 	// If the asset already exists, update it in place rather than appending a duplicate
 	if existingContent != "" {
-		_, _, err := FindAssetKey(existingContent, assetKey)
+		_, _, err := FindAssetKey(existingContent, asset.Name)
 		if err == nil {
 			return UpdateAssetInConfig(configPath, asset.Category, asset.Name, content)
 		}
@@ -455,7 +445,7 @@ func writeAssetToConfig(configPath string, asset SearchResult, content, modulePa
 	}
 
 	// Add the asset definition
-	sb.WriteString(fmt.Sprintf("\t%q: ", assetKey))
+	sb.WriteString(fmt.Sprintf("\t%q: ", asset.Name))
 
 	// Indent the content
 	lines := strings.Split(content, "\n")
@@ -719,10 +709,8 @@ func UpdateAssetInConfig(configPath, category, name, newContent string) error {
 	}
 
 	content := string(data)
-	assetKey := getAssetKey(name)
-
 	// Find the asset entry using context-aware search (ignores keys in comments/strings)
-	keyStart, keyLen, err := FindAssetKey(content, assetKey)
+	keyStart, keyLen, err := FindAssetKey(content, name)
 	if err != nil {
 		return err
 	}
@@ -732,13 +720,13 @@ func UpdateAssetInConfig(configPath, category, name, newContent string) error {
 	// (e.g., "key": // comment { with brace } \n {)
 	braceStart, err := FindOpeningBrace(content, keyStart+keyLen)
 	if err != nil {
-		return fmt.Errorf("invalid config format: no opening brace for %q", assetKey)
+		return fmt.Errorf("invalid config format: no opening brace for %q", name)
 	}
 
 	// Find the matching closing brace using context-aware parsing
 	braceEnd, err := FindMatchingBrace(content, braceStart)
 	if err != nil {
-		return fmt.Errorf("finding closing brace for %q: %w", assetKey, err)
+		return fmt.Errorf("finding closing brace for %q: %w", name, err)
 	}
 
 	// Build the new content - preserve key and replace value
@@ -746,7 +734,7 @@ func UpdateAssetInConfig(configPath, category, name, newContent string) error {
 	sb.WriteString(content[:keyStart])
 	// NOTE: Always uses quoted key format ("key":) even if original was unquoted (key:).
 	// CUE accepts both formats, but this normalizes to quoted for consistency.
-	sb.WriteString(fmt.Sprintf("%q: ", assetKey))
+	sb.WriteString(fmt.Sprintf("%q: ", name))
 
 	// Indent the new content
 	// LIMITATION: This assumes a flat config structure where assets are direct children

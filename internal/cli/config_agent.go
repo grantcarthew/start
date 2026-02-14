@@ -18,7 +18,6 @@ import (
 	"github.com/grantcarthew/start/internal/config"
 	internalcue "github.com/grantcarthew/start/internal/cue"
 	"github.com/spf13/cobra"
-	"golang.org/x/term"
 )
 
 // addConfigAgentCommand adds the agent subcommand group to the config command.
@@ -164,10 +163,7 @@ func runConfigAgentAdd(cmd *cobra.Command, _ []string) error {
 	local := getFlags(cmd).Local
 
 	// Check if interactive - only prompt for optional fields if no flags provided
-	isTTY := false
-	if f, ok := stdin.(*os.File); ok {
-		isTTY = term.IsTerminal(int(f.Fd()))
-	}
+	isTTY := isTerminal(stdin)
 	// If any flags are set, skip prompts for optional fields
 	hasFlags := anyFlagChanged(cmd, "name", "bin", "command", "default-model", "description", "model", "tag")
 	interactive := isTTY && !hasFlags
@@ -500,10 +496,7 @@ func runConfigAgentEdit(cmd *cobra.Command, args []string) error {
 	}
 
 	// No flags: require TTY for interactive editing
-	isTTY := false
-	if f, ok := stdin.(*os.File); ok {
-		isTTY = term.IsTerminal(int(f.Fd()))
-	}
+	isTTY := isTerminal(stdin)
 	if !isTTY {
 		return fmt.Errorf("interactive editing requires a terminal")
 	}
@@ -621,10 +614,7 @@ func runConfigAgentRemove(cmd *cobra.Command, args []string) error {
 	// Confirm removal unless --yes flag is set
 	skipConfirm, _ := cmd.Flags().GetBool("yes")
 	if !skipConfirm {
-		isTTY := false
-		if f, ok := stdin.(*os.File); ok {
-			isTTY = term.IsTerminal(int(f.Fd()))
-		}
+		isTTY := isTerminal(stdin)
 
 		if isTTY {
 			_, _ = fmt.Fprintf(stdout, "Remove agent %q from %s config? %s%s%s ", resolvedName, scopeString(local), colorCyan.Sprint("["), colorDim.Sprint("y/N"), colorCyan.Sprint("]"))

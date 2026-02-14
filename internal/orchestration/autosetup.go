@@ -255,10 +255,8 @@ func loadAgentFromModule(dir, key string, reg modconfig.Registry) (Agent, error)
 }
 
 // extractAgentFromValue extracts agent config from a CUE value.
+// It tries multiple lookup paths to handle both user config and registry module formats.
 func extractAgentFromValue(v cue.Value, name string) (Agent, error) {
-	var agent Agent
-	agent.Name = name
-
 	// Try looking up under "agents" map first (user config style)
 	agentVal := v.LookupPath(cue.ParsePath(internalcue.KeyAgents)).LookupPath(cue.MakePath(cue.Str(name)))
 	if !agentVal.Exists() {
@@ -270,42 +268,7 @@ func extractAgentFromValue(v cue.Value, name string) (Agent, error) {
 		agentVal = v
 	}
 
-	// Extract fields
-	if bin := agentVal.LookupPath(cue.ParsePath("bin")); bin.Exists() {
-		agent.Bin, _ = bin.String()
-	}
-	if cmd := agentVal.LookupPath(cue.ParsePath("command")); cmd.Exists() {
-		agent.Command, _ = cmd.String()
-	}
-	if dm := agentVal.LookupPath(cue.ParsePath("default_model")); dm.Exists() {
-		agent.DefaultModel, _ = dm.String()
-	}
-	if desc := agentVal.LookupPath(cue.ParsePath("description")); desc.Exists() {
-		agent.Description, _ = desc.String()
-	}
-
-	// Extract models map
-	if models := agentVal.LookupPath(cue.ParsePath("models")); models.Exists() {
-		agent.Models = make(map[string]string)
-		iter, err := models.Fields()
-		if err == nil {
-			for iter.Next() {
-				modelName := iter.Selector().Unquoted()
-				modelVal := iter.Value()
-
-				if s, err := modelVal.String(); err == nil {
-					agent.Models[modelName] = s
-					continue
-				}
-
-				if idVal := modelVal.LookupPath(cue.ParsePath("id")); idVal.Exists() {
-					if s, err := idVal.String(); err == nil {
-						agent.Models[modelName] = s
-					}
-				}
-			}
-		}
-	}
+	agent := extractAgentFields(agentVal, name)
 
 	if agent.Bin == "" {
 		return agent, fmt.Errorf("agent %s missing required 'bin' field", name)
