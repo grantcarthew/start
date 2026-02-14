@@ -13,6 +13,7 @@ import (
 	internalcue "github.com/grantcarthew/start/internal/cue"
 	"github.com/grantcarthew/start/internal/registry"
 	"github.com/spf13/cobra"
+	"golang.org/x/mod/semver"
 )
 
 // UpdateResult tracks the result of an update operation.
@@ -156,10 +157,10 @@ func checkAndUpdate(ctx context.Context, client *registry.Client, paths config.P
 	result.OldVersion = asset.InstalledVer
 	result.NewVersion = entry.Version
 
-	// Check if update is needed
-	needsUpdate := force || (entry.Version != "" && entry.Version != asset.InstalledVer)
+	// Check if update is needed (semver comparison detects upgrades only)
+	needsUpdate := force || (entry.Version != "" && (asset.InstalledVer == "" || semver.Compare(entry.Version, asset.InstalledVer) > 0))
 
-	if !needsUpdate && !force {
+	if !needsUpdate {
 		return result
 	}
 

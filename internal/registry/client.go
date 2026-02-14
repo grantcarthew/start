@@ -4,10 +4,12 @@ package registry
 import (
 	"context"
 	"fmt"
+	"slices"
 	"time"
 
 	"cuelang.org/go/mod/modconfig"
 	"cuelang.org/go/mod/module"
+	"golang.org/x/mod/semver"
 )
 
 // Client fetches CUE modules from the registry with retry logic.
@@ -89,18 +91,8 @@ func (c *Client) ResolveLatestVersion(ctx context.Context, modulePath string) (s
 	if err == nil && mv.Version() != "" {
 		// Already has a version, check if it's canonical
 		v := mv.Version()
-		// Canonical versions have at least two dots (v0.0.1)
-		if len(v) > 2 && v[0] == 'v' {
-			dotCount := 0
-			for _, c := range v {
-				if c == '.' {
-					dotCount++
-				}
-			}
-			if dotCount >= 2 {
-				// Already canonical
-				return modulePath, nil
-			}
+		if semver.Canonical(v) == v {
+			return modulePath, nil
 		}
 	}
 
@@ -113,7 +105,8 @@ func (c *Client) ResolveLatestVersion(ctx context.Context, modulePath string) (s
 		return "", fmt.Errorf("no versions found for %s", modulePath)
 	}
 
-	// Versions are returned in semver order, last is latest
+	// Sort versions by semver to find the latest
+	slices.SortFunc(versions, semver.Compare)
 	latestVersion := versions[len(versions)-1]
 
 	// Replace the version in the module path

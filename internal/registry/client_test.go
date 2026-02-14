@@ -338,7 +338,7 @@ func TestIsCanonicalVersion(t *testing.T) {
 		{"v0.0.1", true},
 		{"v1.2.3", true},
 		{"v10.20.30", true},
-		{"v0.0.1-beta", true}, // Has two dots, considered canonical
+		{"v0.0.1-beta", true}, // Valid semver with pre-release
 		{"v0", false},
 		{"v1", false},
 		{"v0.1", false}, // Only one dot

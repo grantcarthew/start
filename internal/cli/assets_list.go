@@ -14,6 +14,7 @@ import (
 	internalcue "github.com/grantcarthew/start/internal/cue"
 	"github.com/grantcarthew/start/internal/registry"
 	"github.com/spf13/cobra"
+	"golang.org/x/mod/semver"
 )
 
 // InstalledAsset represents an installed asset with version info.
@@ -208,7 +209,7 @@ func checkForUpdates(ctx context.Context, client *registry.Client, installed []I
 		entry := findInIndex(index, installed[i].Category, installed[i].Name)
 		if entry != nil && entry.Version != "" {
 			installed[i].LatestVer = entry.Version
-			installed[i].UpdateAvail = installed[i].InstalledVer != entry.Version
+			installed[i].UpdateAvail = semver.Compare(entry.Version, installed[i].InstalledVer) > 0
 		}
 	}
 }
