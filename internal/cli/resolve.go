@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"cuelang.org/go/cue"
 	"github.com/grantcarthew/start/internal/assets"
@@ -633,7 +634,24 @@ func (r *resolver) ensureIndex() (*registry.Index, *registry.Client, error) {
 	}
 	r.client = client
 
-	ctx := context.Background()
+	const fetchTimeout = 60 * time.Second
+	const slowWarning = 10 * time.Second
+
+	ctx, cancel := context.WithTimeout(context.Background(), fetchTimeout)
+	defer cancel()
+
+	// Warn the user if the fetch is taking longer than expected.
+	if !r.flags.Quiet {
+		go func() {
+			select {
+			case <-time.After(slowWarning):
+				remaining := fetchTimeout - slowWarning
+				printWarning(r.stdout, "registry is taking longer than expected, timeout in %d seconds", int(remaining.Seconds()))
+			case <-ctx.Done():
+			}
+		}()
+	}
+
 	index, err := client.FetchIndex(ctx)
 	if err != nil {
 		debugf(r.flags, dbgResolve, "Index fetch failed: %v", err)
