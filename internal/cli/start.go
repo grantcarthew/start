@@ -8,6 +8,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"cuelang.org/go/cue"
 	"github.com/fatih/color"
@@ -48,11 +49,24 @@ func getFlags(cmd *cobra.Command) *Flags {
 	return &Flags{}
 }
 
+// Debug log categories.
+const (
+	dbgConfig  = "config"
+	dbgAgent   = "agent"
+	dbgRole    = "role"
+	dbgContext = "context"
+	dbgTask    = "task"
+	dbgCompose = "compose"
+	dbgExec    = "exec"
+	dbgResolve = "resolve"
+)
+
 // debugf prints debug output if debug mode is enabled.
-// Format: [DEBUG] <category>: <message>
+// Format: [DEBUG HH:MM:SS.mmm] <category>: <message>
 func debugf(flags *Flags, category, format string, args ...interface{}) {
 	if flags.Debug {
-		_, _ = fmt.Fprintf(os.Stderr, "[DEBUG] %s: "+format+"\n", append([]interface{}{category}, args...)...)
+		ts := time.Now().Format("15:04:05.000")
+		_, _ = fmt.Fprintf(os.Stderr, "[DEBUG %s] %s: "+format+"\n", append([]interface{}{ts, category}, args...)...)
 	}
 }
 
@@ -73,13 +87,13 @@ func loadExecutionConfig(flags *Flags) (internalcue.LoadResult, string, error) {
 	var err error
 	if flags.Directory != "" {
 		workingDir = flags.Directory
-		debugf(flags, "config", "Working directory (from --directory): %s", workingDir)
+		debugf(flags, dbgConfig, "Working directory (from --directory): %s", workingDir)
 	} else {
 		workingDir, err = os.Getwd()
 		if err != nil {
 			return internalcue.LoadResult{}, "", fmt.Errorf("getting working directory: %w", err)
 		}
-		debugf(flags, "config", "Working directory (from pwd): %s", workingDir)
+		debugf(flags, dbgConfig, "Working directory (from pwd): %s", workingDir)
 	}
 
 	cfg, err := loadMergedConfigFromDirWithDebug(workingDir, flags)
@@ -97,7 +111,7 @@ func resolveAgentName(cfg internalcue.LoadResult, flags *Flags, stdout io.Writer
 	// Try settings.default_agent
 	if def := cfg.Value.LookupPath(cue.ParsePath(internalcue.KeySettings + ".default_agent")); def.Exists() {
 		if s, err := def.String(); err == nil && s != "" {
-			debugf(flags, "agent", "Selected %q (config default)", s)
+			debugf(flags, dbgAgent, "Selected %q (config default)", s)
 			return s, nil
 		}
 	}
@@ -108,7 +122,7 @@ func resolveAgentName(cfg internalcue.LoadResult, flags *Flags, stdout io.Writer
 	case 0:
 		return "", fmt.Errorf("no agent configured")
 	case 1:
-		debugf(flags, "agent", "Selected %q (only agent)", choices[0].Name)
+		debugf(flags, dbgAgent, "Selected %q (only agent)", choices[0].Name)
 		return choices[0].Name, nil
 	}
 
@@ -117,7 +131,7 @@ func resolveAgentName(cfg internalcue.LoadResult, flags *Flags, stdout io.Writer
 	if !isTTY {
 		// Non-TTY fallback: use first agent
 		name := choices[0].Name
-		debugf(flags, "agent", "Selected %q (first agent, non-TTY)", name)
+		debugf(flags, dbgAgent, "Selected %q (first agent, non-TTY)", name)
 		if !flags.Quiet {
 			_, _ = fmt.Fprintf(stdout, "Using agent %q %s%s%s\n", name, colorCyan.Sprint("("), colorDim.Sprint("set default_agent or use --agent to specify"), colorCyan.Sprint(")"))
 		}
@@ -131,7 +145,7 @@ func resolveAgentName(cfg internalcue.LoadResult, flags *Flags, stdout io.Writer
 	if err != nil {
 		return "", err
 	}
-	debugf(flags, "agent", "Selected %q (interactive)", selected)
+	debugf(flags, dbgAgent, "Selected %q (interactive)", selected)
 	if promptSetDefault(stdout, reader, selected) {
 		if err := setSetting(stdout, flags, "default_agent", selected, false); err != nil {
 			printWarning(stdout, "could not save default: %v", err)
@@ -150,15 +164,15 @@ func buildExecutionEnv(cfg internalcue.LoadResult, workingDir string, agentName 
 		}
 		agentName = resolved
 	} else {
-		debugf(flags, "agent", "Selected %q (--agent flag)", agentName)
+		debugf(flags, dbgAgent, "Selected %q (--agent flag)", agentName)
 	}
 
 	agent, err := orchestration.ExtractAgent(cfg.Value, agentName)
 	if err != nil {
 		return nil, fmt.Errorf("loading agent: %w", err)
 	}
-	debugf(flags, "agent", "Binary: %s", agent.Bin)
-	debugf(flags, "agent", "Command template: %s", agent.Command)
+	debugf(flags, dbgAgent, "Binary: %s", agent.Bin)
+	debugf(flags, dbgAgent, "Command template: %s", agent.Command)
 
 	shellRunner := shell.NewRunner()
 	processor := orchestration.NewTemplateProcessor(nil, shellRunner, workingDir)
@@ -344,14 +358,14 @@ func executeStart(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, selec
 		resolvedModel = r.resolveModelName(resolvedModel, env.Agent)
 	}
 
-	debugf(flags, "context", "Selection: required=%t, defaults=%t, tags=%v",
+	debugf(flags, dbgContext, "Selection: required=%t, defaults=%t, tags=%v",
 		selection.IncludeRequired, selection.IncludeDefaults, selection.Tags)
 
 	// Compose prompt with or without role
 	var result orchestration.ComposeResult
 	var composeErr error
 	if flags.NoRole {
-		debugf(flags, "role", "Skipping role (--no-role)")
+		debugf(flags, dbgRole, "Skipping role (--no-role)")
 		result, composeErr = env.Composer.Compose(env.Cfg.Value, selection, customText, "")
 	} else {
 		result, composeErr = env.Composer.ComposeWithRole(env.Cfg.Value, selection, roleName, customText, "")
@@ -364,12 +378,12 @@ func executeStart(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, selec
 		return fmt.Errorf("composing prompt: %w", composeErr)
 	}
 
-	debugf(flags, "role", "Selected %q", result.RoleName)
+	debugf(flags, dbgRole, "Selected %q", result.RoleName)
 	for _, ctx := range result.Contexts {
-		debugf(flags, "context", "Including %q", ctx.Name)
+		debugf(flags, dbgContext, "Including %q", ctx.Name)
 	}
-	debugf(flags, "compose", "Role: %d bytes", len(result.Role))
-	debugf(flags, "compose", "Prompt: %d bytes (%d contexts)", len(result.Prompt), len(result.Contexts))
+	debugf(flags, dbgCompose, "Role: %d bytes", len(result.Role))
+	debugf(flags, dbgCompose, "Prompt: %d bytes (%d contexts)", len(result.Prompt), len(result.Contexts))
 
 	// Print warnings
 	printWarnings(flags, stderr, result.Warnings)
@@ -377,9 +391,9 @@ func executeStart(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, selec
 	// Determine effective model and its source
 	model, modelSource := resolveModel(resolvedModel, env.Agent.DefaultModel)
 	if model != "" {
-		debugf(flags, "agent", "Model: %s (%s)", model, modelSource)
+		debugf(flags, dbgAgent, "Model: %s (%s)", model, modelSource)
 	} else {
-		debugf(flags, "agent", "Model: agent default (none specified)")
+		debugf(flags, dbgAgent, "Model: agent default (none specified)")
 	}
 
 	// Build execution config
@@ -398,10 +412,10 @@ func executeStart(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, selec
 	if err != nil {
 		return err
 	}
-	debugf(flags, "exec", "Final command: %s", cmdStr)
+	debugf(flags, dbgExec, "Final command: %s", cmdStr)
 
 	if flags.DryRun {
-		debugf(flags, "exec", "Dry-run mode, skipping execution")
+		debugf(flags, dbgExec, "Dry-run mode, skipping execution")
 		return executeDryRun(stdout, env.Executor, execConfig, result, env.Agent, model, modelSource)
 	}
 
@@ -410,7 +424,7 @@ func executeStart(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, selec
 		printExecutionInfo(stdout, env.Agent, model, modelSource, result)
 	}
 
-	debugf(flags, "exec", "Executing agent (process replacement)")
+	debugf(flags, dbgExec, "Executing agent (process replacement)")
 	// Execute agent (replaces current process) - command already validated
 	return env.Executor.ExecuteCommand(cmdStr, execConfig)
 }
@@ -575,8 +589,8 @@ func loadMergedConfigFromDirWithDebug(workingDir string, flags *Flags) (internal
 		return internalcue.LoadResult{}, fmt.Errorf("resolving config paths: %w", err)
 	}
 
-	debugf(flags, "config", "Global: %s (exists: %t)", paths.Global, paths.GlobalExists)
-	debugf(flags, "config", "Local: %s (exists: %t)", paths.Local, paths.LocalExists)
+	debugf(flags, dbgConfig, "Global: %s (exists: %t)", paths.Global, paths.GlobalExists)
+	debugf(flags, dbgConfig, "Local: %s (exists: %t)", paths.Local, paths.LocalExists)
 
 	// Load using the standard function
 	result, err := loadMergedConfigWithIO(os.Stdout, os.Stderr, os.Stdin, workingDir)
@@ -593,7 +607,7 @@ func loadMergedConfigFromDirWithDebug(workingDir string, flags *Flags) (internal
 		loaded = append(loaded, "local")
 	}
 	if len(loaded) > 0 {
-		debugf(flags, "config", "Loaded from: %s", strings.Join(loaded, ", "))
+		debugf(flags, dbgConfig, "Loaded from: %s", strings.Join(loaded, ", "))
 	}
 
 	return result, nil
