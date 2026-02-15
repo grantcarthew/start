@@ -28,6 +28,7 @@ var (
 	colorTasks     = color.New(color.FgHiYellow)
 	colorPrompts   = color.New(color.FgMagenta)
 	colorInstalled = color.New(color.FgHiGreen)
+	colorRegistry  = color.New(color.FgYellow)
 )
 
 // categoryColor returns the colour for an asset category.

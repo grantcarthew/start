@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -84,9 +85,9 @@ func runSearch(cmd *cobra.Command, args []string) error {
 	// Search local config
 	if paths.LocalExists {
 		cfg, err := loader.LoadSingle(paths.Local)
-		if err != nil {
+		if err != nil && !errors.Is(err, internalcue.ErrNoCUEFiles) {
 			printWarning(stderr, "failed to load local config: %s", err)
-		} else {
+		} else if err == nil {
 			var results []assets.SearchResult
 			for _, cat := range categories {
 				catResults, err := assets.SearchInstalledConfig(cfg, cat.cueKey, cat.category, query)
@@ -108,9 +109,9 @@ func runSearch(cmd *cobra.Command, args []string) error {
 	// Search global config
 	if paths.GlobalExists {
 		cfg, err := loader.LoadSingle(paths.Global)
-		if err != nil {
+		if err != nil && !errors.Is(err, internalcue.ErrNoCUEFiles) {
 			printWarning(stderr, "failed to load global config: %s", err)
-		} else {
+		} else if err == nil {
 			var results []assets.SearchResult
 			for _, cat := range categories {
 				catResults, err := assets.SearchInstalledConfig(cfg, cat.cueKey, cat.category, query)

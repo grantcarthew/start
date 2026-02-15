@@ -1228,7 +1228,7 @@ func TestFindExactTaskInRegistry_FullName(t *testing.T) {
 	}
 }
 
-func TestFindExactTaskInRegistry_ShortName(t *testing.T) {
+func TestFindExactTaskInRegistry_ShortNameFallsThrough(t *testing.T) {
 	t.Parallel()
 	index := &registry.Index{
 		Tasks: map[string]registry.IndexEntry{
@@ -1241,43 +1241,13 @@ func TestFindExactTaskInRegistry_ShortName(t *testing.T) {
 		},
 	}
 
+	// Short names should not match - they fall through to regex search + selection
 	result, err := findExactTaskInRegistry(index, "debug")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if result == nil {
-		t.Fatal("expected result, got nil")
-	}
-	if result.Name != "golang/debug" {
-		t.Errorf("expected name %q, got %q", "golang/debug", result.Name)
-	}
-}
-
-func TestFindExactTaskInRegistry_ShortNameAmbiguous(t *testing.T) {
-	t.Parallel()
-	index := &registry.Index{
-		Tasks: map[string]registry.IndexEntry{
-			"golang/debug": {
-				Module: "github.com/example/golang-debug@v0",
-			},
-			"python/debug": {
-				Module: "github.com/example/python-debug@v0",
-			},
-		},
-	}
-
-	result, err := findExactTaskInRegistry(index, "debug")
-	if err == nil {
-		t.Fatal("expected error for ambiguous short name")
-	}
 	if result != nil {
-		t.Errorf("expected nil result, got %v", result)
-	}
-	if !strings.Contains(err.Error(), "ambiguous") {
-		t.Errorf("expected 'ambiguous' in error, got: %v", err)
-	}
-	if !strings.Contains(err.Error(), "golang/debug") || !strings.Contains(err.Error(), "python/debug") {
-		t.Errorf("expected both matching names in error, got: %v", err)
+		t.Errorf("expected nil for short name, got %v", result)
 	}
 }
 

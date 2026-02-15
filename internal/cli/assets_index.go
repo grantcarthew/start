@@ -159,7 +159,7 @@ func printIndex(w io.Writer, index *registry.Index, version string, verbose bool
 		sort.Strings(names)
 
 		_, _ = categoryColor(cat.name).Fprint(w, cat.name)
-		_, _ = fmt.Fprintf(w, "/ (%d)\n", len(cat.entries))
+		_, _ = fmt.Fprintf(w, "/ %s%s%s\n", colorCyan.Sprint("("), colorDim.Sprintf("%d", len(cat.entries)), colorCyan.Sprint(")"))
 
 		for _, name := range names {
 			entry := cat.entries[name]

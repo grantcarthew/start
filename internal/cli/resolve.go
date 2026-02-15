@@ -499,7 +499,13 @@ func (r *resolver) promptAssetSelection(matches []AssetMatch, assetType, query s
 	for i := 0; i < displayCount; i++ {
 		m := matches[i]
 		padding := strings.Repeat(" ", maxNameLen-len(m.Name)+2)
-		_, _ = fmt.Fprintf(r.stdout, "  %2d. %s%s%s\n", i+1, m.Name, padding, m.Source)
+		var sourceLabel string
+		if m.Source == AssetSourceInstalled {
+			sourceLabel = colorInstalled.Sprint(m.Source)
+		} else {
+			sourceLabel = colorRegistry.Sprint(m.Source)
+		}
+		_, _ = fmt.Fprintf(r.stdout, "  %2d. %s%s%s\n", i+1, m.Name, padding, sourceLabel)
 	}
 
 	if truncated {
