@@ -87,8 +87,13 @@ func runConfigList(cmd *cobra.Command, args []string) error {
 		scopeLabel = "local"
 	}
 
+	stderr := cmd.ErrOrStderr()
+
 	// Agents
-	agents, _ := loadAgentsForScope(local)
+	agents, err := loadAgentsForScope(local)
+	if err != nil {
+		printWarning(stderr, "failed to load agents: %s", err)
+	}
 	_, _ = fmt.Fprintln(w)
 	_, _ = colorAgents.Fprint(w, "agents")
 	_, _ = fmt.Fprint(w, "/ ")
@@ -120,7 +125,10 @@ func runConfigList(cmd *cobra.Command, args []string) error {
 	}
 
 	// Roles
-	roles, roleOrder, _ := loadRolesForScope(local)
+	roles, roleOrder, err := loadRolesForScope(local)
+	if err != nil {
+		printWarning(stderr, "failed to load roles: %s", err)
+	}
 	_, _ = fmt.Fprintln(w)
 	_, _ = colorRoles.Fprint(w, "roles")
 	_, _ = fmt.Fprint(w, "/ ")
@@ -139,7 +147,10 @@ func runConfigList(cmd *cobra.Command, args []string) error {
 	}
 
 	// Contexts
-	contexts, contextOrder, _ := loadContextsForScope(local)
+	contexts, contextOrder, err := loadContextsForScope(local)
+	if err != nil {
+		printWarning(stderr, "failed to load contexts: %s", err)
+	}
 	_, _ = fmt.Fprintln(w)
 	_, _ = colorContexts.Fprint(w, "contexts")
 	_, _ = fmt.Fprint(w, "/ ")
@@ -178,7 +189,10 @@ func runConfigList(cmd *cobra.Command, args []string) error {
 	}
 
 	// Tasks
-	tasks, _ := loadTasksForScope(local)
+	tasks, err := loadTasksForScope(local)
+	if err != nil {
+		printWarning(stderr, "failed to load tasks: %s", err)
+	}
 	_, _ = fmt.Fprintln(w)
 	_, _ = colorTasks.Fprint(w, "tasks")
 	_, _ = fmt.Fprint(w, "/ ")

@@ -202,7 +202,10 @@ func (c *Composer) Compose(cfg cue.Value, selection ContextSelection, customText
 		} else if tag == "default" {
 			// "default" pseudo-tag - add default contexts (config order)
 			defaultSelection := ContextSelection{IncludeDefaults: true}
-			contexts, _ := c.selectContexts(cfg, defaultSelection)
+			contexts, err := c.selectContexts(cfg, defaultSelection)
+			if err != nil {
+				return result, fmt.Errorf("selecting contexts: %w", err)
+			}
 			for _, ctx := range contexts {
 				addConfigContext(ctx)
 			}
@@ -215,7 +218,10 @@ func (c *Composer) Compose(cfg cue.Value, selection ContextSelection, customText
 			} else {
 				// Fall back to tag matching
 				tagSelection := ContextSelection{Tags: []string{tag}}
-				contexts, _ := c.selectContexts(cfg, tagSelection)
+				contexts, err := c.selectContexts(cfg, tagSelection)
+				if err != nil {
+					return result, fmt.Errorf("selecting contexts: %w", err)
+				}
 				if len(contexts) == 0 {
 					result.Warnings = append(result.Warnings, fmt.Sprintf("context %q not found", tag))
 				}
@@ -234,7 +240,10 @@ func (c *Composer) Compose(cfg cue.Value, selection ContextSelection, customText
 	// Append excluded default contexts with "skipped" status for visibility.
 	// Get all default contexts and add any not already included.
 	defaultSelection := ContextSelection{IncludeDefaults: true}
-	allDefaults, _ := c.selectContexts(cfg, defaultSelection)
+	allDefaults, err := c.selectContexts(cfg, defaultSelection)
+	if err != nil {
+		return result, fmt.Errorf("selecting contexts: %w", err)
+	}
 	for _, ctx := range allDefaults {
 		if !addedContexts[ctx.Name] {
 			ctx.Status = "skipped"

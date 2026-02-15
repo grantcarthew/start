@@ -316,9 +316,7 @@ func TestConfigAgentRemove(t *testing.T) {
 	stdout := &bytes.Buffer{}
 	cmd.SetOut(stdout)
 	cmd.SetErr(&bytes.Buffer{})
-	// Simulate "y" confirmation
-	cmd.SetIn(strings.NewReader("y\n"))
-	cmd.SetArgs([]string{"config", "agent", "remove", "gemini"})
+	cmd.SetArgs([]string{"config", "agent", "remove", "gemini", "--yes"})
 
 	err = cmd.Execute()
 	if err != nil {

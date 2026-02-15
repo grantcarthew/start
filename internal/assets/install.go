@@ -228,7 +228,7 @@ func formatAssetStruct(v cue.Value, category, originPath, roleName string) (stri
 		// Format the field value
 		formatted, err := formatFieldValue(field, fieldVal)
 		if err != nil {
-			continue // Skip fields that can't be formatted
+			return "", fmt.Errorf("formatting field %q: %w", field, err)
 		}
 		sb.WriteString(formatted)
 	}

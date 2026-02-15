@@ -305,7 +305,11 @@ func (r *resolver) resolveContexts(terms []string) []string {
 			}
 			if result != nil {
 				debugf(r.flags, "resolve", "Context %q: exact registry match %q", term, result.Name)
-				if err := r.autoInstall(client, *result); err == nil {
+				if err := r.autoInstall(client, *result); err != nil {
+					if !r.flags.Quiet {
+						printWarning(r.stdout, "context %q: auto-install failed: %s", term, err)
+					}
+				} else {
 					resolved = append(resolved, result.Name)
 					continue
 				}
@@ -356,6 +360,9 @@ func (r *resolver) resolveContexts(terms []string) []string {
 					Name:     m.Name,
 					Entry:    m.Entry,
 				}); err != nil {
+					if !r.flags.Quiet {
+						printWarning(r.stdout, "context %q: auto-install failed: %s", m.Name, err)
+					}
 					continue
 				}
 			}
