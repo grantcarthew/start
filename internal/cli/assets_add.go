@@ -73,15 +73,8 @@ func runAssetsAdd(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("resolving config paths: %w", err)
 	}
 
-	var configDir string
-	var scopeName string
-	if flags.Local {
-		configDir = paths.Local
-		scopeName = "local"
-	} else {
-		configDir = paths.Global
-		scopeName = "global"
-	}
+	configDir := paths.Dir(flags.Local)
+	scopeName := scopeString(flags.Local)
 
 	// Load CUE config once for existence checks across all queries.
 	// On error with no CUE files (fresh install), cfg is a zero-value cue.Value;

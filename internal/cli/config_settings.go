@@ -166,12 +166,7 @@ func setSetting(w io.Writer, flags *Flags, key, value string, localOnly bool) er
 		return fmt.Errorf("resolving config paths: %w", err)
 	}
 
-	var configDir string
-	if localOnly {
-		configDir = paths.Local
-	} else {
-		configDir = paths.Global
-	}
+	configDir := paths.Dir(localOnly)
 
 	// Ensure directory exists
 	if err := os.MkdirAll(configDir, 0755); err != nil {
@@ -207,12 +202,7 @@ func editSettings(localOnly bool) error {
 		return fmt.Errorf("resolving config paths: %w", err)
 	}
 
-	var configDir string
-	if localOnly {
-		configDir = paths.Local
-	} else {
-		configDir = paths.Global
-	}
+	configDir := paths.Dir(localOnly)
 
 	// Ensure directory exists
 	if err := os.MkdirAll(configDir, 0755); err != nil {

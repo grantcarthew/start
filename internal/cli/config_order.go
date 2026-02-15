@@ -99,12 +99,7 @@ func reorderContexts(stdout io.Writer, stdin io.Reader, local bool) error {
 		return fmt.Errorf("resolving config paths: %w", err)
 	}
 
-	var configDir string
-	if local {
-		configDir = paths.Local
-	} else {
-		configDir = paths.Global
-	}
+	configDir := paths.Dir(local)
 
 	contexts, order, err := loadContextsFromDir(configDir)
 	if err != nil {
@@ -184,12 +179,7 @@ func reorderRoles(stdout io.Writer, stdin io.Reader, local bool) error {
 		return fmt.Errorf("resolving config paths: %w", err)
 	}
 
-	var configDir string
-	if local {
-		configDir = paths.Local
-	} else {
-		configDir = paths.Global
-	}
+	configDir := paths.Dir(local)
 
 	roles, order, err := loadRolesFromDir(configDir)
 	if err != nil {

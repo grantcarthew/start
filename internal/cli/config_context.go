@@ -307,15 +307,8 @@ func runConfigContextAdd(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("resolving config paths: %w", err)
 	}
 
-	var configDir string
-	var scopeName string
-	if local {
-		configDir = paths.Local
-		scopeName = "local"
-	} else {
-		configDir = paths.Global
-		scopeName = "global"
-	}
+	configDir := paths.Dir(local)
+	scopeName := scopeString(local)
 
 	// Ensure directory exists
 	if err := os.MkdirAll(configDir, 0755); err != nil {
@@ -461,12 +454,7 @@ func runConfigContextEdit(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("resolving config paths: %w", err)
 	}
 
-	var configDir string
-	if local {
-		configDir = paths.Local
-	} else {
-		configDir = paths.Global
-	}
+	configDir := paths.Dir(local)
 
 	contextPath := filepath.Join(configDir, "contexts.cue")
 
@@ -684,12 +672,7 @@ func runConfigContextRemove(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("resolving config paths: %w", err)
 	}
 
-	var configDir string
-	if local {
-		configDir = paths.Local
-	} else {
-		configDir = paths.Global
-	}
+	configDir := paths.Dir(local)
 
 	// Load existing contexts
 	contexts, order, err := loadContextsFromDir(configDir)
@@ -705,21 +688,11 @@ func runConfigContextRemove(cmd *cobra.Command, args []string) error {
 	// Confirm removal unless --yes flag is set
 	skipConfirm, _ := cmd.Flags().GetBool("yes")
 	if !skipConfirm {
-		isTTY := isTerminal(stdin)
-
-		if !isTTY {
-			return fmt.Errorf("--yes flag required in non-interactive mode")
-		}
-
-		_, _ = fmt.Fprintf(stdout, "Remove context %q from %s config? %s%s%s ", resolvedName, scopeString(local), colorCyan.Sprint("["), colorDim.Sprint("y/N"), colorCyan.Sprint("]"))
-		reader := bufio.NewReader(stdin)
-		input, err := reader.ReadString('\n')
+		confirmed, err := confirmRemoval(stdout, stdin, "context", resolvedName, local)
 		if err != nil {
-			return fmt.Errorf("reading input: %w", err)
+			return err
 		}
-		input = strings.TrimSpace(strings.ToLower(input))
-		if input != "y" && input != "yes" {
-			_, _ = fmt.Fprintln(stdout, "Cancelled.")
+		if !confirmed {
 			return nil
 		}
 	}
@@ -873,17 +846,7 @@ func loadContextsFromDir(dir string) (map[string]ContextConfig, []string, error)
 			ctx.Default, _ = v.Bool()
 		}
 
-		// Load tags
-		if tagsVal := val.LookupPath(cue.ParsePath("tags")); tagsVal.Exists() {
-			tagIter, err := tagsVal.List()
-			if err == nil {
-				for tagIter.Next() {
-					if s, err := tagIter.Value().String(); err == nil {
-						ctx.Tags = append(ctx.Tags, s)
-					}
-				}
-			}
-		}
+		ctx.Tags = extractTags(val)
 
 		// Load origin (registry provenance)
 		if v := val.LookupPath(cue.ParsePath("origin")); v.Exists() {
@@ -923,33 +886,14 @@ func writeContextsFile(path string, contexts map[string]ContextConfig, order []s
 		if ctx.Command != "" {
 			sb.WriteString(fmt.Sprintf("\t\tcommand: %q\n", ctx.Command))
 		}
-		if ctx.Prompt != "" {
-			if strings.Contains(ctx.Prompt, "\n") || len(ctx.Prompt) > 80 {
-				sb.WriteString("\t\tprompt: \"\"\"\n")
-				for _, line := range strings.Split(ctx.Prompt, "\n") {
-					sb.WriteString(fmt.Sprintf("\t\t\t%s\n", line))
-				}
-				sb.WriteString("\t\t\t\"\"\"\n")
-			} else {
-				sb.WriteString(fmt.Sprintf("\t\tprompt: %q\n", ctx.Prompt))
-			}
-		}
+		writeCUEPrompt(&sb, ctx.Prompt)
 		if ctx.Required {
 			sb.WriteString("\t\trequired: true\n")
 		}
 		if ctx.Default {
 			sb.WriteString("\t\tdefault: true\n")
 		}
-		if len(ctx.Tags) > 0 {
-			sb.WriteString("\t\ttags: [")
-			for i, tag := range ctx.Tags {
-				if i > 0 {
-					sb.WriteString(", ")
-				}
-				sb.WriteString(fmt.Sprintf("%q", tag))
-			}
-			sb.WriteString("]\n")
-		}
+		writeCUETags(&sb, ctx.Tags)
 
 		sb.WriteString("\t}\n")
 	}

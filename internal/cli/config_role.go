@@ -269,15 +269,8 @@ func runConfigRoleAdd(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("resolving config paths: %w", err)
 	}
 
-	var configDir string
-	var scopeName string
-	if local {
-		configDir = paths.Local
-		scopeName = "local"
-	} else {
-		configDir = paths.Global
-		scopeName = "global"
-	}
+	configDir := paths.Dir(local)
+	scopeName := scopeString(local)
 
 	// Ensure directory exists
 	if err := os.MkdirAll(configDir, 0755); err != nil {
@@ -418,12 +411,7 @@ func runConfigRoleEdit(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("resolving config paths: %w", err)
 	}
 
-	var configDir string
-	if local {
-		configDir = paths.Local
-	} else {
-		configDir = paths.Global
-	}
+	configDir := paths.Dir(local)
 
 	rolePath := filepath.Join(configDir, "roles.cue")
 
@@ -617,12 +605,7 @@ func runConfigRoleRemove(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("resolving config paths: %w", err)
 	}
 
-	var configDir string
-	if local {
-		configDir = paths.Local
-	} else {
-		configDir = paths.Global
-	}
+	configDir := paths.Dir(local)
 
 	// Load existing roles
 	roles, order, err := loadRolesFromDir(configDir)
@@ -638,21 +621,11 @@ func runConfigRoleRemove(cmd *cobra.Command, args []string) error {
 	// Confirm removal unless --yes flag is set
 	skipConfirm, _ := cmd.Flags().GetBool("yes")
 	if !skipConfirm {
-		isTTY := isTerminal(stdin)
-
-		if !isTTY {
-			return fmt.Errorf("--yes flag required in non-interactive mode")
-		}
-
-		_, _ = fmt.Fprintf(stdout, "Remove role %q from %s config? %s%s%s ", resolvedName, scopeString(local), colorCyan.Sprint("["), colorDim.Sprint("y/N"), colorCyan.Sprint("]"))
-		reader := bufio.NewReader(stdin)
-		input, err := reader.ReadString('\n')
+		confirmed, err := confirmRemoval(stdout, stdin, "role", resolvedName, local)
 		if err != nil {
-			return fmt.Errorf("reading input: %w", err)
+			return err
 		}
-		input = strings.TrimSpace(strings.ToLower(input))
-		if input != "y" && input != "yes" {
-			_, _ = fmt.Fprintln(stdout, "Cancelled.")
+		if !confirmed {
 			return nil
 		}
 	}
@@ -799,17 +772,7 @@ func loadRolesFromDir(dir string) (map[string]RoleConfig, []string, error) {
 			role.Prompt, _ = v.String()
 		}
 
-		// Load tags
-		if tagsVal := val.LookupPath(cue.ParsePath("tags")); tagsVal.Exists() {
-			tagIter, err := tagsVal.List()
-			if err == nil {
-				for tagIter.Next() {
-					if s, err := tagIter.Value().String(); err == nil {
-						role.Tags = append(role.Tags, s)
-					}
-				}
-			}
-		}
+		role.Tags = extractTags(val)
 
 		// Load origin (registry provenance)
 		if v := val.LookupPath(cue.ParsePath("origin")); v.Exists() {
@@ -854,28 +817,8 @@ func writeRolesFile(path string, roles map[string]RoleConfig, order []string) er
 		if role.Command != "" {
 			sb.WriteString(fmt.Sprintf("\t\tcommand: %q\n", role.Command))
 		}
-		if role.Prompt != "" {
-			// Use multi-line string for long prompts
-			if strings.Contains(role.Prompt, "\n") || len(role.Prompt) > 80 {
-				sb.WriteString("\t\tprompt: \"\"\"\n")
-				for _, line := range strings.Split(role.Prompt, "\n") {
-					sb.WriteString(fmt.Sprintf("\t\t\t%s\n", line))
-				}
-				sb.WriteString("\t\t\t\"\"\"\n")
-			} else {
-				sb.WriteString(fmt.Sprintf("\t\tprompt: %q\n", role.Prompt))
-			}
-		}
-		if len(role.Tags) > 0 {
-			sb.WriteString("\t\ttags: [")
-			for i, tag := range role.Tags {
-				if i > 0 {
-					sb.WriteString(", ")
-				}
-				sb.WriteString(fmt.Sprintf("%q", tag))
-			}
-			sb.WriteString("]\n")
-		}
+		writeCUEPrompt(&sb, role.Prompt)
+		writeCUETags(&sb, role.Tags)
 		if role.Optional {
 			sb.WriteString("\t\toptional: true\n")
 		}
