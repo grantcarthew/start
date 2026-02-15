@@ -125,13 +125,13 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 		resolvedModel = r.resolveModelName(resolvedModel, env.Agent)
 	}
 
-	debugf(flags, "task", "Searching for task %q", taskName)
+	debugf(flags, dbgTask, "Searching for task %q", taskName)
 
 	// Check if taskName is a file path (per DR-038)
 	var taskResult orchestration.ProcessResult
 	var resolvedName string
 	if orchestration.IsFilePath(taskName) {
-		debugf(flags, "task", "Detected file path, reading file")
+		debugf(flags, dbgTask, "Detected file path, reading file")
 		content, err := orchestration.ReadFilePath(taskName)
 		if err != nil {
 			return fmt.Errorf("reading task file %q: %w", taskName, err)
@@ -148,11 +148,11 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 
 		// Step 1: Check for exact match in installed config (fast path, no registry fetch)
 		if hasExactInstalledTask(env.Cfg, taskName) {
-			debugf(flags, "task", "Exact match found in installed config")
+			debugf(flags, dbgTask, "Exact match found in installed config")
 			resolvedName = taskName
 		} else {
 			// Step 2: No exact match - fetch registry and combine results
-			debugf(flags, "task", "No exact installed match, fetching registry index...")
+			debugf(flags, dbgTask, "No exact installed match, fetching registry index...")
 			if !flags.Quiet {
 				_, _ = fmt.Fprintf(stdout, "Task not found in configuration\n")
 			}
@@ -171,7 +171,7 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 				return err
 			}
 			if exactRegistry != nil {
-				debugf(flags, "task", "Exact match found in registry: %s", exactRegistry.Name)
+				debugf(flags, dbgTask, "Exact match found in registry: %s", exactRegistry.Name)
 				// Install and run
 				if !flags.Quiet {
 					_, _ = fmt.Fprintf(stdout, "Installing %s from registry...\n", exactRegistry.Name)
@@ -201,7 +201,7 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 				}
 				allMatches := mergeTaskMatches(installedMatches, registryMatches)
 
-				debugf(flags, "task", "Found %d installed matches, %d registry matches, %d total",
+				debugf(flags, dbgTask, "Found %d installed matches, %d registry matches, %d total",
 					len(installedMatches), len(registryMatches), len(allMatches))
 
 				switch len(allMatches) {
@@ -236,7 +236,7 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 					resolvedName = match.Name
 				default:
 					// Multiple matches - interactive selection
-					debugf(flags, "task", "Multiple matches, prompting for selection")
+					debugf(flags, dbgTask, "Multiple matches, prompting for selection")
 					isTTY := isTerminal(stdin)
 					if !isTTY {
 						var names []string
@@ -280,9 +280,9 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 		}
 
 		if resolvedName != taskName {
-			debugf(flags, "task", "Resolved to %q", resolvedName)
+			debugf(flags, dbgTask, "Resolved to %q", resolvedName)
 		} else {
-			debugf(flags, "task", "Resolved to %q (exact match)", resolvedName)
+			debugf(flags, dbgTask, "Resolved to %q (exact match)", resolvedName)
 		}
 
 		// Resolve task from config
@@ -314,26 +314,26 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 						}
 					}
 				}
-				debugf(flags, "role", "Selected %q (from task)", roleName)
+				debugf(flags, dbgRole, "Selected %q (from task)", roleName)
 			}
 		}
 	}
 
 	if taskResult.CommandExecuted {
-		debugf(flags, "task", "UTD source: command (executed)")
+		debugf(flags, dbgTask, "UTD source: command (executed)")
 	} else if taskResult.FileRead {
-		debugf(flags, "task", "UTD source: file")
+		debugf(flags, dbgTask, "UTD source: file")
 	} else {
-		debugf(flags, "task", "UTD source: prompt")
+		debugf(flags, dbgTask, "UTD source: prompt")
 	}
 
 	if instructions != "" {
-		debugf(flags, "task", "Instructions: %s", instructions)
+		debugf(flags, dbgTask, "Instructions: %s", instructions)
 	}
 
 	// Log role source if specified via flag
 	if flags.Role != "" {
-		debugf(flags, "role", "Selected %q (--role flag)", flags.Role)
+		debugf(flags, dbgRole, "Selected %q (--role flag)", flags.Role)
 	}
 
 	// Per DR-015: required contexts only for tasks
@@ -343,14 +343,14 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 		Tags:            contextTags,
 	}
 
-	debugf(flags, "context", "Selection: required=%t, defaults=%t, tags=%v",
+	debugf(flags, dbgContext, "Selection: required=%t, defaults=%t, tags=%v",
 		selection.IncludeRequired, selection.IncludeDefaults, selection.Tags)
 
 	// Compose contexts and resolve role
 	var composeResult orchestration.ComposeResult
 	var composeErr error
 	if flags.NoRole {
-		debugf(flags, "role", "Skipping role (--no-role)")
+		debugf(flags, dbgRole, "Skipping role (--no-role)")
 		composeResult, composeErr = env.Composer.Compose(env.Cfg.Value, selection, taskResult.Content, "")
 	} else {
 		composeResult, composeErr = env.Composer.ComposeWithRole(env.Cfg.Value, selection, roleName, taskResult.Content, "")
@@ -364,10 +364,10 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 	}
 
 	for _, ctx := range composeResult.Contexts {
-		debugf(flags, "context", "Including %q", ctx.Name)
+		debugf(flags, dbgContext, "Including %q", ctx.Name)
 	}
-	debugf(flags, "compose", "Role: %d bytes", len(composeResult.Role))
-	debugf(flags, "compose", "Prompt: %d bytes (%d contexts)", len(composeResult.Prompt), len(composeResult.Contexts))
+	debugf(flags, dbgCompose, "Role: %d bytes", len(composeResult.Role))
+	debugf(flags, dbgCompose, "Prompt: %d bytes (%d contexts)", len(composeResult.Prompt), len(composeResult.Contexts))
 
 	// Print warnings
 	printWarnings(flags, stderr, taskResult.Warnings)
@@ -376,9 +376,9 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 	// Determine effective model and its source
 	model, modelSource := resolveModel(resolvedModel, env.Agent.DefaultModel)
 	if model != "" {
-		debugf(flags, "task", "Model: %s (%s)", model, modelSource)
+		debugf(flags, dbgTask, "Model: %s (%s)", model, modelSource)
 	} else {
-		debugf(flags, "task", "Model: agent default (none specified)")
+		debugf(flags, dbgTask, "Model: agent default (none specified)")
 	}
 
 	// Build execution config
@@ -396,12 +396,12 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 	if flags.Debug {
 		cmdStr, err := env.Executor.BuildCommand(execConfig)
 		if err == nil {
-			debugf(flags, "exec", "Final command: %s", cmdStr)
+			debugf(flags, dbgExec, "Final command: %s", cmdStr)
 		}
 	}
 
 	if flags.DryRun {
-		debugf(flags, "exec", "Dry-run mode, skipping execution")
+		debugf(flags, dbgExec, "Dry-run mode, skipping execution")
 		return executeTaskDryRun(stdout, env.Executor, execConfig, composeResult, env.Agent, model, modelSource, resolvedName, instructions)
 	}
 
@@ -410,7 +410,7 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 		printTaskExecutionInfo(stdout, env.Agent, model, modelSource, composeResult, resolvedName, instructions, taskResult)
 	}
 
-	debugf(flags, "exec", "Executing agent (process replacement)")
+	debugf(flags, dbgExec, "Executing agent (process replacement)")
 	// Execute agent (replaces current process)
 	return env.Executor.Execute(execConfig)
 }

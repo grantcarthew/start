@@ -76,7 +76,7 @@ func (r *resolver) resolveAgent(name string) (string, error) {
 
 	// Tier 1: Exact match in installed config
 	if hasExactInstalled(r.cfg.Value, internalcue.KeyAgents, name) {
-		debugf(r.flags, "resolve", "Agent %q: exact installed match", name)
+		debugf(r.flags, dbgResolve, "Agent %q: exact installed match", name)
 		return name, nil
 	}
 
@@ -91,7 +91,7 @@ func (r *resolver) resolveAgent(name string) (string, error) {
 			return "", err
 		}
 		if result != nil {
-			debugf(r.flags, "resolve", "Agent %q: exact registry match %q", name, result.Name)
+			debugf(r.flags, dbgResolve, "Agent %q: exact registry match %q", name, result.Name)
 			if err := r.autoInstall(client, *result); err != nil {
 				return "", err
 			}
@@ -113,7 +113,7 @@ func (r *resolver) resolveAgent(name string) (string, error) {
 	}
 	allMatches := mergeAssetMatches(installedMatches, registryMatches)
 
-	debugf(r.flags, "resolve", "Agent %q: %d installed, %d registry, %d total matches",
+	debugf(r.flags, dbgResolve, "Agent %q: %d installed, %d registry, %d total matches",
 		name, len(installedMatches), len(registryMatches), len(allMatches))
 
 	selected, err := r.selectSingleMatch(allMatches, "agent", name)
@@ -142,13 +142,13 @@ func (r *resolver) resolveRole(name string) (string, error) {
 
 	// File path bypass (per DR-038)
 	if orchestration.IsFilePath(name) {
-		debugf(r.flags, "resolve", "Role %q: file path bypass", name)
+		debugf(r.flags, dbgResolve, "Role %q: file path bypass", name)
 		return name, nil
 	}
 
 	// Tier 1: Exact match in installed config
 	if hasExactInstalled(r.cfg.Value, internalcue.KeyRoles, name) {
-		debugf(r.flags, "resolve", "Role %q: exact installed match", name)
+		debugf(r.flags, dbgResolve, "Role %q: exact installed match", name)
 		return name, nil
 	}
 
@@ -163,7 +163,7 @@ func (r *resolver) resolveRole(name string) (string, error) {
 			return "", err
 		}
 		if result != nil {
-			debugf(r.flags, "resolve", "Role %q: exact registry match %q", name, result.Name)
+			debugf(r.flags, dbgResolve, "Role %q: exact registry match %q", name, result.Name)
 			if err := r.autoInstall(client, *result); err != nil {
 				return "", err
 			}
@@ -185,7 +185,7 @@ func (r *resolver) resolveRole(name string) (string, error) {
 	}
 	allMatches := mergeAssetMatches(installedMatches, registryMatches)
 
-	debugf(r.flags, "resolve", "Role %q: %d installed, %d registry, %d total matches",
+	debugf(r.flags, dbgResolve, "Role %q: %d installed, %d registry, %d total matches",
 		name, len(installedMatches), len(registryMatches), len(allMatches))
 
 	selected, err := r.selectSingleMatch(allMatches, "role", name)
@@ -217,7 +217,7 @@ func (r *resolver) resolveModelName(name string, agent orchestration.Agent) stri
 
 	// Exact match
 	if _, ok := agent.Models[name]; ok {
-		debugf(r.flags, "resolve", "Model %q: exact match in models map", name)
+		debugf(r.flags, dbgResolve, "Model %q: exact match in models map", name)
 		return name
 	}
 
@@ -245,16 +245,16 @@ func (r *resolver) resolveModelName(name string, agent orchestration.Agent) stri
 	sort.Strings(matches)
 
 	if len(matches) == 1 {
-		debugf(r.flags, "resolve", "Model %q: match %q", name, matches[0])
+		debugf(r.flags, dbgResolve, "Model %q: match %q", name, matches[0])
 		return matches[0]
 	}
 
 	if len(matches) > 1 {
-		debugf(r.flags, "resolve", "Model %q: multiple matches %v, using passthrough", name, matches)
+		debugf(r.flags, dbgResolve, "Model %q: multiple matches %v, using passthrough", name, matches)
 	}
 
 	// Passthrough
-	debugf(r.flags, "resolve", "Model %q: passthrough", name)
+	debugf(r.flags, dbgResolve, "Model %q: passthrough", name)
 	return name
 }
 
@@ -270,21 +270,21 @@ func (r *resolver) resolveContexts(terms []string) []string {
 	for _, term := range terms {
 		// File path bypass
 		if orchestration.IsFilePath(term) {
-			debugf(r.flags, "resolve", "Context %q: file path bypass", term)
+			debugf(r.flags, dbgResolve, "Context %q: file path bypass", term)
 			resolved = append(resolved, term)
 			continue
 		}
 
 		// "default" pseudo-tag passthrough
 		if term == "default" {
-			debugf(r.flags, "resolve", "Context %q: default passthrough", term)
+			debugf(r.flags, dbgResolve, "Context %q: default passthrough", term)
 			resolved = append(resolved, term)
 			continue
 		}
 
 		// Exact name match in installed config
 		if hasExactInstalled(r.cfg.Value, internalcue.KeyContexts, term) {
-			debugf(r.flags, "resolve", "Context %q: exact installed match", term)
+			debugf(r.flags, dbgResolve, "Context %q: exact installed match", term)
 			resolved = append(resolved, term)
 			continue
 		}
@@ -304,7 +304,7 @@ func (r *resolver) resolveContexts(terms []string) []string {
 				continue
 			}
 			if result != nil {
-				debugf(r.flags, "resolve", "Context %q: exact registry match %q", term, result.Name)
+				debugf(r.flags, dbgResolve, "Context %q: exact registry match %q", term, result.Name)
 				if err := r.autoInstall(client, *result); err != nil {
 					if !r.flags.Quiet {
 						printWarning(r.stdout, "context %q: auto-install failed: %s", term, err)
@@ -320,7 +320,7 @@ func (r *resolver) resolveContexts(terms []string) []string {
 		installedMatches, err := searchInstalled(r.cfg.Value, internalcue.KeyContexts, "contexts", term)
 		if err != nil {
 			// Invalid regex in context term - pass through as-is
-			debugf(r.flags, "resolve", "Context %q: invalid pattern, passing through", term)
+			debugf(r.flags, dbgResolve, "Context %q: invalid pattern, passing through", term)
 			resolved = append(resolved, term)
 			continue
 		}
@@ -328,7 +328,7 @@ func (r *resolver) resolveContexts(terms []string) []string {
 		if index != nil {
 			registryMatches, err = searchRegistryCategory(index.Contexts, "contexts", term)
 			if err != nil {
-				debugf(r.flags, "resolve", "Context %q: invalid pattern, passing through", term)
+				debugf(r.flags, dbgResolve, "Context %q: invalid pattern, passing through", term)
 				resolved = append(resolved, term)
 				continue
 			}
@@ -343,11 +343,11 @@ func (r *resolver) resolveContexts(terms []string) []string {
 			}
 		}
 
-		debugf(r.flags, "resolve", "Context %q: %d matches above threshold", term, len(qualified))
+		debugf(r.flags, dbgResolve, "Context %q: %d matches above threshold", term, len(qualified))
 
 		if len(qualified) == 0 {
 			// No matches - pass through as-is (composer will warn)
-			debugf(r.flags, "resolve", "Context %q: no matches, passing through", term)
+			debugf(r.flags, dbgResolve, "Context %q: no matches, passing through", term)
 			resolved = append(resolved, term)
 			continue
 		}
@@ -627,7 +627,7 @@ func (r *resolver) ensureIndex() (*registry.Index, *registry.Client, error) {
 
 	client, err := registry.NewClient()
 	if err != nil {
-		debugf(r.flags, "resolve", "Registry unavailable: %v", err)
+		debugf(r.flags, dbgResolve, "Registry unavailable: %v", err)
 		r.indexErr = err
 		return nil, nil, nil // Graceful fallback
 	}
@@ -636,7 +636,7 @@ func (r *resolver) ensureIndex() (*registry.Index, *registry.Client, error) {
 	ctx := context.Background()
 	index, err := client.FetchIndex(ctx)
 	if err != nil {
-		debugf(r.flags, "resolve", "Index fetch failed: %v", err)
+		debugf(r.flags, dbgResolve, "Index fetch failed: %v", err)
 		r.indexErr = err
 		return nil, client, nil // Graceful fallback
 	}
