@@ -1,4 +1,4 @@
-// Package config handles configuration discovery and path resolution.
+// Package config handles configuration discovery, path resolution, and validation.
 package config
 
 import (

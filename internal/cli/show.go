@@ -375,7 +375,7 @@ func printPreview(w io.Writer, r ShowResult) {
 	cat := itemTypeToCategory(r.ItemType)
 	_, _ = fmt.Fprintln(w)
 
-	// Show list of all items if available (for agent/role)
+	// Show list of all items if available
 	if len(r.AllNames) > 0 {
 		_, _ = categoryColor(cat).Fprint(w, r.ItemType+"s")
 		_, _ = fmt.Fprintf(w, ": %s\n", strings.Join(r.AllNames, ", "))

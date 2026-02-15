@@ -91,7 +91,7 @@ func CheckConfiguration(paths config.Paths) SectionResult {
 func checkConfigDir(dir, scope string, exists bool) []CheckResult {
 	var results []CheckResult
 
-	// Create scope label
+	// Build display path like "~/.config/start" for check output
 	shortDir := shortenPath(dir)
 
 	if !exists {

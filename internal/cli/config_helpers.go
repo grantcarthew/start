@@ -409,7 +409,7 @@ func resolveInstalledName[T any](items map[string]T, typeName, query string) (st
 		score := 0
 		for _, pattern := range patterns {
 			if pattern.MatchString(name) {
-				score += 3
+				score += 3 // Each matching pattern adds weight; higher score = more query terms matched
 			}
 		}
 		if score > 0 {

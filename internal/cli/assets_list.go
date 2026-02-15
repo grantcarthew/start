@@ -16,7 +16,7 @@ import (
 	"golang.org/x/mod/semver"
 )
 
-// NOTE(review): This file shares registry client creation, index fetching, and config
+// NOTE(design): This file shares registry client creation, index fetching, and config
 // loading patterns with assets_add.go, assets_search.go, assets_update.go, and
 // assets_index.go. This duplication is accepted - each command uses the results
 // differently and a shared helper would couple them for modest line savings.

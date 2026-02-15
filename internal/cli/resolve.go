@@ -209,7 +209,7 @@ func (r *resolver) resolveModelName(name string, agent orchestration.Agent) stri
 		}
 	}
 
-	sort.Strings(matches)
+	sort.Strings(matches) // Deterministic ordering for consistent output
 
 	if len(matches) == 1 {
 		debugf(r.flags, dbgResolve, "Model %q: match %q", name, matches[0])

@@ -214,7 +214,7 @@ func runConfigTaskAdd(cmd *cobra.Command, _ []string) error {
 		}
 		choice = strings.TrimSpace(choice)
 		if choice == "" {
-			choice = "3" // Default to inline prompt for tasks
+			choice = "3" // Default to inline prompt (tasks are typically short prompts, unlike roles/contexts which default to files)
 		}
 
 		switch choice {
