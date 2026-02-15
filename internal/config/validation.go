@@ -1,4 +1,3 @@
-// Package config handles configuration discovery and validation.
 package config
 
 import (

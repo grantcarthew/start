@@ -178,7 +178,7 @@ func setSetting(w io.Writer, flags *Flags, key, value string, localOnly bool) er
 		return fmt.Errorf("creating config directory: %w", err)
 	}
 
-	// Load existing settings
+	// Load existing settings (error ignored: missing file means start fresh)
 	settings, _ := loadSettingsFromDir(configDir)
 	if settings == nil {
 		settings = make(map[string]string)
