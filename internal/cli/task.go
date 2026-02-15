@@ -574,7 +574,13 @@ func promptTaskSelection(w io.Writer, reader *bufio.Reader, matches []TaskMatch,
 	for i := 0; i < displayCount; i++ {
 		m := matches[i]
 		padding := strings.Repeat(" ", maxNameLen-len(m.Name)+2)
-		_, _ = fmt.Fprintf(w, "  %2d. %s%s%s\n", i+1, m.Name, padding, m.Source)
+		var sourceLabel string
+		if m.Source == TaskSourceInstalled {
+			sourceLabel = colorInstalled.Sprint(m.Source)
+		} else {
+			sourceLabel = colorRegistry.Sprint(m.Source)
+		}
+		_, _ = fmt.Fprintf(w, "  %2d. %s%s%s\n", i+1, m.Name, padding, sourceLabel)
 	}
 
 	if truncated {
@@ -663,11 +669,10 @@ func installTaskFromRegistry(stdout io.Writer, flags *Flags, client *registry.Cl
 	return nil
 }
 
-// findExactTaskInRegistry searches for an exact task match in the registry index.
-// Supports both full name (e.g., "golang/code-review") and short name (e.g., "code-review").
-// Returns an error if multiple entries share the same short name.
+// findExactTaskInRegistry searches for an exact full-name task match in the registry index.
+// Only matches the complete name (e.g., "golang/code-review"), not short suffixes.
+// Short/partial names fall through to the regex search + interactive selection flow.
 func findExactTaskInRegistry(index *registry.Index, taskName string) (*assets.SearchResult, error) {
-	// Full name match is always unambiguous
 	if entry, ok := index.Tasks[taskName]; ok {
 		return &assets.SearchResult{
 			Category: "tasks",
@@ -675,28 +680,5 @@ func findExactTaskInRegistry(index *registry.Index, taskName string) (*assets.Se
 			Entry:    entry,
 		}, nil
 	}
-
-	// Short name match: collect all matches to detect ambiguity
-	var matches []string
-	for name := range index.Tasks {
-		if idx := strings.LastIndex(name, "/"); idx != -1 {
-			if name[idx+1:] == taskName {
-				matches = append(matches, name)
-			}
-		}
-	}
-
-	switch len(matches) {
-	case 0:
-		return nil, nil
-	case 1:
-		return &assets.SearchResult{
-			Category: "tasks",
-			Name:     matches[0],
-			Entry:    index.Tasks[matches[0]],
-		}, nil
-	default:
-		sort.Strings(matches)
-		return nil, fmt.Errorf("ambiguous task name %q matches multiple entries: %s", taskName, strings.Join(matches, ", "))
-	}
+	return nil, nil
 }
