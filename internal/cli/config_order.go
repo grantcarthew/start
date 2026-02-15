@@ -4,14 +4,12 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 
 	"github.com/grantcarthew/start/internal/config"
 	"github.com/spf13/cobra"
-	"golang.org/x/term"
 )
 
 // addConfigOrderCommand adds the bare order command to the config command.
@@ -34,11 +32,12 @@ an interactive reorder flow.`,
 // runConfigOrder prompts the user to select contexts or roles, then runs reorder.
 func runConfigOrder(cmd *cobra.Command, _ []string) error {
 	stdin := cmd.InOrStdin()
-	stdout := cmd.OutOrStdout()
-
-	if !isInteractiveInput(stdin) {
+	if !isTerminal(stdin) {
 		return fmt.Errorf("interactive reordering requires a terminal")
 	}
+
+	stdout := cmd.OutOrStdout()
+	local := getFlags(cmd).Local
 
 	_, _ = fmt.Fprintln(stdout, "Reorder:")
 	_, _ = fmt.Fprintln(stdout, "  1. Contexts")
@@ -57,9 +56,9 @@ func runConfigOrder(cmd *cobra.Command, _ []string) error {
 
 	switch choice {
 	case "1":
-		return runConfigContextOrder(cmd, nil)
+		return reorderContexts(stdout, stdin, local)
 	case "2":
-		return runConfigRoleOrder(cmd, nil)
+		return reorderRoles(stdout, stdin, local)
 	default:
 		return fmt.Errorf("invalid choice: %s", choice)
 	}
@@ -87,13 +86,14 @@ Press Enter to save the new order, or q to cancel.`,
 // runConfigContextOrder runs the interactive reorder flow for contexts.
 func runConfigContextOrder(cmd *cobra.Command, _ []string) error {
 	stdin := cmd.InOrStdin()
-	stdout := cmd.OutOrStdout()
-	local := getFlags(cmd).Local
-
-	if !isInteractiveInput(stdin) {
+	if !isTerminal(stdin) {
 		return fmt.Errorf("interactive reordering requires a terminal")
 	}
+	return reorderContexts(cmd.OutOrStdout(), stdin, getFlags(cmd).Local)
+}
 
+// reorderContexts performs the interactive context reorder.
+func reorderContexts(stdout io.Writer, stdin io.Reader, local bool) error {
 	paths, err := config.ResolvePaths("")
 	if err != nil {
 		return fmt.Errorf("resolving config paths: %w", err)
@@ -171,13 +171,14 @@ Press Enter to save the new order, or q to cancel.`,
 // runConfigRoleOrder runs the interactive reorder flow for roles.
 func runConfigRoleOrder(cmd *cobra.Command, _ []string) error {
 	stdin := cmd.InOrStdin()
-	stdout := cmd.OutOrStdout()
-	local := getFlags(cmd).Local
-
-	if !isInteractiveInput(stdin) {
+	if !isTerminal(stdin) {
 		return fmt.Errorf("interactive reordering requires a terminal")
 	}
+	return reorderRoles(cmd.OutOrStdout(), stdin, getFlags(cmd).Local)
+}
 
+// reorderRoles performs the interactive role reorder.
+func reorderRoles(stdout io.Writer, stdin io.Reader, local bool) error {
 	paths, err := config.ResolvePaths("")
 	if err != nil {
 		return fmt.Errorf("resolving config paths: %w", err)
@@ -228,18 +229,6 @@ func runConfigRoleOrder(cmd *cobra.Command, _ []string) error {
 
 	_, _ = fmt.Fprintln(stdout, "Order saved.")
 	return nil
-}
-
-// isInteractiveInput returns true if the reader supports interactive input.
-// Returns true for TTY file descriptors or for non-file readers (e.g., explicitly
-// set via cmd.SetIn in tests). Returns false for piped file descriptors.
-func isInteractiveInput(r io.Reader) bool {
-	f, ok := r.(*os.File)
-	if !ok {
-		// Not a file - stdin was explicitly set (e.g., in tests)
-		return true
-	}
-	return term.IsTerminal(int(f.Fd()))
 }
 
 // runReorderLoop runs the interactive move-up reorder loop.

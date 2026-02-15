@@ -714,6 +714,8 @@ type TaskConfig struct {
 }
 
 // loadTasksForScope loads tasks from the appropriate scope.
+// Unlike loadRolesForScope/loadContextsForScope, this does not return a definition-order
+// slice because task display order is not user-configurable.
 func loadTasksForScope(localOnly bool) (map[string]TaskConfig, error) {
 	paths, err := config.ResolvePaths("")
 	if err != nil {

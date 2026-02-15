@@ -6,14 +6,15 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	internalcue "github.com/grantcarthew/start/internal/cue"
 )
 
 // setupTestConfig creates a temp directory with CUE config for testing.
-// Returns the directory path and a cleanup function.
 //
 // Note: Tests below use os.Chdir (process-global state). Do not add t.Parallel()
 // to any test that calls os.Chdir — it will cause data races on the working directory.
-func setupTestConfig(t *testing.T) (string, func()) {
+func setupTestConfig(t *testing.T) string {
 	t.Helper()
 
 	dir := t.TempDir()
@@ -77,31 +78,15 @@ tasks: {
 		t.Fatalf("writing config: %v", err)
 	}
 
-	// Change to the temp directory so .start is found
-	origDir, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getting cwd: %v", err)
-	}
-	if err := os.Chdir(dir); err != nil {
-		t.Fatalf("changing to temp dir: %v", err)
-	}
+	chdir(t, dir)
+	t.Setenv("HOME", dir)
 
-	// Also set temp HOME for global scope isolation
-	origHome := os.Getenv("HOME")
-	_ = os.Setenv("HOME", dir)
-
-	cleanup := func() {
-		_ = os.Chdir(origDir)
-		_ = os.Setenv("HOME", origHome)
-	}
-
-	return dir, cleanup
+	return dir
 }
 
 // TestPrepareShowAgent tests the prepareShowAgent logic function.
 func TestPrepareShowAgent(t *testing.T) {
-	_, cleanup := setupTestConfig(t)
-	defer cleanup()
+	setupTestConfig(t)
 
 	tests := []struct {
 		name           string
@@ -166,7 +151,7 @@ func TestPrepareShowAgent(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := prepareShowAgent(tt.agentName, tt.scope)
+			result, err := prepareShow(tt.agentName, tt.scope, internalcue.KeyAgents, "Agent")
 
 			if tt.wantErr {
 				if err == nil {
@@ -205,8 +190,7 @@ func TestPrepareShowAgent(t *testing.T) {
 
 // TestPrepareShowRole tests the prepareShowRole logic function.
 func TestPrepareShowRole(t *testing.T) {
-	_, cleanup := setupTestConfig(t)
-	defer cleanup()
+	setupTestConfig(t)
 
 	tests := []struct {
 		name           string
@@ -257,7 +241,7 @@ func TestPrepareShowRole(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := prepareShowRole(tt.roleName, "")
+			result, err := prepareShow(tt.roleName, "", internalcue.KeyRoles, "Role")
 
 			if tt.wantErr {
 				if err == nil {
@@ -295,8 +279,7 @@ func TestPrepareShowRole(t *testing.T) {
 
 // TestPrepareShowContext tests the prepareShowContext logic function.
 func TestPrepareShowContext(t *testing.T) {
-	_, cleanup := setupTestConfig(t)
-	defer cleanup()
+	setupTestConfig(t)
 
 	tests := []struct {
 		name           string
@@ -362,7 +345,7 @@ func TestPrepareShowContext(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := prepareShowContext(tt.contextName, "")
+			result, err := prepareShow(tt.contextName, "", internalcue.KeyContexts, "Context")
 
 			if tt.wantErr {
 				if err == nil {
@@ -400,8 +383,7 @@ func TestPrepareShowContext(t *testing.T) {
 
 // TestPrepareShowTask tests the prepareShowTask logic function.
 func TestPrepareShowTask(t *testing.T) {
-	_, cleanup := setupTestConfig(t)
-	defer cleanup()
+	setupTestConfig(t)
 
 	tests := []struct {
 		name           string
@@ -454,7 +436,7 @@ func TestPrepareShowTask(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := prepareShowTask(tt.taskName, "")
+			result, err := prepareShow(tt.taskName, "", internalcue.KeyTasks, "Task")
 
 			if tt.wantErr {
 				if err == nil {
@@ -534,8 +516,7 @@ func TestPrintPreview(t *testing.T) {
 
 // TestShowCommandIntegration tests the full command flow via Cobra.
 func TestShowCommandIntegration(t *testing.T) {
-	_, cleanup := setupTestConfig(t)
-	defer cleanup()
+	setupTestConfig(t)
 
 	tests := []struct {
 		name       string

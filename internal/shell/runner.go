@@ -19,9 +19,9 @@ type Runner struct {
 	// Shell is the shell command to use (e.g., "bash -c", "sh -c").
 	// If empty, auto-detection is used.
 	Shell string
-	// DefaultTimeout is the default timeout in seconds for commands.
-	// If 0, DefaultTimeout constant is used.
-	DefaultTimeout int
+	// Timeout is the default timeout in seconds for commands.
+	// If 0, the DefaultTimeout constant is used.
+	Timeout int
 }
 
 // NewRunner creates a new shell runner with auto-detected shell.
@@ -74,7 +74,7 @@ func (r *Runner) RunWithResult(command, workingDir, shell string, timeout int) (
 	// Determine timeout
 	timeoutSecs := timeout
 	if timeoutSecs <= 0 {
-		timeoutSecs = r.DefaultTimeout
+		timeoutSecs = r.Timeout
 	}
 	if timeoutSecs <= 0 {
 		timeoutSecs = DefaultTimeout

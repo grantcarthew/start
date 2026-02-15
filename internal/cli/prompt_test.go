@@ -82,15 +82,7 @@ settings: {
 		t.Fatalf("writing config: %v", err)
 	}
 
-	origDir, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getting cwd: %v", err)
-	}
-	defer func() { _ = os.Chdir(origDir) }()
-
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatalf("changing to temp dir: %v", err)
-	}
+	chdir(t, tmpDir)
 
 	cmd := NewRootCmd()
 	stdout := new(bytes.Buffer)
@@ -99,7 +91,7 @@ settings: {
 	cmd.SetErr(stderr)
 	cmd.SetArgs([]string{"prompt", "test prompt text", "--dry-run"})
 
-	err = cmd.Execute()
+	err := cmd.Execute()
 	if err != nil {
 		t.Fatalf("prompt command error: %v", err)
 	}
@@ -148,15 +140,7 @@ settings: {
 		t.Fatalf("writing config: %v", err)
 	}
 
-	origDir, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getting cwd: %v", err)
-	}
-	defer func() { _ = os.Chdir(origDir) }()
-
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatalf("changing to temp dir: %v", err)
-	}
+	chdir(t, tmpDir)
 
 	cmd := NewRootCmd()
 	stdout := new(bytes.Buffer)
@@ -165,7 +149,7 @@ settings: {
 	cmd.SetErr(stderr)
 	cmd.SetArgs([]string{"prompt", "my custom prompt", "--dry-run"})
 
-	err = cmd.Execute()
+	err := cmd.Execute()
 	if err != nil {
 		t.Fatalf("prompt command error: %v", err)
 	}
@@ -208,15 +192,7 @@ settings: {
 		t.Fatalf("writing config: %v", err)
 	}
 
-	origDir, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getting cwd: %v", err)
-	}
-	defer func() { _ = os.Chdir(origDir) }()
-
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatalf("changing to temp dir: %v", err)
-	}
+	chdir(t, tmpDir)
 
 	cmd := NewRootCmd()
 	stdout := new(bytes.Buffer)
@@ -226,7 +202,7 @@ settings: {
 	// No text argument, just prompt command
 	cmd.SetArgs([]string{"prompt", "--dry-run"})
 
-	err = cmd.Execute()
+	err := cmd.Execute()
 	if err != nil {
 		t.Fatalf("prompt command error: %v", err)
 	}
@@ -282,15 +258,7 @@ settings: {
 		t.Fatalf("writing config: %v", err)
 	}
 
-	origDir, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getting cwd: %v", err)
-	}
-	defer func() { _ = os.Chdir(origDir) }()
-
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatalf("changing to temp dir: %v", err)
-	}
+	chdir(t, tmpDir)
 
 	cmd := NewRootCmd()
 	stdout := new(bytes.Buffer)
@@ -299,7 +267,7 @@ settings: {
 	cmd.SetErr(stderr)
 	cmd.SetArgs([]string{"prompt", "test", "--dry-run"})
 
-	err = cmd.Execute()
+	err := cmd.Execute()
 	if err != nil {
 		t.Fatalf("prompt command error: %v", err)
 	}

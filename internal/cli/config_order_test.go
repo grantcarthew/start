@@ -416,24 +416,11 @@ func TestConfigContextOrder_Command(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	origWd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = os.Chdir(origWd) }()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatal(err)
-	}
+	chdir(t, tmpDir)
 
 	// Move item 2 (alpha) up, then save
-	cmd := NewRootCmd()
 	stdout := &bytes.Buffer{}
-	cmd.SetOut(stdout)
-	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetIn(strings.NewReader("2\n\n"))
-	cmd.SetArgs([]string{"config", "context", "order"})
-
-	if err := cmd.Execute(); err != nil {
+	if err := reorderContexts(stdout, strings.NewReader("2\n\n"), false); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -481,24 +468,11 @@ func TestConfigRoleOrder_Command(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	origWd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = os.Chdir(origWd) }()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatal(err)
-	}
+	chdir(t, tmpDir)
 
 	// Move item 2 (alpha) up, then save
-	cmd := NewRootCmd()
 	stdout := &bytes.Buffer{}
-	cmd.SetOut(stdout)
-	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetIn(strings.NewReader("2\n\n"))
-	cmd.SetArgs([]string{"config", "role", "order"})
-
-	if err := cmd.Execute(); err != nil {
+	if err := reorderRoles(stdout, strings.NewReader("2\n\n"), false); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -545,24 +519,11 @@ func TestConfigContextOrder_Cancel(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	origWd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = os.Chdir(origWd) }()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatal(err)
-	}
+	chdir(t, tmpDir)
 
 	// Move item 2 up, then cancel
-	cmd := NewRootCmd()
 	stdout := &bytes.Buffer{}
-	cmd.SetOut(stdout)
-	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetIn(strings.NewReader("2\nq\n"))
-	cmd.SetArgs([]string{"config", "context", "order"})
-
-	if err := cmd.Execute(); err != nil {
+	if err := reorderContexts(stdout, strings.NewReader("2\nq\n"), false); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -597,23 +558,10 @@ func TestConfigContextOrder_NoContexts(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	origWd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = os.Chdir(origWd) }()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatal(err)
-	}
+	chdir(t, tmpDir)
 
-	cmd := NewRootCmd()
 	stdout := &bytes.Buffer{}
-	cmd.SetOut(stdout)
-	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetIn(strings.NewReader(""))
-	cmd.SetArgs([]string{"config", "context", "order"})
-
-	if err := cmd.Execute(); err != nil {
+	if err := reorderContexts(stdout, strings.NewReader(""), false); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -623,7 +571,7 @@ func TestConfigContextOrder_NoContexts(t *testing.T) {
 	}
 }
 
-func TestConfigContextOrder_Reorder_Alias(t *testing.T) {
+func TestConfigContextOrder_SingleItem(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", tmpDir)
 
@@ -641,24 +589,11 @@ func TestConfigContextOrder_Reorder_Alias(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	origWd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = os.Chdir(origWd) }()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatal(err)
-	}
+	chdir(t, tmpDir)
 
-	// Test 'reorder' alias works
-	cmd := NewRootCmd()
+	// Test reorder with single item (save immediately)
 	stdout := &bytes.Buffer{}
-	cmd.SetOut(stdout)
-	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetIn(strings.NewReader("\n"))
-	cmd.SetArgs([]string{"config", "context", "reorder"})
-
-	if err := cmd.Execute(); err != nil {
+	if err := reorderContexts(stdout, strings.NewReader("\n"), false); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -690,14 +625,7 @@ func TestConfigContextAdd_PreservesOrder(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	origWd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = os.Chdir(origWd) }()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatal(err)
-	}
+	chdir(t, tmpDir)
 
 	// Add a new context "beta" - should appear at end
 	cmd := NewRootCmd()
@@ -754,14 +682,7 @@ func TestConfigRoleAdd_PreservesOrder(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	origWd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = os.Chdir(origWd) }()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatal(err)
-	}
+	chdir(t, tmpDir)
 
 	// Add a new role "beta"
 	cmd := NewRootCmd()
@@ -824,14 +745,7 @@ func TestConfigRoleList_PreservesDefinitionOrder(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	origWd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = os.Chdir(origWd) }()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatal(err)
-	}
+	chdir(t, tmpDir)
 
 	cmd := NewRootCmd()
 	stdout := &bytes.Buffer{}

@@ -37,15 +37,7 @@ func TestDoctorCommand_NoConfig(t *testing.T) {
 	t.Setenv("HOME", tmpDir)
 	t.Setenv("XDG_CONFIG_HOME", tmpDir)
 
-	origDir, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getting cwd: %v", err)
-	}
-	defer func() { _ = os.Chdir(origDir) }()
-
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatalf("changing to temp dir: %v", err)
-	}
+	chdir(t, tmpDir)
 
 	cmd := NewRootCmd()
 	stdout := new(bytes.Buffer)
@@ -109,15 +101,7 @@ settings: {
 		t.Fatalf("writing config: %v", err)
 	}
 
-	origDir, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getting cwd: %v", err)
-	}
-	defer func() { _ = os.Chdir(origDir) }()
-
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatalf("changing to temp dir: %v", err)
-	}
+	chdir(t, tmpDir)
 
 	cmd := NewRootCmd()
 	stdout := new(bytes.Buffer)
@@ -151,15 +135,7 @@ func TestDoctorCommand_Verbose(t *testing.T) {
 	t.Setenv("HOME", tmpDir)
 	t.Setenv("XDG_CONFIG_HOME", tmpDir)
 
-	origDir, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getting cwd: %v", err)
-	}
-	defer func() { _ = os.Chdir(origDir) }()
-
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatalf("changing to temp dir: %v", err)
-	}
+	chdir(t, tmpDir)
 
 	cmd := NewRootCmd()
 	stdout := new(bytes.Buffer)
@@ -183,15 +159,7 @@ func TestPrepareDoctor(t *testing.T) {
 	t.Setenv("HOME", tmpDir)
 	t.Setenv("XDG_CONFIG_HOME", tmpDir)
 
-	origDir, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getting cwd: %v", err)
-	}
-	defer func() { _ = os.Chdir(origDir) }()
-
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatalf("changing to temp dir: %v", err)
-	}
+	chdir(t, tmpDir)
 
 	report, err := prepareDoctor()
 	if err != nil {
@@ -255,15 +223,7 @@ contexts: {
 		t.Fatalf("writing config: %v", err)
 	}
 
-	origDir, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getting cwd: %v", err)
-	}
-	defer func() { _ = os.Chdir(origDir) }()
-
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatalf("changing to temp dir: %v", err)
-	}
+	chdir(t, tmpDir)
 
 	report, err := prepareDoctor()
 	if err != nil {

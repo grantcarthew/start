@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strings"
 	"time"
 
 	"cuelang.org/go/mod/modconfig"
@@ -111,13 +112,7 @@ func (c *Client) ResolveLatestVersion(ctx context.Context, modulePath string) (s
 
 	// Replace the version in the module path
 	// Module path format: path@version
-	atIdx := -1
-	for i := len(modulePath) - 1; i >= 0; i-- {
-		if modulePath[i] == '@' {
-			atIdx = i
-			break
-		}
-	}
+	atIdx := strings.LastIndex(modulePath, "@")
 	if atIdx == -1 {
 		return "", fmt.Errorf("invalid module path %s: no version", modulePath)
 	}

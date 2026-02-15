@@ -333,7 +333,7 @@ echo "Tarball SHA256: $TARBALL_SHA256"
 # Edit Formula/start.rb and update:
 # 1. url line: Update version in URL
 # 2. sha256 line: Update with TARBALL_SHA256
-# 3. ldflags: Update version in "-X github.com/grantcarthew/start/internal/cli.cliVersion=X.X.X"
+# 3. ldflags: Update version, commit, buildDate in ldflags (see Formula example below)
 # 4. test: Update expected version in assert_match
 
 # After editing, commit and push
@@ -358,7 +358,8 @@ class Start < Formula
   depends_on "go" => :build
 
   def install
-    ldflags = "-s -w -X github.com/grantcarthew/start/internal/cli.cliVersion=#{version}"
+    pkg = "github.com/grantcarthew/start/internal/cli"
+    ldflags = "-s -w -X #{pkg}.cliVersion=#{version} -X #{pkg}.commit=#{Utils.git_head} -X #{pkg}.buildDate=#{time.iso8601}"
     system "go", "build", *std_go_args(ldflags: ldflags), "./cmd/start"
   end
 

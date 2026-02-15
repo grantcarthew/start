@@ -76,14 +76,7 @@ func TestDoctor_ValidConfig_AllPass(t *testing.T) {
 	tmpDir, paths := setupDoctorTestConfig(t)
 
 	// Change to temp directory
-	origDir, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getting working dir: %v", err)
-	}
-	defer os.Chdir(origDir)
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatalf("changing to temp dir: %v", err)
-	}
+	chdir(t, tmpDir)
 
 	// Build the report manually (simulating what the CLI does)
 	report := runDoctorChecks(t, paths)
@@ -423,14 +416,7 @@ func TestDoctor_FullReport_Integration(t *testing.T) {
 	tmpDir, paths := setupDoctorTestConfig(t)
 
 	// Change to temp directory
-	origDir, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getting working dir: %v", err)
-	}
-	defer os.Chdir(origDir)
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatalf("changing to temp dir: %v", err)
-	}
+	chdir(t, tmpDir)
 
 	// Build full report
 	report := runDoctorChecks(t, paths)

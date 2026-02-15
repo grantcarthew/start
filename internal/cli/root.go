@@ -25,9 +25,11 @@ func IsSilentError(err error) bool {
 	return false
 }
 
-// Version information set via ldflags at build time
+// Build-time variables set via ldflags
 var (
 	cliVersion = "dev"
+	commit     = "unknown"
+	buildDate  = "unknown"
 	repoURL    = "https://github.com/grantcarthew/start"
 )
 
