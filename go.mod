@@ -3,11 +3,11 @@ module github.com/grantcarthew/start
 go 1.24.0
 
 require (
-	cuelang.org/go v0.15.1
+	cuelang.org/go v0.15.4
 	github.com/fatih/color v1.18.0
 	github.com/spf13/cobra v1.10.2
-	golang.org/x/mod v0.29.0
-	golang.org/x/term v0.36.0
+	golang.org/x/mod v0.33.0
+	golang.org/x/term v0.40.0
 )
 
 require (
@@ -29,7 +29,7 @@ require (
 	golang.org/x/net v0.46.0 // indirect
 	golang.org/x/oauth2 v0.32.0 // indirect
 	golang.org/x/sync v0.17.0 // indirect
-	golang.org/x/sys v0.37.0 // indirect
+	golang.org/x/sys v0.41.0 // indirect
 	golang.org/x/text v0.30.0 // indirect
 	google.golang.org/protobuf v1.33.0 // indirect
 )
