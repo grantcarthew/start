@@ -10,6 +10,9 @@ import (
 	"time"
 )
 
+// unsafeCharsRe matches characters not safe for filenames.
+var unsafeCharsRe = regexp.MustCompile(`[^a-zA-Z0-9-_.]`)
+
 // Manager handles temporary file creation and management.
 type Manager struct {
 	// BaseDir is the base directory for temp files.
@@ -111,8 +114,7 @@ func deriveFileName(entityType, name string) string {
 	safeName = strings.ReplaceAll(safeName, "\\", "-")
 
 	// Remove or replace unsafe characters
-	reg := regexp.MustCompile(`[^a-zA-Z0-9-_.]`)
-	safeName = reg.ReplaceAllString(safeName, "-")
+	safeName = unsafeCharsRe.ReplaceAllString(safeName, "-")
 
 	// Remove consecutive dashes
 	for strings.Contains(safeName, "--") {
