@@ -37,7 +37,7 @@ func addShowCommand(parent *cobra.Command) {
 		Short:   "Display resolved role content",
 		Long:    `Display resolved role content after UTD processing.`,
 		Args:    cobra.MaximumNArgs(1),
-		RunE:    runShowRole,
+		RunE:    runShowItem(internalcue.KeyRoles, "Role"),
 	}
 
 	showContextCmd := &cobra.Command{
@@ -46,7 +46,7 @@ func addShowCommand(parent *cobra.Command) {
 		Short:   "Display resolved context content",
 		Long:    `Display resolved context content after UTD processing.`,
 		Args:    cobra.MaximumNArgs(1),
-		RunE:    runShowContext,
+		RunE:    runShowItem(internalcue.KeyContexts, "Context"),
 	}
 
 	showAgentCmd := &cobra.Command{
@@ -55,7 +55,7 @@ func addShowCommand(parent *cobra.Command) {
 		Short:   "Display agent configuration",
 		Long:    `Display effective agent configuration after config merging.`,
 		Args:    cobra.MaximumNArgs(1),
-		RunE:    runShowAgent,
+		RunE:    runShowItem(internalcue.KeyAgents, "Agent"),
 	}
 
 	showTaskCmd := &cobra.Command{
@@ -64,7 +64,7 @@ func addShowCommand(parent *cobra.Command) {
 		Short:   "Display task template",
 		Long:    `Display resolved task prompt template.`,
 		Args:    cobra.MaximumNArgs(1),
-		RunE:    runShowTask,
+		RunE:    runShowItem(internalcue.KeyTasks, "Task"),
 	}
 
 	// Add --scope flag to show command
@@ -99,16 +99,16 @@ func runShow(cmd *cobra.Command, args []string) error {
 
 	var sections []section
 
-	if result, err := prepareShowAgent("", scope); err == nil {
+	if result, err := prepareShow("", scope, internalcue.KeyAgents, "Agent"); err == nil {
 		sections = append(sections, section{"agents", result.AllNames})
 	}
-	if result, err := prepareShowRole("", scope); err == nil {
+	if result, err := prepareShow("", scope, internalcue.KeyRoles, "Role"); err == nil {
 		sections = append(sections, section{"roles", result.AllNames})
 	}
-	if result, err := prepareShowContext("", scope); err == nil {
+	if result, err := prepareShow("", scope, internalcue.KeyContexts, "Context"); err == nil {
 		sections = append(sections, section{"contexts", result.AllNames})
 	}
-	if result, err := prepareShowTask("", scope); err == nil {
+	if result, err := prepareShow("", scope, internalcue.KeyTasks, "Task"); err == nil {
 		sections = append(sections, section{"tasks", result.AllNames})
 	}
 
@@ -124,100 +124,55 @@ func runShow(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-// runShowRole displays resolved role content.
-func runShowRole(cmd *cobra.Command, args []string) error {
-	name := ""
-	if len(args) > 0 {
-		name = args[0]
-	}
+// runShowItem returns a cobra RunE handler that displays a specific item type.
+func runShowItem(cueKey, itemType string) func(*cobra.Command, []string) error {
+	return func(cmd *cobra.Command, args []string) error {
+		name := ""
+		if len(args) > 0 {
+			name = args[0]
+		}
 
-	scope, _ := cmd.Flags().GetString("scope")
-	result, err := prepareShowRole(name, scope)
-	if err != nil {
-		return err
-	}
+		scope, _ := cmd.Flags().GetString("scope")
+		result, err := prepareShow(name, scope, cueKey, itemType)
+		if err != nil {
+			return err
+		}
 
-	printPreview(cmd.OutOrStdout(), result)
-	return nil
+		printPreview(cmd.OutOrStdout(), result)
+		return nil
+	}
 }
 
-// runShowContext displays resolved context content.
-func runShowContext(cmd *cobra.Command, args []string) error {
-	name := ""
-	if len(args) > 0 {
-		name = args[0]
-	}
-
-	scope, _ := cmd.Flags().GetString("scope")
-	result, err := prepareShowContext(name, scope)
-	if err != nil {
-		return err
-	}
-
-	printPreview(cmd.OutOrStdout(), result)
-	return nil
-}
-
-// runShowAgent displays agent configuration.
-func runShowAgent(cmd *cobra.Command, args []string) error {
-	name := ""
-	if len(args) > 0 {
-		name = args[0]
-	}
-
-	scope, _ := cmd.Flags().GetString("scope")
-	result, err := prepareShowAgent(name, scope)
-	if err != nil {
-		return err
-	}
-
-	printPreview(cmd.OutOrStdout(), result)
-	return nil
-}
-
-// runShowTask displays task template.
-func runShowTask(cmd *cobra.Command, args []string) error {
-	name := ""
-	if len(args) > 0 {
-		name = args[0]
-	}
-
-	scope, _ := cmd.Flags().GetString("scope")
-	result, err := prepareShowTask(name, scope)
-	if err != nil {
-		return err
-	}
-
-	printPreview(cmd.OutOrStdout(), result)
-	return nil
-}
-
-// prepareShowRole prepares show output for a role.
-func prepareShowRole(name, scope string) (ShowResult, error) {
+// prepareShow prepares show output for an item type.
+// cueKey is the top-level CUE key (e.g., internalcue.KeyRoles).
+// itemType is the display name (e.g., "Role").
+func prepareShow(name, scope, cueKey, itemType string) (ShowResult, error) {
 	cfg, err := loadConfig(scope)
 	if err != nil {
 		return ShowResult{}, err
 	}
 
-	roles := cfg.Value.LookupPath(cue.ParsePath(internalcue.KeyRoles))
-	if !roles.Exists() {
-		return ShowResult{}, fmt.Errorf("no roles defined in configuration")
+	typePlural := strings.ToLower(itemType) + "s"
+
+	items := cfg.Value.LookupPath(cue.ParsePath(cueKey))
+	if !items.Exists() {
+		return ShowResult{}, fmt.Errorf("no %s defined in configuration", typePlural)
 	}
 
-	// Collect all role names in config order
+	// Collect all names in config order
 	var allNames []string
-	iter, err := roles.Fields()
+	iter, err := items.Fields()
 	if err != nil {
-		return ShowResult{}, fmt.Errorf("reading roles: %w", err)
+		return ShowResult{}, fmt.Errorf("reading %s: %w", typePlural, err)
 	}
 	for iter.Next() {
 		allNames = append(allNames, iter.Selector().Unquoted())
 	}
 	if len(allNames) == 0 {
-		return ShowResult{}, fmt.Errorf("no roles defined in configuration")
+		return ShowResult{}, fmt.Errorf("no %s defined in configuration", typePlural)
 	}
 
-	// Determine which role to show and why
+	// Determine which item to show and why
 	showReason := ""
 	if name == "" {
 		name = allNames[0]
@@ -225,230 +180,31 @@ func prepareShowRole(name, scope string) (ShowResult, error) {
 	}
 
 	resolvedName := name
-	role := roles.LookupPath(cue.MakePath(cue.Str(name)))
-	if !role.Exists() {
+	item := items.LookupPath(cue.MakePath(cue.Str(name)))
+	if !item.Exists() {
 		// Try substring match
 		var matches []string
-		for _, roleName := range allNames {
-			if strings.Contains(roleName, name) {
-				matches = append(matches, roleName)
+		for _, n := range allNames {
+			if strings.Contains(n, name) {
+				matches = append(matches, n)
 			}
 		}
 
 		switch len(matches) {
 		case 0:
-			return ShowResult{}, fmt.Errorf("role %q not found", name)
+			return ShowResult{}, fmt.Errorf("%s %q not found", strings.ToLower(itemType), name)
 		case 1:
 			resolvedName = matches[0]
-			role = roles.LookupPath(cue.MakePath(cue.Str(resolvedName)))
+			item = items.LookupPath(cue.MakePath(cue.Str(resolvedName)))
 		default:
-			return ShowResult{}, fmt.Errorf("ambiguous role name %q matches: %s", name, strings.Join(matches, ", "))
+			return ShowResult{}, fmt.Errorf("ambiguous %s name %q matches: %s", strings.ToLower(itemType), name, strings.Join(matches, ", "))
 		}
 	}
 
-	content := formatShowContent(role, "role")
+	content := formatShowContent(item, strings.ToLower(itemType))
 
 	return ShowResult{
-		ItemType:   "Role",
-		Name:       resolvedName,
-		Content:    content,
-		AllNames:   allNames,
-		ShowReason: showReason,
-	}, nil
-}
-
-// prepareShowContext prepares show output for context(s).
-func prepareShowContext(name, scope string) (ShowResult, error) {
-	cfg, err := loadConfig(scope)
-	if err != nil {
-		return ShowResult{}, err
-	}
-
-	contexts := cfg.Value.LookupPath(cue.ParsePath(internalcue.KeyContexts))
-	if !contexts.Exists() {
-		return ShowResult{}, fmt.Errorf("no contexts defined in configuration")
-	}
-
-	// Collect all context names in config order
-	var allNames []string
-	showReason := ""
-
-	iter, err := contexts.Fields()
-	if err != nil {
-		return ShowResult{}, fmt.Errorf("reading contexts: %w", err)
-	}
-	for iter.Next() {
-		allNames = append(allNames, iter.Selector().Unquoted())
-	}
-
-	if len(allNames) == 0 {
-		return ShowResult{}, fmt.Errorf("no contexts defined in configuration")
-	}
-
-	// If no name specified, show first context
-	if name == "" {
-		name = allNames[0]
-		showReason = "first in config"
-	}
-
-	// Show single context
-	resolvedName := name
-	ctx := contexts.LookupPath(cue.MakePath(cue.Str(name)))
-	if !ctx.Exists() {
-		// Try substring match
-		var matches []string
-		for _, ctxName := range allNames {
-			if strings.Contains(ctxName, name) {
-				matches = append(matches, ctxName)
-			}
-		}
-
-		switch len(matches) {
-		case 0:
-			return ShowResult{}, fmt.Errorf("context %q not found", name)
-		case 1:
-			resolvedName = matches[0]
-			ctx = contexts.LookupPath(cue.MakePath(cue.Str(resolvedName)))
-		default:
-			return ShowResult{}, fmt.Errorf("ambiguous context name %q matches: %s", name, strings.Join(matches, ", "))
-		}
-	}
-
-	content := formatShowContent(ctx, "context")
-
-	return ShowResult{
-		ItemType:   "Context",
-		Name:       resolvedName,
-		Content:    content,
-		AllNames:   allNames,
-		ShowReason: showReason,
-	}, nil
-}
-
-// prepareShowAgent prepares show output for an agent.
-func prepareShowAgent(name, scope string) (ShowResult, error) {
-	cfg, err := loadConfig(scope)
-	if err != nil {
-		return ShowResult{}, err
-	}
-
-	agents := cfg.Value.LookupPath(cue.ParsePath(internalcue.KeyAgents))
-	if !agents.Exists() {
-		return ShowResult{}, fmt.Errorf("no agents defined in configuration")
-	}
-
-	// Collect all agent names in config order
-	var allNames []string
-	iter, err := agents.Fields()
-	if err != nil {
-		return ShowResult{}, fmt.Errorf("reading agents: %w", err)
-	}
-	for iter.Next() {
-		allNames = append(allNames, iter.Selector().Unquoted())
-	}
-	if len(allNames) == 0 {
-		return ShowResult{}, fmt.Errorf("no agents defined in configuration")
-	}
-
-	// Determine which agent to show and why
-	showReason := ""
-	if name == "" {
-		name = allNames[0]
-		showReason = "first in config"
-	}
-
-	resolvedName := name
-	agent := agents.LookupPath(cue.MakePath(cue.Str(name)))
-	if !agent.Exists() {
-		// Try substring match
-		var matches []string
-		for _, agentName := range allNames {
-			if strings.Contains(agentName, name) {
-				matches = append(matches, agentName)
-			}
-		}
-
-		switch len(matches) {
-		case 0:
-			return ShowResult{}, fmt.Errorf("agent %q not found", name)
-		case 1:
-			resolvedName = matches[0]
-			agent = agents.LookupPath(cue.MakePath(cue.Str(resolvedName)))
-		default:
-			return ShowResult{}, fmt.Errorf("ambiguous agent name %q matches: %s", name, strings.Join(matches, ", "))
-		}
-	}
-
-	content := formatShowContent(agent, "agent")
-
-	return ShowResult{
-		ItemType:   "Agent",
-		Name:       resolvedName,
-		Content:    content,
-		AllNames:   allNames,
-		ShowReason: showReason,
-	}, nil
-}
-
-// prepareShowTask prepares show output for a task.
-func prepareShowTask(name, scope string) (ShowResult, error) {
-	cfg, err := loadConfig(scope)
-	if err != nil {
-		return ShowResult{}, err
-	}
-
-	tasks := cfg.Value.LookupPath(cue.ParsePath(internalcue.KeyTasks))
-	if !tasks.Exists() {
-		return ShowResult{}, fmt.Errorf("no tasks defined in configuration")
-	}
-
-	// Collect all task names in config order
-	var allNames []string
-	iter, err := tasks.Fields()
-	if err != nil {
-		return ShowResult{}, fmt.Errorf("reading tasks: %w", err)
-	}
-	for iter.Next() {
-		allNames = append(allNames, iter.Selector().Unquoted())
-	}
-	if len(allNames) == 0 {
-		return ShowResult{}, fmt.Errorf("no tasks defined in configuration")
-	}
-
-	// Determine which task to show and why
-	showReason := ""
-	if name == "" {
-		name = allNames[0]
-		showReason = "first in config"
-	}
-
-	// Try exact match first
-	resolvedName := name
-	task := tasks.LookupPath(cue.MakePath(cue.Str(name)))
-	if !task.Exists() {
-		// Try substring match (per DR-015)
-		var matches []string
-		for _, taskName := range allNames {
-			if strings.Contains(taskName, name) {
-				matches = append(matches, taskName)
-			}
-		}
-
-		switch len(matches) {
-		case 0:
-			return ShowResult{}, fmt.Errorf("task %q not found", name)
-		case 1:
-			resolvedName = matches[0]
-			task = tasks.LookupPath(cue.MakePath(cue.Str(resolvedName)))
-		default:
-			return ShowResult{}, fmt.Errorf("ambiguous task name %q matches: %s", name, strings.Join(matches, ", "))
-		}
-	}
-
-	content := formatShowContent(task, "task")
-
-	return ShowResult{
-		ItemType:   "Task",
+		ItemType:   itemType,
 		Name:       resolvedName,
 		Content:    content,
 		AllNames:   allNames,

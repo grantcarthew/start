@@ -2,7 +2,7 @@
 // dependency resolution, asset extraction, config file text manipulation). The Find*
 // functions implement character-by-character CUE syntax state machines which are the
 // most complex code in the repository. This complexity is inherent to text-level CUE
-// manipulation without an AST API. The state machines share structure and could be
+// manipulation without an AST API. The state machines share cueParseState and could be
 // unified behind a common scanner, but are well-tested (see install_test.go).
 package assets
 
@@ -22,6 +22,17 @@ import (
 	"cuelang.org/go/mod/modfile"
 	internalcue "github.com/grantcarthew/start/internal/cue"
 	"github.com/grantcarthew/start/internal/registry"
+)
+
+// cueParseState tracks CUE syntax context during character-by-character scanning
+// used by the Find* functions.
+type cueParseState int
+
+const (
+	stateNormal        cueParseState = iota
+	stateInString                    // Inside "..." string
+	stateInMultiString               // Inside """...""" string
+	stateInComment                   // After // until newline
 )
 
 // InstallAsset installs an asset from the registry to the config directory.
@@ -487,14 +498,6 @@ func FindAssetKey(content, assetKey string) (keyStart, keyLen int, err error) {
 		return 0, 0, fmt.Errorf("asset key must not be empty")
 	}
 
-	type state int
-	const (
-		stateNormal state = iota
-		stateInString
-		stateInMultiString
-		stateInComment
-	)
-
 	quotedKey := fmt.Sprintf("%q:", assetKey)
 	unquotedKey := assetKey + ":"
 	currentState := stateNormal
@@ -563,14 +566,6 @@ func FindAssetKey(content, assetKey string) (keyStart, keyLen int, err error) {
 //
 // Returns the position immediately after the matching closing brace.
 func FindMatchingBrace(content string, openBracePos int) (int, error) {
-	type state int
-	const (
-		stateNormal        state = iota
-		stateInString            // Inside "..." string
-		stateInMultiString       // Inside """...""" string
-		stateInComment           // After // until newline
-	)
-
 	currentState := stateNormal
 	braceCount := 1
 	pos := openBracePos + 1
@@ -642,14 +637,6 @@ func FindMatchingBrace(content string, openBracePos int) (int, error) {
 //
 // Returns the position of the opening brace, or error if not found.
 func FindOpeningBrace(content string, startPos int) (int, error) {
-	type state int
-	const (
-		stateNormal state = iota
-		stateInString
-		stateInMultiString
-		stateInComment
-	)
-
 	currentState := stateNormal
 	pos := startPos
 

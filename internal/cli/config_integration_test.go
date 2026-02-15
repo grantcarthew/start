@@ -18,14 +18,7 @@ func TestConfigAgent_FullWorkflow(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", tmpDir)
 
-	origWd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = os.Chdir(origWd) }()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatal(err)
-	}
+	chdir(t, tmpDir)
 
 	globalDir := filepath.Join(tmpDir, "start")
 	if err := os.MkdirAll(globalDir, 0755); err != nil {
@@ -282,14 +275,7 @@ func TestConfigRole_FullWorkflow(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", tmpDir)
 
-	origWd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = os.Chdir(origWd) }()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatal(err)
-	}
+	chdir(t, tmpDir)
 
 	globalDir := filepath.Join(tmpDir, "start")
 	if err := os.MkdirAll(globalDir, 0755); err != nil {
@@ -383,14 +369,7 @@ func TestConfigContext_FullWorkflow(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", tmpDir)
 
-	origWd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = os.Chdir(origWd) }()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatal(err)
-	}
+	chdir(t, tmpDir)
 
 	globalDir := filepath.Join(tmpDir, "start")
 	if err := os.MkdirAll(globalDir, 0755); err != nil {
@@ -467,14 +446,7 @@ func TestConfigTask_FullWorkflow(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", tmpDir)
 
-	origWd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = os.Chdir(origWd) }()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatal(err)
-	}
+	chdir(t, tmpDir)
 
 	globalDir := filepath.Join(tmpDir, "start")
 	if err := os.MkdirAll(globalDir, 0755); err != nil {
@@ -659,14 +631,7 @@ func TestConfigTask_SubstringResolution(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", tmpDir)
 
-	origWd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = os.Chdir(origWd) }()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatal(err)
-	}
+	chdir(t, tmpDir)
 
 	globalDir := filepath.Join(tmpDir, "start")
 	if err := os.MkdirAll(globalDir, 0755); err != nil {

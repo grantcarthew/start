@@ -13,6 +13,19 @@ import (
 	"github.com/grantcarthew/start/internal/registry"
 )
 
+// chdir changes to the given directory and registers a cleanup to restore the original.
+func chdir(t *testing.T, dir string) {
+	t.Helper()
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getting cwd: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(origDir) })
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("changing to dir %s: %v", dir, err)
+	}
+}
+
 // setupStartTestConfig creates a minimal CUE config for start command testing.
 func setupStartTestConfig(t *testing.T) string {
 	t.Helper()
@@ -82,14 +95,7 @@ settings: {
 
 func TestExecuteStart_DryRun(t *testing.T) {
 	tmpDir := setupStartTestConfig(t)
-	origDir, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getting working dir: %v", err)
-	}
-	defer func() { _ = os.Chdir(origDir) }()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatalf("changing to temp dir: %v", err)
-	}
+	chdir(t, tmpDir)
 
 	flags := &Flags{DryRun: true}
 
@@ -101,7 +107,7 @@ func TestExecuteStart_DryRun(t *testing.T) {
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
 
-	err = executeStart(stdout, stderr, strings.NewReader(""), flags, selection, "")
+	err := executeStart(stdout, stderr, strings.NewReader(""), flags, selection, "")
 	if err != nil {
 		t.Fatalf("executeStart() error = %v", err)
 	}
@@ -126,14 +132,7 @@ func TestExecuteStart_DryRun(t *testing.T) {
 
 func TestExecuteStart_NoRole(t *testing.T) {
 	tmpDir := setupStartTestConfig(t)
-	origDir, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getting working dir: %v", err)
-	}
-	defer func() { _ = os.Chdir(origDir) }()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatalf("changing to temp dir: %v", err)
-	}
+	chdir(t, tmpDir)
 
 	flags := &Flags{DryRun: true, NoRole: true}
 
@@ -145,7 +144,7 @@ func TestExecuteStart_NoRole(t *testing.T) {
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
 
-	err = executeStart(stdout, stderr, strings.NewReader(""), flags, selection, "")
+	err := executeStart(stdout, stderr, strings.NewReader(""), flags, selection, "")
 	if err != nil {
 		t.Fatalf("executeStart() error = %v", err)
 	}
@@ -180,21 +179,14 @@ func TestExecuteStart_NoRole(t *testing.T) {
 
 func TestExecuteTask_NoRole(t *testing.T) {
 	tmpDir := setupStartTestConfig(t)
-	origDir, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getting working dir: %v", err)
-	}
-	defer func() { _ = os.Chdir(origDir) }()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatalf("changing to temp dir: %v", err)
-	}
+	chdir(t, tmpDir)
 
 	flags := &Flags{DryRun: true, NoRole: true}
 
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
 
-	err = executeTask(stdout, stderr, strings.NewReader(""), flags, "test-task", "focus on testing")
+	err := executeTask(stdout, stderr, strings.NewReader(""), flags, "test-task", "focus on testing")
 	if err != nil {
 		t.Fatalf("executeTask() error = %v", err)
 	}
@@ -255,21 +247,14 @@ settings: {
 		t.Fatalf("writing config: %v", err)
 	}
 
-	origDir, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getting working dir: %v", err)
-	}
-	defer func() { _ = os.Chdir(origDir) }()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatalf("changing to temp dir: %v", err)
-	}
+	chdir(t, tmpDir)
 
 	flags := &Flags{DryRun: true}
 
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
 
-	err = executeTask(stdout, stderr, strings.NewReader(""), flags, "test-task", "")
+	err := executeTask(stdout, stderr, strings.NewReader(""), flags, "test-task", "")
 	if err == nil {
 		t.Fatal("Expected error for missing task role, got nil")
 	}
@@ -283,14 +268,7 @@ settings: {
 
 func TestExecuteStart_ContextSelection(t *testing.T) {
 	tmpDir := setupStartTestConfig(t)
-	origDir, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getting working dir: %v", err)
-	}
-	defer func() { _ = os.Chdir(origDir) }()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatalf("changing to temp dir: %v", err)
-	}
+	chdir(t, tmpDir)
 
 	flags := &Flags{DryRun: true}
 
@@ -337,21 +315,14 @@ func TestExecuteStart_ContextSelection(t *testing.T) {
 
 func TestExecuteTask_DryRun(t *testing.T) {
 	tmpDir := setupStartTestConfig(t)
-	origDir, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getting working dir: %v", err)
-	}
-	defer func() { _ = os.Chdir(origDir) }()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatalf("changing to temp dir: %v", err)
-	}
+	chdir(t, tmpDir)
 
 	flags := &Flags{DryRun: true}
 
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
 
-	err = executeTask(stdout, stderr, strings.NewReader(""), flags, "test-task", "focus on testing")
+	err := executeTask(stdout, stderr, strings.NewReader(""), flags, "test-task", "focus on testing")
 	if err != nil {
 		t.Fatalf("executeTask() error = %v", err)
 	}
@@ -476,14 +447,7 @@ func TestTaskResolution(t *testing.T) {
 	_ = os.Setenv("HOME", tmpDir)
 	defer func() { _ = os.Setenv("HOME", oldHome) }()
 
-	origDir, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getting working dir: %v", err)
-	}
-	defer func() { _ = os.Chdir(origDir) }()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatalf("changing to temp dir: %v", err)
-	}
+	chdir(t, tmpDir)
 
 	// Load config for testing
 	cfg, err := loadMergedConfig()
@@ -570,14 +534,7 @@ settings: {
 		t.Fatalf("writing config: %v", err)
 	}
 
-	origDir, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getting working dir: %v", err)
-	}
-	defer func() { _ = os.Chdir(origDir) }()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatalf("changing to temp dir: %v", err)
-	}
+	chdir(t, tmpDir)
 
 	cfg, err := loadMergedConfig()
 	if err != nil {
@@ -648,14 +605,7 @@ settings: {
 		t.Fatalf("writing config: %v", err)
 	}
 
-	origDir, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getting working dir: %v", err)
-	}
-	defer func() { _ = os.Chdir(origDir) }()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatalf("changing to temp dir: %v", err)
-	}
+	chdir(t, tmpDir)
 
 	cfg, err := loadMergedConfig()
 	if err != nil {
@@ -679,14 +629,7 @@ settings: {
 
 func TestExecuteStart_FilePathRole(t *testing.T) {
 	tmpDir := setupStartTestConfig(t)
-	origDir, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getting working dir: %v", err)
-	}
-	defer func() { _ = os.Chdir(origDir) }()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatalf("changing to temp dir: %v", err)
-	}
+	chdir(t, tmpDir)
 
 	// Create a role file
 	roleContent := "You are a file-based role for testing."
@@ -708,7 +651,7 @@ func TestExecuteStart_FilePathRole(t *testing.T) {
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
 
-	err = executeStart(stdout, stderr, strings.NewReader(""), flags, selection, "")
+	err := executeStart(stdout, stderr, strings.NewReader(""), flags, selection, "")
 	if err != nil {
 		t.Fatalf("executeStart() error = %v", err)
 	}
@@ -728,14 +671,7 @@ func TestExecuteStart_FilePathRole(t *testing.T) {
 
 func TestExecuteStart_FilePathContext(t *testing.T) {
 	tmpDir := setupStartTestConfig(t)
-	origDir, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getting working dir: %v", err)
-	}
-	defer func() { _ = os.Chdir(origDir) }()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatalf("changing to temp dir: %v", err)
-	}
+	chdir(t, tmpDir)
 
 	// Create a context file
 	ctxContent := "File-based context content for testing."
@@ -757,7 +693,7 @@ func TestExecuteStart_FilePathContext(t *testing.T) {
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
 
-	err = executeStart(stdout, stderr, strings.NewReader(""), flags, selection, "")
+	err := executeStart(stdout, stderr, strings.NewReader(""), flags, selection, "")
 	if err != nil {
 		t.Fatalf("executeStart() error = %v", err)
 	}
@@ -772,14 +708,7 @@ func TestExecuteStart_FilePathContext(t *testing.T) {
 
 func TestExecuteStart_MixedContextOrder(t *testing.T) {
 	tmpDir := setupStartTestConfig(t)
-	origDir, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getting working dir: %v", err)
-	}
-	defer func() { _ = os.Chdir(origDir) }()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatalf("changing to temp dir: %v", err)
-	}
+	chdir(t, tmpDir)
 
 	// Create context files
 	if err := os.WriteFile(filepath.Join(tmpDir, "first.md"), []byte("First file context"), 0644); err != nil {
@@ -803,7 +732,7 @@ func TestExecuteStart_MixedContextOrder(t *testing.T) {
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
 
-	err = executeStart(stdout, stderr, strings.NewReader(""), flags, selection, "")
+	err := executeStart(stdout, stderr, strings.NewReader(""), flags, selection, "")
 	if err != nil {
 		t.Fatalf("executeStart() error = %v", err)
 	}
@@ -835,14 +764,7 @@ func TestExecuteStart_MixedContextOrder(t *testing.T) {
 
 func TestExecuteTask_FilePathTask(t *testing.T) {
 	tmpDir := setupStartTestConfig(t)
-	origDir, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getting working dir: %v", err)
-	}
-	defer func() { _ = os.Chdir(origDir) }()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatalf("changing to temp dir: %v", err)
-	}
+	chdir(t, tmpDir)
 
 	// Create a task file
 	taskContent := "File-based task prompt for testing."
@@ -856,7 +778,7 @@ func TestExecuteTask_FilePathTask(t *testing.T) {
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
 
-	err = executeTask(stdout, stderr, strings.NewReader(""), flags, "./test-task.md", "")
+	err := executeTask(stdout, stderr, strings.NewReader(""), flags, "./test-task.md", "")
 	if err != nil {
 		t.Fatalf("executeTask() error = %v", err)
 	}
@@ -876,14 +798,7 @@ func TestExecuteTask_FilePathTask(t *testing.T) {
 
 func TestExecuteTask_FilePathWithInstructions(t *testing.T) {
 	tmpDir := setupStartTestConfig(t)
-	origDir, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getting working dir: %v", err)
-	}
-	defer func() { _ = os.Chdir(origDir) }()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatalf("changing to temp dir: %v", err)
-	}
+	chdir(t, tmpDir)
 
 	// Create a task file with instructions placeholder
 	taskContent := "Review this code.\nInstructions: {{.instructions}}"
@@ -897,7 +812,7 @@ func TestExecuteTask_FilePathWithInstructions(t *testing.T) {
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
 
-	err = executeTask(stdout, stderr, strings.NewReader(""), flags, "./review-task.md", "focus on security")
+	err := executeTask(stdout, stderr, strings.NewReader(""), flags, "./review-task.md", "focus on security")
 	if err != nil {
 		t.Fatalf("executeTask() error = %v", err)
 	}
@@ -917,21 +832,14 @@ func TestExecuteTask_FilePathWithInstructions(t *testing.T) {
 
 func TestExecuteTask_FilePathMissing(t *testing.T) {
 	tmpDir := setupStartTestConfig(t)
-	origDir, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getting working dir: %v", err)
-	}
-	defer func() { _ = os.Chdir(origDir) }()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatalf("changing to temp dir: %v", err)
-	}
+	chdir(t, tmpDir)
 
 	flags := &Flags{DryRun: true}
 
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
 
-	err = executeTask(stdout, stderr, strings.NewReader(""), flags, "./nonexistent.md", "")
+	err := executeTask(stdout, stderr, strings.NewReader(""), flags, "./nonexistent.md", "")
 
 	if err == nil {
 		t.Error("Expected error for missing file")
@@ -946,14 +854,7 @@ func TestExecuteTask_FilePathMissing(t *testing.T) {
 
 func TestExecuteStart_FilePathContextMissing(t *testing.T) {
 	tmpDir := setupStartTestConfig(t)
-	origDir, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getting working dir: %v", err)
-	}
-	defer func() { _ = os.Chdir(origDir) }()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatalf("changing to temp dir: %v", err)
-	}
+	chdir(t, tmpDir)
 
 	flags := &Flags{
 		DryRun:  true,
@@ -969,7 +870,7 @@ func TestExecuteStart_FilePathContextMissing(t *testing.T) {
 	stderr := new(bytes.Buffer)
 
 	// Missing context files should not cause fatal error (per DR-038: show ○ status)
-	err = executeStart(stdout, stderr, strings.NewReader(""), flags, selection, "")
+	err := executeStart(stdout, stderr, strings.NewReader(""), flags, selection, "")
 	if err != nil {
 		t.Fatalf("executeStart() should not fail for missing context file: %v", err)
 	}
@@ -986,14 +887,7 @@ func TestExecuteStart_FilePathContextMissing(t *testing.T) {
 
 func TestHasExactInstalledTask(t *testing.T) {
 	tmpDir := setupStartTestConfig(t)
-	origDir, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getting working dir: %v", err)
-	}
-	defer func() { _ = os.Chdir(origDir) }()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatalf("changing to temp dir: %v", err)
-	}
+	chdir(t, tmpDir)
 
 	cfg, err := loadMergedConfig()
 	if err != nil {
@@ -1074,14 +968,7 @@ settings: {
 		t.Fatalf("writing config: %v", err)
 	}
 
-	origDir, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getting working dir: %v", err)
-	}
-	defer func() { _ = os.Chdir(origDir) }()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatalf("changing to temp dir: %v", err)
-	}
+	chdir(t, tmpDir)
 
 	cfg, err := loadMergedConfig()
 	if err != nil {

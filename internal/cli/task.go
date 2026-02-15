@@ -172,19 +172,10 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 			}
 			if exactRegistry != nil {
 				debugf(flags, dbgTask, "Exact match found in registry: %s", exactRegistry.Name)
-				// Install and run
 				if !flags.Quiet {
 					_, _ = fmt.Fprintf(stdout, "Installing %s from registry...\n", exactRegistry.Name)
 				}
-				if err := installTaskFromRegistry(stdout, flags, client, index, *exactRegistry); err != nil {
-					return err
-				}
-				// Reload config after install
-				reloadedCfg, err := loadMergedConfigFromDirWithDebug(workingDir, flags)
-				if err != nil {
-					return fmt.Errorf("reloading configuration: %w", err)
-				}
-				env, err = buildExecutionEnv(reloadedCfg, workingDir, agentName, flags, stdout, stdin)
+				env, err = installTaskAndReloadEnv(stdout, stdin, flags, client, index, *exactRegistry, workingDir, agentName)
 				if err != nil {
 					return err
 				}
@@ -211,24 +202,15 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 					// Single match - use it
 					match := allMatches[0]
 					if match.Source == TaskSourceRegistry {
-						// Install from registry first
 						if !flags.Quiet {
 							_, _ = fmt.Fprintf(stdout, "Installing %s from registry...\n", match.Name)
 						}
-						result := &assets.SearchResult{
+						result := assets.SearchResult{
 							Category: "tasks",
 							Name:     match.Name,
 							Entry:    match.Entry,
 						}
-						if err := installTaskFromRegistry(stdout, flags, client, index, *result); err != nil {
-							return err
-						}
-						// Reload config after install
-						reloadedCfg, reloadErr := loadMergedConfigFromDirWithDebug(workingDir, flags)
-						if reloadErr != nil {
-							return fmt.Errorf("reloading configuration: %w", reloadErr)
-						}
-						env, err = buildExecutionEnv(reloadedCfg, workingDir, agentName, flags, stdout, stdin)
+						env, err = installTaskAndReloadEnv(stdout, stdin, flags, client, index, result, workingDir, agentName)
 						if err != nil {
 							return err
 						}
@@ -252,24 +234,15 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 					}
 
 					if selected.Source == TaskSourceRegistry {
-						// Install from registry first
 						if !flags.Quiet {
 							_, _ = fmt.Fprintf(stdout, "Installing %s from registry...\n", selected.Name)
 						}
-						result := &assets.SearchResult{
+						result := assets.SearchResult{
 							Category: "tasks",
 							Name:     selected.Name,
 							Entry:    selected.Entry,
 						}
-						if err := installTaskFromRegistry(stdout, flags, client, index, *result); err != nil {
-							return err
-						}
-						// Reload config after install
-						reloadedCfg, reloadErr := loadMergedConfigFromDirWithDebug(workingDir, flags)
-						if reloadErr != nil {
-							return fmt.Errorf("reloading configuration: %w", reloadErr)
-						}
-						env, err = buildExecutionEnv(reloadedCfg, workingDir, agentName, flags, stdout, stdin)
+						env, err = installTaskAndReloadEnv(stdout, stdin, flags, client, index, result, workingDir, agentName)
 						if err != nil {
 							return err
 						}
@@ -304,11 +277,7 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 						return err
 					}
 					if r.didInstall && !beforeInstall {
-						reloadedCfg, reloadErr := loadMergedConfigFromDirWithDebug(workingDir, flags)
-						if reloadErr != nil {
-							return fmt.Errorf("reloading configuration: %w", reloadErr)
-						}
-						env, err = buildExecutionEnv(reloadedCfg, workingDir, agentName, flags, stdout, stdin)
+						env, err = reloadEnv(workingDir, agentName, flags, stdout, stdin)
 						if err != nil {
 							return err
 						}
@@ -650,6 +619,23 @@ func promptTaskSelection(w io.Writer, reader *bufio.Reader, matches []TaskMatch,
 	}
 
 	return TaskMatch{}, fmt.Errorf("invalid selection: %s", input)
+}
+
+// reloadEnv reloads configuration and rebuilds the execution environment after an asset install.
+func reloadEnv(workingDir, agentName string, flags *Flags, stdout io.Writer, stdin io.Reader) (*ExecutionEnv, error) {
+	reloadedCfg, err := loadMergedConfigFromDirWithDebug(workingDir, flags)
+	if err != nil {
+		return nil, fmt.Errorf("reloading configuration: %w", err)
+	}
+	return buildExecutionEnv(reloadedCfg, workingDir, agentName, flags, stdout, stdin)
+}
+
+// installTaskAndReloadEnv installs a task from the registry and reloads the execution environment.
+func installTaskAndReloadEnv(stdout io.Writer, stdin io.Reader, flags *Flags, client *registry.Client, index *registry.Index, result assets.SearchResult, workingDir, agentName string) (*ExecutionEnv, error) {
+	if err := installTaskFromRegistry(stdout, flags, client, index, result); err != nil {
+		return nil, err
+	}
+	return reloadEnv(workingDir, agentName, flags, stdout, stdin)
 }
 
 // installTaskFromRegistry installs a task from the registry using a pre-fetched client and result.

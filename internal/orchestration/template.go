@@ -13,7 +13,7 @@ import (
 // Uses lowercase keys to match documented placeholder names (e.g., {{.file}}, {{.instructions}}).
 type TemplateData map[string]string
 
-// UTDFields represents the raw UTD fields extracted from CUE configuration.
+// UTDFields represents the raw Unified Template Design (UTD) fields extracted from CUE configuration.
 type UTDFields struct {
 	// File is the path to read content from.
 	File string

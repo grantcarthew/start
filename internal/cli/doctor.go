@@ -12,13 +12,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// Build-time variables set via ldflags
-var (
-	version   = "dev"
-	commit    = "unknown"
-	buildDate = "unknown"
-)
-
 // addDoctorCommand adds the doctor command to the parent command.
 func addDoctorCommand(parent *cobra.Command) {
 	cmd := &cobra.Command{
@@ -83,7 +76,7 @@ func prepareDoctor() (doctor.Report, error) {
 
 	// Version section
 	buildInfo := doctor.BuildInfo{
-		Version:      version,
+		Version:      cliVersion,
 		Commit:       commit,
 		BuildDate:    buildDate,
 		GoVersion:    doctor.DefaultBuildInfo().GoVersion,

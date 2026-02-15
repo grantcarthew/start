@@ -16,16 +16,7 @@ func TestConfigAgentList_NoConfig(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", tmpDir)
 
-	origWd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = os.Chdir(origWd) }()
-
-	// Change to temp directory (no local config)
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatal(err)
-	}
+	chdir(t, tmpDir)
 
 	cmd := NewRootCmd()
 	stdout := &bytes.Buffer{}
@@ -33,7 +24,7 @@ func TestConfigAgentList_NoConfig(t *testing.T) {
 	cmd.SetErr(&bytes.Buffer{})
 	cmd.SetArgs([]string{"config", "agent", "list", "--local"})
 
-	err = cmd.Execute()
+	err := cmd.Execute()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -66,14 +57,7 @@ func TestConfigAgentList_WithAgents(t *testing.T) {
 	}
 
 	// Save and restore working directory
-	origWd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = os.Chdir(origWd) }()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatal(err)
-	}
+	chdir(t, tmpDir)
 
 	cmd := NewRootCmd()
 	stdout := &bytes.Buffer{}
@@ -81,7 +65,7 @@ func TestConfigAgentList_WithAgents(t *testing.T) {
 	cmd.SetErr(&bytes.Buffer{})
 	cmd.SetArgs([]string{"config", "agent", "list"})
 
-	err = cmd.Execute()
+	err := cmd.Execute()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -121,14 +105,7 @@ func TestConfigAgentInfo(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	origWd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = os.Chdir(origWd) }()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatal(err)
-	}
+	chdir(t, tmpDir)
 
 	cmd := NewRootCmd()
 	stdout := &bytes.Buffer{}
@@ -136,7 +113,7 @@ func TestConfigAgentInfo(t *testing.T) {
 	cmd.SetErr(&bytes.Buffer{})
 	cmd.SetArgs([]string{"config", "agent", "info", "claude"})
 
-	err = cmd.Execute()
+	err := cmd.Execute()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -169,21 +146,14 @@ func TestConfigAgentInfo_NotFound(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	origWd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = os.Chdir(origWd) }()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatal(err)
-	}
+	chdir(t, tmpDir)
 
 	cmd := NewRootCmd()
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
 	cmd.SetArgs([]string{"config", "agent", "info", "nonexistent"})
 
-	err = cmd.Execute()
+	err := cmd.Execute()
 	if err == nil {
 		t.Fatal("expected error for nonexistent agent")
 	}
@@ -202,14 +172,7 @@ func TestConfigAgentAdd_NonInteractive_MissingFlags(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	origWd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = os.Chdir(origWd) }()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatal(err)
-	}
+	chdir(t, tmpDir)
 
 	cmd := NewRootCmd()
 	cmd.SetOut(&bytes.Buffer{})
@@ -218,7 +181,7 @@ func TestConfigAgentAdd_NonInteractive_MissingFlags(t *testing.T) {
 	cmd.SetIn(strings.NewReader(""))
 	cmd.SetArgs([]string{"config", "agent", "add"})
 
-	err = cmd.Execute()
+	err := cmd.Execute()
 	if err == nil {
 		t.Fatal("expected error when missing required flags in non-interactive mode")
 	}
@@ -237,14 +200,7 @@ func TestConfigAgentAdd_WithFlags(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	origWd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = os.Chdir(origWd) }()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatal(err)
-	}
+	chdir(t, tmpDir)
 
 	cmd := NewRootCmd()
 	stdout := &bytes.Buffer{}
@@ -259,7 +215,7 @@ func TestConfigAgentAdd_WithFlags(t *testing.T) {
 		"--description", "Google Gemini",
 	})
 
-	err = cmd.Execute()
+	err := cmd.Execute()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -303,14 +259,7 @@ func TestConfigAgentRemove(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	origWd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = os.Chdir(origWd) }()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatal(err)
-	}
+	chdir(t, tmpDir)
 
 	cmd := NewRootCmd()
 	stdout := &bytes.Buffer{}
@@ -318,7 +267,7 @@ func TestConfigAgentRemove(t *testing.T) {
 	cmd.SetErr(&bytes.Buffer{})
 	cmd.SetArgs([]string{"config", "agent", "remove", "gemini", "--yes"})
 
-	err = cmd.Execute()
+	err := cmd.Execute()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -354,14 +303,7 @@ func TestConfigAgentDefault_Show(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	origWd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = os.Chdir(origWd) }()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatal(err)
-	}
+	chdir(t, tmpDir)
 
 	cmd := NewRootCmd()
 	stdout := &bytes.Buffer{}
@@ -369,7 +311,7 @@ func TestConfigAgentDefault_Show(t *testing.T) {
 	cmd.SetErr(&bytes.Buffer{})
 	cmd.SetArgs([]string{"config", "agent", "default"})
 
-	err = cmd.Execute()
+	err := cmd.Execute()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -384,14 +326,7 @@ func TestConfigRoleList_NoConfig(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", tmpDir)
 
-	origWd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = os.Chdir(origWd) }()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatal(err)
-	}
+	chdir(t, tmpDir)
 
 	cmd := NewRootCmd()
 	stdout := &bytes.Buffer{}
@@ -399,7 +334,7 @@ func TestConfigRoleList_NoConfig(t *testing.T) {
 	cmd.SetErr(&bytes.Buffer{})
 	cmd.SetArgs([]string{"config", "role", "list", "--local"})
 
-	err = cmd.Execute()
+	err := cmd.Execute()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -431,14 +366,7 @@ func TestConfigContextList_WithContexts(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	origWd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = os.Chdir(origWd) }()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatal(err)
-	}
+	chdir(t, tmpDir)
 
 	cmd := NewRootCmd()
 	stdout := &bytes.Buffer{}
@@ -446,7 +374,7 @@ func TestConfigContextList_WithContexts(t *testing.T) {
 	cmd.SetErr(&bytes.Buffer{})
 	cmd.SetArgs([]string{"config", "context", "list"})
 
-	err = cmd.Execute()
+	err := cmd.Execute()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -490,14 +418,7 @@ func TestConfigContextList_PreservesDefinitionOrder(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	origWd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = os.Chdir(origWd) }()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatal(err)
-	}
+	chdir(t, tmpDir)
 
 	cmd := NewRootCmd()
 	stdout := &bytes.Buffer{}
@@ -505,7 +426,7 @@ func TestConfigContextList_PreservesDefinitionOrder(t *testing.T) {
 	cmd.SetErr(&bytes.Buffer{})
 	cmd.SetArgs([]string{"config", "context", "list"})
 
-	err = cmd.Execute()
+	err := cmd.Execute()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -548,14 +469,7 @@ func TestConfigTaskList_WithTasks(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	origWd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = os.Chdir(origWd) }()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatal(err)
-	}
+	chdir(t, tmpDir)
 
 	cmd := NewRootCmd()
 	stdout := &bytes.Buffer{}
@@ -563,7 +477,7 @@ func TestConfigTaskList_WithTasks(t *testing.T) {
 	cmd.SetErr(&bytes.Buffer{})
 	cmd.SetArgs([]string{"config", "task", "list"})
 
-	err = cmd.Execute()
+	err := cmd.Execute()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -771,14 +685,7 @@ func TestConfigSettingsList_NoConfig(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", tmpDir)
 
-	origWd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = os.Chdir(origWd) }()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatal(err)
-	}
+	chdir(t, tmpDir)
 
 	cmd := NewRootCmd()
 	stdout := &bytes.Buffer{}
@@ -786,7 +693,7 @@ func TestConfigSettingsList_NoConfig(t *testing.T) {
 	cmd.SetErr(&bytes.Buffer{})
 	cmd.SetArgs([]string{"config", "settings"})
 
-	err = cmd.Execute()
+	err := cmd.Execute()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -814,14 +721,7 @@ func TestConfigSettingsList_WithSettings(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	origWd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = os.Chdir(origWd) }()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatal(err)
-	}
+	chdir(t, tmpDir)
 
 	cmd := NewRootCmd()
 	stdout := &bytes.Buffer{}
@@ -829,7 +729,7 @@ func TestConfigSettingsList_WithSettings(t *testing.T) {
 	cmd.SetErr(&bytes.Buffer{})
 	cmd.SetArgs([]string{"config", "settings"})
 
-	err = cmd.Execute()
+	err := cmd.Execute()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -859,14 +759,7 @@ func TestConfigSettingsShow_SingleKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	origWd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = os.Chdir(origWd) }()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatal(err)
-	}
+	chdir(t, tmpDir)
 
 	cmd := NewRootCmd()
 	stdout := &bytes.Buffer{}
@@ -874,7 +767,7 @@ func TestConfigSettingsShow_SingleKey(t *testing.T) {
 	cmd.SetErr(&bytes.Buffer{})
 	cmd.SetArgs([]string{"config", "settings", "default_agent"})
 
-	err = cmd.Execute()
+	err := cmd.Execute()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -901,14 +794,7 @@ func TestConfigSettingsShow_NotSet(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	origWd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = os.Chdir(origWd) }()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatal(err)
-	}
+	chdir(t, tmpDir)
 
 	cmd := NewRootCmd()
 	stdout := &bytes.Buffer{}
@@ -916,7 +802,7 @@ func TestConfigSettingsShow_NotSet(t *testing.T) {
 	cmd.SetErr(&bytes.Buffer{})
 	cmd.SetArgs([]string{"config", "settings", "shell"})
 
-	err = cmd.Execute()
+	err := cmd.Execute()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -931,14 +817,7 @@ func TestConfigSettingsShow_InvalidKey(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", tmpDir)
 
-	origWd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = os.Chdir(origWd) }()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatal(err)
-	}
+	chdir(t, tmpDir)
 
 	cmd := NewRootCmd()
 	stdout := &bytes.Buffer{}
@@ -947,7 +826,7 @@ func TestConfigSettingsShow_InvalidKey(t *testing.T) {
 	cmd.SetErr(stderr)
 	cmd.SetArgs([]string{"config", "settings", "invalid_key"})
 
-	err = cmd.Execute()
+	err := cmd.Execute()
 	if err == nil {
 		t.Fatal("expected error for invalid key")
 	}
@@ -961,14 +840,7 @@ func TestConfigSettingsSet(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", tmpDir)
 
-	origWd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = os.Chdir(origWd) }()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatal(err)
-	}
+	chdir(t, tmpDir)
 
 	cmd := NewRootCmd()
 	stdout := &bytes.Buffer{}
@@ -976,7 +848,7 @@ func TestConfigSettingsSet(t *testing.T) {
 	cmd.SetErr(&bytes.Buffer{})
 	cmd.SetArgs([]string{"config", "settings", "default_agent", "claude"})
 
-	err = cmd.Execute()
+	err := cmd.Execute()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1002,14 +874,7 @@ func TestConfigSettingsSet_Integer(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", tmpDir)
 
-	origWd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = os.Chdir(origWd) }()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatal(err)
-	}
+	chdir(t, tmpDir)
 
 	cmd := NewRootCmd()
 	stdout := &bytes.Buffer{}
@@ -1017,7 +882,7 @@ func TestConfigSettingsSet_Integer(t *testing.T) {
 	cmd.SetErr(&bytes.Buffer{})
 	cmd.SetArgs([]string{"config", "settings", "timeout", "60"})
 
-	err = cmd.Execute()
+	err := cmd.Execute()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1042,14 +907,7 @@ func TestConfigSettingsSet_InvalidValue(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", tmpDir)
 
-	origWd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = os.Chdir(origWd) }()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatal(err)
-	}
+	chdir(t, tmpDir)
 
 	cmd := NewRootCmd()
 	stdout := &bytes.Buffer{}
@@ -1058,7 +916,7 @@ func TestConfigSettingsSet_InvalidValue(t *testing.T) {
 	cmd.SetErr(stderr)
 	cmd.SetArgs([]string{"config", "settings", "timeout", "not-a-number"})
 
-	err = cmd.Execute()
+	err := cmd.Execute()
 	if err == nil {
 		t.Fatal("expected error for non-integer timeout")
 	}
@@ -1148,14 +1006,7 @@ agents: {
 		t.Fatal(err)
 	}
 
-	origWd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = os.Chdir(origWd) }()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatal(err)
-	}
+	chdir(t, tmpDir)
 
 	cmd := NewRootCmd()
 	stdout := &bytes.Buffer{}
@@ -1163,7 +1014,7 @@ agents: {
 	cmd.SetErr(&bytes.Buffer{})
 	cmd.SetArgs([]string{"config", "settings", "default_agent", "gemini"})
 
-	err = cmd.Execute()
+	err := cmd.Execute()
 	if err == nil {
 		t.Fatal("expected error when trying to overwrite file with non-settings content")
 	}

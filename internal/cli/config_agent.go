@@ -780,6 +780,8 @@ type AgentConfig struct {
 }
 
 // loadAgentsForScope loads agents from the appropriate scope.
+// Unlike loadRolesForScope/loadContextsForScope, this does not return a definition-order
+// slice because agent display order is not user-configurable.
 func loadAgentsForScope(localOnly bool) (map[string]AgentConfig, error) {
 	paths, err := config.ResolvePaths("")
 	if err != nil {

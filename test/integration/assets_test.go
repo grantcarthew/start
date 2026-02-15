@@ -59,14 +59,7 @@ tasks: {
 	}
 
 	// Change to temp directory
-	origDir, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getting cwd: %v", err)
-	}
-	defer os.Chdir(origDir)
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatalf("changing to temp dir: %v", err)
-	}
+	chdir(t, tmpDir)
 
 	// Override HOME to isolate from global config
 	oldHome := os.Getenv("HOME")
@@ -79,7 +72,7 @@ tasks: {
 	cmd.SetErr(buf)
 	cmd.SetArgs([]string{"assets", "list"})
 
-	err = cmd.Execute()
+	err := cmd.Execute()
 	if err != nil {
 		t.Fatalf("assets list failed: %v", err)
 	}
@@ -113,14 +106,7 @@ tasks: {
 func TestIntegration_AssetsListNoConfig(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	origDir, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getting cwd: %v", err)
-	}
-	defer os.Chdir(origDir)
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatalf("changing to temp dir: %v", err)
-	}
+	chdir(t, tmpDir)
 
 	// Override HOME to isolate
 	oldHome := os.Getenv("HOME")
@@ -133,7 +119,7 @@ func TestIntegration_AssetsListNoConfig(t *testing.T) {
 	cmd.SetErr(buf)
 	cmd.SetArgs([]string{"assets", "list"})
 
-	err = cmd.Execute()
+	err := cmd.Execute()
 	if err != nil {
 		t.Fatalf("assets list failed: %v", err)
 	}

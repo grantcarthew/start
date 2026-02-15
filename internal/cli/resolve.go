@@ -66,33 +66,54 @@ func newResolver(cfg internalcue.LoadResult, flags *Flags, stdout io.Writer, std
 	}
 }
 
-// resolveAgent resolves an agent name through three-tier search:
+// resolveAgent resolves an agent name through three-tier search.
+func (r *resolver) resolveAgent(name string) (string, error) {
+	return r.resolveAsset(name, internalcue.KeyAgents, "agents", "Agent", false)
+}
+
+// resolveRole resolves a role name through file path bypass then three-tier search.
+func (r *resolver) resolveRole(name string) (string, error) {
+	return r.resolveAsset(name, internalcue.KeyRoles, "roles", "Role", true)
+}
+
+// resolveAsset performs three-tier resolution for an asset:
 // 1. Exact match in installed config
 // 2. Exact match in registry index
 // 3. Substring search across installed config + registry
-func (r *resolver) resolveAgent(name string) (string, error) {
+// displayType is the capitalised display name (e.g., "Agent", "Role").
+// When allowFilePath is true, file paths bypass resolution (per DR-038).
+func (r *resolver) resolveAsset(name, cueKey, category, displayType string, allowFilePath bool) (string, error) {
 	if name == "" {
 		return "", nil
 	}
 
+	// File path bypass (per DR-038)
+	if allowFilePath && orchestration.IsFilePath(name) {
+		debugf(r.flags, dbgResolve, "%s %q: file path bypass", displayType, name)
+		return name, nil
+	}
+
+	searchType := strings.ToLower(displayType)
+
 	// Tier 1: Exact match in installed config
-	if hasExactInstalled(r.cfg.Value, internalcue.KeyAgents, name) {
-		debugf(r.flags, dbgResolve, "Agent %q: exact installed match", name)
+	if hasExactInstalled(r.cfg.Value, cueKey, name) {
+		debugf(r.flags, dbgResolve, "%s %q: exact installed match", displayType, name)
 		return name, nil
 	}
 
 	// Tier 2: Exact match in registry
 	if !r.flags.Quiet {
-		_, _ = fmt.Fprintf(r.stdout, "Agent %q not found in configuration\n", name)
+		_, _ = fmt.Fprintf(r.stdout, "%s %q not found in configuration\n", displayType, name)
 	}
 	index, client, err := r.ensureIndex()
 	if err == nil && index != nil {
-		result, err := findExactInRegistry(index.Agents, "agents", name)
+		entries := registryEntries(index, category)
+		result, err := findExactInRegistry(entries, category, name)
 		if err != nil {
 			return "", err
 		}
 		if result != nil {
-			debugf(r.flags, dbgResolve, "Agent %q: exact registry match %q", name, result.Name)
+			debugf(r.flags, dbgResolve, "%s %q: exact registry match %q", displayType, name, result.Name)
 			if err := r.autoInstall(client, *result); err != nil {
 				return "", err
 			}
@@ -101,23 +122,24 @@ func (r *resolver) resolveAgent(name string) (string, error) {
 	}
 
 	// Tier 3: Regex search across installed + registry
-	installedMatches, err := searchInstalled(r.cfg.Value, internalcue.KeyAgents, "agents", name)
+	installedMatches, err := searchInstalled(r.cfg.Value, cueKey, category, name)
 	if err != nil {
 		return "", err
 	}
 	var registryMatches []AssetMatch
 	if index != nil {
-		registryMatches, err = searchRegistryCategory(index.Agents, "agents", name)
+		entries := registryEntries(index, category)
+		registryMatches, err = searchRegistryCategory(entries, category, name)
 		if err != nil {
 			return "", err
 		}
 	}
 	allMatches := mergeAssetMatches(installedMatches, registryMatches)
 
-	debugf(r.flags, dbgResolve, "Agent %q: %d installed, %d registry, %d total matches",
-		name, len(installedMatches), len(registryMatches), len(allMatches))
+	debugf(r.flags, dbgResolve, "%s %q: %d installed, %d registry, %d total matches",
+		displayType, name, len(installedMatches), len(registryMatches), len(allMatches))
 
-	selected, err := r.selectSingleMatch(allMatches, "agent", name)
+	selected, err := r.selectSingleMatch(allMatches, searchType, name)
 	if err != nil {
 		return "", err
 	}
@@ -135,76 +157,20 @@ func (r *resolver) resolveAgent(name string) (string, error) {
 	return selected.Name, nil
 }
 
-// resolveRole resolves a role name through file path bypass then three-tier search.
-func (r *resolver) resolveRole(name string) (string, error) {
-	if name == "" {
-		return "", nil
+// registryEntries returns the entries map for a category from the index.
+func registryEntries(index *registry.Index, category string) map[string]registry.IndexEntry {
+	switch category {
+	case "agents":
+		return index.Agents
+	case "roles":
+		return index.Roles
+	case "contexts":
+		return index.Contexts
+	case "tasks":
+		return index.Tasks
+	default:
+		return nil
 	}
-
-	// File path bypass (per DR-038)
-	if orchestration.IsFilePath(name) {
-		debugf(r.flags, dbgResolve, "Role %q: file path bypass", name)
-		return name, nil
-	}
-
-	// Tier 1: Exact match in installed config
-	if hasExactInstalled(r.cfg.Value, internalcue.KeyRoles, name) {
-		debugf(r.flags, dbgResolve, "Role %q: exact installed match", name)
-		return name, nil
-	}
-
-	// Tier 2: Exact match in registry
-	if !r.flags.Quiet {
-		_, _ = fmt.Fprintf(r.stdout, "Role %q not found in configuration\n", name)
-	}
-	index, client, err := r.ensureIndex()
-	if err == nil && index != nil {
-		result, err := findExactInRegistry(index.Roles, "roles", name)
-		if err != nil {
-			return "", err
-		}
-		if result != nil {
-			debugf(r.flags, dbgResolve, "Role %q: exact registry match %q", name, result.Name)
-			if err := r.autoInstall(client, *result); err != nil {
-				return "", err
-			}
-			return result.Name, nil
-		}
-	}
-
-	// Tier 3: Regex search across installed + registry
-	installedMatches, err := searchInstalled(r.cfg.Value, internalcue.KeyRoles, "roles", name)
-	if err != nil {
-		return "", err
-	}
-	var registryMatches []AssetMatch
-	if index != nil {
-		registryMatches, err = searchRegistryCategory(index.Roles, "roles", name)
-		if err != nil {
-			return "", err
-		}
-	}
-	allMatches := mergeAssetMatches(installedMatches, registryMatches)
-
-	debugf(r.flags, dbgResolve, "Role %q: %d installed, %d registry, %d total matches",
-		name, len(installedMatches), len(registryMatches), len(allMatches))
-
-	selected, err := r.selectSingleMatch(allMatches, "role", name)
-	if err != nil {
-		return "", err
-	}
-
-	if selected.Source == AssetSourceRegistry {
-		if err := r.autoInstall(client, assets.SearchResult{
-			Category: selected.Category,
-			Name:     selected.Name,
-			Entry:    selected.Entry,
-		}); err != nil {
-			return "", err
-		}
-	}
-
-	return selected.Name, nil
 }
 
 // resolveModelName resolves a model name against an agent's models map.

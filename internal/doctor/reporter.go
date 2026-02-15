@@ -185,10 +185,10 @@ func (r *Reporter) printSummary(report Report) {
 	_, _ = colorHeader.Fprintln(r.w, "Summary")
 	_, _ = colorSeparator.Fprintln(r.w, strings.Repeat("─", 59))
 
-	errors := report.ErrorCount()
+	errCount := report.ErrorCount()
 	warnings := report.WarnCount()
 
-	if errors == 0 && warnings == 0 {
+	if errCount == 0 && warnings == 0 {
 		_, _ = colorSuccess.Fprintln(r.w, "  No issues found")
 		_, _ = fmt.Fprintln(r.w)
 		return
@@ -196,12 +196,12 @@ func (r *Reporter) printSummary(report Report) {
 
 	// Count summary
 	_, _ = fmt.Fprint(r.w, "  ")
-	if errors > 0 {
+	if errCount > 0 {
 		label := "error"
-		if errors > 1 {
+		if errCount > 1 {
 			label = "errors"
 		}
-		_, _ = colorError.Fprintf(r.w, "%d %s", errors, label)
+		_, _ = colorError.Fprintf(r.w, "%d %s", errCount, label)
 		if warnings > 0 {
 			_, _ = fmt.Fprint(r.w, ", ")
 		}

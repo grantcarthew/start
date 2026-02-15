@@ -13,6 +13,19 @@ import (
 	"github.com/grantcarthew/start/internal/shell"
 )
 
+// chdir changes to the given directory and registers a cleanup to restore the original.
+func chdir(t *testing.T, dir string) {
+	t.Helper()
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getting cwd: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(origDir) })
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("changing to dir %s: %v", dir, err)
+	}
+}
+
 // setupTestConfig creates a temporary directory with a valid CUE config.
 func setupTestConfig(t *testing.T) string {
 	t.Helper()
@@ -88,14 +101,7 @@ settings: {
 func TestIntegration_CUELoaderWithComposer(t *testing.T) {
 	tmpDir := setupTestConfig(t)
 
-	origDir, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getting working dir: %v", err)
-	}
-	defer os.Chdir(origDir)
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatalf("changing to temp dir: %v", err)
-	}
+	chdir(t, tmpDir)
 
 	// Load CUE configuration
 	loader := internalcue.NewLoader()
@@ -137,14 +143,7 @@ func TestIntegration_CUELoaderWithComposer(t *testing.T) {
 func TestIntegration_CUELoaderWithComposer_DefaultContexts(t *testing.T) {
 	tmpDir := setupTestConfig(t)
 
-	origDir, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getting working dir: %v", err)
-	}
-	defer os.Chdir(origDir)
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatalf("changing to temp dir: %v", err)
-	}
+	chdir(t, tmpDir)
 
 	loader := internalcue.NewLoader()
 	result, err := loader.Load([]string{filepath.Join(tmpDir, ".start")})
@@ -193,14 +192,7 @@ func TestIntegration_CUELoaderWithComposer_DefaultContexts(t *testing.T) {
 func TestIntegration_CUELoaderWithComposer_TaggedContexts(t *testing.T) {
 	tmpDir := setupTestConfig(t)
 
-	origDir, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getting working dir: %v", err)
-	}
-	defer os.Chdir(origDir)
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatalf("changing to temp dir: %v", err)
-	}
+	chdir(t, tmpDir)
 
 	loader := internalcue.NewLoader()
 	result, err := loader.Load([]string{filepath.Join(tmpDir, ".start")})
@@ -242,14 +234,7 @@ func TestIntegration_CUELoaderWithComposer_TaggedContexts(t *testing.T) {
 func TestIntegration_ComposeWithRole(t *testing.T) {
 	tmpDir := setupTestConfig(t)
 
-	origDir, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getting working dir: %v", err)
-	}
-	defer os.Chdir(origDir)
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatalf("changing to temp dir: %v", err)
-	}
+	chdir(t, tmpDir)
 
 	loader := internalcue.NewLoader()
 	result, err := loader.Load([]string{filepath.Join(tmpDir, ".start")})
@@ -282,14 +267,7 @@ func TestIntegration_ComposeWithRole(t *testing.T) {
 func TestIntegration_ResolveTask(t *testing.T) {
 	tmpDir := setupTestConfig(t)
 
-	origDir, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getting working dir: %v", err)
-	}
-	defer os.Chdir(origDir)
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatalf("changing to temp dir: %v", err)
-	}
+	chdir(t, tmpDir)
 
 	loader := internalcue.NewLoader()
 	result, err := loader.Load([]string{filepath.Join(tmpDir, ".start")})
@@ -328,14 +306,7 @@ func TestIntegration_ResolveTask(t *testing.T) {
 func TestIntegration_ExecutorBuildCommand(t *testing.T) {
 	tmpDir := setupTestConfig(t)
 
-	origDir, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getting working dir: %v", err)
-	}
-	defer os.Chdir(origDir)
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatalf("changing to temp dir: %v", err)
-	}
+	chdir(t, tmpDir)
 
 	loader := internalcue.NewLoader()
 	result, err := loader.Load([]string{filepath.Join(tmpDir, ".start")})
@@ -372,14 +343,7 @@ func TestIntegration_ExecutorBuildCommand(t *testing.T) {
 func TestIntegration_GetTaskRole(t *testing.T) {
 	tmpDir := setupTestConfig(t)
 
-	origDir, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getting working dir: %v", err)
-	}
-	defer os.Chdir(origDir)
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatalf("changing to temp dir: %v", err)
-	}
+	chdir(t, tmpDir)
 
 	loader := internalcue.NewLoader()
 	result, err := loader.Load([]string{filepath.Join(tmpDir, ".start")})
