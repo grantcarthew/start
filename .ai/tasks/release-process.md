@@ -289,6 +289,10 @@ TARBALL_SHA256=$(curl -sL "$TARBALL_URL" | shasum -a 256 | cut -d' ' -f1)
 # TARBALL_SHA256=$(curl -sL "$TARBALL_URL" | sha256sum | cut -d' ' -f1)
 echo "Tarball SHA256: $TARBALL_SHA256"
 
+# Get commit hash for the tag (needed for Homebrew formula)
+TAG_COMMIT=$(git rev-parse "v${VERSION}^{commit}")
+echo "Tag commit: $TAG_COMMIT"
+
 # Create GitHub Release using gh CLI
 PREV_VERSION=$(git tag -l | grep -v "v${VERSION}" | tail -1)
 if [ -z "$PREV_VERSION" ]; then
@@ -333,7 +337,7 @@ echo "Tarball SHA256: $TARBALL_SHA256"
 # Edit Formula/start.rb and update:
 # 1. url line: Update version in URL
 # 2. sha256 line: Update with TARBALL_SHA256
-# 3. ldflags: Update version, commit, buildDate in ldflags (see Formula example below)
+# 3. commit line: Update with TAG_COMMIT from Step 7
 # 4. test: Update expected version in assert_match
 
 # After editing, commit and push
@@ -347,19 +351,24 @@ cd -
 
 **Formula example** (Formula/start.rb):
 
+Note: GitHub tarballs are not git repositories, so `Utils.git_head` cannot be used.
+The commit hash must be hardcoded from the tag (captured in Step 7 as `TAG_COMMIT`).
+
 ```ruby
 class Start < Formula
   desc "AI agent CLI orchestrator built on CUE"
   homepage "https://github.com/grantcarthew/start"
   url "https://github.com/grantcarthew/start/archive/refs/tags/v0.0.1.tar.gz"
   sha256 "abc123..."  # Use TARBALL_SHA256 value
-  license "MIT"
+  license "MPL-2.0"
 
   depends_on "go" => :build
 
   def install
+    ENV["CGO_ENABLED"] = "0"
     pkg = "github.com/grantcarthew/start/internal/cli"
-    ldflags = "-s -w -X #{pkg}.cliVersion=#{version} -X #{pkg}.commit=#{Utils.git_head} -X #{pkg}.buildDate=#{time.iso8601}"
+    commit = "abc123..."  # Use TAG_COMMIT value
+    ldflags = "-s -w -X #{pkg}.cliVersion=#{version} -X #{pkg}.commit=#{commit} -X #{pkg}.buildDate=#{time.iso8601}"
     system "go", "build", *std_go_args(ldflags: ldflags), "./cmd/start"
   end
 
@@ -495,11 +504,13 @@ git push origin "v${VERSION}"
 gh release create "v${VERSION}" --title "Release v${VERSION}" \
   --notes "$(git log ${PREV_VERSION}..v${VERSION} --pretty=format:'- %s' 2>/dev/null || git log --pretty=format:'- %s' | head -20)"
 
-# 6. Get tarball SHA256 (macOS)
-TARBALL_SHA256=$(curl -sL "https://github.com/grantcarthew/start/archive/refs/tags/v${VERSION}.tar.gz" | shasum -a 256 | cut -d' ' -f1)
+# 6. Get tarball SHA256 and commit hash
+TARBALL_SHA256=$(curl -sL "https://github.com/grantcarthew/start/archive/refs/tags/v${VERSION}.tar.gz" | sha256sum | cut -d' ' -f1)
+TAG_COMMIT=$(git rev-parse "v${VERSION}^{commit}")
 echo "SHA256: $TARBALL_SHA256"
+echo "Commit: $TAG_COMMIT"
 
-# 7. Update Homebrew (edit Formula/start.rb with VERSION and SHA256)
+# 7. Update Homebrew (edit Formula/start.rb with VERSION, SHA256, and TAG_COMMIT)
 cd ~/Projects/homebrew-tap
 # Edit Formula/start.rb
 git add Formula/start.rb
