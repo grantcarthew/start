@@ -379,7 +379,7 @@ func writeCUETags(sb *strings.Builder, tags []string) {
 		if i > 0 {
 			sb.WriteString(", ")
 		}
-		sb.WriteString(fmt.Sprintf("%q", tag))
+		fmt.Fprintf(sb, "%q", tag)
 	}
 	sb.WriteString("]\n")
 }
@@ -393,11 +393,11 @@ func writeCUEPrompt(sb *strings.Builder, prompt string) {
 	if strings.Contains(prompt, "\n") || len(prompt) > 80 {
 		sb.WriteString("\t\tprompt: \"\"\"\n")
 		for _, line := range strings.Split(prompt, "\n") {
-			sb.WriteString(fmt.Sprintf("\t\t\t%s\n", line))
+			fmt.Fprintf(sb, "\t\t\t%s\n", line)
 		}
 		sb.WriteString("\t\t\t\"\"\"\n")
 	} else {
-		sb.WriteString(fmt.Sprintf("\t\tprompt: %q\n", prompt))
+		fmt.Fprintf(sb, "\t\tprompt: %q\n", prompt)
 	}
 }
 

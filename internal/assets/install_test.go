@@ -103,7 +103,6 @@ func TestAssetTypeToConfigFile(t *testing.T) {
 	}
 }
 
-
 // TestFindAssetKey tests the FindAssetKey function.
 func TestFindAssetKey(t *testing.T) {
 	t.Parallel()
