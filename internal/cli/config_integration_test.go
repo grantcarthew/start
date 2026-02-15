@@ -235,13 +235,12 @@ func TestConfigAgent_FullWorkflow(t *testing.T) {
 		}
 	})
 
-	t.Run("remove agent with confirmation", func(t *testing.T) {
+	t.Run("remove agent with --yes", func(t *testing.T) {
 		cmd := NewRootCmd()
 		stdout := &bytes.Buffer{}
 		cmd.SetOut(stdout)
 		cmd.SetErr(&bytes.Buffer{})
-		cmd.SetIn(strings.NewReader("y\n"))
-		cmd.SetArgs([]string{"config", "agent", "remove", "gemini"})
+		cmd.SetArgs([]string{"config", "agent", "remove", "gemini", "--yes"})
 
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("remove failed: %v", err)

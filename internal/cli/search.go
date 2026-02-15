@@ -79,10 +79,14 @@ func runSearch(cmd *cobra.Command, args []string) error {
 
 	var sections []searchSection
 
+	stderr := cmd.ErrOrStderr()
+
 	// Search local config
 	if paths.LocalExists {
 		cfg, err := loader.LoadSingle(paths.Local)
-		if err == nil {
+		if err != nil {
+			printWarning(stderr, "failed to load local config: %s", err)
+		} else {
 			var results []assets.SearchResult
 			for _, cat := range categories {
 				catResults, err := assets.SearchInstalledConfig(cfg, cat.cueKey, cat.category, query)
@@ -104,7 +108,9 @@ func runSearch(cmd *cobra.Command, args []string) error {
 	// Search global config
 	if paths.GlobalExists {
 		cfg, err := loader.LoadSingle(paths.Global)
-		if err == nil {
+		if err != nil {
+			printWarning(stderr, "failed to load global config: %s", err)
+		} else {
 			var results []assets.SearchResult
 			for _, cat := range categories {
 				catResults, err := assets.SearchInstalledConfig(cfg, cat.cueKey, cat.category, query)

@@ -640,18 +640,20 @@ func runConfigRoleRemove(cmd *cobra.Command, args []string) error {
 	if !skipConfirm {
 		isTTY := isTerminal(stdin)
 
-		if isTTY {
-			_, _ = fmt.Fprintf(stdout, "Remove role %q from %s config? %s%s%s ", resolvedName, scopeString(local), colorCyan.Sprint("["), colorDim.Sprint("y/N"), colorCyan.Sprint("]"))
-			reader := bufio.NewReader(stdin)
-			input, err := reader.ReadString('\n')
-			if err != nil {
-				return fmt.Errorf("reading input: %w", err)
-			}
-			input = strings.TrimSpace(strings.ToLower(input))
-			if input != "y" && input != "yes" {
-				_, _ = fmt.Fprintln(stdout, "Cancelled.")
-				return nil
-			}
+		if !isTTY {
+			return fmt.Errorf("--yes flag required in non-interactive mode")
+		}
+
+		_, _ = fmt.Fprintf(stdout, "Remove role %q from %s config? %s%s%s ", resolvedName, scopeString(local), colorCyan.Sprint("["), colorDim.Sprint("y/N"), colorCyan.Sprint("]"))
+		reader := bufio.NewReader(stdin)
+		input, err := reader.ReadString('\n')
+		if err != nil {
+			return fmt.Errorf("reading input: %w", err)
+		}
+		input = strings.TrimSpace(strings.ToLower(input))
+		if input != "y" && input != "yes" {
+			_, _ = fmt.Fprintln(stdout, "Cancelled.")
+			return nil
 		}
 	}
 

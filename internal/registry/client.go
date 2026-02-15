@@ -68,7 +68,7 @@ func (c *Client) Fetch(ctx context.Context, modulePath string) (FetchResult, err
 			// Get the OS path from the SourceLoc
 			dir, err := sourceLocToPath(loc)
 			if err != nil {
-				return FetchResult{}, fmt.Errorf("resolving source location: %w", err)
+				return FetchResult{}, fmt.Errorf("resolving source location for %s: %w", modulePath, err)
 			}
 			return FetchResult{SourceDir: dir}, nil
 		}
