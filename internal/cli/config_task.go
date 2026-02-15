@@ -285,15 +285,8 @@ func runConfigTaskAdd(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("resolving config paths: %w", err)
 	}
 
-	var configDir string
-	var scopeName string
-	if local {
-		configDir = paths.Local
-		scopeName = "local"
-	} else {
-		configDir = paths.Global
-		scopeName = "global"
-	}
+	configDir := paths.Dir(local)
+	scopeName := scopeString(local)
 
 	// Ensure directory exists
 	if err := os.MkdirAll(configDir, 0755); err != nil {
@@ -438,12 +431,7 @@ func runConfigTaskEdit(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("resolving config paths: %w", err)
 	}
 
-	var configDir string
-	if local {
-		configDir = paths.Local
-	} else {
-		configDir = paths.Global
-	}
+	configDir := paths.Dir(local)
 
 	taskPath := filepath.Join(configDir, "tasks.cue")
 
@@ -643,12 +631,7 @@ func runConfigTaskRemove(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("resolving config paths: %w", err)
 	}
 
-	var configDir string
-	if local {
-		configDir = paths.Local
-	} else {
-		configDir = paths.Global
-	}
+	configDir := paths.Dir(local)
 
 	// Load existing tasks
 	tasks, err := loadTasksFromDir(configDir)
@@ -664,21 +647,11 @@ func runConfigTaskRemove(cmd *cobra.Command, args []string) error {
 	// Confirm removal unless --yes flag is set
 	skipConfirm, _ := cmd.Flags().GetBool("yes")
 	if !skipConfirm {
-		isTTY := isTerminal(stdin)
-
-		if !isTTY {
-			return fmt.Errorf("--yes flag required in non-interactive mode")
-		}
-
-		_, _ = fmt.Fprintf(stdout, "Remove task %q from %s config? %s%s%s ", resolvedName, scopeString(local), colorCyan.Sprint("["), colorDim.Sprint("y/N"), colorCyan.Sprint("]"))
-		reader := bufio.NewReader(stdin)
-		input, err := reader.ReadString('\n')
+		confirmed, err := confirmRemoval(stdout, stdin, "task", resolvedName, local)
 		if err != nil {
-			return fmt.Errorf("reading input: %w", err)
+			return err
 		}
-		input = strings.TrimSpace(strings.ToLower(input))
-		if input != "y" && input != "yes" {
-			_, _ = fmt.Fprintln(stdout, "Cancelled.")
+		if !confirmed {
 			return nil
 		}
 	}
@@ -807,17 +780,7 @@ func loadTasksFromDir(dir string) (map[string]TaskConfig, error) {
 			task.Role, _ = v.String()
 		}
 
-		// Load tags
-		if tagsVal := val.LookupPath(cue.ParsePath("tags")); tagsVal.Exists() {
-			tagIter, err := tagsVal.List()
-			if err == nil {
-				for tagIter.Next() {
-					if s, err := tagIter.Value().String(); err == nil {
-						task.Tags = append(task.Tags, s)
-					}
-				}
-			}
-		}
+		task.Tags = extractTags(val)
 
 		// Load origin (registry provenance)
 		if v := val.LookupPath(cue.ParsePath("origin")); v.Exists() {
@@ -862,30 +825,11 @@ func writeTasksFile(path string, tasks map[string]TaskConfig) error {
 		if task.Command != "" {
 			sb.WriteString(fmt.Sprintf("\t\tcommand: %q\n", task.Command))
 		}
-		if task.Prompt != "" {
-			if strings.Contains(task.Prompt, "\n") || len(task.Prompt) > 80 {
-				sb.WriteString("\t\tprompt: \"\"\"\n")
-				for _, line := range strings.Split(task.Prompt, "\n") {
-					sb.WriteString(fmt.Sprintf("\t\t\t%s\n", line))
-				}
-				sb.WriteString("\t\t\t\"\"\"\n")
-			} else {
-				sb.WriteString(fmt.Sprintf("\t\tprompt: %q\n", task.Prompt))
-			}
-		}
+		writeCUEPrompt(&sb, task.Prompt)
 		if task.Role != "" {
 			sb.WriteString(fmt.Sprintf("\t\trole: %q\n", task.Role))
 		}
-		if len(task.Tags) > 0 {
-			sb.WriteString("\t\ttags: [")
-			for i, tag := range task.Tags {
-				if i > 0 {
-					sb.WriteString(", ")
-				}
-				sb.WriteString(fmt.Sprintf("%q", tag))
-			}
-			sb.WriteString("]\n")
-		}
+		writeCUETags(&sb, task.Tags)
 
 		sb.WriteString("\t}\n")
 	}

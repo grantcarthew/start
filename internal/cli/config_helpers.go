@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"cuelang.org/go/cue"
 	"github.com/grantcarthew/start/internal/assets"
 )
 
@@ -366,6 +367,80 @@ func truncatePrompt(s string, max int) string {
 		return s
 	}
 	return s[:max-3] + "..."
+}
+
+// writeCUETags writes a CUE tags array field into a strings.Builder.
+func writeCUETags(sb *strings.Builder, tags []string) {
+	if len(tags) == 0 {
+		return
+	}
+	sb.WriteString("\t\ttags: [")
+	for i, tag := range tags {
+		if i > 0 {
+			sb.WriteString(", ")
+		}
+		sb.WriteString(fmt.Sprintf("%q", tag))
+	}
+	sb.WriteString("]\n")
+}
+
+// writeCUEPrompt writes a CUE prompt field into a strings.Builder,
+// using triple-quote syntax for long or multi-line prompts.
+func writeCUEPrompt(sb *strings.Builder, prompt string) {
+	if prompt == "" {
+		return
+	}
+	if strings.Contains(prompt, "\n") || len(prompt) > 80 {
+		sb.WriteString("\t\tprompt: \"\"\"\n")
+		for _, line := range strings.Split(prompt, "\n") {
+			sb.WriteString(fmt.Sprintf("\t\t\t%s\n", line))
+		}
+		sb.WriteString("\t\t\t\"\"\"\n")
+	} else {
+		sb.WriteString(fmt.Sprintf("\t\tprompt: %q\n", prompt))
+	}
+}
+
+// extractTags extracts a string slice from the "tags" field of a CUE value.
+func extractTags(val cue.Value) []string {
+	tagsVal := val.LookupPath(cue.ParsePath("tags"))
+	if !tagsVal.Exists() {
+		return nil
+	}
+	tagIter, err := tagsVal.List()
+	if err != nil {
+		return nil
+	}
+	var tags []string
+	for tagIter.Next() {
+		if s, err := tagIter.Value().String(); err == nil {
+			tags = append(tags, s)
+		}
+	}
+	return tags
+}
+
+// confirmRemoval prompts the user to confirm removal of a config entity.
+// Returns true if confirmed, false if cancelled. Requires --yes flag in non-interactive mode.
+func confirmRemoval(w io.Writer, r io.Reader, entityType, name string, local bool) (bool, error) {
+	isTTY := isTerminal(r)
+
+	if !isTTY {
+		return false, fmt.Errorf("--yes flag required in non-interactive mode")
+	}
+
+	_, _ = fmt.Fprintf(w, "Remove %s %q from %s config? %s%s%s ", entityType, name, scopeString(local), colorCyan.Sprint("["), colorDim.Sprint("y/N"), colorCyan.Sprint("]"))
+	reader := bufio.NewReader(r)
+	input, err := reader.ReadString('\n')
+	if err != nil {
+		return false, fmt.Errorf("reading input: %w", err)
+	}
+	input = strings.TrimSpace(strings.ToLower(input))
+	if input != "y" && input != "yes" {
+		_, _ = fmt.Fprintln(w, "Cancelled.")
+		return false, nil
+	}
+	return true, nil
 }
 
 // scopeString returns "local" or "global" based on the flag.

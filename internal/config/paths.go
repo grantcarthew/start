@@ -54,6 +54,14 @@ type Paths struct {
 	LocalExists bool
 }
 
+// Dir returns the config directory for the given scope.
+func (p Paths) Dir(local bool) string {
+	if local {
+		return p.Local
+	}
+	return p.Global
+}
+
 // ResolvePaths discovers configuration directories.
 // workingDir specifies the base directory for local config resolution.
 // If workingDir is empty, the current working directory is used.

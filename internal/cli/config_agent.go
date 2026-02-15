@@ -6,7 +6,6 @@
 package cli
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
 	"os"
@@ -256,15 +255,8 @@ func runConfigAgentAdd(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("resolving config paths: %w", err)
 	}
 
-	var configDir string
-	var scopeName string
-	if local {
-		configDir = paths.Local
-		scopeName = "local"
-	} else {
-		configDir = paths.Global
-		scopeName = "global"
-	}
+	configDir := paths.Dir(local)
+	scopeName := scopeString(local)
 
 	// Ensure directory exists
 	if err := os.MkdirAll(configDir, 0755); err != nil {
@@ -419,12 +411,7 @@ func runConfigAgentEdit(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("resolving config paths: %w", err)
 	}
 
-	var configDir string
-	if local {
-		configDir = paths.Local
-	} else {
-		configDir = paths.Global
-	}
+	configDir := paths.Dir(local)
 
 	agentPath := filepath.Join(configDir, "agents.cue")
 
@@ -593,12 +580,7 @@ func runConfigAgentRemove(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("resolving config paths: %w", err)
 	}
 
-	var configDir string
-	if local {
-		configDir = paths.Local
-	} else {
-		configDir = paths.Global
-	}
+	configDir := paths.Dir(local)
 
 	// Load existing agents
 	agents, err := loadAgentsFromDir(configDir)
@@ -614,21 +596,11 @@ func runConfigAgentRemove(cmd *cobra.Command, args []string) error {
 	// Confirm removal unless --yes flag is set
 	skipConfirm, _ := cmd.Flags().GetBool("yes")
 	if !skipConfirm {
-		isTTY := isTerminal(stdin)
-
-		if !isTTY {
-			return fmt.Errorf("--yes flag required in non-interactive mode")
-		}
-
-		_, _ = fmt.Fprintf(stdout, "Remove agent %q from %s config? %s%s%s ", resolvedName, scopeString(local), colorCyan.Sprint("["), colorDim.Sprint("y/N"), colorCyan.Sprint("]"))
-		reader := bufio.NewReader(stdin)
-		input, err := reader.ReadString('\n')
+		confirmed, err := confirmRemoval(stdout, stdin, "agent", resolvedName, local)
 		if err != nil {
-			return fmt.Errorf("reading input: %w", err)
+			return err
 		}
-		input = strings.TrimSpace(strings.ToLower(input))
-		if input != "y" && input != "yes" {
-			_, _ = fmt.Fprintln(stdout, "Cancelled.")
+		if !confirmed {
 			return nil
 		}
 	}
@@ -685,12 +657,7 @@ func runConfigAgentDefault(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("resolving config paths: %w", err)
 	}
 
-	var configDir string
-	if local {
-		configDir = paths.Local
-	} else {
-		configDir = paths.Global
-	}
+	configDir := paths.Dir(local)
 
 	// Unset default
 	if unset {
@@ -872,17 +839,7 @@ func loadAgentsFromDir(dir string) (map[string]AgentConfig, error) {
 			agent.Description, _ = v.String()
 		}
 
-		// Load tags
-		if tagsVal := val.LookupPath(cue.ParsePath("tags")); tagsVal.Exists() {
-			tagIter, err := tagsVal.List()
-			if err == nil {
-				for tagIter.Next() {
-					if s, err := tagIter.Value().String(); err == nil {
-						agent.Tags = append(agent.Tags, s)
-					}
-				}
-			}
-		}
+		agent.Tags = extractTags(val)
 
 		// Load models
 		if modelsVal := val.LookupPath(cue.ParsePath("models")); modelsVal.Exists() {
@@ -943,16 +900,7 @@ func writeAgentsFile(path string, agents map[string]AgentConfig) error {
 		if agent.Description != "" {
 			sb.WriteString(fmt.Sprintf("\t\tdescription: %q\n", agent.Description))
 		}
-		if len(agent.Tags) > 0 {
-			sb.WriteString("\t\ttags: [")
-			for i, tag := range agent.Tags {
-				if i > 0 {
-					sb.WriteString(", ")
-				}
-				sb.WriteString(fmt.Sprintf("%q", tag))
-			}
-			sb.WriteString("]\n")
-		}
+		writeCUETags(&sb, agent.Tags)
 		if len(agent.Models) > 0 {
 			sb.WriteString("\t\tmodels: {\n")
 			var aliases []string
