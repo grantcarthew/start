@@ -667,5 +667,3 @@ func installTaskFromRegistry(stdout io.Writer, flags *Flags, client *registry.Cl
 
 	return nil
 }
-
-
