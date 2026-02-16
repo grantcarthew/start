@@ -335,7 +335,10 @@ func executeStart(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, selec
 
 	// Resolve --context flags
 	if len(selection.Tags) > 0 {
-		selection.Tags = r.resolveContexts(selection.Tags)
+		selection.Tags, err = r.resolveContexts(selection.Tags)
+		if err != nil {
+			return err
+		}
 	}
 
 	// If any registry installs happened, reload config

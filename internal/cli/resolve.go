@@ -95,10 +95,12 @@ func (r *resolver) resolveAsset(name, cueKey, category, displayType string, allo
 
 	searchType := strings.ToLower(displayType)
 
-	// Tier 1: Exact match in installed config
-	if hasExactInstalled(r.cfg.Value, cueKey, name) {
-		debugf(r.flags, dbgResolve, "%s %q: exact installed match", displayType, name)
-		return name, nil
+	// Tier 1: Exact or short name match in installed config
+	if resolved, err := findExactInstalledName(r.cfg.Value, cueKey, name); err != nil {
+		return "", err
+	} else if resolved != "" {
+		debugf(r.flags, dbgResolve, "%s %q: installed match -> %q", displayType, name, resolved)
+		return resolved, nil
 	}
 
 	// Tier 2: Exact match in registry
@@ -228,9 +230,9 @@ func (r *resolver) resolveModelName(name string, agent orchestration.Agent) stri
 // resolveContexts resolves context flag values.
 // Per-term: file path bypass -> "default" passthrough -> exact name -> search (all above threshold).
 // Returns the resolved list of context terms for ContextSelection.Tags.
-func (r *resolver) resolveContexts(terms []string) []string {
+func (r *resolver) resolveContexts(terms []string) ([]string, error) {
 	if len(terms) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	var resolved []string
@@ -249,10 +251,12 @@ func (r *resolver) resolveContexts(terms []string) []string {
 			continue
 		}
 
-		// Exact name match in installed config
-		if hasExactInstalled(r.cfg.Value, internalcue.KeyContexts, term) {
-			debugf(r.flags, dbgResolve, "Context %q: exact installed match", term)
-			resolved = append(resolved, term)
+		// Exact or short name match in installed config
+		if resolvedCtx, err := findExactInstalledName(r.cfg.Value, internalcue.KeyContexts, term); err != nil {
+			return nil, err
+		} else if resolvedCtx != "" {
+			debugf(r.flags, dbgResolve, "Context %q: installed match -> %q", term, resolvedCtx)
+			resolved = append(resolved, resolvedCtx)
 			continue
 		}
 
@@ -337,16 +341,49 @@ func (r *resolver) resolveContexts(terms []string) []string {
 		}
 	}
 
-	return resolved
+	return resolved, nil
 }
 
-// hasExactInstalled checks if an exact name exists under a category in the config.
-func hasExactInstalled(cfg cue.Value, cueKey, name string) bool {
+// findExactInstalledName finds an asset by exact or short name in installed config.
+// Supports both full name (e.g., "golang/assistant") and short name match.
+// Returns the resolved full name, or empty string if not found.
+// Returns an error if the short name is ambiguous.
+func findExactInstalledName(cfg cue.Value, cueKey, name string) (string, error) {
 	catVal := cfg.LookupPath(cue.ParsePath(cueKey))
 	if !catVal.Exists() {
-		return false
+		return "", nil
 	}
-	return catVal.LookupPath(cue.MakePath(cue.Str(name))).Exists()
+
+	// Full name match is always unambiguous
+	if catVal.LookupPath(cue.MakePath(cue.Str(name))).Exists() {
+		return name, nil
+	}
+
+	// Short name match: collect all matches to detect ambiguity
+	iter, err := catVal.Fields()
+	if err != nil {
+		return "", nil
+	}
+	var matches []string
+	for iter.Next() {
+		entryName := iter.Selector().Unquoted()
+		if idx := strings.LastIndex(entryName, "/"); idx != -1 {
+			if entryName[idx+1:] == name {
+				matches = append(matches, entryName)
+			}
+		}
+	}
+
+	switch len(matches) {
+	case 0:
+		return "", nil
+	case 1:
+		return matches[0], nil
+	default:
+		sort.Strings(matches)
+		return "", fmt.Errorf("ambiguous %s name %q matches multiple entries: %s",
+			cueKey, name, strings.Join(matches, ", "))
+	}
 }
 
 // findExactInRegistry searches for an exact name match in registry entries.

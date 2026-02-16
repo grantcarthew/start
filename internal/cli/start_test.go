@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	internalcue "github.com/grantcarthew/start/internal/cue"
 	"github.com/grantcarthew/start/internal/orchestration"
 	"github.com/grantcarthew/start/internal/registry"
 )
@@ -456,14 +457,22 @@ func TestTaskResolution(t *testing.T) {
 	}
 
 	t.Run("exact match", func(t *testing.T) {
-		if !hasExactInstalledTask(cfg, "test-task") {
-			t.Error("hasExactInstalledTask() = false, want true")
+		got, err := findExactInstalledName(cfg.Value, internalcue.KeyTasks, "test-task")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got != "test-task" {
+			t.Errorf("findExactInstalledName() = %q, want %q", got, "test-task")
 		}
 	})
 
 	t.Run("exact match not found", func(t *testing.T) {
-		if hasExactInstalledTask(cfg, "nonexistent") {
-			t.Error("hasExactInstalledTask() = true, want false")
+		got, err := findExactInstalledName(cfg.Value, internalcue.KeyTasks, "nonexistent")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got != "" {
+			t.Errorf("findExactInstalledName() = %q, want empty", got)
 		}
 	})
 
@@ -612,8 +621,8 @@ settings: {
 		t.Fatalf("loading config: %v", err)
 	}
 
-	if hasExactInstalledTask(cfg, "anything") {
-		t.Error("hasExactInstalledTask() = true, want false for missing tasks")
+	if got, _ := findExactInstalledName(cfg.Value, internalcue.KeyTasks, "anything"); got != "" {
+		t.Errorf("findExactInstalledName() = %q, want empty for missing tasks", got)
 	}
 
 	matches, err := findInstalledTasks(cfg, "anything")
@@ -885,47 +894,6 @@ func TestExecuteStart_FilePathContextMissing(t *testing.T) {
 
 // Tests for unified task resolution (DR-015 update)
 
-func TestHasExactInstalledTask(t *testing.T) {
-	tmpDir := setupStartTestConfig(t)
-	chdir(t, tmpDir)
-
-	cfg, err := loadMergedConfig()
-	if err != nil {
-		t.Fatalf("loading config: %v", err)
-	}
-
-	tests := []struct {
-		name     string
-		taskName string
-		want     bool
-	}{
-		{
-			name:     "exact match exists",
-			taskName: "test-task",
-			want:     true,
-		},
-		{
-			name:     "partial match does not count",
-			taskName: "test",
-			want:     false,
-		},
-		{
-			name:     "nonexistent task",
-			taskName: "nonexistent",
-			want:     false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := hasExactInstalledTask(cfg, tt.taskName)
-			if got != tt.want {
-				t.Errorf("hasExactInstalledTask(%q) = %v, want %v", tt.taskName, got, tt.want)
-			}
-		})
-	}
-}
-
 func TestFindInstalledTasks(t *testing.T) {
 	tmpDir := t.TempDir()
 
@@ -1195,93 +1163,6 @@ func TestMergeTaskMatches_Empty(t *testing.T) {
 	merged = mergeTaskMatches(nil, registry)
 	if len(merged) != 1 {
 		t.Errorf("expected 1 result, got %d", len(merged))
-	}
-}
-
-func TestFindExactTaskInRegistry_FullName(t *testing.T) {
-	t.Parallel()
-	index := &registry.Index{
-		Tasks: map[string]registry.IndexEntry{
-			"golang/debug": {
-				Module:      "github.com/example/golang-debug@v0",
-				Description: "Debug Go code",
-			},
-			"golang/review": {
-				Module:      "github.com/example/golang-review@v0",
-				Description: "Review Go code",
-			},
-		},
-	}
-
-	result, err := findExactTaskInRegistry(index, "golang/debug")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if result == nil {
-		t.Fatal("expected result, got nil")
-	}
-	if result.Name != "golang/debug" {
-		t.Errorf("expected name %q, got %q", "golang/debug", result.Name)
-	}
-	if result.Category != "tasks" {
-		t.Errorf("expected category %q, got %q", "tasks", result.Category)
-	}
-}
-
-func TestFindExactTaskInRegistry_ShortNameFallsThrough(t *testing.T) {
-	t.Parallel()
-	index := &registry.Index{
-		Tasks: map[string]registry.IndexEntry{
-			"golang/debug": {
-				Module: "github.com/example/golang-debug@v0",
-			},
-			"golang/review": {
-				Module: "github.com/example/golang-review@v0",
-			},
-		},
-	}
-
-	// Short names should not match - they fall through to regex search + selection
-	result, err := findExactTaskInRegistry(index, "debug")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if result != nil {
-		t.Errorf("expected nil for short name, got %v", result)
-	}
-}
-
-func TestFindExactTaskInRegistry_NoMatch(t *testing.T) {
-	t.Parallel()
-	index := &registry.Index{
-		Tasks: map[string]registry.IndexEntry{
-			"golang/debug": {
-				Module: "github.com/example/golang-debug@v0",
-			},
-		},
-	}
-
-	result, err := findExactTaskInRegistry(index, "nonexistent")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if result != nil {
-		t.Errorf("expected nil result, got %v", result)
-	}
-}
-
-func TestFindExactTaskInRegistry_EmptyIndex(t *testing.T) {
-	t.Parallel()
-	index := &registry.Index{
-		Tasks: map[string]registry.IndexEntry{},
-	}
-
-	result, err := findExactTaskInRegistry(index, "anything")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if result != nil {
-		t.Errorf("expected nil result, got %v", result)
 	}
 }
 
