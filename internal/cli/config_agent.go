@@ -1,8 +1,3 @@
-// NOTE(design): This file shares structural patterns with config_role.go,
-// config_context.go, and config_task.go (CUE field extraction, scope-aware loading,
-// interactive prompting, CUE file generation). This duplication is accepted - each
-// entity has distinct fields and behaviours that make a generic abstraction more
-// complex than the repetition it would eliminate.
 package cli
 
 import (
@@ -72,7 +67,7 @@ Use --local to show only local agents.`,
 // runConfigAgentList lists all configured agents.
 func runConfigAgentList(cmd *cobra.Command, _ []string) error {
 	local := getFlags(cmd).Local
-	agents, err := loadAgentsForScope(local)
+	agents, order, err := loadAgentsForScope(local)
 	if err != nil {
 		return err
 	}
@@ -93,14 +88,7 @@ func runConfigAgentList(cmd *cobra.Command, _ []string) error {
 	_, _ = fmt.Fprintln(w, "/")
 	_, _ = fmt.Fprintln(w)
 
-	// Sort agent names for consistent output
-	var names []string
-	for name := range agents {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-
-	for _, name := range names {
+	for _, name := range order {
 		agent := agents[name]
 		marker := "  "
 		if name == defaultAgent {
@@ -264,7 +252,7 @@ func runConfigAgentAdd(cmd *cobra.Command, _ []string) error {
 	}
 
 	// Load existing agents from target directory
-	existingAgents, err := loadAgentsFromDir(configDir)
+	existingAgents, _, err := loadAgentsFromDir(configDir)
 	if err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("loading existing agents: %w", err)
 	}
@@ -312,7 +300,7 @@ func runConfigAgentInfo(cmd *cobra.Command, args []string) error {
 	name := args[0]
 	local := getFlags(cmd).Local
 
-	agents, err := loadAgentsForScope(local)
+	agents, _, err := loadAgentsForScope(local)
 	if err != nil {
 		return err
 	}
@@ -426,7 +414,7 @@ func runConfigAgentEdit(cmd *cobra.Command, args []string) error {
 	stdout := cmd.OutOrStdout()
 
 	// Load existing agents
-	agents, err := loadAgentsFromDir(configDir)
+	agents, _, err := loadAgentsFromDir(configDir)
 	if err != nil {
 		return fmt.Errorf("loading agents: %w", err)
 	}
@@ -583,7 +571,7 @@ func runConfigAgentRemove(cmd *cobra.Command, args []string) error {
 	configDir := paths.Dir(local)
 
 	// Load existing agents
-	agents, err := loadAgentsFromDir(configDir)
+	agents, _, err := loadAgentsFromDir(configDir)
 	if err != nil {
 		return fmt.Errorf("loading agents: %w", err)
 	}
@@ -699,7 +687,7 @@ func runConfigAgentDefault(cmd *cobra.Command, args []string) error {
 	name := args[0]
 
 	// Verify agent exists
-	agents, err := loadAgentsForScope(local)
+	agents, _, err := loadAgentsForScope(local)
 	if err != nil {
 		return err
 	}
@@ -747,77 +735,35 @@ type AgentConfig struct {
 }
 
 // loadAgentsForScope loads agents from the appropriate scope.
-// Unlike loadRolesForScope/loadContextsForScope, this does not return a definition-order
-// slice because agent display order is not user-configurable.
-func loadAgentsForScope(localOnly bool) (map[string]AgentConfig, error) {
-	paths, err := config.ResolvePaths("")
-	if err != nil {
-		return nil, fmt.Errorf("resolving config paths: %w", err)
-	}
-
-	agents := make(map[string]AgentConfig)
-
-	if localOnly {
-		// Local only
-		if paths.LocalExists {
-			localAgents, err := loadAgentsFromDir(paths.Local)
-			if err != nil && !os.IsNotExist(err) {
-				return nil, err
-			}
-			for name, agent := range localAgents {
-				agent.Source = "local"
-				agents[name] = agent
-			}
-		}
-	} else {
-		// Merged: global first, then local overrides
-		if paths.GlobalExists {
-			globalAgents, err := loadAgentsFromDir(paths.Global)
-			if err != nil && !os.IsNotExist(err) {
-				return nil, err
-			}
-			for name, agent := range globalAgents {
-				agent.Source = "global"
-				agents[name] = agent
-			}
-		}
-		if paths.LocalExists {
-			localAgents, err := loadAgentsFromDir(paths.Local)
-			if err != nil && !os.IsNotExist(err) {
-				return nil, err
-			}
-			for name, agent := range localAgents {
-				agent.Source = "local"
-				agents[name] = agent
-			}
-		}
-	}
-
-	return agents, nil
+// Returns the agents map, names in definition order, and any error.
+func loadAgentsForScope(localOnly bool) (map[string]AgentConfig, []string, error) {
+	return loadForScope(localOnly, loadAgentsFromDir, func(a *AgentConfig, s string) { a.Source = s })
 }
 
 // loadAgentsFromDir loads agents from a specific directory.
-func loadAgentsFromDir(dir string) (map[string]AgentConfig, error) {
+// Returns the agents map, names in definition order, and any error.
+func loadAgentsFromDir(dir string) (map[string]AgentConfig, []string, error) {
 	agents := make(map[string]AgentConfig)
+	var order []string
 
 	loader := internalcue.NewLoader()
 	cfg, err := loader.LoadSingle(dir)
 	if err != nil {
 		// If no CUE files exist, return empty map (not an error)
 		if errors.Is(err, internalcue.ErrNoCUEFiles) {
-			return agents, nil
+			return agents, order, nil
 		}
-		return agents, err
+		return agents, order, err
 	}
 
 	agentsVal := cfg.LookupPath(cue.ParsePath(internalcue.KeyAgents))
 	if !agentsVal.Exists() {
-		return agents, nil
+		return agents, order, nil
 	}
 
 	iter, err := agentsVal.Fields()
 	if err != nil {
-		return nil, fmt.Errorf("iterating agents: %w", err)
+		return nil, nil, fmt.Errorf("iterating agents: %w", err)
 	}
 
 	for iter.Next() {
@@ -861,12 +807,14 @@ func loadAgentsFromDir(dir string) (map[string]AgentConfig, error) {
 		}
 
 		agents[name] = agent
+		order = append(order, name)
 	}
 
-	return agents, nil
+	return agents, order, nil
 }
 
 // writeAgentsFile writes the agents configuration to a file.
+// Agents are not order-dependent, so names are sorted alphabetically for consistent output.
 func writeAgentsFile(path string, agents map[string]AgentConfig) error {
 	var sb strings.Builder
 

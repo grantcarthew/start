@@ -1,8 +1,3 @@
-// NOTE(design): This file shares structural patterns with config_agent.go,
-// config_role.go, and config_task.go (CUE field extraction, scope-aware loading,
-// interactive prompting, CUE file generation). This duplication is accepted - each
-// entity has distinct fields and behaviours that make a generic abstraction more
-// complex than the repetition it would eliminate.
 package cli
 
 import (
@@ -736,63 +731,8 @@ type ContextConfig struct {
 
 // loadContextsForScope loads contexts from the appropriate scope.
 // Returns the contexts map, names in definition order, and any error.
-// Order: global contexts first (in definition order), then local contexts (in definition order).
-// Local contexts override global contexts with the same name but retain their global position.
 func loadContextsForScope(localOnly bool) (map[string]ContextConfig, []string, error) {
-	paths, err := config.ResolvePaths("")
-	if err != nil {
-		return nil, nil, fmt.Errorf("resolving config paths: %w", err)
-	}
-
-	contexts := make(map[string]ContextConfig)
-	var order []string
-	seen := make(map[string]bool)
-
-	if localOnly {
-		if paths.LocalExists {
-			localContexts, localOrder, err := loadContextsFromDir(paths.Local)
-			if err != nil && !os.IsNotExist(err) {
-				return nil, nil, err
-			}
-			for _, name := range localOrder {
-				ctx := localContexts[name]
-				ctx.Source = "local"
-				contexts[name] = ctx
-				order = append(order, name)
-			}
-		}
-	} else {
-		if paths.GlobalExists {
-			globalContexts, globalOrder, err := loadContextsFromDir(paths.Global)
-			if err != nil && !os.IsNotExist(err) {
-				return nil, nil, err
-			}
-			for _, name := range globalOrder {
-				ctx := globalContexts[name]
-				ctx.Source = "global"
-				contexts[name] = ctx
-				order = append(order, name)
-				seen[name] = true
-			}
-		}
-		if paths.LocalExists {
-			localContexts, localOrder, err := loadContextsFromDir(paths.Local)
-			if err != nil && !os.IsNotExist(err) {
-				return nil, nil, err
-			}
-			for _, name := range localOrder {
-				ctx := localContexts[name]
-				ctx.Source = "local"
-				contexts[name] = ctx
-				// Only add to order if not already present from global
-				if !seen[name] {
-					order = append(order, name)
-				}
-			}
-		}
-	}
-
-	return contexts, order, nil
+	return loadForScope(localOnly, loadContextsFromDir, func(c *ContextConfig, s string) { c.Source = s })
 }
 
 // loadContextsFromDir loads contexts from a specific directory.

@@ -2,7 +2,6 @@ package cli
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 
 	"github.com/grantcarthew/start/internal/config"
@@ -90,7 +89,7 @@ func runConfigList(cmd *cobra.Command, args []string) error {
 	stderr := cmd.ErrOrStderr()
 
 	// Agents
-	agents, err := loadAgentsForScope(local)
+	agents, agentOrder, err := loadAgentsForScope(local)
 	if err != nil {
 		printWarning(stderr, "failed to load agents: %s", err)
 	}
@@ -106,12 +105,7 @@ func runConfigList(cmd *cobra.Command, args []string) error {
 		if cfg, err := loadConfigForScope(local); err == nil {
 			defaultAgent = getDefaultAgentFromConfig(cfg)
 		}
-		var names []string
-		for name := range agents {
-			names = append(names, name)
-		}
-		sort.Strings(names)
-		for _, name := range names {
+		for _, name := range agentOrder {
 			agent := agents[name]
 			marker := "  "
 			if name == defaultAgent {
@@ -189,7 +183,7 @@ func runConfigList(cmd *cobra.Command, args []string) error {
 	}
 
 	// Tasks
-	tasks, err := loadTasksForScope(local)
+	tasks, taskOrder, err := loadTasksForScope(local)
 	if err != nil {
 		printWarning(stderr, "failed to load tasks: %s", err)
 	}
@@ -201,12 +195,7 @@ func runConfigList(cmd *cobra.Command, args []string) error {
 	_, _ = colorCyan.Fprint(w, ")")
 	_, _ = colorDim.Fprintf(w, ": %d\n", len(tasks))
 	if len(tasks) > 0 {
-		var names []string
-		for name := range tasks {
-			names = append(names, name)
-		}
-		sort.Strings(names)
-		for _, name := range names {
+		for _, name := range taskOrder {
 			task := tasks[name]
 			_, _ = fmt.Fprintf(w, "    %s ", name)
 			_, _ = colorCyan.Fprint(w, "(")
