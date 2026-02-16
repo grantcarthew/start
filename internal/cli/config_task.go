@@ -1,8 +1,3 @@
-// NOTE(design): This file shares structural patterns with config_agent.go,
-// config_role.go, and config_context.go (CUE field extraction, scope-aware loading,
-// interactive prompting, CUE file generation). This duplication is accepted - each
-// entity has distinct fields and behaviours that make a generic abstraction more
-// complex than the repetition it would eliminate.
 package cli
 
 import (
@@ -72,7 +67,7 @@ Use --local to show only local tasks.`,
 // runConfigTaskList lists all configured tasks.
 func runConfigTaskList(cmd *cobra.Command, _ []string) error {
 	local := getFlags(cmd).Local
-	tasks, err := loadTasksForScope(local)
+	tasks, order, err := loadTasksForScope(local)
 	if err != nil {
 		return err
 	}
@@ -87,14 +82,7 @@ func runConfigTaskList(cmd *cobra.Command, _ []string) error {
 	_, _ = fmt.Fprintln(w, "/")
 	_, _ = fmt.Fprintln(w)
 
-	// Sort task names for consistent output
-	var names []string
-	for name := range tasks {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-
-	for _, name := range names {
+	for _, name := range order {
 		task := tasks[name]
 		source := task.Source
 		if task.Origin != "" {
@@ -294,7 +282,7 @@ func runConfigTaskAdd(cmd *cobra.Command, _ []string) error {
 	}
 
 	// Load existing tasks from target directory
-	existingTasks, err := loadTasksFromDir(configDir)
+	existingTasks, _, err := loadTasksFromDir(configDir)
 	if err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("loading existing tasks: %w", err)
 	}
@@ -342,7 +330,7 @@ func runConfigTaskInfo(cmd *cobra.Command, args []string) error {
 	name := args[0]
 	local := getFlags(cmd).Local
 
-	tasks, err := loadTasksForScope(local)
+	tasks, _, err := loadTasksForScope(local)
 	if err != nil {
 		return err
 	}
@@ -446,7 +434,7 @@ func runConfigTaskEdit(cmd *cobra.Command, args []string) error {
 	stdout := cmd.OutOrStdout()
 
 	// Load existing tasks
-	tasks, err := loadTasksFromDir(configDir)
+	tasks, _, err := loadTasksFromDir(configDir)
 	if err != nil {
 		return fmt.Errorf("loading tasks: %w", err)
 	}
@@ -634,7 +622,7 @@ func runConfigTaskRemove(cmd *cobra.Command, args []string) error {
 	configDir := paths.Dir(local)
 
 	// Load existing tasks
-	tasks, err := loadTasksFromDir(configDir)
+	tasks, _, err := loadTasksFromDir(configDir)
 	if err != nil {
 		return fmt.Errorf("loading tasks: %w", err)
 	}
@@ -687,75 +675,35 @@ type TaskConfig struct {
 }
 
 // loadTasksForScope loads tasks from the appropriate scope.
-// Unlike loadRolesForScope/loadContextsForScope, this does not return a definition-order
-// slice because task display order is not user-configurable.
-func loadTasksForScope(localOnly bool) (map[string]TaskConfig, error) {
-	paths, err := config.ResolvePaths("")
-	if err != nil {
-		return nil, fmt.Errorf("resolving config paths: %w", err)
-	}
-
-	tasks := make(map[string]TaskConfig)
-
-	if localOnly {
-		if paths.LocalExists {
-			localTasks, err := loadTasksFromDir(paths.Local)
-			if err != nil && !os.IsNotExist(err) {
-				return nil, err
-			}
-			for name, task := range localTasks {
-				task.Source = "local"
-				tasks[name] = task
-			}
-		}
-	} else {
-		if paths.GlobalExists {
-			globalTasks, err := loadTasksFromDir(paths.Global)
-			if err != nil && !os.IsNotExist(err) {
-				return nil, err
-			}
-			for name, task := range globalTasks {
-				task.Source = "global"
-				tasks[name] = task
-			}
-		}
-		if paths.LocalExists {
-			localTasks, err := loadTasksFromDir(paths.Local)
-			if err != nil && !os.IsNotExist(err) {
-				return nil, err
-			}
-			for name, task := range localTasks {
-				task.Source = "local"
-				tasks[name] = task
-			}
-		}
-	}
-
-	return tasks, nil
+// Returns the tasks map, names in definition order, and any error.
+func loadTasksForScope(localOnly bool) (map[string]TaskConfig, []string, error) {
+	return loadForScope(localOnly, loadTasksFromDir, func(t *TaskConfig, s string) { t.Source = s })
 }
 
 // loadTasksFromDir loads tasks from a specific directory.
-func loadTasksFromDir(dir string) (map[string]TaskConfig, error) {
+// Returns the tasks map, names in definition order, and any error.
+func loadTasksFromDir(dir string) (map[string]TaskConfig, []string, error) {
 	tasks := make(map[string]TaskConfig)
+	var order []string
 
 	loader := internalcue.NewLoader()
 	cfg, err := loader.LoadSingle(dir)
 	if err != nil {
 		// If no CUE files exist, return empty map (not an error)
 		if errors.Is(err, internalcue.ErrNoCUEFiles) {
-			return tasks, nil
+			return tasks, order, nil
 		}
-		return tasks, err
+		return tasks, order, err
 	}
 
 	tasksVal := cfg.LookupPath(cue.ParsePath(internalcue.KeyTasks))
 	if !tasksVal.Exists() {
-		return tasks, nil
+		return tasks, order, nil
 	}
 
 	iter, err := tasksVal.Fields()
 	if err != nil {
-		return nil, fmt.Errorf("iterating tasks: %w", err)
+		return nil, nil, fmt.Errorf("iterating tasks: %w", err)
 	}
 
 	for iter.Next() {
@@ -788,12 +736,14 @@ func loadTasksFromDir(dir string) (map[string]TaskConfig, error) {
 		}
 
 		tasks[name] = task
+		order = append(order, name)
 	}
 
-	return tasks, nil
+	return tasks, order, nil
 }
 
 // writeTasksFile writes the tasks configuration to a file.
+// Tasks are not order-dependent, so names are sorted alphabetically for consistent output.
 func writeTasksFile(path string, tasks map[string]TaskConfig) error {
 	var sb strings.Builder
 

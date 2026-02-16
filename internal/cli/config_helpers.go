@@ -12,7 +12,73 @@ import (
 
 	"cuelang.org/go/cue"
 	"github.com/grantcarthew/start/internal/assets"
+	"github.com/grantcarthew/start/internal/config"
 )
+
+// loadForScope loads entities from the appropriate scope using a generic merge strategy.
+// Returns the entity map, names in definition order, and any error.
+// Order: global entries first (in definition order), then local entries (in definition order).
+// Local entries override global entries with the same name but retain their global position.
+func loadForScope[T any](
+	localOnly bool,
+	loadFromDir func(string) (map[string]T, []string, error),
+	setSource func(*T, string),
+) (map[string]T, []string, error) {
+	paths, err := config.ResolvePaths("")
+	if err != nil {
+		return nil, nil, fmt.Errorf("resolving config paths: %w", err)
+	}
+
+	items := make(map[string]T)
+	var order []string
+	seen := make(map[string]bool)
+
+	if localOnly {
+		if paths.LocalExists {
+			localItems, localOrder, err := loadFromDir(paths.Local)
+			if err != nil && !os.IsNotExist(err) {
+				return nil, nil, err
+			}
+			for _, name := range localOrder {
+				item := localItems[name]
+				setSource(&item, "local")
+				items[name] = item
+				order = append(order, name)
+			}
+		}
+	} else {
+		if paths.GlobalExists {
+			globalItems, globalOrder, err := loadFromDir(paths.Global)
+			if err != nil && !os.IsNotExist(err) {
+				return nil, nil, err
+			}
+			for _, name := range globalOrder {
+				item := globalItems[name]
+				setSource(&item, "global")
+				items[name] = item
+				order = append(order, name)
+				seen[name] = true
+			}
+		}
+		if paths.LocalExists {
+			localItems, localOrder, err := loadFromDir(paths.Local)
+			if err != nil && !os.IsNotExist(err) {
+				return nil, nil, err
+			}
+			for _, name := range localOrder {
+				item := localItems[name]
+				setSource(&item, "local")
+				items[name] = item
+				// Only add to order if not already present from global
+				if !seen[name] {
+					order = append(order, name)
+				}
+			}
+		}
+	}
+
+	return items, order, nil
+}
 
 // promptString prompts for a string value with a default.
 func promptString(w io.Writer, r io.Reader, label, defaultVal string) (string, error) {

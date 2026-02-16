@@ -1,8 +1,3 @@
-// NOTE(design): This file shares structural patterns with config_agent.go,
-// config_context.go, and config_task.go (CUE field extraction, scope-aware loading,
-// interactive prompting, CUE file generation). This duplication is accepted - each
-// entity has distinct fields and behaviours that make a generic abstraction more
-// complex than the repetition it would eliminate.
 package cli
 
 import (
@@ -668,63 +663,8 @@ type RoleConfig struct {
 
 // loadRolesForScope loads roles from the appropriate scope.
 // Returns the roles map, names in definition order, and any error.
-// Order: global roles first (in definition order), then local roles (in definition order).
-// Local roles override global roles with the same name but retain their global position.
 func loadRolesForScope(localOnly bool) (map[string]RoleConfig, []string, error) {
-	paths, err := config.ResolvePaths("")
-	if err != nil {
-		return nil, nil, fmt.Errorf("resolving config paths: %w", err)
-	}
-
-	roles := make(map[string]RoleConfig)
-	var order []string
-	seen := make(map[string]bool)
-
-	if localOnly {
-		if paths.LocalExists {
-			localRoles, localOrder, err := loadRolesFromDir(paths.Local)
-			if err != nil && !os.IsNotExist(err) {
-				return nil, nil, err
-			}
-			for _, name := range localOrder {
-				role := localRoles[name]
-				role.Source = "local"
-				roles[name] = role
-				order = append(order, name)
-			}
-		}
-	} else {
-		if paths.GlobalExists {
-			globalRoles, globalOrder, err := loadRolesFromDir(paths.Global)
-			if err != nil && !os.IsNotExist(err) {
-				return nil, nil, err
-			}
-			for _, name := range globalOrder {
-				role := globalRoles[name]
-				role.Source = "global"
-				roles[name] = role
-				order = append(order, name)
-				seen[name] = true
-			}
-		}
-		if paths.LocalExists {
-			localRoles, localOrder, err := loadRolesFromDir(paths.Local)
-			if err != nil && !os.IsNotExist(err) {
-				return nil, nil, err
-			}
-			for _, name := range localOrder {
-				role := localRoles[name]
-				role.Source = "local"
-				roles[name] = role
-				// Only add to order if not already present from global
-				if !seen[name] {
-					order = append(order, name)
-				}
-			}
-		}
-	}
-
-	return roles, order, nil
+	return loadForScope(localOnly, loadRolesFromDir, func(r *RoleConfig, s string) { r.Source = s })
 }
 
 // loadRolesFromDir loads roles from a specific directory.
