@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"strings"
 
-	"cuelang.org/go/cue"
 	"github.com/grantcarthew/start/internal/assets"
 	"github.com/grantcarthew/start/internal/config"
 	internalcue "github.com/grantcarthew/start/internal/cue"
@@ -99,7 +98,10 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 
 	contextTags := flags.Context
 	if len(contextTags) > 0 {
-		contextTags = r.resolveContexts(contextTags)
+		contextTags, err = r.resolveContexts(contextTags)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Track if we need a config reload (from flag resolution installs)
@@ -146,10 +148,12 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 	} else {
 		// Per DR-015: Unified task resolution across installed config and registry
 
-		// Step 1: Check for exact match in installed config (fast path, no registry fetch)
-		if hasExactInstalledTask(env.Cfg, taskName) {
-			debugf(flags, dbgTask, "Exact match found in installed config")
-			resolvedName = taskName
+		// Step 1: Check for exact or short name match in installed config (fast path, no registry fetch)
+		if resolved, err := findExactInstalledName(env.Cfg.Value, internalcue.KeyTasks, taskName); err != nil {
+			return err
+		} else if resolved != "" {
+			debugf(flags, dbgTask, "Installed match found: %s", resolved)
+			resolvedName = resolved
 		} else {
 			// Step 2: No exact match - fetch registry and combine results
 			debugf(flags, dbgTask, "No exact installed match, fetching registry index...")
@@ -165,8 +169,8 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 				return fmt.Errorf("task %q not found and registry is unavailable", taskName)
 			}
 
-			// Check for exact match in registry
-			exactRegistry, err := findExactTaskInRegistry(index, taskName)
+			// Check for exact or short name match in registry
+			exactRegistry, err := findExactInRegistry(index.Tasks, "tasks", taskName)
 			if err != nil {
 				return err
 			}
@@ -270,7 +274,11 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 			if roleName != "" {
 				// If the task's role is not installed, resolve through three-tier
 				// search which may auto-install from registry (same as --role flag).
-				if !hasExactInstalled(env.Cfg.Value, internalcue.KeyRoles, roleName) {
+				if resolved, err := findExactInstalledName(env.Cfg.Value, internalcue.KeyRoles, roleName); err != nil {
+					return err
+				} else if resolved != "" {
+					roleName = resolved
+				} else {
 					beforeInstall := r.didInstall
 					roleName, err = r.resolveRole(roleName)
 					if err != nil {
@@ -473,15 +481,6 @@ func printTaskDryRunSummary(w io.Writer, agent orchestration.Agent, model, model
 	_, _ = fmt.Fprintln(w, "  command.txt")
 }
 
-// hasExactInstalledTask checks if an exact task name exists in the config.
-func hasExactInstalledTask(cfg internalcue.LoadResult, name string) bool {
-	tasks := cfg.Value.LookupPath(cue.ParsePath(internalcue.KeyTasks))
-	if !tasks.Exists() {
-		return false
-	}
-	return tasks.LookupPath(cue.MakePath(cue.Str(name))).Exists()
-}
-
 // findInstalledTasks finds tasks in the config that match the search term.
 // Uses the scoring system to match against name, description, and tags.
 // Multiple terms (space or comma separated) use AND logic - all must match.
@@ -669,16 +668,4 @@ func installTaskFromRegistry(stdout io.Writer, flags *Flags, client *registry.Cl
 	return nil
 }
 
-// findExactTaskInRegistry searches for an exact full-name task match in the registry index.
-// Only matches the complete name (e.g., "golang/code-review"), not short suffixes.
-// Short/partial names fall through to the regex search + interactive selection flow.
-func findExactTaskInRegistry(index *registry.Index, taskName string) (*assets.SearchResult, error) {
-	if entry, ok := index.Tasks[taskName]; ok {
-		return &assets.SearchResult{
-			Category: "tasks",
-			Name:     taskName,
-			Entry:    entry,
-		}, nil
-	}
-	return nil, nil
-}
+

@@ -22,7 +22,7 @@ func buildTestCfg(t *testing.T, cueStr string) internalcue.LoadResult {
 	return internalcue.LoadResult{Value: v}
 }
 
-func TestHasExactInstalled(t *testing.T) {
+func TestFindExactInstalledName(t *testing.T) {
 	t.Parallel()
 
 	cfg := buildTestCfg(t, `{
@@ -41,6 +41,17 @@ func TestHasExactInstalled(t *testing.T) {
 				prompt: "You are a Go expert"
 			}
 		}
+		tasks: {
+			"review/git-diff": {
+				prompt: "Review the git diff"
+			}
+			"review/code": {
+				prompt: "Review code"
+			}
+			"standalone": {
+				prompt: "A standalone task"
+			}
+		}
 		contexts: {
 			env: {
 				required: true
@@ -53,25 +64,62 @@ func TestHasExactInstalled(t *testing.T) {
 		name     string
 		cueKey   string
 		assetKey string
-		want     bool
+		wantName string
+		wantErr  bool
 	}{
-		{"exact agent match", internalcue.KeyAgents, "claude", true},
-		{"exact agent with slash", internalcue.KeyAgents, "gemini-non-interactive", true},
-		{"partial agent no match", internalcue.KeyAgents, "clau", false},
-		{"nonexistent agent", internalcue.KeyAgents, "nonexistent", false},
-		{"exact role match", internalcue.KeyRoles, "golang/assistant", true},
-		{"partial role no match", internalcue.KeyRoles, "golang", false},
-		{"exact context match", internalcue.KeyContexts, "env", true},
-		{"missing category", internalcue.KeyTasks, "anything", false},
+		{"exact agent match", internalcue.KeyAgents, "claude", "claude", false},
+		{"exact agent with hyphen", internalcue.KeyAgents, "gemini-non-interactive", "gemini-non-interactive", false},
+		{"partial agent no match", internalcue.KeyAgents, "clau", "", false},
+		{"nonexistent agent", internalcue.KeyAgents, "nonexistent", "", false},
+		{"exact role full name", internalcue.KeyRoles, "golang/assistant", "golang/assistant", false},
+		{"role short name match", internalcue.KeyRoles, "assistant", "golang/assistant", false},
+		{"partial role no match", internalcue.KeyRoles, "golang", "", false},
+		{"exact context match", internalcue.KeyContexts, "env", "env", false},
+		{"missing category", "missing", "anything", "", false},
+		{"task short name match", internalcue.KeyTasks, "git-diff", "review/git-diff", false},
+		{"task exact full name", internalcue.KeyTasks, "review/code", "review/code", false},
+		{"task standalone exact", internalcue.KeyTasks, "standalone", "standalone", false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := hasExactInstalled(cfg.Value, tt.cueKey, tt.assetKey)
-			if got != tt.want {
-				t.Errorf("hasExactInstalled(%q, %q) = %v, want %v", tt.cueKey, tt.assetKey, got, tt.want)
+			got, err := findExactInstalledName(cfg.Value, tt.cueKey, tt.assetKey)
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("findExactInstalledName(%q, %q) expected error, got nil", tt.cueKey, tt.assetKey)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("findExactInstalledName(%q, %q) unexpected error: %v", tt.cueKey, tt.assetKey, err)
+			}
+			if got != tt.wantName {
+				t.Errorf("findExactInstalledName(%q, %q) = %q, want %q", tt.cueKey, tt.assetKey, got, tt.wantName)
 			}
 		})
+	}
+}
+
+func TestFindExactInstalledName_Ambiguous(t *testing.T) {
+	t.Parallel()
+
+	cfg := buildTestCfg(t, `{
+		tasks: {
+			"review/debug": {
+				prompt: "Review debug"
+			}
+			"golang/debug": {
+				prompt: "Debug Go code"
+			}
+		}
+	}`)
+
+	_, err := findExactInstalledName(cfg.Value, internalcue.KeyTasks, "debug")
+	if err == nil {
+		t.Error("expected ambiguity error, got nil")
+	}
+	if !strings.Contains(err.Error(), "ambiguous") {
+		t.Errorf("expected ambiguity error, got: %v", err)
 	}
 }
 
@@ -497,7 +545,10 @@ func TestResolveContexts_ExactName(t *testing.T) {
 	}`)
 
 	r := newTestResolver(cfg)
-	resolved := r.resolveContexts([]string{"env"})
+	resolved, err := r.resolveContexts([]string{"env"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	if len(resolved) != 1 || resolved[0] != "env" {
 		t.Errorf("resolveContexts([env]) = %v, want [env]", resolved)
 	}
@@ -508,7 +559,10 @@ func TestResolveContexts_FilePathBypass(t *testing.T) {
 
 	cfg := buildTestCfg(t, `{contexts: {}}`)
 	r := newTestResolver(cfg)
-	resolved := r.resolveContexts([]string{"./docs/guide.md"})
+	resolved, err := r.resolveContexts([]string{"./docs/guide.md"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	if len(resolved) != 1 || resolved[0] != "./docs/guide.md" {
 		t.Errorf("resolveContexts([./docs/guide.md]) = %v, want [./docs/guide.md]", resolved)
 	}
@@ -519,7 +573,10 @@ func TestResolveContexts_DefaultPassthrough(t *testing.T) {
 
 	cfg := buildTestCfg(t, `{contexts: {}}`)
 	r := newTestResolver(cfg)
-	resolved := r.resolveContexts([]string{"default"})
+	resolved, err := r.resolveContexts([]string{"default"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	if len(resolved) != 1 || resolved[0] != "default" {
 		t.Errorf("resolveContexts([default]) = %v, want [default]", resolved)
 	}
@@ -539,7 +596,10 @@ func TestResolveContexts_SearchMatch(t *testing.T) {
 	}`)
 
 	r := newTestResolver(cfg)
-	resolved := r.resolveContexts([]string{"golang"})
+	resolved, err := r.resolveContexts([]string{"golang"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	if len(resolved) != 1 || resolved[0] != "golang-env" {
 		t.Errorf("resolveContexts([golang]) = %v, want [golang-env]", resolved)
 	}
@@ -557,7 +617,10 @@ func TestResolveContexts_NoMatchPassthrough(t *testing.T) {
 	}`)
 
 	r := newTestResolver(cfg)
-	resolved := r.resolveContexts([]string{"nonexistent"})
+	resolved, err := r.resolveContexts([]string{"nonexistent"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	// No matches -> pass through as-is (composer will warn)
 	if len(resolved) != 1 || resolved[0] != "nonexistent" {
 		t.Errorf("resolveContexts([nonexistent]) = %v, want [nonexistent]", resolved)
@@ -582,7 +645,10 @@ func TestResolveContexts_Mixed(t *testing.T) {
 	}`)
 
 	r := newTestResolver(cfg)
-	resolved := r.resolveContexts([]string{"./custom.md", "default", "env"})
+	resolved, err := r.resolveContexts([]string{"./custom.md", "default", "env"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	if len(resolved) != 3 {
 		t.Fatalf("resolveContexts() returned %d items, want 3: %v", len(resolved), resolved)
 	}
@@ -716,7 +782,10 @@ func TestContextScoreThreshold_LowScoreExcluded(t *testing.T) {
 	}`)
 
 	r := newTestResolver(cfg)
-	resolved := r.resolveContexts([]string{"golang"})
+	resolved, err := r.resolveContexts([]string{"golang"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	// Should only find golang-env (score 4), not env (score 0)
 	if len(resolved) != 1 {
