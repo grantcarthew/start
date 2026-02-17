@@ -442,12 +442,6 @@ func TestPrintContentPreview(t *testing.T) {
 
 func TestTaskResolution(t *testing.T) {
 	tmpDir := setupStartTestConfig(t)
-
-	// Isolate from global config
-	oldHome := os.Getenv("HOME")
-	_ = os.Setenv("HOME", tmpDir)
-	defer func() { _ = os.Setenv("HOME", oldHome) }()
-
 	chdir(t, tmpDir)
 
 	// Load config for testing
@@ -504,9 +498,8 @@ func TestTaskResolution_AmbiguousPrefix(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// Isolate from global config
-	oldHome := os.Getenv("HOME")
-	_ = os.Setenv("HOME", tmpDir)
-	defer func() { _ = os.Setenv("HOME", oldHome) }()
+	t.Setenv("HOME", tmpDir)
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
 
 	configDir := filepath.Join(tmpDir, ".start")
 	if err := os.MkdirAll(configDir, 0755); err != nil {
@@ -583,13 +576,105 @@ settings: {
 	}
 }
 
+func TestTaskResolution_ExactMatchFallsThrough(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Isolate from global config
+	t.Setenv("HOME", tmpDir)
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	// CUE registry extracts modules with read-only permissions which
+	// breaks t.TempDir() cleanup. Fix permissions before removal.
+	t.Cleanup(func() {
+		_ = filepath.WalkDir(tmpDir, func(path string, d os.DirEntry, err error) error {
+			if err != nil {
+				return nil
+			}
+			_ = os.Chmod(path, 0755)
+			return nil
+		})
+	})
+
+	configDir := filepath.Join(tmpDir, ".start")
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		t.Fatalf("creating config dir: %v", err)
+	}
+
+	// Config where "review" is both an exact task name AND a substring
+	// matching "start/review". The multipleInstalled path should cause
+	// executeTask to fall through to selection instead of silently
+	// running the exact match.
+	config := `
+agents: {
+	echo: {
+		bin: "echo"
+		command: "{{.bin}} test"
+	}
+}
+
+tasks: {
+	"review": {
+		prompt: "General review"
+	}
+	"start/review": {
+		prompt: "Start review"
+	}
+}
+
+settings: {
+	default_agent: "echo"
+}
+`
+	configFile := filepath.Join(configDir, "settings.cue")
+	if err := os.WriteFile(configFile, []byte(config), 0644); err != nil {
+		t.Fatalf("writing config: %v", err)
+	}
+
+	chdir(t, tmpDir)
+
+	cfg, err := loadMergedConfig()
+	if err != nil {
+		t.Fatalf("loading config: %v", err)
+	}
+
+	// Precondition: exact match exists
+	exact, err := findExactInstalledName(cfg.Value, internalcue.KeyTasks, "review")
+	if err != nil {
+		t.Fatalf("findExactInstalledName error: %v", err)
+	}
+	if exact != "review" {
+		t.Fatalf("expected exact match %q, got %q", "review", exact)
+	}
+
+	// Precondition: multiple regex matches exist
+	matches, err := findInstalledTasks(cfg, "review")
+	if err != nil {
+		t.Fatalf("findInstalledTasks error: %v", err)
+	}
+	if len(matches) != 2 {
+		t.Fatalf("expected 2 matches, got %d: %v", len(matches), matches)
+	}
+
+	// executeTask should NOT silently use the exact match.
+	// With non-TTY stdin, multiple matches produce an ambiguous error.
+	stdout := new(bytes.Buffer)
+	stderr := new(bytes.Buffer)
+	flags := &Flags{Quiet: true}
+	err = executeTask(stdout, stderr, strings.NewReader(""), flags, "review", "")
+	if err == nil {
+		t.Fatal("expected ambiguous task error, got nil")
+	}
+	if !strings.Contains(err.Error(), "ambiguous") {
+		t.Errorf("expected error containing %q, got: %v", "ambiguous", err)
+	}
+}
+
 func TestTaskResolution_NoTasksDefined(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// Isolate from global config
-	oldHome := os.Getenv("HOME")
-	_ = os.Setenv("HOME", tmpDir)
-	defer func() { _ = os.Setenv("HOME", oldHome) }()
+	t.Setenv("HOME", tmpDir)
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
 
 	configDir := filepath.Join(tmpDir, ".start")
 	if err := os.MkdirAll(configDir, 0755); err != nil {
@@ -898,9 +983,8 @@ func TestFindInstalledTasks(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// Isolate from global config
-	oldHome := os.Getenv("HOME")
-	_ = os.Setenv("HOME", tmpDir)
-	defer func() { _ = os.Setenv("HOME", oldHome) }()
+	t.Setenv("HOME", tmpDir)
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
 
 	configDir := filepath.Join(tmpDir, ".start")
 	if err := os.MkdirAll(configDir, 0755); err != nil {
