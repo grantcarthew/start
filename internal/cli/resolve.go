@@ -103,12 +103,26 @@ func (r *resolver) resolveAsset(name, cueKey, category, displayType string, allo
 		return resolved, nil
 	}
 
-	// Tier 2: Exact match in registry
-	if !r.flags.Quiet {
-		_, _ = fmt.Fprintf(r.stdout, "%s %q not found in configuration\n", displayType, name)
+	// Tier 1b: Substring search in installed config before going to registry.
+	// Single match is used directly. Multiple matches include registry in search.
+	installedMatches, err := searchInstalled(r.cfg.Value, cueKey, category, name)
+	if err != nil {
+		return "", err
+	}
+	if len(installedMatches) == 1 {
+		debugf(r.flags, dbgResolve, "%s %q: single installed substring match %q",
+			displayType, name, installedMatches[0].Name)
+		return installedMatches[0].Name, nil
+	}
+
+	// Tier 2: Exact match in registry (only when no installed matches)
+	if len(installedMatches) == 0 {
+		if !r.flags.Quiet {
+			_, _ = fmt.Fprintf(r.stdout, "%s %q not found in configuration\n", displayType, name)
+		}
 	}
 	index, client, err := r.ensureIndex()
-	if err == nil && index != nil {
+	if len(installedMatches) == 0 && err == nil && index != nil {
 		entries := registryEntries(index, category)
 		result, err := findExactInRegistry(entries, category, name)
 		if err != nil {
@@ -123,11 +137,8 @@ func (r *resolver) resolveAsset(name, cueKey, category, displayType string, allo
 		}
 	}
 
-	// Tier 3: Regex search across installed + registry
-	installedMatches, err := searchInstalled(r.cfg.Value, cueKey, category, name)
-	if err != nil {
-		return "", err
-	}
+	// Tier 3: Combined search across installed + registry.
+	// Reuse installed matches from tier 1b.
 	var registryMatches []AssetMatch
 	if index != nil {
 		entries := registryEntries(index, category)
@@ -260,12 +271,26 @@ func (r *resolver) resolveContexts(terms []string) ([]string, error) {
 			continue
 		}
 
-		// Exact name match in registry
-		if !r.flags.Quiet {
-			_, _ = fmt.Fprintf(r.stdout, "Context %q not found in configuration\n", term)
+		// Substring search in installed config before going to registry
+		installedMatches, err := searchInstalled(r.cfg.Value, internalcue.KeyContexts, "contexts", term)
+		if err != nil {
+			// Invalid regex in context term - pass through as-is
+			debugf(r.flags, dbgResolve, "Context %q: invalid pattern, passing through", term)
+			resolved = append(resolved, term)
+			continue
 		}
+		hasInstalledMatches := len(installedMatches) > 0
+
+		// Only show "not found" when no installed matches exist
+		if !hasInstalledMatches {
+			if !r.flags.Quiet {
+				_, _ = fmt.Fprintf(r.stdout, "Context %q not found in configuration\n", term)
+			}
+		}
+
+		// Exact name match in registry (only when no installed matches)
 		index, client, _ := r.ensureIndex()
-		if index != nil {
+		if !hasInstalledMatches && index != nil {
 			result, err := findExactInRegistry(index.Contexts, "contexts", term)
 			if err != nil {
 				if !r.flags.Quiet {
@@ -287,14 +312,8 @@ func (r *resolver) resolveContexts(terms []string) ([]string, error) {
 			}
 		}
 
-		// Search across installed + registry (all matches above threshold)
-		installedMatches, err := searchInstalled(r.cfg.Value, internalcue.KeyContexts, "contexts", term)
-		if err != nil {
-			// Invalid regex in context term - pass through as-is
-			debugf(r.flags, dbgResolve, "Context %q: invalid pattern, passing through", term)
-			resolved = append(resolved, term)
-			continue
-		}
+		// Combined search across installed + registry (all matches above threshold).
+		// Reuse installed matches from above.
 		var registryMatches []AssetMatch
 		if index != nil {
 			registryMatches, err = searchRegistryCategory(index.Contexts, "contexts", term)
