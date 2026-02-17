@@ -187,7 +187,7 @@ func TestExecuteTask_NoRole(t *testing.T) {
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
 
-	err := executeTask(stdout, stderr, strings.NewReader(""), flags, "test-task", "focus on testing")
+	err := executeTask(stdout, stderr, strings.NewReader(""), flags, "test-task", "focus on testing", nil)
 	if err != nil {
 		t.Fatalf("executeTask() error = %v", err)
 	}
@@ -255,7 +255,7 @@ settings: {
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
 
-	err := executeTask(stdout, stderr, strings.NewReader(""), flags, "test-task", "")
+	err := executeTask(stdout, stderr, strings.NewReader(""), flags, "test-task", "", nil)
 	if err == nil {
 		t.Fatal("Expected error for missing task role, got nil")
 	}
@@ -323,7 +323,7 @@ func TestExecuteTask_DryRun(t *testing.T) {
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
 
-	err := executeTask(stdout, stderr, strings.NewReader(""), flags, "test-task", "focus on testing")
+	err := executeTask(stdout, stderr, strings.NewReader(""), flags, "test-task", "focus on testing", nil)
 	if err != nil {
 		t.Fatalf("executeTask() error = %v", err)
 	}
@@ -471,7 +471,7 @@ func TestTaskResolution(t *testing.T) {
 	})
 
 	t.Run("substring match", func(t *testing.T) {
-		matches, err := findInstalledTasks(cfg, "test")
+		matches, err := findInstalledTasks(cfg, "test", nil)
 		if err != nil {
 			t.Fatalf("findInstalledTasks() error: %v", err)
 		}
@@ -484,7 +484,7 @@ func TestTaskResolution(t *testing.T) {
 	})
 
 	t.Run("no match", func(t *testing.T) {
-		matches, err := findInstalledTasks(cfg, "nonexistent")
+		matches, err := findInstalledTasks(cfg, "nonexistent", nil)
 		if err != nil {
 			t.Fatalf("findInstalledTasks() error: %v", err)
 		}
@@ -544,7 +544,7 @@ settings: {
 	}
 
 	// Ambiguous prefix should return multiple matches
-	matches, err := findInstalledTasks(cfg, "review")
+	matches, err := findInstalledTasks(cfg, "review", nil)
 	if err != nil {
 		t.Fatalf("findInstalledTasks() error: %v", err)
 	}
@@ -564,7 +564,7 @@ settings: {
 	}
 
 	// Multi-term AND should narrow results
-	matches, err = findInstalledTasks(cfg, "review,code")
+	matches, err = findInstalledTasks(cfg, "review,code", nil)
 	if err != nil {
 		t.Fatalf("findInstalledTasks() error: %v", err)
 	}
@@ -647,7 +647,7 @@ settings: {
 	}
 
 	// Precondition: multiple regex matches exist
-	matches, err := findInstalledTasks(cfg, "review")
+	matches, err := findInstalledTasks(cfg, "review", nil)
 	if err != nil {
 		t.Fatalf("findInstalledTasks error: %v", err)
 	}
@@ -660,12 +660,116 @@ settings: {
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
 	flags := &Flags{Quiet: true}
-	err = executeTask(stdout, stderr, strings.NewReader(""), flags, "review", "")
+	err = executeTask(stdout, stderr, strings.NewReader(""), flags, "review", "", nil)
 	if err == nil {
 		t.Fatal("expected ambiguous task error, got nil")
 	}
 	if !strings.Contains(err.Error(), "ambiguous") {
 		t.Errorf("expected error containing %q, got: %v", "ambiguous", err)
+	}
+}
+
+func TestTaskResolution_ExactMatchTagFilter(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Isolate from global config
+	t.Setenv("HOME", tmpDir)
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	// CUE registry extracts modules with read-only permissions which
+	// breaks t.TempDir() cleanup. Fix permissions before removal.
+	t.Cleanup(func() {
+		_ = filepath.WalkDir(tmpDir, func(path string, d os.DirEntry, err error) error {
+			if err != nil {
+				return nil
+			}
+			_ = os.Chmod(path, 0755)
+			return nil
+		})
+	})
+
+	configDir := filepath.Join(tmpDir, ".start")
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		t.Fatalf("creating config dir: %v", err)
+	}
+
+	// Config with tasks that have different tags. "review" is an exact
+	// name match but lacks the "golang" tag. When --tag golang is
+	// specified, the exact match should be skipped.
+	config := `
+agents: {
+	echo: {
+		bin: "echo"
+		command: "{{.bin}} test"
+	}
+}
+
+tasks: {
+	"review": {
+		prompt: "General review"
+		tags: ["general"]
+	}
+	"golang/review": {
+		prompt: "Go code review"
+		tags: ["golang", "review"]
+	}
+}
+
+settings: {
+	default_agent: "echo"
+}
+`
+	configFile := filepath.Join(configDir, "settings.cue")
+	if err := os.WriteFile(configFile, []byte(config), 0644); err != nil {
+		t.Fatalf("writing config: %v", err)
+	}
+
+	chdir(t, tmpDir)
+
+	cfg, err := loadMergedConfig()
+	if err != nil {
+		t.Fatalf("loading config: %v", err)
+	}
+
+	// Precondition: exact match exists for "review"
+	exact, err := findExactInstalledName(cfg.Value, internalcue.KeyTasks, "review")
+	if err != nil {
+		t.Fatalf("findExactInstalledName error: %v", err)
+	}
+	if exact != "review" {
+		t.Fatalf("expected exact match %q, got %q", "review", exact)
+	}
+
+	// Precondition: tag-filtered search excludes "review" (no "golang" tag)
+	matches, err := findInstalledTasks(cfg, "review", []string{"golang"})
+	if err != nil {
+		t.Fatalf("findInstalledTasks error: %v", err)
+	}
+	if len(matches) != 1 {
+		t.Fatalf("expected 1 tag-filtered match, got %d: %v", len(matches), matches)
+	}
+	if matches[0].Name != "golang/review" {
+		t.Fatalf("expected tag-filtered match %q, got %q", "golang/review", matches[0].Name)
+	}
+
+	// With --tag golang, exact match "review" should be skipped.
+	// Single remaining match "golang/review" should be used directly.
+	// Use --dry-run to capture the resolved task name without executing.
+	stdout := new(bytes.Buffer)
+	stderr := new(bytes.Buffer)
+	flags := &Flags{DryRun: true}
+	err = executeTask(stdout, stderr, strings.NewReader(""), flags, "review", "", []string{"golang"})
+	if err != nil {
+		t.Fatalf("executeTask() error: %v", err)
+	}
+
+	// Dry-run output should show "golang/review", not "review"
+	output := stdout.String()
+	if !strings.Contains(output, "golang/review") {
+		t.Errorf("expected resolved task 'golang/review' in output, got:\n%s", output)
+	}
+	if strings.Contains(output, "Task: review\n") {
+		t.Errorf("exact match 'review' should have been skipped due to tag filter, got:\n%s", output)
 	}
 }
 
@@ -710,7 +814,7 @@ settings: {
 		t.Errorf("findExactInstalledName() = %q, want empty for missing tasks", got)
 	}
 
-	matches, err := findInstalledTasks(cfg, "anything")
+	matches, err := findInstalledTasks(cfg, "anything", nil)
 	if err != nil {
 		t.Fatalf("findInstalledTasks() error: %v", err)
 	}
@@ -872,7 +976,7 @@ func TestExecuteTask_FilePathTask(t *testing.T) {
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
 
-	err := executeTask(stdout, stderr, strings.NewReader(""), flags, "./test-task.md", "")
+	err := executeTask(stdout, stderr, strings.NewReader(""), flags, "./test-task.md", "", nil)
 	if err != nil {
 		t.Fatalf("executeTask() error = %v", err)
 	}
@@ -906,7 +1010,7 @@ func TestExecuteTask_FilePathWithInstructions(t *testing.T) {
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
 
-	err := executeTask(stdout, stderr, strings.NewReader(""), flags, "./review-task.md", "focus on security")
+	err := executeTask(stdout, stderr, strings.NewReader(""), flags, "./review-task.md", "focus on security", nil)
 	if err != nil {
 		t.Fatalf("executeTask() error = %v", err)
 	}
@@ -933,7 +1037,7 @@ func TestExecuteTask_FilePathMissing(t *testing.T) {
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
 
-	err := executeTask(stdout, stderr, strings.NewReader(""), flags, "./nonexistent.md", "")
+	err := executeTask(stdout, stderr, strings.NewReader(""), flags, "./nonexistent.md", "", nil)
 
 	if err == nil {
 		t.Error("Expected error for missing file")
@@ -978,6 +1082,39 @@ func TestExecuteStart_FilePathContextMissing(t *testing.T) {
 }
 
 // Tests for unified task resolution (DR-015 update)
+
+func TestTaskInMatches(t *testing.T) {
+	t.Parallel()
+
+	matches := []TaskMatch{
+		{Name: "golang/review", Source: TaskSourceInstalled},
+		{Name: "start/commit", Source: TaskSourceRegistry},
+	}
+
+	tests := []struct {
+		name string
+		task string
+		want bool
+	}{
+		{"found", "golang/review", true},
+		{"found registry", "start/commit", true},
+		{"not found", "review", false},
+		{"empty list", "anything", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			input := matches
+			if tt.name == "empty list" {
+				input = nil
+			}
+			got := taskInMatches(tt.task, input)
+			if got != tt.want {
+				t.Errorf("taskInMatches(%q) = %v, want %v", tt.task, got, tt.want)
+			}
+		})
+	}
+}
 
 func TestFindInstalledTasks(t *testing.T) {
 	tmpDir := t.TempDir()
@@ -1055,7 +1192,7 @@ settings: {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			matches, err := findInstalledTasks(cfg, tt.searchTerm)
+			matches, err := findInstalledTasks(cfg, tt.searchTerm, nil)
 			if err != nil {
 				t.Fatalf("findInstalledTasks() error: %v", err)
 			}
@@ -1134,7 +1271,7 @@ func TestFindRegistryTasks(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			matches, err := findRegistryTasks(index, tt.searchTerm)
+			matches, err := findRegistryTasks(index, tt.searchTerm, nil)
 			if err != nil {
 				t.Fatalf("findRegistryTasks() error: %v", err)
 			}
