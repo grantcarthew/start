@@ -84,7 +84,104 @@ tasks: {
 	return dir
 }
 
-// TestPrepareShowAgent tests the prepareShowAgent logic function.
+// setupTestConfigWithFiles creates a test config that includes file-based resources
+// with actual readable files.
+func setupTestConfigWithFiles(t *testing.T) string {
+	t.Helper()
+
+	dir := t.TempDir()
+	startDir := filepath.Join(dir, ".start")
+	if err := os.MkdirAll(startDir, 0755); err != nil {
+		t.Fatalf("creating .start dir: %v", err)
+	}
+
+	// Create a file-based role
+	roleFile := filepath.Join(dir, "role.md")
+	if err := os.WriteFile(roleFile, []byte("You are a Go expert."), 0644); err != nil {
+		t.Fatalf("writing role file: %v", err)
+	}
+
+	// Create a file-based context
+	contextFile := filepath.Join(dir, "context.md")
+	if err := os.WriteFile(contextFile, []byte("Project context info."), 0644); err != nil {
+		t.Fatalf("writing context file: %v", err)
+	}
+
+	config := `
+agents: {
+	claude: {
+		bin:         "claude"
+		command:     "{{.bin}} '{{.prompt}}'"
+		description: "Claude by Anthropic"
+	}
+}
+
+roles: {
+	"go-expert": {
+		description: "Go language expert"
+		file:        "` + roleFile + `"
+	}
+}
+
+contexts: {
+	project: {
+		description: "Project context"
+		file:        "` + contextFile + `"
+		tags:        ["project"]
+	}
+}
+
+tasks: {
+	review: {
+		description: "Review changes"
+		command:     "git diff --staged"
+		prompt:      "Review the changes."
+	}
+}
+`
+	configPath := filepath.Join(startDir, "settings.cue")
+	if err := os.WriteFile(configPath, []byte(config), 0644); err != nil {
+		t.Fatalf("writing config: %v", err)
+	}
+
+	chdir(t, dir)
+	t.Setenv("HOME", dir)
+
+	return dir
+}
+
+// setupTestConfigWithOrigin creates a test config with origin fields for testing
+// verbose dump of registry-installed assets.
+func setupTestConfigWithOrigin(t *testing.T) string {
+	t.Helper()
+
+	dir := t.TempDir()
+	startDir := filepath.Join(dir, ".start")
+	if err := os.MkdirAll(startDir, 0755); err != nil {
+		t.Fatalf("creating .start dir: %v", err)
+	}
+
+	config := `
+roles: {
+	"golang/assistant": {
+		description: "Go assistant"
+		origin:      "github.com/grantcarthew/start-assets/roles/golang@v0.1.0"
+		prompt:      "You are a Go assistant."
+	}
+}
+`
+	configPath := filepath.Join(startDir, "settings.cue")
+	if err := os.WriteFile(configPath, []byte(config), 0644); err != nil {
+		t.Fatalf("writing config: %v", err)
+	}
+
+	chdir(t, dir)
+	t.Setenv("HOME", dir)
+
+	return dir
+}
+
+// TestPrepareShowAgent tests the prepareShow function for agents.
 func TestPrepareShowAgent(t *testing.T) {
 	setupTestConfig(t)
 
@@ -94,7 +191,6 @@ func TestPrepareShowAgent(t *testing.T) {
 		scope          string
 		wantType       string
 		wantName       string
-		wantContent    []string
 		wantAllNames   []string
 		wantShowReason string
 		wantErr        bool
@@ -107,22 +203,13 @@ func TestPrepareShowAgent(t *testing.T) {
 			wantName:       "claude",
 			wantAllNames:   []string{"claude"},
 			wantShowReason: "first in config",
-			wantErr:        false,
 		},
 		{
-			name:      "named agent with all fields",
+			name:      "named agent",
 			agentName: "claude",
 			scope:     "",
 			wantType:  "Agent",
 			wantName:  "claude",
-			wantContent: []string{
-				"Claude by Anthropic",
-				"sonnet: claude-sonnet-4-20250514",
-				"opus: claude-opus-4-20250514",
-				"Tags: anthropic, claude, ai",
-			},
-			wantAllNames: []string{"claude"},
-			wantErr:      false,
 		},
 		{
 			name:      "substring match",
@@ -130,15 +217,10 @@ func TestPrepareShowAgent(t *testing.T) {
 			scope:     "",
 			wantType:  "Agent",
 			wantName:  "claude",
-			wantContent: []string{
-				"Claude by Anthropic",
-			},
-			wantErr: false,
 		},
 		{
 			name:      "nonexistent agent",
 			agentName: "nonexistent",
-			scope:     "",
 			wantErr:   true,
 		},
 		{
@@ -170,25 +252,23 @@ func TestPrepareShowAgent(t *testing.T) {
 			if result.Name != tt.wantName {
 				t.Errorf("Name = %q, want %q", result.Name, tt.wantName)
 			}
-			for _, want := range tt.wantContent {
-				if !strings.Contains(result.Content, want) {
-					t.Errorf("Content missing %q\ngot: %s", want, result.Content)
-				}
-			}
 			if tt.wantShowReason != "" && result.ShowReason != tt.wantShowReason {
 				t.Errorf("ShowReason = %q, want %q", result.ShowReason, tt.wantShowReason)
 			}
-			// Check AllNames
 			if len(tt.wantAllNames) > 0 {
 				if len(result.AllNames) != len(tt.wantAllNames) {
 					t.Errorf("AllNames length = %d, want %d", len(result.AllNames), len(tt.wantAllNames))
 				}
 			}
+			// Verify Value is populated
+			if !result.Value.Exists() {
+				t.Error("Value should exist")
+			}
 		})
 	}
 }
 
-// TestPrepareShowRole tests the prepareShowRole logic function.
+// TestPrepareShowRole tests the prepareShow function for roles.
 func TestPrepareShowRole(t *testing.T) {
 	setupTestConfig(t)
 
@@ -197,7 +277,6 @@ func TestPrepareShowRole(t *testing.T) {
 		roleName       string
 		wantType       string
 		wantName       string
-		wantContent    []string
 		wantAllNames   []string
 		wantShowReason string
 		wantErr        bool
@@ -209,28 +288,18 @@ func TestPrepareShowRole(t *testing.T) {
 			wantName:       "assistant",
 			wantAllNames:   []string{"assistant", "code-reviewer"},
 			wantShowReason: "first in config",
-			wantErr:        false,
 		},
 		{
 			name:     "named role with hyphen",
 			roleName: "code-reviewer",
 			wantType: "Role",
 			wantName: "code-reviewer",
-			wantContent: []string{
-				"Description: Code reviewer",
-				"You are an expert code reviewer.",
-			},
-			wantErr: false,
 		},
 		{
 			name:     "substring match",
 			roleName: "code",
 			wantType: "Role",
 			wantName: "code-reviewer",
-			wantContent: []string{
-				"Description: Code reviewer",
-			},
-			wantErr: false,
 		},
 		{
 			name:     "nonexistent role",
@@ -260,11 +329,6 @@ func TestPrepareShowRole(t *testing.T) {
 			if result.Name != tt.wantName {
 				t.Errorf("Name = %q, want %q", result.Name, tt.wantName)
 			}
-			for _, want := range tt.wantContent {
-				if !strings.Contains(result.Content, want) {
-					t.Errorf("Content missing %q\ngot: %s", want, result.Content)
-				}
-			}
 			if tt.wantShowReason != "" && result.ShowReason != tt.wantShowReason {
 				t.Errorf("ShowReason = %q, want %q", result.ShowReason, tt.wantShowReason)
 			}
@@ -277,7 +341,7 @@ func TestPrepareShowRole(t *testing.T) {
 	}
 }
 
-// TestPrepareShowContext tests the prepareShowContext logic function.
+// TestPrepareShowContext tests the prepareShow function for contexts.
 func TestPrepareShowContext(t *testing.T) {
 	setupTestConfig(t)
 
@@ -286,7 +350,6 @@ func TestPrepareShowContext(t *testing.T) {
 		contextName    string
 		wantType       string
 		wantName       string
-		wantContent    []string
 		wantAllNames   []string
 		wantShowReason string
 		wantErr        bool
@@ -298,43 +361,18 @@ func TestPrepareShowContext(t *testing.T) {
 			wantName:       "environment",
 			wantAllNames:   []string{"environment", "git-status"},
 			wantShowReason: "first in config",
-			wantErr:        false,
 		},
 		{
-			name:        "context with file and required",
+			name:        "context by name",
 			contextName: "environment",
 			wantType:    "Context",
 			wantName:    "environment",
-			wantContent: []string{
-				"File: ~/context/ENVIRONMENT.md",
-				"Environment context loaded.",
-				"Required: true",
-				"Tags: system, environment",
-			},
-			wantErr: false,
-		},
-		{
-			name:        "context with command and default",
-			contextName: "git-status",
-			wantType:    "Context",
-			wantName:    "git-status",
-			wantContent: []string{
-				"Command: git status --short",
-				"Git status output.",
-				"Default: true",
-				"Tags: git, vcs",
-			},
-			wantErr: false,
 		},
 		{
 			name:        "substring match",
 			contextName: "git",
 			wantType:    "Context",
 			wantName:    "git-status",
-			wantContent: []string{
-				"Command: git status --short",
-			},
-			wantErr: false,
 		},
 		{
 			name:        "nonexistent context",
@@ -364,11 +402,6 @@ func TestPrepareShowContext(t *testing.T) {
 			if result.Name != tt.wantName {
 				t.Errorf("Name = %q, want %q", result.Name, tt.wantName)
 			}
-			for _, want := range tt.wantContent {
-				if !strings.Contains(result.Content, want) {
-					t.Errorf("Content missing %q\ngot: %s", want, result.Content)
-				}
-			}
 			if tt.wantShowReason != "" && result.ShowReason != tt.wantShowReason {
 				t.Errorf("ShowReason = %q, want %q", result.ShowReason, tt.wantShowReason)
 			}
@@ -381,7 +414,7 @@ func TestPrepareShowContext(t *testing.T) {
 	}
 }
 
-// TestPrepareShowTask tests the prepareShowTask logic function.
+// TestPrepareShowTask tests the prepareShow function for tasks.
 func TestPrepareShowTask(t *testing.T) {
 	setupTestConfig(t)
 
@@ -390,7 +423,6 @@ func TestPrepareShowTask(t *testing.T) {
 		taskName       string
 		wantType       string
 		wantName       string
-		wantContent    []string
 		wantAllNames   []string
 		wantShowReason string
 		wantErr        bool
@@ -402,20 +434,12 @@ func TestPrepareShowTask(t *testing.T) {
 			wantName:       "review",
 			wantAllNames:   []string{"review"},
 			wantShowReason: "first in config",
-			wantErr:        false,
 		},
 		{
-			name:     "task with all fields",
+			name:     "task by name",
 			taskName: "review",
 			wantType: "Task",
 			wantName: "review",
-			wantContent: []string{
-				"Description: Review changes",
-				"Command: git diff --staged",
-				"Review: {{.command_output}}",
-				"Role: code-reviewer",
-			},
-			wantErr: false,
 		},
 		{
 			name:     "nonexistent task",
@@ -427,10 +451,6 @@ func TestPrepareShowTask(t *testing.T) {
 			taskName: "rev",
 			wantType: "Task",
 			wantName: "review",
-			wantContent: []string{
-				"Description: Review changes",
-			},
-			wantErr: false,
 		},
 	}
 
@@ -455,11 +475,6 @@ func TestPrepareShowTask(t *testing.T) {
 			if result.Name != tt.wantName {
 				t.Errorf("Name = %q, want %q", result.Name, tt.wantName)
 			}
-			for _, want := range tt.wantContent {
-				if !strings.Contains(result.Content, want) {
-					t.Errorf("Content missing %q\ngot: %s", want, result.Content)
-				}
-			}
 			if tt.wantShowReason != "" && result.ShowReason != tt.wantShowReason {
 				t.Errorf("ShowReason = %q, want %q", result.ShowReason, tt.wantShowReason)
 			}
@@ -472,45 +487,341 @@ func TestPrepareShowTask(t *testing.T) {
 	}
 }
 
-// TestPrintPreview tests the printPreview output function.
-func TestPrintPreview(t *testing.T) {
-	result := ShowResult{
-		ItemType:   "Agent",
-		Name:       "claude",
-		Content:    "Line 1\nLine 2\nLine 3",
-		AllNames:   []string{"claude", "gemini"},
-		ShowReason: "first in config",
+// TestVerboseDumpCUEDefinition verifies CUE definition output in verbose dump.
+func TestVerboseDumpCUEDefinition(t *testing.T) {
+	setupTestConfig(t)
+
+	result, err := prepareShow("claude", "", internalcue.KeyAgents, "Agent")
+	if err != nil {
+		t.Fatalf("prepareShow: %v", err)
 	}
 
 	var buf bytes.Buffer
-	printPreview(&buf, result)
+	printVerboseDump(&buf, result)
+	output := buf.String()
+
+	// CUE definition should contain struct markers and field names
+	wantStrings := []string{
+		"bin:",
+		"command:",
+		`"claude"`,
+		"models:",
+		"sonnet:",
+		"opus:",
+		"tags:",
+	}
+	for _, want := range wantStrings {
+		if !strings.Contains(output, want) {
+			t.Errorf("output missing CUE definition element %q\ngot:\n%s", want, output)
+		}
+	}
+}
+
+// TestVerboseDumpConfigSource verifies config source path in verbose dump.
+func TestVerboseDumpConfigSource(t *testing.T) {
+	dir := setupTestConfig(t)
+
+	result, err := prepareShow("claude", "", internalcue.KeyAgents, "Agent")
+	if err != nil {
+		t.Fatalf("prepareShow: %v", err)
+	}
+
+	var buf bytes.Buffer
+	printVerboseDump(&buf, result)
+	output := buf.String()
+
+	// Config source should show the .cue file path
+	expectedPath := filepath.Join(dir, ".start", "settings.cue")
+	if !strings.Contains(output, expectedPath) {
+		t.Errorf("output missing config source path %q\ngot:\n%s", expectedPath, output)
+	}
+
+	// Config line should contain item name in parentheses
+	if !strings.Contains(output, "claude") {
+		t.Errorf("output missing item name 'claude'\ngot:\n%s", output)
+	}
+}
+
+// TestVerboseDumpOriginCache verifies origin and cache display for registry assets.
+func TestVerboseDumpOriginCache(t *testing.T) {
+	setupTestConfigWithOrigin(t)
+
+	result, err := prepareShow("golang/assistant", "", internalcue.KeyRoles, "Role")
+	if err != nil {
+		t.Fatalf("prepareShow: %v", err)
+	}
+
+	var buf bytes.Buffer
+	printVerboseDump(&buf, result)
+	output := buf.String()
+
+	// Origin should be displayed
+	if !strings.Contains(output, "github.com/grantcarthew/start-assets/roles/golang@v0.1.0") {
+		t.Errorf("output missing origin\ngot:\n%s", output)
+	}
+
+	// Cache directory should contain mod/extract path
+	if !strings.Contains(output, "mod/extract") {
+		t.Errorf("output missing cache path\ngot:\n%s", output)
+	}
+}
+
+// TestVerboseDumpFileContent verifies file content display.
+func TestVerboseDumpFileContent(t *testing.T) {
+	setupTestConfigWithFiles(t)
+
+	result, err := prepareShow("go-expert", "", internalcue.KeyRoles, "Role")
+	if err != nil {
+		t.Fatalf("prepareShow: %v", err)
+	}
+
+	var buf bytes.Buffer
+	printVerboseDump(&buf, result)
+	output := buf.String()
+
+	// Should display the file content
+	if !strings.Contains(output, "You are a Go expert.") {
+		t.Errorf("output missing file content\ngot:\n%s", output)
+	}
+}
+
+// TestVerboseDumpFileError verifies inline error for unreadable files.
+func TestVerboseDumpFileError(t *testing.T) {
+	dir := t.TempDir()
+	startDir := filepath.Join(dir, ".start")
+	if err := os.MkdirAll(startDir, 0755); err != nil {
+		t.Fatalf("creating .start dir: %v", err)
+	}
+
+	config := `
+roles: {
+	broken: {
+		description: "Broken role"
+		file:        "/nonexistent/path/role.md"
+	}
+}
+`
+	configPath := filepath.Join(startDir, "settings.cue")
+	if err := os.WriteFile(configPath, []byte(config), 0644); err != nil {
+		t.Fatalf("writing config: %v", err)
+	}
+
+	chdir(t, dir)
+	t.Setenv("HOME", dir)
+
+	result, err := prepareShow("broken", "", internalcue.KeyRoles, "Role")
+	if err != nil {
+		t.Fatalf("prepareShow: %v", err)
+	}
+
+	var buf bytes.Buffer
+	printVerboseDump(&buf, result)
+	output := buf.String()
+
+	// Should show inline error, not crash
+	if !strings.Contains(output, "[error:") {
+		t.Errorf("output missing inline error\ngot:\n%s", output)
+	}
+}
+
+// TestVerboseDumpCommand verifies command display.
+func TestVerboseDumpCommand(t *testing.T) {
+	setupTestConfig(t)
+
+	result, err := prepareShow("review", "", internalcue.KeyTasks, "Task")
+	if err != nil {
+		t.Fatalf("prepareShow: %v", err)
+	}
+
+	var buf bytes.Buffer
+	printVerboseDump(&buf, result)
+	output := buf.String()
+
+	// Should display command as string
+	if !strings.Contains(output, "git diff --staged") {
+		t.Errorf("output missing command\ngot:\n%s", output)
+	}
+}
+
+// TestVerboseDumpSeparators verifies separator lines in verbose dump.
+func TestVerboseDumpSeparators(t *testing.T) {
+	setupTestConfig(t)
+
+	result, err := prepareShow("claude", "", internalcue.KeyAgents, "Agent")
+	if err != nil {
+		t.Fatalf("prepareShow: %v", err)
+	}
+
+	var buf bytes.Buffer
+	printVerboseDump(&buf, result)
+	output := buf.String()
+
+	separator := strings.Repeat("─", 79)
+	count := strings.Count(output, separator)
+	if count < 2 {
+		t.Errorf("expected at least 2 separator lines, got %d\n%s", count, output)
+	}
+}
+
+// TestShowListingDescriptions verifies enhanced listing with descriptions.
+func TestShowListingDescriptions(t *testing.T) {
+	setupTestConfig(t)
+
+	buf := new(bytes.Buffer)
+	cmd := NewRootCmd()
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	cmd.SetArgs([]string{"show"})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	output := buf.String()
 
-	// Check list of all items
-	if !strings.Contains(output, "Agents: claude, gemini") {
-		t.Errorf("output should contain agents list, got: %s", output)
+	// Check category headers
+	if !strings.Contains(output, "agents/") {
+		t.Error("output missing agents/ header")
+	}
+	if !strings.Contains(output, "roles/") {
+		t.Error("output missing roles/ header")
+	}
+	if !strings.Contains(output, "contexts/") {
+		t.Error("output missing contexts/ header")
+	}
+	if !strings.Contains(output, "tasks/") {
+		t.Error("output missing tasks/ header")
 	}
 
-	// Check header with show reason
+	// Check names are present
+	if !strings.Contains(output, "claude") {
+		t.Error("output missing agent name 'claude'")
+	}
+	if !strings.Contains(output, "assistant") {
+		t.Error("output missing role name 'assistant'")
+	}
+
+	// Check descriptions are present alongside names
+	if !strings.Contains(output, "Claude by Anthropic") {
+		t.Error("output missing description 'Claude by Anthropic'")
+	}
+	if !strings.Contains(output, "General assistant") {
+		t.Error("output missing description 'General assistant'")
+	}
+	if !strings.Contains(output, "Review changes") {
+		t.Error("output missing description 'Review changes'")
+	}
+}
+
+// TestShowListingNoDescriptions verifies items without descriptions are listed.
+func TestShowListingNoDescriptions(t *testing.T) {
+	dir := t.TempDir()
+	startDir := filepath.Join(dir, ".start")
+	if err := os.MkdirAll(startDir, 0755); err != nil {
+		t.Fatalf("creating .start dir: %v", err)
+	}
+
+	config := `
+roles: {
+	minimal: {
+		prompt: "You are minimal."
+	}
+}
+`
+	if err := os.WriteFile(filepath.Join(startDir, "settings.cue"), []byte(config), 0644); err != nil {
+		t.Fatalf("writing config: %v", err)
+	}
+
+	chdir(t, dir)
+	t.Setenv("HOME", dir)
+
+	buf := new(bytes.Buffer)
+	cmd := NewRootCmd()
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	cmd.SetArgs([]string{"show"})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := buf.String()
+	if !strings.Contains(output, "minimal") {
+		t.Error("output missing item name 'minimal'")
+	}
+}
+
+// TestShowCrossCategory verifies cross-category search with a single match.
+func TestShowCrossCategory(t *testing.T) {
+	setupTestConfig(t)
+
+	buf := new(bytes.Buffer)
+	cmd := NewRootCmd()
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	cmd.SetArgs([]string{"show", "claude"})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := buf.String()
+
+	// Should show verbose dump for claude agent
 	if !strings.Contains(output, "Agent: claude") {
-		t.Errorf("output should contain 'Agent: claude', got: %s", output)
-	}
-	if !strings.Contains(output, "first in config") {
-		t.Errorf("output should contain 'first in config', got: %s", output)
+		t.Errorf("output missing 'Agent: claude'\ngot:\n%s", output)
 	}
 
-	// Check separator line
-	if !strings.Contains(output, strings.Repeat("─", 79)) {
-		t.Error("output should contain separator line")
+	// Should contain CUE definition
+	if !strings.Contains(output, "bin:") {
+		t.Errorf("output missing CUE definition\ngot:\n%s", output)
+	}
+}
+
+// TestShowCrossCategoryMultipleExact verifies ambiguity when an exact name exists
+// in multiple categories (non-TTY returns error).
+func TestShowCrossCategoryMultipleExact(t *testing.T) {
+	dir := t.TempDir()
+	startDir := filepath.Join(dir, ".start")
+	if err := os.MkdirAll(startDir, 0755); err != nil {
+		t.Fatalf("creating .start dir: %v", err)
 	}
 
-	// Check full content is shown
-	if !strings.Contains(output, "Line 1") {
-		t.Error("output should contain Line 1")
+	// "helper" exists as both a role and a task
+	config := `
+roles: {
+	helper: {
+		description: "Helper role"
+		prompt:      "You help."
 	}
-	if !strings.Contains(output, "Line 3") {
-		t.Error("output should contain Line 3")
+}
+tasks: {
+	helper: {
+		description: "Helper task"
+		prompt:      "Help."
+	}
+}
+`
+	if err := os.WriteFile(filepath.Join(startDir, "settings.cue"), []byte(config), 0644); err != nil {
+		t.Fatalf("writing config: %v", err)
+	}
+
+	chdir(t, dir)
+	t.Setenv("HOME", dir)
+
+	buf := new(bytes.Buffer)
+	cmd := NewRootCmd()
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	// stdin is not a TTY in tests, so multiple matches should return an error
+	cmd.SetArgs([]string{"show", "helper"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error for ambiguous exact match in non-TTY")
+	}
+	if !strings.Contains(err.Error(), "ambiguous") {
+		t.Errorf("error should mention ambiguity, got: %v", err)
 	}
 }
 
@@ -527,44 +838,47 @@ func TestShowCommandIntegration(t *testing.T) {
 		{
 			name:       "show agent no name shows first agent",
 			args:       []string{"show", "agent"},
-			wantOutput: []string{"Agents:", "Agent:", "claude", "first in config"},
-			wantErr:    false,
+			wantOutput: []string{"Agent:", "claude", "first in config"},
 		},
 		{
-			name:       "show agent with name shows content",
+			name:       "show agent with name shows verbose dump",
 			args:       []string{"show", "agent", "claude"},
-			wantOutput: []string{"Agent: claude", "Description:"},
-			wantErr:    false,
+			wantOutput: []string{"Agent: claude", "bin:"},
 		},
 		{
 			name:       "show role no name shows first role",
 			args:       []string{"show", "role"},
-			wantOutput: []string{"Roles:", "Role:", "assistant", "first in config"},
-			wantErr:    false,
+			wantOutput: []string{"Role:", "assistant", "first in config"},
 		},
 		{
 			name:       "show context no name shows first context",
 			args:       []string{"show", "context"},
-			wantOutput: []string{"Contexts:", "Context:", "environment", "first in config"},
-			wantErr:    false,
+			wantOutput: []string{"Context:", "environment", "first in config"},
 		},
 		{
-			name:       "show context with name shows content",
+			name:       "show context with name shows verbose dump",
 			args:       []string{"show", "context", "environment"},
 			wantOutput: []string{"Context: environment"},
-			wantErr:    false,
 		},
 		{
-			name:       "show task with name shows content",
+			name:       "show task with name shows verbose dump",
 			args:       []string{"show", "task", "review"},
-			wantOutput: []string{"Task: review"},
-			wantErr:    false,
+			wantOutput: []string{"Task: review", "git diff --staged"},
 		},
 		{
 			name:       "show task no name shows first task",
 			args:       []string{"show", "task"},
-			wantOutput: []string{"Tasks:", "Task:", "review", "first in config"},
-			wantErr:    false,
+			wantOutput: []string{"Task:", "review", "first in config"},
+		},
+		{
+			name:       "show no args lists all items",
+			args:       []string{"show"},
+			wantOutput: []string{"agents/", "roles/", "contexts/", "tasks/", "claude", "assistant"},
+		},
+		{
+			name:       "show cross-category search single match",
+			args:       []string{"show", "claude"},
+			wantOutput: []string{"Agent: claude"},
 		},
 	}
 
@@ -597,4 +911,93 @@ func TestShowCommandIntegration(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestFormatCUEDefinition verifies the CUE definition formatter.
+func TestFormatCUEDefinition(t *testing.T) {
+	setupTestConfig(t)
+
+	result, err := prepareShow("assistant", "", internalcue.KeyRoles, "Role")
+	if err != nil {
+		t.Fatalf("prepareShow: %v", err)
+	}
+
+	def := formatCUEDefinition(result.Value)
+	if def == "" {
+		t.Fatal("formatCUEDefinition returned empty string")
+	}
+
+	// Should contain CUE syntax markers
+	if !strings.Contains(def, "{") {
+		t.Error("CUE definition missing struct marker '{'")
+	}
+	if !strings.Contains(def, "description:") {
+		t.Error("CUE definition missing 'description:' field")
+	}
+	if !strings.Contains(def, "prompt:") {
+		t.Error("CUE definition missing 'prompt:' field")
+	}
+}
+
+// TestResolveShowFile verifies file resolution for different path types.
+func TestResolveShowFile(t *testing.T) {
+	// Create a temp file
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "test.md")
+	if err := os.WriteFile(testFile, []byte("test content"), 0644); err != nil {
+		t.Fatalf("writing test file: %v", err)
+	}
+
+	t.Run("absolute path", func(t *testing.T) {
+		resolvedPath, content, err := resolveShowFile(testFile, "")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if content != "test content" {
+			t.Errorf("content = %q, want %q", content, "test content")
+		}
+		if resolvedPath != testFile {
+			t.Errorf("resolvedPath = %q, want %q", resolvedPath, testFile)
+		}
+	})
+
+	t.Run("nonexistent file", func(t *testing.T) {
+		_, _, err := resolveShowFile("/nonexistent/file.md", "")
+		if err == nil {
+			t.Error("expected error for nonexistent file")
+		}
+	})
+
+	t.Run("empty file path", func(t *testing.T) {
+		resolvedPath, content, err := resolveShowFile("", "")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if resolvedPath != "" || content != "" {
+			t.Errorf("expected empty results for empty path, got path=%q content=%q", resolvedPath, content)
+		}
+	})
+}
+
+// TestDeriveCacheDir verifies cache directory derivation from origin.
+func TestDeriveCacheDir(t *testing.T) {
+	t.Run("origin with version", func(t *testing.T) {
+		result := deriveCacheDir("github.com/grantcarthew/start-assets/roles/golang@v0.1.0")
+		if result == "" {
+			t.Error("expected non-empty cache dir")
+		}
+		if !strings.Contains(result, "mod/extract") {
+			t.Errorf("cache dir missing mod/extract: %s", result)
+		}
+		if !strings.Contains(result, "golang@v0.1.0") {
+			t.Errorf("cache dir missing versioned module name: %s", result)
+		}
+	})
+
+	t.Run("origin without version", func(t *testing.T) {
+		result := deriveCacheDir("github.com/grantcarthew/start-assets/roles/golang")
+		if result != "" {
+			t.Errorf("expected empty cache dir for unversioned origin, got %q", result)
+		}
+	})
 }

@@ -431,16 +431,16 @@ func (c *Composer) resolveContext(cfg cue.Value, name string) (ProcessResult, er
 		return ProcessResult{}, fmt.Errorf("context not found")
 	}
 
-	fields := extractUTDFields(ctxVal)
+	fields := ExtractUTDFields(ctxVal)
 	if !IsUTDValid(fields) {
 		return ProcessResult{}, fmt.Errorf("invalid UTD: no file, command, or prompt")
 	}
 
 	// Resolve @module/ paths using origin field (per DR-023)
 	if strings.HasPrefix(fields.File, "@module/") {
-		origin := extractOrigin(ctxVal)
+		origin := ExtractOrigin(ctxVal)
 		if origin != "" {
-			resolved, err := resolveModulePath(fields.File, origin)
+			resolved, err := ResolveModulePath(fields.File, origin)
 			if err == nil {
 				fields.File = resolved
 			}
@@ -490,16 +490,16 @@ func (c *Composer) resolveRole(cfg cue.Value, name string) (content, filePath st
 		return "", "", fmt.Errorf("role not found")
 	}
 
-	fields := extractUTDFields(roleVal)
+	fields := ExtractUTDFields(roleVal)
 	if !IsUTDValid(fields) {
 		return "", "", fmt.Errorf("invalid UTD: no file, command, or prompt")
 	}
 
 	// Resolve @module/ paths using origin field (per DR-023)
 	if strings.HasPrefix(fields.File, "@module/") {
-		origin := extractOrigin(roleVal)
+		origin := ExtractOrigin(roleVal)
 		if origin != "" {
-			resolved, err := resolveModulePath(fields.File, origin)
+			resolved, err := ResolveModulePath(fields.File, origin)
 			if err == nil {
 				fields.File = resolved
 			}
@@ -645,8 +645,8 @@ func (c *Composer) getDefaultRole(cfg cue.Value) string {
 	return roleName
 }
 
-// extractUTDFields extracts UTD fields from a CUE value.
-func extractUTDFields(v cue.Value) UTDFields {
+// ExtractUTDFields extracts UTD fields from a CUE value.
+func ExtractUTDFields(v cue.Value) UTDFields {
 	var fields UTDFields
 
 	if file := v.LookupPath(cue.ParsePath("file")); file.Exists() {
@@ -677,16 +677,16 @@ func (c *Composer) ResolveTask(cfg cue.Value, name, instructions string) (Proces
 		return ProcessResult{}, fmt.Errorf("task %q not found", name)
 	}
 
-	fields := extractUTDFields(taskVal)
+	fields := ExtractUTDFields(taskVal)
 	if !IsUTDValid(fields) {
 		return ProcessResult{}, fmt.Errorf("invalid UTD: no file, command, or prompt")
 	}
 
 	// Resolve @module/ paths using origin field (per DR-023)
 	if strings.HasPrefix(fields.File, "@module/") {
-		origin := extractOrigin(taskVal)
+		origin := ExtractOrigin(taskVal)
 		if origin != "" {
-			resolved, err := resolveModulePath(fields.File, origin)
+			resolved, err := ResolveModulePath(fields.File, origin)
 			if err == nil {
 				fields.File = resolved
 			}
@@ -737,8 +737,8 @@ func (c *Composer) ProcessContent(content, instructions string) (ProcessResult, 
 	return c.processor.Process(fields, instructions)
 }
 
-// extractOrigin extracts the origin field from a CUE value.
-func extractOrigin(v cue.Value) string {
+// ExtractOrigin extracts the origin field from a CUE value.
+func ExtractOrigin(v cue.Value) string {
 	if origin := v.LookupPath(cue.ParsePath("origin")); origin.Exists() {
 		if s, err := origin.String(); err == nil {
 			return s
@@ -747,18 +747,18 @@ func extractOrigin(v cue.Value) string {
 	return ""
 }
 
-// resolveModulePath resolves an @module/ path to the CUE cache location.
+// ResolveModulePath resolves an @module/ path to the CUE cache location.
 // Per DR-023, @module/ paths resolve relative to the cached module directory.
 // The origin field contains the exact versioned module path (e.g.,
 // "github.com/.../task@v0.1.2") which maps directly to a cache directory.
-func resolveModulePath(path, origin string) (string, error) {
+func ResolveModulePath(path, origin string) (string, error) {
 	if !strings.HasPrefix(path, "@module/") {
 		return path, nil
 	}
 
 	relativePath := strings.TrimPrefix(path, "@module/")
 
-	cacheDir, err := getCUECacheDir()
+	cacheDir, err := GetCUECacheDir()
 	if err != nil {
 		return "", fmt.Errorf("getting CUE cache dir: %w", err)
 	}
@@ -814,9 +814,9 @@ func resolveModulePath(path, origin string) (string, error) {
 	return filepath.Join(moduleDir, relativePath), nil
 }
 
-// getCUECacheDir returns the CUE cache directory.
+// GetCUECacheDir returns the CUE cache directory.
 // Respects CUE_CACHE_DIR environment variable.
-func getCUECacheDir() (string, error) {
+func GetCUECacheDir() (string, error) {
 	if dir := os.Getenv("CUE_CACHE_DIR"); dir != "" {
 		return dir, nil
 	}

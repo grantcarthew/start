@@ -540,7 +540,7 @@ func TestExtractUTDFields(t *testing.T) {
 	}
 
 	item := cfg.LookupPath(cue.ParsePath("item"))
-	fields := extractUTDFields(item)
+	fields := ExtractUTDFields(item)
 
 	if fields.File != "test.md" {
 		t.Errorf("File = %q, want 'test.md'", fields.File)
@@ -1585,9 +1585,9 @@ func TestExtractOrigin(t *testing.T) {
 				t.Fatalf("compiling CUE: %v", err)
 			}
 
-			got := extractOrigin(v)
+			got := ExtractOrigin(v)
 			if got != tt.want {
-				t.Errorf("extractOrigin() = %q, want %q", got, tt.want)
+				t.Errorf("ExtractOrigin() = %q, want %q", got, tt.want)
 			}
 		})
 	}
@@ -1597,31 +1597,31 @@ func TestGetCUECacheDir(t *testing.T) {
 	t.Run("respects CUE_CACHE_DIR env var", func(t *testing.T) {
 		t.Setenv("CUE_CACHE_DIR", "/custom/cue/cache")
 
-		dir, err := getCUECacheDir()
+		dir, err := GetCUECacheDir()
 		if err != nil {
-			t.Fatalf("getCUECacheDir() error: %v", err)
+			t.Fatalf("GetCUECacheDir() error: %v", err)
 		}
 		if dir != "/custom/cue/cache" {
-			t.Errorf("getCUECacheDir() = %q, want %q", dir, "/custom/cue/cache")
+			t.Errorf("GetCUECacheDir() = %q, want %q", dir, "/custom/cue/cache")
 		}
 	})
 
 	t.Run("falls back to user cache dir", func(t *testing.T) {
 		t.Setenv("CUE_CACHE_DIR", "")
 
-		dir, err := getCUECacheDir()
+		dir, err := GetCUECacheDir()
 		if err != nil {
-			t.Fatalf("getCUECacheDir() error: %v", err)
+			t.Fatalf("GetCUECacheDir() error: %v", err)
 		}
 		if !strings.HasSuffix(dir, string(filepath.Separator)+"cue") {
-			t.Errorf("getCUECacheDir() = %q, want suffix /cue", dir)
+			t.Errorf("GetCUECacheDir() = %q, want suffix /cue", dir)
 		}
 	})
 }
 
 func TestResolveModulePath(t *testing.T) {
 	t.Run("non-module path returned unchanged", func(t *testing.T) {
-		result, err := resolveModulePath("/some/absolute/path.md", "any-origin")
+		result, err := ResolveModulePath("/some/absolute/path.md", "any-origin")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -1631,7 +1631,7 @@ func TestResolveModulePath(t *testing.T) {
 	})
 
 	t.Run("relative path returned unchanged", func(t *testing.T) {
-		result, err := resolveModulePath("relative/path.md", "any-origin")
+		result, err := ResolveModulePath("relative/path.md", "any-origin")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -1654,7 +1654,7 @@ func TestResolveModulePath(t *testing.T) {
 			t.Fatalf("writing test file: %v", err)
 		}
 
-		result, err := resolveModulePath("@module/prompt.md", origin)
+		result, err := ResolveModulePath("@module/prompt.md", origin)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -1672,7 +1672,7 @@ func TestResolveModulePath(t *testing.T) {
 			t.Fatalf("creating parent dir: %v", err)
 		}
 
-		_, err := resolveModulePath("@module/prompt.md", "github.com/test/tasks/mytask@v0.1.0")
+		_, err := ResolveModulePath("@module/prompt.md", "github.com/test/tasks/mytask@v0.1.0")
 		if err == nil {
 			t.Fatal("expected error for missing module")
 		}
@@ -1685,7 +1685,7 @@ func TestResolveModulePath(t *testing.T) {
 		cacheDir := t.TempDir()
 		t.Setenv("CUE_CACHE_DIR", cacheDir)
 
-		_, err := resolveModulePath("@module/prompt.md", "github.com/test/tasks/mytask@v0.1.0")
+		_, err := ResolveModulePath("@module/prompt.md", "github.com/test/tasks/mytask@v0.1.0")
 		if err == nil {
 			t.Fatal("expected error for missing cache directory")
 		}
@@ -1700,7 +1700,7 @@ func TestResolveModulePath(t *testing.T) {
 			t.Fatalf("creating cache dir: %v", err)
 		}
 
-		result, err := resolveModulePath("@module/data.cue", "github.com/test/tasks/mytask")
+		result, err := ResolveModulePath("@module/data.cue", "github.com/test/tasks/mytask")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -1733,7 +1733,7 @@ func TestResolveModulePath(t *testing.T) {
 
 		// Origin points to v0.1.2 — should resolve to the new version
 		origin := "github.com/test/tasks/review/holistic@v0.1.2"
-		result, err := resolveModulePath("@module/task.md", origin)
+		result, err := ResolveModulePath("@module/task.md", origin)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -1769,7 +1769,7 @@ func TestResolveModulePath(t *testing.T) {
 
 		// Origin points to v0.3.0 which isn't cached — fallback should pick v0.2.0 (latest)
 		origin := "github.com/test/tasks/mytask@v0.3.0"
-		result, err := resolveModulePath("@module/data.cue", origin)
+		result, err := ResolveModulePath("@module/data.cue", origin)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}

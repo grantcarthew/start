@@ -1,7 +1,7 @@
 # P-029: CLI Show Verbose Inspection
 
-- Status: Pending
-- Started:
+- Status: In Progress
+- Started: 2026-02-17
 - Completed:
 
 ## Overview
@@ -104,10 +104,10 @@ Replace `formatShowContent()` with a verbose dump that shows everything about a 
 1. Header: Category-coloured type label + name
 2. Separator: Magenta 79-char line
 3. Metadata section:
-   - `Config:` source `.cue` file path with item name in parentheses, via `v.Pos().Filename()`
+   - `Config:` source `.cue` file path with item name in parentheses. Determined in show code by using `internalcue.NewLoader().LoadSingle()` on each config dir (global, local) and checking which contains the item. Self-contained in show — no changes to loader or other packages.
    - `Origin:` registry module path (only if origin field exists)
    - `Cache:` resolved CUE package cache directory (only if origin exists), derived from origin string
-4. CUE Definition: The resolved CUE value formatted as CUE syntax using `v.Syntax(cue.Final(), cue.Concrete(false), cue.Definitions(true), cue.Hidden(true), cue.Optional(true))` + `cueformat.Node()`
+4. CUE Definition: The resolved CUE value formatted as CUE syntax using `v.Syntax(cue.Concrete(false), cue.Definitions(true), cue.Hidden(true), cue.Optional(true))` + `cueformat.Node()`. No `cue.Final()` — tolerates non-concrete constraint values.
 5. File contents: For each `file` field reference:
    - `File:` original file reference (e.g., `@module/task.md`)
    - `Path:` resolved absolute path on disk
@@ -175,26 +175,26 @@ All tests remain non-parallel due to `os.Chdir()` usage in setup.
 
 ## Success Criteria
 
-- [ ] `start show` (no args) lists all items with descriptions, coloured per DR-042
-- [ ] `start show <name>` searches across all categories and displays verbose dump
-- [ ] `start show <name>` with multiple matches shows interactive selection list (TTY)
-- [ ] `start show <name>` with multiple matches shows error with match list (non-TTY)
-- [ ] Verbose dump shows CUE definition formatted as CUE syntax
-- [ ] Verbose dump shows config file source path
-- [ ] Verbose dump shows origin and cache path for registry-installed assets
-- [ ] Verbose dump shows full file contents for file-based resources
-- [ ] Verbose dump shows inline error for unreadable files
-- [ ] Verbose dump shows command as string (not executed)
-- [ ] Subcommands (`show agent/role/context/task`) use verbose dump format
-- [ ] Registry matches auto-install on selection
-- [ ] All output follows DR-042 colour standard
-- [ ] All existing tests pass (updated for new format)
-- [ ] New tests cover cross-category search, verbose dump, file content display, error handling
-- [ ] Tests run via `scripts/invoke-tests`
+- [x] `start show` (no args) lists all items with descriptions, coloured per DR-042
+- [x] `start show <name>` searches across all categories and displays verbose dump
+- [x] `start show <name>` with multiple matches shows interactive selection list (TTY)
+- [x] `start show <name>` with multiple matches shows error with match list (non-TTY)
+- [x] Verbose dump shows CUE definition formatted as CUE syntax
+- [x] Verbose dump shows config file source path
+- [x] Verbose dump shows origin and cache path for registry-installed assets
+- [x] Verbose dump shows full file contents for file-based resources
+- [x] Verbose dump shows inline error for unreadable files
+- [x] Verbose dump shows command as string (not executed)
+- [x] Subcommands (`show agent/role/context/task`) use verbose dump format
+- [x] Registry matches auto-install on selection
+- [x] All output follows DR-042 colour standard
+- [x] All existing tests pass (updated for new format)
+- [x] New tests cover cross-category search, verbose dump, file content display, error handling
+- [x] Tests run via `scripts/invoke-tests`
 
 ## Deliverables
 
-- Updated `internal/orchestration/composer.go` with exported wrappers
+- Updated `internal/orchestration/composer.go` with exported functions (renamed from unexported)
 - Rewritten `internal/cli/show.go` with enhanced listing, cross-category search, verbose dump
 - Updated `internal/cli/show_test.go` with comprehensive test coverage
 - GitHub issue #42 closable upon completion
@@ -216,8 +216,14 @@ Follow dr-024 testing approach:
 - Create temp files with known content to verify file display
 - Test both TTY and non-TTY paths for selection
 
+## Decision Points
+
+1. Config source file path strategy — Decided: Show code uses `LoadSingle()` per config dir to find which file defines the item, then `v.Pos().Filename()` on the single-dir value for the real path. Self-contained in show code, no changes to loader.
+
+## Known Bugs
+
+- `start show review` vs `start show review/`: Without trailing slash, cross-category search finds "project/review" via short-name exact match in `findExactInstalledName` and displays it directly. With trailing slash it shows all review items. These should produce the same result. Fix: copy the pattern from `start task` in `task.go` — after finding an exact/short-name match, also run a substring search; if the substring search finds more matches than the single exact match, fall through to show the full match list instead of silently selecting the exact match. See `executeTask()` around the "For tasks: when an exact/short name match exists" comment block (~line 162-185 in task.go).
+
 ## Notes
 
-- `v.Pos()` is not currently used in the codebase. Verify it returns the correct source file path for merged CUE configurations where values may come from multiple files. If `v.Pos()` returns an empty position for some values, fall back gracefully (omit the Config line rather than showing an empty path).
-- The CUE formatting pattern in `loader.go` uses `cue.Final()` which may error on non-concrete values. Consider using the `install.go` pattern (`v.Syntax()` without `Final()`) as a fallback if some values contain constraints.
-- Cross-category search introduces a dependency on the resolver (and potentially registry). Ensure the show command works fully offline for installed assets, with registry search as an additive enhancement.
+- Cross-category search uses a resolver (and potentially registry). The existing resolver pattern already handles offline gracefully — installed matches work without registry access. No special handling needed.
