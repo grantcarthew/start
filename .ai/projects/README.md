@@ -13,6 +13,7 @@ See [p-writing-guide.md](./p-writing-guide.md) for guidelines on creating and ma
 | Project | Title | Started |
 |---------|-------|---------|
 | [p-022](./p-022-assets-ast-refactor.md) | Assets AST Refactor | Pending |
+| [p-029](./p-029-cli-show-verbose-inspection.md) | CLI Show Verbose Inspection | Pending |
 
 ### Completed Projects
 
@@ -56,6 +57,14 @@ Refactor asset installation code to use CUE's AST APIs instead of fragile string
 **Key Deliverables:** AST-based `internal/assets/install.go`, removed string manipulation, updated tests
 
 **Dependencies:** p-021
+
+#### p-029: CLI Show Verbose Inspection
+
+Enhance `start show` into a comprehensive resource inspection tool with cross-category search, verbose dump (CUE definitions, file contents, origin/cache metadata), and enhanced listing with descriptions. Addresses GitHub issue #42.
+
+**Key Deliverables:** Rewritten `show.go` with verbose dump and cross-category search, exported wrappers in `composer.go`, updated tests
+
+**Dependencies:** p-024, p-025
 
 ### Completed
 
