@@ -159,7 +159,7 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 		// the search term (e.g., "review" matches both "start/review" and
 		// "review/git-diff"), fall through to the full search to show a
 		// selection list rather than silently running the short-name match.
-		multipleInstalled := false
+		hasInstalledMatches := false
 		var installedMatches []TaskMatch
 		if resolved != "" {
 			var searchErr error
@@ -169,7 +169,7 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 			} else if len(installedMatches) > 1 {
 				debugf(flags, dbgTask, "Exact match %q found but %d installed matches, falling through to search", resolved, len(installedMatches))
 				resolved = ""
-				multipleInstalled = true
+				hasInstalledMatches = true
 			}
 		}
 
@@ -177,53 +177,70 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 			debugf(flags, dbgTask, "Installed match found: %s", resolved)
 			resolvedName = resolved
 		} else {
-			// Step 2: No exact/unique match - fetch registry and combine results
-			debugf(flags, dbgTask, "No single installed match, fetching registry index...")
-			if !flags.Quiet && !multipleInstalled {
-				_, _ = fmt.Fprintf(stdout, "Task not found in configuration\n")
-			}
-
-			var index *registry.Index
-			var client *registry.Client
-			index, client, err = r.ensureIndex()
-			if err != nil {
-				return fmt.Errorf("fetching registry index: %w", err)
-			}
-			// When multipleInstalled is true, a nil index is not fatal:
-			// step 3 will merge with installed matches only.
-			if index == nil && !multipleInstalled {
-				return fmt.Errorf("task %q not found and registry is unavailable", taskName)
-			}
-
-			// Check for exact or short name match in registry.
-			// Skip when falling through from multiple installed matches
-			// to ensure the full match list is shown.
-			if !multipleInstalled && index != nil {
-				exactRegistry, err := findExactInRegistry(index.Tasks, "tasks", taskName)
+			// Step 1b: Substring search in installed config before going to registry.
+			// Single match is used directly. Multiple matches include registry in search.
+			if !hasInstalledMatches {
+				installedMatches, err = findInstalledTasks(env.Cfg, taskName)
 				if err != nil {
 					return err
 				}
-				if exactRegistry != nil {
-					debugf(flags, dbgTask, "Exact match found in registry: %s", exactRegistry.Name)
+				if len(installedMatches) > 0 {
+					debugf(flags, dbgTask, "No exact match but %d installed substring matches", len(installedMatches))
+					hasInstalledMatches = true
+				}
+			}
+
+			// Single installed substring match - use directly without registry
+			if hasInstalledMatches && len(installedMatches) == 1 {
+				debugf(flags, dbgTask, "Single installed substring match: %s", installedMatches[0].Name)
+				resolvedName = installedMatches[0].Name
+			}
+
+			// Step 2: No installed match - fetch registry for exact match
+			var index *registry.Index
+			var client *registry.Client
+			if resolvedName == "" {
+				if !hasInstalledMatches {
+					debugf(flags, dbgTask, "No installed match, fetching registry index...")
 					if !flags.Quiet {
-						_, _ = fmt.Fprintf(stdout, "Installing %s from registry...\n", exactRegistry.Name)
+						_, _ = fmt.Fprintf(stdout, "Task not found in configuration\n")
 					}
-					env, err = installTaskAndReloadEnv(stdout, stdin, flags, client, index, *exactRegistry, workingDir, agentName)
+				}
+
+				index, client, err = r.ensureIndex()
+				if err != nil {
+					return fmt.Errorf("fetching registry index: %w", err)
+				}
+				// When hasInstalledMatches is true, a nil index is not fatal:
+				// step 3 will merge with installed matches only.
+				if index == nil && !hasInstalledMatches {
+					return fmt.Errorf("task %q not found and registry is unavailable", taskName)
+				}
+
+				// Check for exact or short name match in registry.
+				// Skip when there are installed matches to show the full match list.
+				if !hasInstalledMatches && index != nil {
+					exactRegistry, err := findExactInRegistry(index.Tasks, "tasks", taskName)
 					if err != nil {
 						return err
 					}
-					resolvedName = exactRegistry.Name
+					if exactRegistry != nil {
+						debugf(flags, dbgTask, "Exact match found in registry: %s", exactRegistry.Name)
+						if !flags.Quiet {
+							_, _ = fmt.Fprintf(stdout, "Installing %s from registry...\n", exactRegistry.Name)
+						}
+						env, err = installTaskAndReloadEnv(stdout, stdin, flags, client, index, *exactRegistry, workingDir, agentName)
+						if err != nil {
+							return err
+						}
+						resolvedName = exactRegistry.Name
+					}
 				}
 			}
 
 			if resolvedName == "" {
-				// Step 3: Regex match across installed + registry
-				if !multipleInstalled {
-					installedMatches, err = findInstalledTasks(env.Cfg, taskName)
-					if err != nil {
-						return err
-					}
-				}
+				// Step 3: Combined match across installed + registry.
+				// Reuse installed matches from step 1b.
 				var registryMatches []TaskMatch
 				if index != nil {
 					registryMatches, err = findRegistryTasks(index, taskName)
