@@ -51,6 +51,7 @@ Instructions are passed to the task template via the {{.instructions}} placehold
 		Args: cobra.RangeArgs(1, 2),
 		RunE: runTask,
 	}
+	taskCmd.Flags().StringSlice("tag", nil, "Filter by tags (comma-separated)")
 	parent.AddCommand(taskCmd)
 }
 
@@ -62,12 +63,15 @@ func runTask(cmd *cobra.Command, args []string) error {
 		instructions = args[1]
 	}
 
+	tagFlags, _ := cmd.Flags().GetStringSlice("tag")
+	tags := assets.ParseSearchTerms(strings.Join(tagFlags, ","))
+
 	flags := getFlags(cmd)
-	return executeTask(cmd.OutOrStdout(), cmd.ErrOrStderr(), cmd.InOrStdin(), flags, taskName, instructions)
+	return executeTask(cmd.OutOrStdout(), cmd.ErrOrStderr(), cmd.InOrStdin(), flags, taskName, instructions, tags)
 }
 
 // executeTask handles task execution.
-func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskName, instructions string) error {
+func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskName, instructions string, tags []string) error {
 	// Phase 1: Load config
 	cfg, workingDir, err := loadExecutionConfig(flags)
 	if err != nil {
@@ -163,13 +167,20 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 		var installedMatches []TaskMatch
 		if resolved != "" {
 			var searchErr error
-			installedMatches, searchErr = findInstalledTasks(env.Cfg, taskName)
+			installedMatches, searchErr = findInstalledTasks(env.Cfg, taskName, tags)
 			if searchErr != nil {
 				debugf(flags, dbgTask, "Installed search failed, using exact match: %v", searchErr)
 			} else if len(installedMatches) > 1 {
 				debugf(flags, dbgTask, "Exact match %q found but %d installed matches, falling through to search", resolved, len(installedMatches))
 				resolved = ""
 				hasInstalledMatches = true
+			} else if len(tags) > 0 && !taskInMatches(resolved, installedMatches) {
+				// Exact match doesn't pass tag filter - fall through to search
+				debugf(flags, dbgTask, "Exact match %q does not match tags %v, falling through", resolved, tags)
+				resolved = ""
+				if len(installedMatches) > 0 {
+					hasInstalledMatches = true
+				}
 			}
 		}
 
@@ -180,7 +191,7 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 			// Step 1b: Substring search in installed config before going to registry.
 			// Single match is used directly. Multiple matches include registry in search.
 			if !hasInstalledMatches {
-				installedMatches, err = findInstalledTasks(env.Cfg, taskName)
+				installedMatches, err = findInstalledTasks(env.Cfg, taskName, tags)
 				if err != nil {
 					return err
 				}
@@ -243,7 +254,7 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 				// Reuse installed matches from step 1b.
 				var registryMatches []TaskMatch
 				if index != nil {
-					registryMatches, err = findRegistryTasks(index, taskName)
+					registryMatches, err = findRegistryTasks(index, taskName, tags)
 					if err != nil {
 						return err
 					}
@@ -535,11 +546,22 @@ func printTaskDryRunSummary(w io.Writer, agent orchestration.Agent, model, model
 	_, _ = fmt.Fprintln(w, "  command.txt")
 }
 
+// taskInMatches returns true if a task name appears in the match list.
+func taskInMatches(name string, matches []TaskMatch) bool {
+	for _, m := range matches {
+		if m.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
 // findInstalledTasks finds tasks in the config that match the search term.
 // Uses the scoring system to match against name, description, and tags.
 // Multiple terms (space or comma separated) use AND logic - all must match.
-func findInstalledTasks(cfg internalcue.LoadResult, searchTerm string) ([]TaskMatch, error) {
-	results, err := assets.SearchInstalledConfig(cfg.Value, internalcue.KeyTasks, "tasks", searchTerm)
+// When tags is non-empty, entries must also match at least one tag.
+func findInstalledTasks(cfg internalcue.LoadResult, searchTerm string, tags []string) ([]TaskMatch, error) {
+	results, err := assets.SearchInstalledConfig(cfg.Value, internalcue.KeyTasks, "tasks", searchTerm, tags)
 	if err != nil {
 		return nil, err
 	}
@@ -556,8 +578,9 @@ func findInstalledTasks(cfg internalcue.LoadResult, searchTerm string) ([]TaskMa
 // findRegistryTasks finds tasks in the registry that match the search term.
 // Uses the scoring system to match against name, description, and tags.
 // Multiple terms (space or comma separated) use AND logic - all must match.
-func findRegistryTasks(index *registry.Index, searchTerm string) ([]TaskMatch, error) {
-	results, err := assets.SearchCategoryEntries("tasks", index.Tasks, searchTerm)
+// When tags is non-empty, entries must also match at least one tag.
+func findRegistryTasks(index *registry.Index, searchTerm string, tags []string) ([]TaskMatch, error) {
+	results, err := assets.SearchCategoryEntries("tasks", index.Tasks, searchTerm, tags)
 	if err != nil {
 		return nil, err
 	}

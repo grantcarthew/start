@@ -53,7 +53,7 @@ func runAssetsInfo(cmd *cobra.Command, args []string) error {
 	}
 
 	// Search for matching assets
-	results, err := assets.SearchIndex(index, query)
+	results, err := assets.SearchIndex(index, query, nil)
 	if err != nil {
 		return err
 	}

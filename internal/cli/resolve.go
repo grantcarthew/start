@@ -445,7 +445,7 @@ func findExactInRegistry(entries map[string]registry.IndexEntry, category, name 
 
 // searchInstalled searches installed config entries and returns AssetMatch results.
 func searchInstalled(cfg cue.Value, cueKey, category, query string) ([]AssetMatch, error) {
-	results, err := assets.SearchInstalledConfig(cfg, cueKey, category, query)
+	results, err := assets.SearchInstalledConfig(cfg, cueKey, category, query, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -464,7 +464,7 @@ func searchInstalled(cfg cue.Value, cueKey, category, query string) ([]AssetMatc
 
 // searchRegistryCategory searches registry entries and returns AssetMatch results.
 func searchRegistryCategory(entries map[string]registry.IndexEntry, category, query string) ([]AssetMatch, error) {
-	results, err := assets.SearchCategoryEntries(category, entries, query)
+	results, err := assets.SearchCategoryEntries(category, entries, query, nil)
 	if err != nil {
 		return nil, err
 	}

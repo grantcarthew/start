@@ -26,7 +26,7 @@ type searchSection struct {
 // addSearchCommand adds the top-level search command.
 func addSearchCommand(parent *cobra.Command) {
 	searchCmd := &cobra.Command{
-		Use:     "search <query>...",
+		Use:     "search [query]...",
 		Aliases: []string{"find"},
 		GroupID: "commands",
 		Short:   "Search configs and registry for assets",
@@ -36,10 +36,13 @@ Searches asset names, descriptions, and tags. Multiple words are combined
 with AND logic - all terms must match. Terms can be space-separated or
 comma-separated. Total query must be at least 3 characters.
 Terms support regex patterns (e.g. ^home, expert$, go.*review).
-Results are grouped by source (local, global, registry) and category.`,
-		Args: cobra.MinimumNArgs(1),
+Results are grouped by source (local, global, registry) and category.
+
+Use --tag to filter by tags. Tags can be used alone or combined with a query.`,
+		Args: cobra.MinimumNArgs(0),
 		RunE: runSearch,
 	}
+	searchCmd.Flags().StringSlice("tag", nil, "Filter by tags (comma-separated)")
 
 	parent.AddCommand(searchCmd)
 }
@@ -48,18 +51,19 @@ Results are grouped by source (local, global, registry) and category.`,
 func runSearch(cmd *cobra.Command, args []string) error {
 	query := strings.Join(args, " ")
 
+	tagFlags, _ := cmd.Flags().GetStringSlice("tag")
+	tags := assets.ParseSearchTerms(strings.Join(tagFlags, ","))
+
 	terms := assets.ParseSearchPatterns(query)
-	totalLen := 0
-	for _, t := range terms {
-		totalLen += len(t)
-	}
-	if totalLen < 3 {
-		return fmt.Errorf("query must be at least 3 characters")
+	if err := assets.ValidateSearchQuery(terms, tags); err != nil {
+		return err
 	}
 
 	// Validate regex patterns before searching
-	if _, err := assets.CompileSearchTerms(terms); err != nil {
-		return err
+	if len(terms) > 0 {
+		if _, err := assets.CompileSearchTerms(terms); err != nil {
+			return err
+		}
 	}
 
 	paths, err := config.ResolvePaths("")
@@ -90,7 +94,7 @@ func runSearch(cmd *cobra.Command, args []string) error {
 		} else if err == nil {
 			var results []assets.SearchResult
 			for _, cat := range categories {
-				catResults, err := assets.SearchInstalledConfig(cfg, cat.cueKey, cat.category, query)
+				catResults, err := assets.SearchInstalledConfig(cfg, cat.cueKey, cat.category, query, tags)
 				if err != nil {
 					return err
 				}
@@ -114,7 +118,7 @@ func runSearch(cmd *cobra.Command, args []string) error {
 		} else if err == nil {
 			var results []assets.SearchResult
 			for _, cat := range categories {
-				catResults, err := assets.SearchInstalledConfig(cfg, cat.cueKey, cat.category, query)
+				catResults, err := assets.SearchInstalledConfig(cfg, cat.cueKey, cat.category, query, tags)
 				if err != nil {
 					return err
 				}
@@ -141,7 +145,7 @@ func runSearch(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			registryErr = err
 		} else {
-			results, err := assets.SearchIndex(index, query)
+			results, err := assets.SearchIndex(index, query, tags)
 			if err != nil {
 				return err
 			}
@@ -155,8 +159,13 @@ func runSearch(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	displayQuery := query
+	if displayQuery == "" && len(tags) > 0 {
+		displayQuery = "--tag " + strings.Join(tags, ",")
+	}
+
 	if len(sections) == 0 {
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "No matches found for %q\n", query)
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "No matches found for %q\n", displayQuery)
 		if registryErr != nil {
 			printWarning(cmd.ErrOrStderr(), "registry unavailable: %v\n", registryErr)
 		}

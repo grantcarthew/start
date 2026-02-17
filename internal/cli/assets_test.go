@@ -90,7 +90,7 @@ func TestSearchIndex(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			results, err := assets.SearchIndex(index, tt.query)
+			results, err := assets.SearchIndex(index, tt.query, nil)
 			if err != nil {
 				t.Fatalf("assets.SearchIndex() error: %v", err)
 			}
