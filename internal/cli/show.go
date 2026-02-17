@@ -1,34 +1,70 @@
 package cli
 
 import (
+	"bufio"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
+	"strconv"
 	"strings"
 
 	"cuelang.org/go/cue"
+	cueformat "cuelang.org/go/cue/format"
+	"github.com/grantcarthew/start/internal/assets"
 	"github.com/grantcarthew/start/internal/config"
 	internalcue "github.com/grantcarthew/start/internal/cue"
+	"github.com/grantcarthew/start/internal/orchestration"
 	"github.com/spf13/cobra"
 )
 
 // ShowResult holds the result of preparing show output.
 type ShowResult struct {
-	ItemType   string   // "Agent", "Role", "Context", "Task"
-	Name       string   // Item name (when showing specific item)
-	Content    string   // Formatted content
-	AllNames   []string // All available items of this type
-	ShowReason string   // Why this item is shown (e.g., "first in config", "default")
+	ItemType   string    // "Agent", "Role", "Context", "Task"
+	Category   string    // "agents", "roles", "contexts", "tasks"
+	CueKey     string    // Top-level CUE key (e.g., "agents")
+	Name       string    // Item name (when showing specific item)
+	Value      cue.Value // The CUE value for this item
+	AllNames   []string  // All available items of this type
+	ShowReason string    // Why this item is shown (e.g., "first in config", "default")
+}
+
+// showCategory maps category metadata used for cross-category operations.
+type showCategory struct {
+	key      string // CUE key (e.g., "agents")
+	category string // Category name (e.g., "agents")
+	itemType string // Display type (e.g., "Agent")
+}
+
+var showCategories = []showCategory{
+	{internalcue.KeyAgents, "agents", "Agent"},
+	{internalcue.KeyRoles, "roles", "Role"},
+	{internalcue.KeyContexts, "contexts", "Context"},
+	{internalcue.KeyTasks, "tasks", "Task"},
+}
+
+func showCategoryFor(category string) *showCategory {
+	for i := range showCategories {
+		if showCategories[i].category == category {
+			return &showCategories[i]
+		}
+	}
+	return nil
 }
 
 // addShowCommand adds the show command and its subcommands to the parent command.
 func addShowCommand(parent *cobra.Command) {
 	showCmd := &cobra.Command{
-		Use:     "show",
+		Use:     "show [name]",
 		Aliases: []string{"view"},
 		GroupID: "commands",
 		Short:   "Display resolved configuration content",
-		Long:    `Display resolved configuration content after UTD processing and config merging.`,
-		RunE:    runShow,
+		Long: `Display resolved configuration content after UTD processing and config merging.
+
+Without arguments, lists all configured items with descriptions.
+With an argument, searches across all categories and displays a verbose dump.`,
+		Args: cobra.MaximumNArgs(1),
+		RunE: runShow,
 	}
 
 	showRoleCmd := &cobra.Command{
@@ -80,47 +116,279 @@ func addShowCommand(parent *cobra.Command) {
 	parent.AddCommand(showCmd)
 }
 
-// runShow displays all configuration (agents, roles, contexts, tasks).
+// runShow displays all configuration or searches for a specific item.
 func runShow(cmd *cobra.Command, args []string) error {
 	if shown, err := checkHelpArg(cmd, args); shown || err != nil {
 		return err
 	}
-	if len(args) > 0 {
-		return unknownCommandError("start show", args[0])
+
+	if len(args) == 0 {
+		return runShowListing(cmd)
 	}
 
+	return runShowSearch(cmd, args[0])
+}
+
+// runShowListing displays all items grouped by category with descriptions.
+func runShowListing(cmd *cobra.Command) error {
 	w := cmd.OutOrStdout()
 	scope, _ := cmd.Flags().GetString("scope")
 
-	type section struct {
-		category string
-		names    []string
+	cfg, err := loadConfig(scope)
+	if err != nil {
+		return err
 	}
 
-	var sections []section
-
-	if result, err := prepareShow("", scope, internalcue.KeyAgents, "Agent"); err == nil {
-		sections = append(sections, section{"agents", result.AllNames})
-	}
-	if result, err := prepareShow("", scope, internalcue.KeyRoles, "Role"); err == nil {
-		sections = append(sections, section{"roles", result.AllNames})
-	}
-	if result, err := prepareShow("", scope, internalcue.KeyContexts, "Context"); err == nil {
-		sections = append(sections, section{"contexts", result.AllNames})
-	}
-	if result, err := prepareShow("", scope, internalcue.KeyTasks, "Task"); err == nil {
-		sections = append(sections, section{"tasks", result.AllNames})
-	}
-
-	for _, s := range sections {
-		_, _ = categoryColor(s.category).Fprint(w, s.category)
-		_, _ = fmt.Fprintln(w, "/")
-		for _, name := range s.names {
-			_, _ = fmt.Fprintf(w, "  %s\n", name)
+	for _, cat := range showCategories {
+		items := cfg.Value.LookupPath(cue.ParsePath(cat.key))
+		if !items.Exists() {
+			continue
 		}
+
+		type entry struct {
+			name string
+			desc string
+		}
+
+		var entries []entry
+		maxNameLen := 0
+
+		iter, err := items.Fields()
+		if err != nil {
+			continue
+		}
+		for iter.Next() {
+			name := iter.Selector().Unquoted()
+			desc := ""
+			if d := iter.Value().LookupPath(cue.ParsePath("description")); d.Exists() {
+				desc, _ = d.String()
+			}
+			entries = append(entries, entry{name, desc})
+			if len(name) > maxNameLen {
+				maxNameLen = len(name)
+			}
+		}
+
+		if len(entries) == 0 {
+			continue
+		}
+
+		_, _ = categoryColor(cat.category).Fprint(w, cat.category)
+		_, _ = fmt.Fprintln(w, "/")
+
+		for _, e := range entries {
+			if e.desc != "" {
+				padding := strings.Repeat(" ", maxNameLen-len(e.name)+2)
+				_, _ = fmt.Fprintf(w, "  %s%s", e.name, padding)
+				_, _ = colorDim.Fprintln(w, e.desc)
+			} else {
+				_, _ = fmt.Fprintf(w, "  %s\n", e.name)
+			}
+		}
+
 		_, _ = fmt.Fprintln(w)
 	}
 
+	return nil
+}
+
+// runShowSearch handles cross-category search for `start show <name>`.
+func runShowSearch(cmd *cobra.Command, name string) error {
+	w := cmd.OutOrStdout()
+	scope, _ := cmd.Flags().GetString("scope")
+	flags := getFlags(cmd)
+	stdin := cmd.InOrStdin()
+
+	cfg, err := loadConfig(scope)
+	if err != nil {
+		return err
+	}
+
+	// Step 1: Exact match in installed config across all categories
+	var exactMatches []AssetMatch
+	for _, cat := range showCategories {
+		resolved, err := findExactInstalledName(cfg.Value, cat.key, name)
+		if err != nil {
+			return err
+		}
+		if resolved != "" {
+			exactMatches = append(exactMatches, AssetMatch{
+				Name:     resolved,
+				Category: cat.category,
+				Source:   AssetSourceInstalled,
+				Score:    100,
+			})
+		}
+	}
+
+	if len(exactMatches) == 1 {
+		cat := showCategoryFor(exactMatches[0].Category)
+		return showVerboseItem(w, exactMatches[0].Name, scope, cat.key, cat.itemType)
+	}
+	if len(exactMatches) > 1 {
+		return promptShowSelection(w, stdin, scope, exactMatches, name, nil)
+	}
+
+	// Step 2: Substring search in installed config
+	var installedMatches []AssetMatch
+	for _, cat := range showCategories {
+		matches, err := searchInstalled(cfg.Value, cat.key, cat.category, name)
+		if err != nil {
+			continue
+		}
+		installedMatches = append(installedMatches, matches...)
+	}
+
+	if len(installedMatches) == 1 {
+		cat := showCategoryFor(installedMatches[0].Category)
+		return showVerboseItem(w, installedMatches[0].Name, scope, cat.key, cat.itemType)
+	}
+
+	// Step 3: Registry search
+	r := newResolver(cfg, flags, w, stdin)
+	index, _, _ := r.ensureIndex()
+
+	// Exact registry match (only when no installed matches)
+	if len(installedMatches) == 0 && index != nil {
+		for _, cat := range showCategories {
+			entries := registryEntries(index, cat.category)
+			if entries == nil {
+				continue
+			}
+			result, err := findExactInRegistry(entries, cat.category, name)
+			if err != nil {
+				return err
+			}
+			if result != nil {
+				if err := r.autoInstall(r.client, *result); err != nil {
+					return err
+				}
+				// After install, use merged scope to see the new item
+				return showVerboseItem(w, result.Name, "", cat.key, cat.itemType)
+			}
+		}
+	}
+
+	// Combined search across installed + registry
+	var registryMatches []AssetMatch
+	if index != nil {
+		for _, cat := range showCategories {
+			entries := registryEntries(index, cat.category)
+			if entries == nil {
+				continue
+			}
+			regMatches, err := searchRegistryCategory(entries, cat.category, name)
+			if err != nil {
+				continue
+			}
+			registryMatches = append(registryMatches, regMatches...)
+		}
+	}
+
+	allMatches := mergeAssetMatches(installedMatches, registryMatches)
+
+	switch len(allMatches) {
+	case 0:
+		return fmt.Errorf("%q not found", name)
+	case 1:
+		return displayShowMatch(w, scope, allMatches[0], r)
+	default:
+		return promptShowSelection(w, stdin, scope, allMatches, name, r)
+	}
+}
+
+// displayShowMatch handles auto-install (if needed) and displays a verbose dump.
+func displayShowMatch(w io.Writer, scope string, m AssetMatch, r *resolver) error {
+	cat := showCategoryFor(m.Category)
+	if m.Source == AssetSourceRegistry && r != nil {
+		if err := r.autoInstall(r.client, assets.SearchResult{
+			Category: m.Category,
+			Name:     m.Name,
+			Entry:    m.Entry,
+		}); err != nil {
+			return err
+		}
+		// After install, use merged scope to see the new item
+		scope = ""
+	}
+	return showVerboseItem(w, m.Name, scope, cat.key, cat.itemType)
+}
+
+// promptShowSelection handles interactive selection from multiple cross-category matches.
+func promptShowSelection(w io.Writer, stdin io.Reader, scope string, matches []AssetMatch, query string, r *resolver) error {
+	isTTY := isTerminal(stdin)
+
+	if !isTTY {
+		var names []string
+		for _, m := range matches {
+			names = append(names, m.Category+"/"+m.Name)
+		}
+		return fmt.Errorf("ambiguous name %q matches: %s\nSpecify exact name or run interactively",
+			query, strings.Join(names, ", "))
+	}
+
+	displayCount := len(matches)
+	if displayCount > maxAssetResults {
+		displayCount = maxAssetResults
+	}
+
+	_, _ = fmt.Fprintf(w, "Found %d matches for %q:\n\n", len(matches), query)
+
+	// Find longest display name for alignment
+	maxDisplayLen := 0
+	for i := 0; i < displayCount; i++ {
+		display := matches[i].Category + "/" + matches[i].Name
+		if len(display) > maxDisplayLen {
+			maxDisplayLen = len(display)
+		}
+	}
+
+	for i := 0; i < displayCount; i++ {
+		m := matches[i]
+		display := m.Category + "/" + m.Name
+		padding := strings.Repeat(" ", maxDisplayLen-len(display)+2)
+		var sourceLabel string
+		if m.Source == AssetSourceInstalled {
+			sourceLabel = colorInstalled.Sprint(m.Source)
+		} else {
+			sourceLabel = colorRegistry.Sprint(m.Source)
+		}
+		_, _ = fmt.Fprintf(w, "  %2d. %s%s%s\n", i+1, display, padding, sourceLabel)
+	}
+
+	if displayCount < len(matches) {
+		_, _ = fmt.Fprintf(w, "\nShowing %d of %d matches. Refine search for more specific results.\n",
+			displayCount, len(matches))
+	}
+
+	_, _ = fmt.Fprintln(w)
+	_, _ = fmt.Fprintf(w, "Select %s%s%s: ", colorCyan.Sprint("("), colorDim.Sprintf("1-%d", displayCount), colorCyan.Sprint(")"))
+
+	reader := bufio.NewReader(stdin)
+	input, err := reader.ReadString('\n')
+	if err != nil {
+		return fmt.Errorf("reading input: %w", err)
+	}
+	input = strings.TrimSpace(input)
+
+	// Try number
+	if choice, err := strconv.Atoi(input); err == nil {
+		if choice >= 1 && choice <= displayCount {
+			return displayShowMatch(w, scope, matches[choice-1], r)
+		}
+		return fmt.Errorf("invalid selection: %s (choose 1-%d)", input, displayCount)
+	}
+
+	return fmt.Errorf("invalid selection: %s", input)
+}
+
+// showVerboseItem prepares and displays a verbose dump for a single item.
+func showVerboseItem(w io.Writer, name, scope, cueKey, itemType string) error {
+	result, err := prepareShow(name, scope, cueKey, itemType)
+	if err != nil {
+		return err
+	}
+	printVerboseDump(w, result)
 	return nil
 }
 
@@ -138,7 +406,7 @@ func runShowItem(cueKey, itemType string) func(*cobra.Command, []string) error {
 			return err
 		}
 
-		printPreview(cmd.OutOrStdout(), result)
+		printVerboseDump(cmd.OutOrStdout(), result)
 		return nil
 	}
 }
@@ -201,12 +469,12 @@ func prepareShow(name, scope, cueKey, itemType string) (ShowResult, error) {
 		}
 	}
 
-	content := formatShowContent(item, strings.ToLower(itemType))
-
 	return ShowResult{
 		ItemType:   itemType,
+		Category:   typePlural,
+		CueKey:     cueKey,
 		Name:       resolvedName,
-		Content:    content,
+		Value:      item,
 		AllNames:   allNames,
 		ShowReason: showReason,
 	}, nil
@@ -237,152 +505,13 @@ func loadConfig(scope string) (internalcue.LoadResult, error) {
 	return loader.Load(dirs)
 }
 
-// formatShowContent formats a CUE value for display.
-func formatShowContent(v cue.Value, itemType string) string {
-	var sb strings.Builder
-
+// printVerboseDump writes the full verbose dump for a ShowResult.
+func printVerboseDump(w io.Writer, r ShowResult) {
+	cat := r.Category
 	label := colorDim.Sprint
 
-	switch itemType {
-	case "agent":
-		if desc := v.LookupPath(cue.ParsePath("description")); desc.Exists() {
-			if s, err := desc.String(); err == nil {
-				sb.WriteString(fmt.Sprintf("%s %s\n\n", label("Description:"), s))
-			}
-		}
-		if bin := v.LookupPath(cue.ParsePath("bin")); bin.Exists() {
-			if s, err := bin.String(); err == nil {
-				sb.WriteString(fmt.Sprintf("%s %s\n", label("Binary:"), s))
-			}
-		}
-		if cmd := v.LookupPath(cue.ParsePath("command")); cmd.Exists() {
-			if s, err := cmd.String(); err == nil {
-				sb.WriteString(fmt.Sprintf("%s %s\n", label("Command:"), s))
-			}
-		}
-		if dm := v.LookupPath(cue.ParsePath("default_model")); dm.Exists() {
-			if s, err := dm.String(); err == nil {
-				sb.WriteString(fmt.Sprintf("%s %s\n", label("Default Model:"), s))
-			}
-		}
-		if models := v.LookupPath(cue.ParsePath("models")); models.Exists() {
-			sb.WriteString(fmt.Sprintf("\n%s\n", label("Models:")))
-			iter, err := models.Fields()
-			if err == nil {
-				for iter.Next() {
-					modelName := iter.Selector().Unquoted()
-					if s, err := iter.Value().String(); err == nil {
-						sb.WriteString(fmt.Sprintf("  %s %s\n", label(modelName+":"), s))
-					}
-				}
-			}
-		}
-		if tags := v.LookupPath(cue.ParsePath("tags")); tags.Exists() {
-			iter, err := tags.List()
-			if err == nil {
-				var tagList []string
-				for iter.Next() {
-					if s, err := iter.Value().String(); err == nil {
-						tagList = append(tagList, s)
-					}
-				}
-				if len(tagList) > 0 {
-					sb.WriteString(fmt.Sprintf("\n%s %s\n", label("Tags:"), strings.Join(tagList, ", ")))
-				}
-			}
-		}
-
-	case "role", "context", "task":
-		if desc := v.LookupPath(cue.ParsePath("description")); desc.Exists() {
-			if s, err := desc.String(); err == nil {
-				sb.WriteString(fmt.Sprintf("%s %s\n\n", label("Description:"), s))
-			}
-		}
-
-		if file := v.LookupPath(cue.ParsePath("file")); file.Exists() {
-			if s, err := file.String(); err == nil {
-				sb.WriteString(fmt.Sprintf("%s %s\n", label("File:"), s))
-			}
-		}
-		if cmd := v.LookupPath(cue.ParsePath("command")); cmd.Exists() {
-			if s, err := cmd.String(); err == nil {
-				sb.WriteString(fmt.Sprintf("%s %s\n", label("Command:"), s))
-			}
-		}
-		if prompt := v.LookupPath(cue.ParsePath("prompt")); prompt.Exists() {
-			if s, err := prompt.String(); err == nil {
-				sb.WriteString(fmt.Sprintf("\n%s %s\n", label("Prompt:"), s))
-			}
-		}
-
-		if itemType == "context" {
-			if req := v.LookupPath(cue.ParsePath("required")); req.Exists() {
-				if b, err := req.Bool(); err == nil {
-					sb.WriteString(fmt.Sprintf("%s %t\n", label("Required:"), b))
-				}
-			}
-			if def := v.LookupPath(cue.ParsePath("default")); def.Exists() {
-				if b, err := def.Bool(); err == nil {
-					sb.WriteString(fmt.Sprintf("%s %t\n", label("Default:"), b))
-				}
-			}
-			if tags := v.LookupPath(cue.ParsePath("tags")); tags.Exists() {
-				iter, err := tags.List()
-				if err == nil {
-					var tagList []string
-					for iter.Next() {
-						if s, err := iter.Value().String(); err == nil {
-							tagList = append(tagList, s)
-						}
-					}
-					if len(tagList) > 0 {
-						sb.WriteString(fmt.Sprintf("%s %s\n", label("Tags:"), strings.Join(tagList, ", ")))
-					}
-				}
-			}
-		}
-
-		if itemType == "task" {
-			if role := v.LookupPath(cue.ParsePath("role")); role.Exists() {
-				if s, err := role.String(); err == nil {
-					sb.WriteString(fmt.Sprintf("%s %s\n", label("Role:"), s))
-				}
-			}
-		}
-	}
-
-	return sb.String()
-}
-
-// itemTypeToCategory maps ShowResult.ItemType to the category string for categoryColor().
-func itemTypeToCategory(itemType string) string {
-	switch itemType {
-	case "Agent":
-		return "agents"
-	case "Role":
-		return "roles"
-	case "Context":
-		return "contexts"
-	case "Task":
-		return "tasks"
-	default:
-		return ""
-	}
-}
-
-// printPreview writes the ShowResult to the given writer.
-func printPreview(w io.Writer, r ShowResult) {
-	cat := itemTypeToCategory(r.ItemType)
+	// Header
 	_, _ = fmt.Fprintln(w)
-
-	// Show list of all items if available
-	if len(r.AllNames) > 0 {
-		_, _ = categoryColor(cat).Fprint(w, r.ItemType+"s")
-		_, _ = fmt.Fprintf(w, ": %s\n", strings.Join(r.AllNames, ", "))
-		_, _ = fmt.Fprintln(w)
-	}
-
-	// Show which item and why
 	_, _ = categoryColor(cat).Fprint(w, r.ItemType)
 	_, _ = fmt.Fprintf(w, ": %s", r.Name)
 	if r.ShowReason != "" {
@@ -394,10 +523,164 @@ func printPreview(w io.Writer, r ShowResult) {
 	_, _ = fmt.Fprintln(w)
 	printSeparator(w)
 
-	// Show full content
-	_, _ = fmt.Fprint(w, r.Content)
-	if !strings.HasSuffix(r.Content, "\n") {
-		_, _ = fmt.Fprintln(w)
+	// Config source
+	configSource := findConfigSource(r.CueKey, r.Name)
+	if configSource != "" {
+		_, _ = fmt.Fprintf(w, "%s %s %s%s%s\n",
+			label("Config:"), configSource,
+			colorCyan.Sprint("("), colorDim.Sprint(r.Name), colorCyan.Sprint(")"))
 	}
+
+	// Origin and cache
+	origin := orchestration.ExtractOrigin(r.Value)
+	if origin != "" {
+		_, _ = fmt.Fprintf(w, "%s %s\n", label("Origin:"), origin)
+		cacheDir := deriveCacheDir(origin)
+		if cacheDir != "" {
+			_, _ = fmt.Fprintf(w, "%s %s\n", label("Cache:"), cacheDir)
+		}
+	}
+
+	// CUE Definition
+	cueDef := formatCUEDefinition(r.Value)
+	if cueDef != "" {
+		_, _ = fmt.Fprintln(w)
+		_, _ = fmt.Fprintln(w, cueDef)
+	}
+
+	// File contents
+	fields := orchestration.ExtractUTDFields(r.Value)
+	if fields.File != "" {
+		_, _ = fmt.Fprintln(w)
+		_, _ = fmt.Fprintf(w, "%s %s\n", label("File:"), fields.File)
+
+		resolvedPath, content, readErr := resolveShowFile(fields.File, origin)
+		if resolvedPath != "" && resolvedPath != fields.File {
+			_, _ = fmt.Fprintf(w, "%s %s\n", label("Path:"), resolvedPath)
+		}
+
+		if readErr != nil {
+			_, _ = fmt.Fprintf(w, "[error: %s]\n", readErr)
+		} else if content != "" {
+			_, _ = fmt.Fprintln(w)
+			_, _ = fmt.Fprint(w, content)
+			if !strings.HasSuffix(content, "\n") {
+				_, _ = fmt.Fprintln(w)
+			}
+		}
+	}
+
+	// Command
+	if fields.Command != "" {
+		_, _ = fmt.Fprintln(w)
+		_, _ = fmt.Fprintf(w, "%s %s\n", label("Command:"), fields.Command)
+	}
+
 	printSeparator(w)
 }
+
+// findConfigSource determines which config file defines an item.
+// Uses LoadSingle on each config dir to find the source, with local taking precedence.
+func findConfigSource(cueKey, name string) string {
+	paths, err := config.ResolvePaths("")
+	if err != nil {
+		return ""
+	}
+
+	loader := internalcue.NewLoader()
+
+	// Check local first (higher priority - overrides global)
+	if paths.LocalExists {
+		if v, err := loader.LoadSingle(paths.Local); err == nil {
+			item := v.LookupPath(cue.ParsePath(cueKey)).LookupPath(cue.MakePath(cue.Str(name)))
+			if item.Exists() {
+				if pos := item.Pos(); pos.IsValid() {
+					return pos.Filename()
+				}
+			}
+		}
+	}
+
+	// Check global
+	if paths.GlobalExists {
+		if v, err := loader.LoadSingle(paths.Global); err == nil {
+			item := v.LookupPath(cue.ParsePath(cueKey)).LookupPath(cue.MakePath(cue.Str(name)))
+			if item.Exists() {
+				if pos := item.Pos(); pos.IsValid() {
+					return pos.Filename()
+				}
+			}
+		}
+	}
+
+	return ""
+}
+
+// formatCUEDefinition formats a CUE value as CUE syntax.
+func formatCUEDefinition(v cue.Value) string {
+	syn := v.Syntax(
+		cue.Concrete(false),
+		cue.Definitions(true),
+		cue.Hidden(true),
+		cue.Optional(true),
+	)
+
+	b, err := cueformat.Node(syn)
+	if err != nil {
+		return ""
+	}
+	return string(b)
+}
+
+// resolveShowFile resolves a file reference and reads its contents.
+// Returns the resolved path, content, and any error.
+func resolveShowFile(filePath, origin string) (resolvedPath, content string, err error) {
+	if filePath == "" {
+		return "", "", nil
+	}
+
+	// @module/ paths
+	if strings.HasPrefix(filePath, "@module/") && origin != "" {
+		resolved, err := orchestration.ResolveModulePath(filePath, origin)
+		if err != nil {
+			return "", "", err
+		}
+		data, err := os.ReadFile(resolved)
+		if err != nil {
+			return resolved, "", err
+		}
+		return resolved, string(data), nil
+	}
+
+	// ~/ and other paths
+	expanded, err := orchestration.ExpandFilePath(filePath)
+	if err != nil {
+		return "", "", err
+	}
+
+	data, readErr := os.ReadFile(expanded)
+	if readErr != nil {
+		return expanded, "", readErr
+	}
+	return expanded, string(data), nil
+}
+
+// deriveCacheDir constructs the CUE cache directory for an origin.
+func deriveCacheDir(origin string) string {
+	cacheDir, err := orchestration.GetCUECacheDir()
+	if err != nil {
+		return ""
+	}
+
+	idx := strings.LastIndex(origin, "@")
+	if idx == -1 {
+		return ""
+	}
+
+	modulePath := origin[:idx]
+	version := origin[idx:]
+	return filepath.Join(cacheDir, "mod", "extract",
+		filepath.Dir(modulePath),
+		filepath.Base(modulePath)+version)
+}
+
