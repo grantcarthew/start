@@ -43,6 +43,11 @@ var showCategories = []showCategory{
 	{internalcue.KeyTasks, "tasks", "Task"},
 }
 
+// showCategoryFor looks up a showCategory by its category string.
+// Returns nil only if category is not in showCategories. All callers pass
+// Category values that originate from iterating showCategories, so nil is
+// unreachable in practice. If a new AssetMatch source is added, ensure its
+// Category is drawn from showCategories.
 func showCategoryFor(category string) *showCategory {
 	for i := range showCategories {
 		if showCategories[i].category == category {
@@ -222,8 +227,25 @@ func runShowSearch(cmd *cobra.Command, name string) error {
 	}
 
 	if len(exactMatches) == 1 {
-		cat := showCategoryFor(exactMatches[0].Category)
-		return showVerboseItem(w, exactMatches[0].Name, scope, cat.key, cat.itemType)
+		// Before returning the single exact match, check if a substring search
+		// finds additional matches. If so, fall through to show a selection list
+		// rather than silently picking the exact match. See task.go for the same
+		// pattern applied to task resolution.
+		var moreMatches bool
+		for _, cat := range showCategories {
+			matches, err := searchInstalled(cfg.Value, cat.key, cat.category, name)
+			if err != nil {
+				continue
+			}
+			if len(matches) > 1 {
+				moreMatches = true
+				break
+			}
+		}
+		if !moreMatches {
+			cat := showCategoryFor(exactMatches[0].Category)
+			return showVerboseItem(w, exactMatches[0].Name, scope, cat.key, cat.itemType)
+		}
 	}
 	if len(exactMatches) > 1 {
 		return promptShowSelection(w, stdin, scope, exactMatches, name, nil)
@@ -580,7 +602,8 @@ func printVerboseDump(w io.Writer, r ShowResult) {
 }
 
 // findConfigSource determines which config file defines an item.
-// Uses LoadSingle on each config dir to find the source, with local taking precedence.
+// This loads each config dir separately via LoadSingle rather than reusing the
+// merged config because merged CUE values lose per-file position information.
 func findConfigSource(cueKey, name string) string {
 	paths, err := config.ResolvePaths("")
 	if err != nil {
@@ -640,7 +663,10 @@ func resolveShowFile(filePath, origin string) (resolvedPath, content string, err
 	}
 
 	// @module/ paths
-	if strings.HasPrefix(filePath, "@module/") && origin != "" {
+	if strings.HasPrefix(filePath, "@module/") {
+		if origin == "" {
+			return "", "", fmt.Errorf("@module/ path requires origin field: %s", filePath)
+		}
 		resolved, err := orchestration.ResolveModulePath(filePath, origin)
 		if err != nil {
 			return "", "", err

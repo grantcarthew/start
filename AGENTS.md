@@ -12,7 +12,7 @@ Avoid references to the prototype in new documentation. This is a new design.
 
 Projects are stored in `.ai/projects/`. Continue by reading the active project.
 
-Active Project: [p-029](.ai/projects/p-029-cli-show-verbose-inspection.md) - CLI Show Verbose Inspection
+Active Project: [p-027](.ai/projects/p-027-cli-content-source-menu.md) - CLI Content Source Menu Extraction
 
 Other Projects (paused):
 - None
@@ -186,5 +186,6 @@ start-assets/
 - p-024: CLI Flag Asset Search (three-tier resolution for --agent, --role, --model, --context flags)
 - p-025: Terminal Colour Standard (DR-042 applied across all CLI output, added prompt colour)
 - p-026: CLI Config Loader Return Type Alignment (agents/tasks loaders return definition order)
+- p-029: CLI Show Verbose Inspection (comprehensive resource inspection, cross-category search, verbose dump)
 
 The prototype validated that this tool solves a real problem. This version will implement it properly.
