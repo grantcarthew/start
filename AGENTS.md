@@ -12,7 +12,7 @@ Avoid references to the prototype in new documentation. This is a new design.
 
 Projects are stored in `.ai/projects/`. Continue by reading the active project.
 
-Active Project: [p-028](.ai/projects/p-028-tui-shared-package.md) - TUI Shared Package
+Active Project: None
 
 Other Projects (paused):
 - None
@@ -187,6 +187,7 @@ start-assets/
 - p-025: Terminal Colour Standard (DR-042 applied across all CLI output, added prompt colour)
 - p-026: CLI Config Loader Return Type Alignment (agents/tasks loaders return definition order)
 - p-027: CLI Content Source Menu Extraction (normalised and extracted promptContentSource helper)
+- p-028: TUI Shared Package (shared colour definitions, Annotate/Bracket helpers, cli+doctor migration)
 - p-029: CLI Show Verbose Inspection (comprehensive resource inspection, cross-category search, verbose dump)
 
 The prototype validated that this tool solves a real problem. This version will implement it properly.
