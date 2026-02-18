@@ -1,8 +1,8 @@
 # P-029: CLI Show Verbose Inspection
 
-- Status: In Progress
+- Status: Complete
 - Started: 2026-02-17
-- Completed:
+- Completed: 2026-02-18
 
 ## Overview
 
@@ -222,7 +222,7 @@ Follow dr-024 testing approach:
 
 ## Known Bugs
 
-- `start show review` vs `start show review/`: Without trailing slash, cross-category search finds "project/review" via short-name exact match in `findExactInstalledName` and displays it directly. With trailing slash it shows all review items. These should produce the same result. Fix: copy the pattern from `start task` in `task.go` — after finding an exact/short-name match, also run a substring search; if the substring search finds more matches than the single exact match, fall through to show the full match list instead of silently selecting the exact match. See `executeTask()` around the "For tasks: when an exact/short name match exists" comment block (~line 162-185 in task.go).
+None remaining. The `start show review` vs `start show review/` inconsistency was fixed during diff review on 2026-02-18.
 
 ## Notes
 
