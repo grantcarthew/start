@@ -22,12 +22,19 @@ This project will replace 160+ lines of manual parser code with proper AST manip
 
 In Scope:
 
-- Refactor `AssetExists` to parse and check AST structure
-- Refactor `writeAssetToConfig` to build and manipulate AST nodes
+- Refactor `writeAssetToConfig` to use AST parsing and manipulation
 - Refactor `UpdateAssetInConfig` to use AST manipulation
 - Remove manual parser functions (FindAssetKey, FindMatchingBrace, FindOpeningBrace)
+- Remove `cueParseState` type and constants
+- Remove fuzz tests for deleted functions (`internal/assets/fuzz_test.go`)
+- Remove `TestFindOpeningBrace` from `internal/cli/assets_test.go` (lines 669-818)
 - Update tests to work with AST-based implementation
 - Maintain backward compatibility for existing callers
+
+Already Done (no longer in scope):
+
+- `AssetExists` already uses CUE value lookup (not string matching)
+- Code duplication in `assets_update.go` already resolved (calls `assets.ExtractAssetContent` and `assets.UpdateAssetInConfig` directly)
 
 Out of Scope:
 
@@ -38,10 +45,12 @@ Out of Scope:
 
 ## Success Criteria
 
-- [ ] AssetExists parses CUE files and checks AST (no string matching)
+- [x] AssetExists uses CUE value lookup (already done)
 - [ ] writeAssetToConfig builds proper AST nodes and uses format.Node()
 - [ ] UpdateAssetInConfig manipulates AST directly
 - [ ] FindAssetKey, FindMatchingBrace, FindOpeningBrace removed
+- [ ] cueParseState type and constants removed
+- [ ] Fuzz tests for deleted functions removed
 - [ ] All tests pass with AST-based implementation
 - [ ] Manual test: install, update, and check asset existence work correctly
 - [ ] No hardcoded indentation logic remains
@@ -49,70 +58,41 @@ Out of Scope:
 
 ## Current State
 
-Verified: 2026-02-03
+Verified: 2026-02-18
 
-The current implementation in `internal/assets/install.go` has several problematic patterns:
+Already Resolved:
 
-String-Based Existence Check (lines 67-80):
+- `AssetExists` (install.go:135-138): Already uses CUE value lookup via `cfg.LookupPath()`. No string matching. No changes needed.
+- Code duplication in `assets_update.go`: Already resolved. The update command calls `assets.ExtractAssetContent()` and `assets.UpdateAssetInConfig()` directly. File is 292 lines with no duplicated functions.
 
-```go
-func AssetExists(configDir, category, name string) bool {
-    data, err := os.ReadFile(configPath)
-    // ...
-    return strings.Contains(existingContent, fmt.Sprintf("%q:", assetKey)) ||
-        strings.Contains(existingContent, assetKey+":")
-}
-```
+Remaining Problems in `internal/assets/install.go`:
 
-Issues: False positives if asset name appears in comments or descriptions.
+writeAssetToConfig (lines 398-483): Uses string manipulation to insert assets into config files. Calls `FindAssetKey` to detect duplicates, `FindOpeningBrace` and `FindMatchingBrace` to locate the category block, then manually builds the output with hardcoded `\t` indentation.
 
-Acknowledged Hack in writeAssetToConfig (lines 286-306):
+UpdateAssetInConfig (lines 692-751): Uses `FindAssetKey` + `FindOpeningBrace` + `FindMatchingBrace` to locate the asset entry, then does string splicing with hardcoded `\t` indentation to replace it.
 
-```go
-// This is a simple approach - for complex files might need proper parsing
-closingBrace := strings.LastIndex(existingContent, "}")
-```
+Manual CUE Parser (lines 485-689): Three state-machine functions totalling ~170 lines:
+- `FindAssetKey` (lines 496-555): Character-by-character scanner for finding keys
+- `FindMatchingBrace` (lines 568-627): Character-by-character brace matcher
+- `FindOpeningBrace` (lines 639-689): Character-by-character brace finder
 
-Issues: Will break with nested structures, uses naive string search for brace matching.
+Supporting types (lines 28-36): `cueParseState` type with four state constants used only by the Find* functions.
 
-Manual CUE Parser (lines 383-607):
+Hardcoded indentation in both `writeAssetToConfig` (lines 462-473) and `UpdateAssetInConfig` (lines 735-746): Uses `\t` prefix per line, with LIMITATION comment acknowledging this only works for flat structures.
 
-- FindAssetKey: 70 lines of state machine for finding keys
-- FindMatchingBrace: 67 lines for brace matching
-- FindOpeningBrace: 58 lines for finding opening braces
-
-Issues: Reimplements CUE parsing, doesn't handle all escape sequences, will have edge cases.
-
-Hardcoded Indentation (lines 647-667):
-
-```go
-// LIMITATION: This assumes a flat config structure where assets are direct children
-// of the category (e.g., tasks: { "name": { ... } }). It adds exactly one tab to
-// each line (except the first).
-lines := strings.Split(newContent, "\n")
-for i, line := range lines {
-    if i == 0 {
-        sb.WriteString(line)
-    } else {
-        if line != "" {
-            sb.WriteString("\n\t" + line)  // Hardcoded single tab
-```
-
-Issues: Explicitly documented limitation, won't work with nested structures.
-
-Code Duplication (internal/cli/assets_update.go:255-408):
-
-150+ lines of extractAssetContent, formatAssetStruct, formatFieldValue duplicated from assets package.
-
-Issues: Violates DRY, creates maintenance burden when logic changes.
+Test files referencing Find* functions:
+- `internal/assets/install_test.go`: TestFindAssetKey, TestFindMatchingBrace, TestFindOpeningBrace, TestFindAssetKey_EmptyKey, TestFindAssetKey_EmptyContent, TestFindMatchingBrace_MultiLineString, TestFindOpeningBrace_MultiLineString
+- `internal/assets/fuzz_test.go`: FuzzFindAssetKey, FuzzFindMatchingBrace, FuzzFindOpeningBrace (entire file)
+- `internal/cli/assets_test.go`: TestFindOpeningBrace (lines 669-818)
 
 ## Deliverables
 
 Files:
 
-- Updated `internal/assets/install.go` - AST-based implementation
-- Updated `internal/assets/install_test.go` - Tests for AST approach
-- Updated `internal/cli/assets_update.go` - Use exported functions, remove duplication
+- Updated `internal/assets/install.go` - AST-based writeAssetToConfig and UpdateAssetInConfig; Find* functions and cueParseState removed
+- Updated `internal/assets/install_test.go` - Find* tests removed; writeAssetToConfig and UpdateAssetInConfig tests updated for formatter output
+- Deleted `internal/assets/fuzz_test.go` - All fuzz tests target removed functions
+- Updated `internal/cli/assets_test.go` - TestFindOpeningBrace removed
 
 Documentation:
 
@@ -126,50 +106,65 @@ Tests:
 
 ## Technical Approach
 
-Replace String Operations with AST:
+CUE AST APIs (cuelang.org/go v0.15.4):
 
-1. Use `parser.ParseFile()` to read existing config files
-2. Use `ast.Field` and `ast.StructLit` to build/modify structures
-3. Use `format.Node()` to generate output (handles indentation automatically)
-4. Use `ast.LabelName()` to extract field labels safely
+1. `parser.ParseFile("file.cue", source, parser.ParseComments)` - Parse CUE source into `*ast.File`
+2. `ast.LabelName(field.Label)` - Extract field name from any label type (returns name, isQuoted, err)
+3. `ast.NewStruct(fields ...interface{})` - Build structs; accepts `*ast.Field`, `string`/`ast.Label` + `ast.Expr` pairs
+4. `ast.NewString(s)`, `ast.NewBool(b)`, `ast.NewList(exprs...)` - Build literal nodes
+5. `ast.NewStringLabel(name)` - Creates quoted or unquoted label as needed (handles `cwd/agents-md` style names)
+6. `format.Node(node, format.Simplify())` - Format any AST node to `[]byte` with proper indentation
 
 Key Changes:
 
-AssetExists:
-```go
-// Before: strings.Contains(content, assetKey+":")
-// After: Parse file, iterate AST nodes, check LabelName()
-```
-
 writeAssetToConfig:
 ```go
-// Before: String concatenation with manual indentation
-// After: Build ast.File with ast.Field nodes, format.Node()
+// Before: String search for category block, manual indentation
+// After: parser.ParseFile() -> find/create category struct -> append new field -> format.Node()
+// For new files: build ast.File with comment group + category field -> format.Node()
 ```
 
 UpdateAssetInConfig:
 ```go
-// Before: FindAssetKey + FindMatchingBrace + string replacement
-// After: Parse, find field in AST, replace field.Value, format.Node()
+// Before: FindAssetKey + FindMatchingBrace + string splicing
+// After: parser.ParseFile() -> walk to find field by LabelName() -> replace field.Value -> format.Node()
 ```
 
-Remove Manual Parsers:
+Asset content (from formatAssetStruct) needs to be parsed into an `ast.Expr` before inserting:
+```go
+// Parse the content string "{...}" into an AST expression
+expr, err := parser.ParseExpr("asset.cue", content)
+```
 
-Delete FindAssetKey, FindMatchingBrace, FindOpeningBrace entirely - AST operations don't need them.
+Remove: FindAssetKey, FindMatchingBrace, FindOpeningBrace, cueParseState type and constants.
 
 Backward Compatibility:
 
-Keep the same function signatures where possible. Internal implementation changes should be transparent to callers.
+Keep the same function signatures. `writeAssetToConfig` and `UpdateAssetInConfig` accept string content; internally parse it to AST. Callers are unaffected.
 
 ## Dependencies
 
 Requires:
 
-- p-021 (Auto-Setup Default Assets) - Must be completed and committed first
+- p-021 (Auto-Setup Default Assets) - Completed
 
 ## Decision Points
 
-None currently - approach is clear from code review.
+1. Comment preservation during AST round-trip
+
+`format.Node()` reformats the entire file when writing back. This means existing files will be normalised to CUE formatter style. Changes may include whitespace adjustments and comment positioning.
+
+Options:
+- A. Accept full reformat - simpler implementation, output is always canonical CUE
+- B. Preserve original formatting for unmodified sections - significantly more complex, would need to splice AST output into original text for modified sections only
+
+2. Handling the `content` parameter
+
+`writeAssetToConfig` and `UpdateAssetInConfig` receive `content` as a string (e.g., `"{\n\torigin: ...\n}"`). This needs to become an AST node.
+
+Options:
+- A. Parse content string with `parser.ParseExpr()` inside the function - no caller changes needed
+- B. Change function signatures to accept `ast.Expr` - cleaner but breaks callers (ExtractAssetContent, checkAndUpdate)
 
 ## Testing Strategy
 
@@ -213,8 +208,23 @@ Initial refactoring attempt revealed:
 
 These are minor issues to resolve during implementation, not blockers.
 
+CUE AST Key Details (verified 2026-02-18):
+
+- `parser.ParseFile` with `parser.ParseComments` preserves comments in AST
+- `ast.NewStruct` accepts `*ast.Field` directly or label/value pairs as `...interface{}`
+- `ast.NewStringLabel(name)` handles quoting automatically (uses `StringLabelNeedsQuoting`)
+- File-level declarations are in `file.Decls []ast.Decl`; top-level fields are `*ast.Field`
+- Struct elements are in `structLit.Elts []ast.Decl`; fields are `*ast.Field`
+- `format.Node` works on `*ast.File`, `ast.Expr`, or any `ast.Node`
+
 Alternative Considered:
 
 Continue with string manipulation and fix the edge cases individually.
 
 Rejected because: Band-aid approach. Each fix creates new complexity. The root problem is not using the right tool (AST) for the job.
+
+## Estimation
+
+Lines to remove: ~230 (Find* functions ~170, cueParseState ~10, hardcoded indentation ~20, fuzz_test.go ~155, cli TestFindOpeningBrace ~150)
+Lines to add: ~80-100 (AST-based writeAssetToConfig and UpdateAssetInConfig, helper functions)
+Net reduction: ~280-300 lines

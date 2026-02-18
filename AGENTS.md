@@ -12,7 +12,7 @@ Avoid references to the prototype in new documentation. This is a new design.
 
 Projects are stored in `.ai/projects/`. Continue by reading the active project.
 
-Active Project: None
+Active Project: .ai/projects/p-022-assets-ast-refactor.md
 
 Other Projects (paused):
 - None
