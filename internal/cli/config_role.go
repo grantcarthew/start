@@ -189,40 +189,10 @@ func runConfigRoleAdd(cmd *cobra.Command, _ []string) error {
 	}
 
 	if sourceCount == 0 && interactive {
-		_, _ = fmt.Fprintf(stdout, "\nContent source %s%s%s:\n", colorCyan.Sprint("("), colorDim.Sprint("choose one"), colorCyan.Sprint(")"))
-		_, _ = fmt.Fprintln(stdout, "  1. File path")
-		_, _ = fmt.Fprintln(stdout, "  2. Command")
-		_, _ = fmt.Fprintln(stdout, "  3. Inline prompt")
-		_, _ = fmt.Fprintf(stdout, "Choice %s%s%s: ", colorCyan.Sprint("["), colorDim.Sprint("1"), colorCyan.Sprint("]"))
-
-		reader := bufio.NewReader(stdin)
-		choice, err := reader.ReadString('\n')
+		var err error
+		file, command, prompt, err = promptContentSource(stdout, stdin, "1", "")
 		if err != nil {
-			return fmt.Errorf("reading input: %w", err)
-		}
-		choice = strings.TrimSpace(choice)
-		if choice == "" {
-			choice = "1"
-		}
-
-		switch choice {
-		case "1":
-			file, err = promptString(stdout, stdin, "File path", "")
-			if err != nil {
-				return err
-			}
-		case "2":
-			command, err = promptString(stdout, stdin, "Command", "")
-			if err != nil {
-				return err
-			}
-		case "3":
-			prompt, err = promptText(stdout, stdin, "Prompt text", "")
-			if err != nil {
-				return err
-			}
-		default:
-			return fmt.Errorf("invalid choice: %s", choice)
+			return err
 		}
 	}
 
@@ -507,42 +477,9 @@ func runConfigRoleEdit(cmd *cobra.Command, args []string) error {
 	newPrompt := role.Prompt
 
 	if input == "n" || input == "no" {
-		// Clear existing and prompt for new
-		newFile = ""
-		newCommand = ""
-		newPrompt = ""
-
-		_, _ = fmt.Fprintln(stdout, "\nNew content source:")
-		_, _ = fmt.Fprintln(stdout, "  1. File path")
-		_, _ = fmt.Fprintln(stdout, "  2. Command")
-		_, _ = fmt.Fprintln(stdout, "  3. Inline prompt")
-		_, _ = fmt.Fprintf(stdout, "Choice %s%s%s: ", colorCyan.Sprint("["), colorDim.Sprint("1"), colorCyan.Sprint("]"))
-
-		choice, err := reader.ReadString('\n')
+		newFile, newCommand, newPrompt, err = promptContentSource(stdout, stdin, "1", role.Prompt)
 		if err != nil {
-			return fmt.Errorf("reading input: %w", err)
-		}
-		choice = strings.TrimSpace(choice)
-		if choice == "" {
-			choice = "1"
-		}
-
-		switch choice {
-		case "1":
-			newFile, err = promptString(stdout, stdin, "File path", "")
-			if err != nil {
-				return err
-			}
-		case "2":
-			newCommand, err = promptString(stdout, stdin, "Command", "")
-			if err != nil {
-				return err
-			}
-		case "3":
-			newPrompt, err = promptText(stdout, stdin, "Prompt text", role.Prompt)
-			if err != nil {
-				return err
-			}
+			return err
 		}
 	}
 

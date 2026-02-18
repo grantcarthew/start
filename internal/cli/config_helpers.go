@@ -113,6 +113,50 @@ func promptString(w io.Writer, r io.Reader, label, defaultVal string) (string, e
 	return input, nil
 }
 
+// promptContentSource prompts the user to choose a content source (file, command, or inline prompt).
+// defaultChoice is the default menu option ("1" for file, "3" for inline prompt).
+// currentPrompt is passed to promptText as the default value for option 3.
+// Returns the selected file, command, and prompt values (only one will be non-empty).
+func promptContentSource(w io.Writer, r io.Reader, defaultChoice, currentPrompt string) (file, command, prompt string, err error) {
+	_, _ = fmt.Fprintf(w, "\nContent source %s%s%s:\n", colorCyan.Sprint("("), colorDim.Sprint("choose one"), colorCyan.Sprint(")"))
+	_, _ = fmt.Fprintln(w, "  1. File path")
+	_, _ = fmt.Fprintln(w, "  2. Command")
+	_, _ = fmt.Fprintln(w, "  3. Inline prompt")
+	_, _ = fmt.Fprintf(w, "Choice %s%s%s: ", colorCyan.Sprint("["), colorDim.Sprint(defaultChoice), colorCyan.Sprint("]"))
+
+	reader := bufio.NewReader(r)
+	choice, err := reader.ReadString('\n')
+	if err != nil {
+		return "", "", "", fmt.Errorf("reading input: %w", err)
+	}
+	choice = strings.TrimSpace(choice)
+	if choice == "" {
+		choice = defaultChoice
+	}
+
+	switch choice {
+	case "1":
+		file, err = promptString(w, r, "File path", "")
+		if err != nil {
+			return "", "", "", err
+		}
+	case "2":
+		command, err = promptString(w, r, "Command", "")
+		if err != nil {
+			return "", "", "", err
+		}
+	case "3":
+		prompt, err = promptText(w, r, "Prompt text", currentPrompt)
+		if err != nil {
+			return "", "", "", err
+		}
+	default:
+		return "", "", "", fmt.Errorf("invalid choice: %s", choice)
+	}
+
+	return file, command, prompt, nil
+}
+
 // promptText prompts for multi-line text input.
 // Users can type text directly (finish with a blank line) or press Enter
 // to open $EDITOR for longer input.
