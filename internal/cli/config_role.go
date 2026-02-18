@@ -11,6 +11,7 @@ import (
 	"cuelang.org/go/cue"
 	"github.com/grantcarthew/start/internal/config"
 	internalcue "github.com/grantcarthew/start/internal/cue"
+	"github.com/grantcarthew/start/internal/tui"
 	"github.com/spf13/cobra"
 )
 
@@ -78,7 +79,7 @@ func runConfigRoleList(cmd *cobra.Command, _ []string) error {
 	}
 
 	w := cmd.OutOrStdout()
-	_, _ = colorRoles.Fprint(w, "roles")
+	_, _ = tui.ColorRoles.Fprint(w, "roles")
 	_, _ = fmt.Fprintln(w, "/")
 	_, _ = fmt.Fprintln(w)
 
@@ -90,15 +91,11 @@ func runConfigRoleList(cmd *cobra.Command, _ []string) error {
 		}
 		if role.Description != "" {
 			_, _ = fmt.Fprintf(w, "  %s ", name)
-			_, _ = colorDim.Fprint(w, "- "+role.Description+" ")
-			_, _ = colorCyan.Fprint(w, "(")
-			_, _ = colorDim.Fprint(w, source)
-			_, _ = colorCyan.Fprintln(w, ")")
+			_, _ = tui.ColorDim.Fprint(w, "- "+role.Description+" ")
+			_, _ = fmt.Fprintln(w, tui.Annotate("%s", source))
 		} else {
 			_, _ = fmt.Fprintf(w, "  %s ", name)
-			_, _ = colorCyan.Fprint(w, "(")
-			_, _ = colorDim.Fprint(w, source)
-			_, _ = colorCyan.Fprintln(w, ")")
+			_, _ = fmt.Fprintln(w, tui.Annotate("%s", source))
 		}
 	}
 
@@ -303,35 +300,35 @@ func runConfigRoleInfo(cmd *cobra.Command, args []string) error {
 
 	w := cmd.OutOrStdout()
 	_, _ = fmt.Fprintln(w)
-	_, _ = colorRoles.Fprint(w, "roles")
+	_, _ = tui.ColorRoles.Fprint(w, "roles")
 	_, _ = fmt.Fprintf(w, "/%s\n", resolvedName)
 	printSeparator(w)
 
-	_, _ = colorDim.Fprint(w, "Source:")
+	_, _ = tui.ColorDim.Fprint(w, "Source:")
 	_, _ = fmt.Fprintf(w, " %s\n", role.Source)
 	if role.Origin != "" {
-		_, _ = colorDim.Fprint(w, "Origin:")
+		_, _ = tui.ColorDim.Fprint(w, "Origin:")
 		_, _ = fmt.Fprintf(w, " %s\n", role.Origin)
 	}
 	if role.Description != "" {
 		_, _ = fmt.Fprintln(w)
-		_, _ = colorDim.Fprint(w, "Description:")
+		_, _ = tui.ColorDim.Fprint(w, "Description:")
 		_, _ = fmt.Fprintf(w, " %s\n", role.Description)
 	}
 	if role.File != "" {
-		_, _ = colorDim.Fprint(w, "File:")
+		_, _ = tui.ColorDim.Fprint(w, "File:")
 		_, _ = fmt.Fprintf(w, " %s\n", role.File)
 	}
 	if role.Command != "" {
-		_, _ = colorDim.Fprint(w, "Command:")
+		_, _ = tui.ColorDim.Fprint(w, "Command:")
 		_, _ = fmt.Fprintf(w, " %s\n", role.Command)
 	}
 	if role.Prompt != "" {
-		_, _ = colorDim.Fprint(w, "Prompt:")
+		_, _ = tui.ColorDim.Fprint(w, "Prompt:")
 		_, _ = fmt.Fprintf(w, " %s\n", truncatePrompt(role.Prompt, 100))
 	}
 	if len(role.Tags) > 0 {
-		_, _ = colorDim.Fprint(w, "Tags:")
+		_, _ = tui.ColorDim.Fprint(w, "Tags:")
 		_, _ = fmt.Fprintf(w, " %s\n", strings.Join(role.Tags, ", "))
 	}
 	printSeparator(w)
@@ -445,7 +442,7 @@ func runConfigRoleEdit(cmd *cobra.Command, args []string) error {
 	}
 
 	// Prompt for each field with current value as default
-	_, _ = fmt.Fprintf(stdout, "Editing role %q %s%s%s\n\n", resolvedName, colorCyan.Sprint("("), colorDim.Sprint("press Enter to keep current value"), colorCyan.Sprint(")"))
+	_, _ = fmt.Fprintf(stdout, "Editing role %q %s\n\n", resolvedName, tui.Annotate("press Enter to keep current value"))
 
 	newDescription, err := promptString(stdout, stdin, "Description", role.Description)
 	if err != nil {
@@ -464,7 +461,7 @@ func runConfigRoleEdit(cmd *cobra.Command, args []string) error {
 		_, _ = fmt.Fprintf(stdout, "  Prompt: %s\n", truncatePrompt(role.Prompt, 50))
 	}
 
-	_, _ = fmt.Fprintf(stdout, "Keep current? %s%s%s ", colorCyan.Sprint("["), colorDim.Sprint("Y/n"), colorCyan.Sprint("]"))
+	_, _ = fmt.Fprintf(stdout, "Keep current? %s ", tui.Bracket("Y/n"))
 	reader := bufio.NewReader(stdin)
 	input, err := reader.ReadString('\n')
 	if err != nil {

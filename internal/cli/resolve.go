@@ -16,6 +16,7 @@ import (
 	internalcue "github.com/grantcarthew/start/internal/cue"
 	"github.com/grantcarthew/start/internal/orchestration"
 	"github.com/grantcarthew/start/internal/registry"
+	"github.com/grantcarthew/start/internal/tui"
 )
 
 // AssetSource indicates where an asset was found.
@@ -557,9 +558,9 @@ func (r *resolver) promptAssetSelection(matches []AssetMatch, assetType, query s
 		padding := strings.Repeat(" ", maxNameLen-len(m.Name)+2)
 		var sourceLabel string
 		if m.Source == AssetSourceInstalled {
-			sourceLabel = colorInstalled.Sprint(m.Source)
+			sourceLabel = tui.ColorInstalled.Sprint(m.Source)
 		} else {
-			sourceLabel = colorRegistry.Sprint(m.Source)
+			sourceLabel = tui.ColorRegistry.Sprint(m.Source)
 		}
 		_, _ = fmt.Fprintf(r.stdout, "  %2d. %s%s%s\n", i+1, m.Name, padding, sourceLabel)
 	}
@@ -570,7 +571,7 @@ func (r *resolver) promptAssetSelection(matches []AssetMatch, assetType, query s
 	}
 
 	_, _ = fmt.Fprintln(r.stdout)
-	_, _ = fmt.Fprintf(r.stdout, "Select %s%s%s: ", colorCyan.Sprint("("), colorDim.Sprintf("1-%d", displayCount), colorCyan.Sprint(")"))
+	_, _ = fmt.Fprintf(r.stdout, "Select %s: ", tui.Annotate("1-%d", displayCount))
 
 	reader := bufio.NewReader(r.stdin)
 	input, err := reader.ReadString('\n')

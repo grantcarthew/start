@@ -12,6 +12,7 @@ import (
 	"cuelang.org/go/cue"
 	"github.com/grantcarthew/start/internal/config"
 	internalcue "github.com/grantcarthew/start/internal/cue"
+	"github.com/grantcarthew/start/internal/tui"
 	"github.com/spf13/cobra"
 )
 
@@ -78,7 +79,7 @@ func runConfigTaskList(cmd *cobra.Command, _ []string) error {
 	}
 
 	w := cmd.OutOrStdout()
-	_, _ = colorTasks.Fprint(w, "tasks")
+	_, _ = tui.ColorTasks.Fprint(w, "tasks")
 	_, _ = fmt.Fprintln(w, "/")
 	_, _ = fmt.Fprintln(w)
 
@@ -90,15 +91,11 @@ func runConfigTaskList(cmd *cobra.Command, _ []string) error {
 		}
 		if task.Description != "" {
 			_, _ = fmt.Fprintf(w, "  %s ", name)
-			_, _ = colorDim.Fprint(w, "- "+task.Description+" ")
-			_, _ = colorCyan.Fprint(w, "(")
-			_, _ = colorDim.Fprint(w, source)
-			_, _ = colorCyan.Fprintln(w, ")")
+			_, _ = tui.ColorDim.Fprint(w, "- "+task.Description+" ")
+			_, _ = fmt.Fprintln(w, tui.Annotate("%s", source))
 		} else {
 			_, _ = fmt.Fprintf(w, "  %s ", name)
-			_, _ = colorCyan.Fprint(w, "(")
-			_, _ = colorDim.Fprint(w, source)
-			_, _ = colorCyan.Fprintln(w, ")")
+			_, _ = fmt.Fprintln(w, tui.Annotate("%s", source))
 		}
 	}
 
@@ -312,39 +309,39 @@ func runConfigTaskInfo(cmd *cobra.Command, args []string) error {
 
 	w := cmd.OutOrStdout()
 	_, _ = fmt.Fprintln(w)
-	_, _ = colorTasks.Fprint(w, "tasks")
+	_, _ = tui.ColorTasks.Fprint(w, "tasks")
 	_, _ = fmt.Fprintf(w, "/%s\n", resolvedName)
 	printSeparator(w)
 
-	_, _ = colorDim.Fprint(w, "Source:")
+	_, _ = tui.ColorDim.Fprint(w, "Source:")
 	_, _ = fmt.Fprintf(w, " %s\n", task.Source)
 	if task.Origin != "" {
-		_, _ = colorDim.Fprint(w, "Origin:")
+		_, _ = tui.ColorDim.Fprint(w, "Origin:")
 		_, _ = fmt.Fprintf(w, " %s\n", task.Origin)
 	}
 	if task.Description != "" {
 		_, _ = fmt.Fprintln(w)
-		_, _ = colorDim.Fprint(w, "Description:")
+		_, _ = tui.ColorDim.Fprint(w, "Description:")
 		_, _ = fmt.Fprintf(w, " %s\n", task.Description)
 	}
 	if task.File != "" {
-		_, _ = colorDim.Fprint(w, "File:")
+		_, _ = tui.ColorDim.Fprint(w, "File:")
 		_, _ = fmt.Fprintf(w, " %s\n", task.File)
 	}
 	if task.Command != "" {
-		_, _ = colorDim.Fprint(w, "Command:")
+		_, _ = tui.ColorDim.Fprint(w, "Command:")
 		_, _ = fmt.Fprintf(w, " %s\n", task.Command)
 	}
 	if task.Prompt != "" {
-		_, _ = colorDim.Fprint(w, "Prompt:")
+		_, _ = tui.ColorDim.Fprint(w, "Prompt:")
 		_, _ = fmt.Fprintf(w, " %s\n", truncatePrompt(task.Prompt, 100))
 	}
 	if task.Role != "" {
-		_, _ = colorDim.Fprint(w, "Role:")
+		_, _ = tui.ColorDim.Fprint(w, "Role:")
 		_, _ = fmt.Fprintf(w, " %s\n", task.Role)
 	}
 	if len(task.Tags) > 0 {
-		_, _ = colorDim.Fprint(w, "Tags:")
+		_, _ = tui.ColorDim.Fprint(w, "Tags:")
 		_, _ = fmt.Fprintf(w, " %s\n", strings.Join(task.Tags, ", "))
 	}
 	printSeparator(w)
@@ -458,7 +455,7 @@ func runConfigTaskEdit(cmd *cobra.Command, args []string) error {
 	}
 
 	// Prompt for each field with current value as default
-	_, _ = fmt.Fprintf(stdout, "Editing task %q %s%s%s\n\n", resolvedName, colorCyan.Sprint("("), colorDim.Sprint("press Enter to keep current value"), colorCyan.Sprint(")"))
+	_, _ = fmt.Fprintf(stdout, "Editing task %q %s\n\n", resolvedName, tui.Annotate("press Enter to keep current value"))
 
 	newDescription, err := promptString(stdout, stdin, "Description", task.Description)
 	if err != nil {
@@ -477,7 +474,7 @@ func runConfigTaskEdit(cmd *cobra.Command, args []string) error {
 		_, _ = fmt.Fprintf(stdout, "  Prompt: %s\n", truncatePrompt(task.Prompt, 50))
 	}
 
-	_, _ = fmt.Fprintf(stdout, "Keep current? %s%s%s ", colorCyan.Sprint("["), colorDim.Sprint("Y/n"), colorCyan.Sprint("]"))
+	_, _ = fmt.Fprintf(stdout, "Keep current? %s ", tui.Bracket("Y/n"))
 	reader := bufio.NewReader(stdin)
 	input, err := reader.ReadString('\n')
 	if err != nil {

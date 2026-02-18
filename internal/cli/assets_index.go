@@ -13,6 +13,7 @@ import (
 	"cuelang.org/go/mod/modconfig"
 	"github.com/grantcarthew/start/internal/assets"
 	"github.com/grantcarthew/start/internal/registry"
+	"github.com/grantcarthew/start/internal/tui"
 	"github.com/spf13/cobra"
 )
 
@@ -158,22 +159,22 @@ func printIndex(w io.Writer, index *registry.Index, version string, verbose bool
 		}
 		sort.Strings(names)
 
-		_, _ = categoryColor(cat.name).Fprint(w, cat.name)
-		_, _ = fmt.Fprintf(w, "/ %s%s%s\n", colorCyan.Sprint("("), colorDim.Sprintf("%d", len(cat.entries)), colorCyan.Sprint(")"))
+		_, _ = tui.CategoryColor(cat.name).Fprint(w, cat.name)
+		_, _ = fmt.Fprintf(w, "/ %s\n", tui.Annotate("%d", len(cat.entries)))
 
 		for _, name := range names {
 			entry := cat.entries[name]
 			marker := "  "
 			if installed[cat.name+"/"+name] {
-				marker = colorInstalled.Sprint("★") + " "
+				marker = tui.ColorInstalled.Sprint("★") + " "
 			}
 
-			_, _ = fmt.Fprintf(w, "  %s%-25s %s\n", marker, name, colorDim.Sprint(entry.Description))
+			_, _ = fmt.Fprintf(w, "  %s%-25s %s\n", marker, name, tui.ColorDim.Sprint(entry.Description))
 
 			if verbose {
-				_, _ = fmt.Fprintf(w, "      Module: %s\n", colorDim.Sprint(entry.Module))
+				_, _ = fmt.Fprintf(w, "      Module: %s\n", tui.ColorDim.Sprint(entry.Module))
 				if len(entry.Tags) > 0 {
-					_, _ = fmt.Fprintf(w, "      Tags: %s\n", colorDim.Sprint(strings.Join(entry.Tags, ", ")))
+					_, _ = fmt.Fprintf(w, "      Tags: %s\n", tui.ColorDim.Sprint(strings.Join(entry.Tags, ", ")))
 				}
 			}
 		}

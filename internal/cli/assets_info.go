@@ -11,6 +11,7 @@ import (
 	"github.com/grantcarthew/start/internal/config"
 	internalcue "github.com/grantcarthew/start/internal/cue"
 	"github.com/grantcarthew/start/internal/registry"
+	"github.com/grantcarthew/start/internal/tui"
 	"github.com/spf13/cobra"
 )
 
@@ -118,40 +119,36 @@ func checkIfInstalled(asset assets.SearchResult) (bool, string) {
 // printAssetInfo prints detailed information about an asset.
 func printAssetInfo(w io.Writer, asset assets.SearchResult, installed bool, scope string, verbose bool) {
 	_, _ = fmt.Fprintln(w)
-	_, _ = categoryColor(asset.Category).Fprint(w, asset.Category)
+	_, _ = tui.CategoryColor(asset.Category).Fprint(w, asset.Category)
 	_, _ = fmt.Fprintf(w, "/%s\n", asset.Name)
 	printSeparator(w)
 
-	_, _ = colorDim.Fprint(w, "Type:")
+	_, _ = tui.ColorDim.Fprint(w, "Type:")
 	_, _ = fmt.Fprintf(w, " %s\n", asset.Category)
-	_, _ = colorDim.Fprint(w, "Module:")
+	_, _ = tui.ColorDim.Fprint(w, "Module:")
 	_, _ = fmt.Fprintf(w, " %s\n", asset.Entry.Module)
 
 	if asset.Entry.Description != "" {
 		_, _ = fmt.Fprintln(w)
-		_, _ = colorDim.Fprint(w, "Description:")
+		_, _ = tui.ColorDim.Fprint(w, "Description:")
 		_, _ = fmt.Fprintf(w, " %s\n", asset.Entry.Description)
 	}
 
 	if len(asset.Entry.Tags) > 0 {
-		_, _ = colorDim.Fprint(w, "Tags:")
+		_, _ = tui.ColorDim.Fprint(w, "Tags:")
 		_, _ = fmt.Fprintf(w, " %s\n", strings.Join(asset.Entry.Tags, ", "))
 	}
 
 	_, _ = fmt.Fprintln(w)
 	if installed {
-		_, _ = colorInstalled.Fprint(w, "✓")
-		_, _ = fmt.Fprint(w, " Installed ")
-		_, _ = colorCyan.Fprint(w, "(")
-		_, _ = colorDim.Fprint(w, scope)
-		_, _ = colorCyan.Fprint(w, ")")
-		_, _ = fmt.Fprintln(w)
+		_, _ = tui.ColorInstalled.Fprint(w, "✓")
+		_, _ = fmt.Fprintf(w, " Installed %s\n", tui.Annotate("%s", scope))
 	} else {
 		_, _ = fmt.Fprintln(w, "  Not installed")
 	}
 
 	if asset.Entry.Version != "" {
-		_, _ = colorDim.Fprint(w, "Version:")
+		_, _ = tui.ColorDim.Fprint(w, "Version:")
 		_, _ = fmt.Fprintf(w, " %s\n", asset.Entry.Version)
 	}
 

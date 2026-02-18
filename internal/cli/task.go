@@ -15,6 +15,7 @@ import (
 	"github.com/grantcarthew/start/internal/orchestration"
 	"github.com/grantcarthew/start/internal/registry"
 	"github.com/grantcarthew/start/internal/temp"
+	"github.com/grantcarthew/start/internal/tui"
 	"github.com/spf13/cobra"
 )
 
@@ -529,17 +530,17 @@ func printTaskDryRunSummary(w io.Writer, agent orchestration.Agent, model, model
 
 	// Show role preview
 	if result.Role != "" {
-		printContentPreview(w, "Role", colorRoles, result.Role, 5)
+		printContentPreview(w, "Role", tui.ColorRoles, result.Role, 5)
 		_, _ = fmt.Fprintln(w)
 	}
 
 	// Show prompt preview
 	if result.Prompt != "" {
-		printContentPreview(w, "Prompt", colorPrompts, result.Prompt, 5)
+		printContentPreview(w, "Prompt", tui.ColorPrompts, result.Prompt, 5)
 		_, _ = fmt.Fprintln(w)
 	}
 
-	_, _ = colorDim.Fprint(w, "Files:")
+	_, _ = tui.ColorDim.Fprint(w, "Files:")
 	_, _ = fmt.Fprintf(w, " %s/\n", dir)
 	_, _ = fmt.Fprintln(w, "  role.md")
 	_, _ = fmt.Fprintln(w, "  prompt.md")
@@ -652,9 +653,9 @@ func promptTaskSelection(w io.Writer, reader *bufio.Reader, matches []TaskMatch,
 		padding := strings.Repeat(" ", maxNameLen-len(m.Name)+2)
 		var sourceLabel string
 		if m.Source == TaskSourceInstalled {
-			sourceLabel = colorInstalled.Sprint(m.Source)
+			sourceLabel = tui.ColorInstalled.Sprint(m.Source)
 		} else {
-			sourceLabel = colorRegistry.Sprint(m.Source)
+			sourceLabel = tui.ColorRegistry.Sprint(m.Source)
 		}
 		_, _ = fmt.Fprintf(w, "  %2d. %s%s%s\n", i+1, m.Name, padding, sourceLabel)
 	}
@@ -664,7 +665,7 @@ func promptTaskSelection(w io.Writer, reader *bufio.Reader, matches []TaskMatch,
 	}
 
 	_, _ = fmt.Fprintln(w)
-	_, _ = fmt.Fprintf(w, "Select %s%s%s: ", colorCyan.Sprint("("), colorDim.Sprintf("1-%d", displayCount), colorCyan.Sprint(")"))
+	_, _ = fmt.Fprintf(w, "Select %s: ", tui.Annotate("1-%d", displayCount))
 
 	input, err := reader.ReadString('\n')
 	if err != nil {

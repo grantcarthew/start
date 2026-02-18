@@ -12,6 +12,7 @@ import (
 	"github.com/grantcarthew/start/internal/config"
 	internalcue "github.com/grantcarthew/start/internal/cue"
 	"github.com/grantcarthew/start/internal/registry"
+	"github.com/grantcarthew/start/internal/tui"
 	"github.com/spf13/cobra"
 	"golang.org/x/mod/semver"
 )
@@ -250,33 +251,33 @@ func printUpdateResults(w io.Writer, results []UpdateResult, dryRun bool) {
 		_, _ = fmt.Fprintf(w, "  %s ", name)
 
 		if r.Error != nil {
-			_, _ = colorCyan.Fprint(w, "(")
-			_, _ = colorError.Fprintf(w, "error: %v", r.Error)
-			_, _ = colorCyan.Fprintln(w, ")")
+			_, _ = tui.ColorCyan.Fprint(w, "(")
+			_, _ = tui.ColorError.Fprintf(w, "error: %v", r.Error)
+			_, _ = tui.ColorCyan.Fprintln(w, ")")
 			failed++
 		} else if r.Updated {
-			_, _ = colorCyan.Fprint(w, "(")
+			_, _ = tui.ColorCyan.Fprint(w, "(")
 			if r.OldVersion != "" {
-				_, _ = colorDim.Fprint(w, r.OldVersion)
+				_, _ = tui.ColorDim.Fprint(w, r.OldVersion)
 				_, _ = fmt.Fprint(w, " ")
 			}
-			_, _ = colorBlue.Fprint(w, "->")
+			_, _ = tui.ColorBlue.Fprint(w, "->")
 			if r.NewVersion != "" {
 				_, _ = fmt.Fprint(w, " ")
-				_, _ = colorSuccess.Fprint(w, r.NewVersion)
+				_, _ = tui.ColorSuccess.Fprint(w, r.NewVersion)
 			}
-			_, _ = colorCyan.Fprintln(w, ")")
+			_, _ = tui.ColorCyan.Fprintln(w, ")")
 			updated++
 		} else {
-			_, _ = colorCyan.Fprint(w, "(")
+			_, _ = tui.ColorCyan.Fprint(w, "(")
 			if r.OldVersion != "" {
-				_, _ = colorDim.Fprint(w, r.OldVersion)
+				_, _ = tui.ColorDim.Fprint(w, r.OldVersion)
 				_, _ = fmt.Fprint(w, " ")
-				_, _ = colorBlue.Fprint(w, "->")
+				_, _ = tui.ColorBlue.Fprint(w, "->")
 				_, _ = fmt.Fprint(w, " ")
 			}
-			_, _ = colorDim.Fprint(w, "current")
-			_, _ = colorCyan.Fprintln(w, ")")
+			_, _ = tui.ColorDim.Fprint(w, "current")
+			_, _ = tui.ColorCyan.Fprintln(w, ")")
 			current++
 		}
 	}

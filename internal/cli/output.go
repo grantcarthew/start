@@ -6,50 +6,13 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/fatih/color"
 	"github.com/grantcarthew/start/internal/orchestration"
+	"github.com/grantcarthew/start/internal/tui"
 )
-
-// Color definitions per DR-042
-var (
-	colorError     = color.New(color.FgRed)
-	colorWarning   = color.New(color.FgYellow)
-	colorSuccess   = color.New(color.FgGreen)
-	colorHeader    = color.New(color.FgGreen)
-	colorSeparator = color.New(color.FgMagenta)
-	colorDim       = color.New(color.Faint)
-	colorCyan      = color.New(color.FgCyan)
-	colorBlue      = color.New(color.FgBlue)
-
-	// Asset category colours
-	colorAgents    = color.New(color.FgBlue)
-	colorRoles     = color.New(color.FgGreen)
-	colorContexts  = color.New(color.FgCyan)
-	colorTasks     = color.New(color.FgHiYellow)
-	colorPrompts   = color.New(color.FgMagenta)
-	colorInstalled = color.New(color.FgHiGreen)
-	colorRegistry  = color.New(color.FgYellow)
-)
-
-// categoryColor returns the colour for an asset category.
-func categoryColor(category string) *color.Color {
-	switch category {
-	case "agents":
-		return colorAgents
-	case "roles":
-		return colorRoles
-	case "contexts":
-		return colorContexts
-	case "tasks":
-		return colorTasks
-	default:
-		return colorDim
-	}
-}
 
 // printWarning prints a warning message in yellow.
 func printWarning(w io.Writer, format string, args ...interface{}) {
-	_, _ = colorWarning.Fprintf(w, "Warning: ")
+	_, _ = tui.ColorWarning.Fprintf(w, "Warning: ")
 	_, _ = fmt.Fprintf(w, format, args...)
 	_, _ = fmt.Fprintln(w)
 }
@@ -57,12 +20,12 @@ func printWarning(w io.Writer, format string, args ...interface{}) {
 // printHeader prints a header/title in green with a leading blank line.
 func printHeader(w io.Writer, text string) {
 	_, _ = fmt.Fprintln(w)
-	_, _ = colorHeader.Fprintln(w, text)
+	_, _ = tui.ColorHeader.Fprintln(w, text)
 }
 
 // printSeparator prints a separator line in magenta.
 func printSeparator(w io.Writer) {
-	_, _ = colorSeparator.Fprintln(w, strings.Repeat("─", 79))
+	_, _ = tui.ColorSeparator.Fprintln(w, strings.Repeat("─", 79))
 }
 
 // printContextTable prints contexts in a table format.
@@ -86,9 +49,9 @@ func printContextTable(w io.Writer, contexts []orchestration.Context, selection 
 		}
 	}
 
-	_, _ = colorContexts.Fprint(w, "Context:")
+	_, _ = tui.ColorContexts.Fprint(w, "Context:")
 	if len(parts) > 0 {
-		_, _ = fmt.Fprintf(w, " %s%s%s", colorCyan.Sprint("("), colorDim.Sprint(strings.Join(parts, ", ")), colorCyan.Sprint(")"))
+		_, _ = fmt.Fprintf(w, " %s", tui.Annotate("%s", strings.Join(parts, ", ")))
 	}
 	_, _ = fmt.Fprintln(w)
 
@@ -157,7 +120,7 @@ func printContextTable(w io.Writer, contexts []orchestration.Context, selection 
 	}
 
 	// Print header
-	_, _ = colorDim.Fprintf(w, "  %-*s  %s  %-*s  %s\n",
+	_, _ = tui.ColorDim.Fprintf(w, "  %-*s  %s  %-*s  %s\n",
 		nameWidth, "Name", "Status", tagsWidth, "Tags", "File")
 
 	// Print rows
@@ -165,9 +128,9 @@ func printContextTable(w io.Writer, contexts []orchestration.Context, selection 
 		_, _ = fmt.Fprint(w, "  ")
 		_, _ = fmt.Fprintf(w, "%-*s  ", nameWidth, r.name)
 		if r.status == "✓" {
-			_, _ = colorSuccess.Fprintf(w, "%s", r.status)
+			_, _ = tui.ColorSuccess.Fprintf(w, "%s", r.status)
 		} else {
-			_, _ = colorTasks.Fprint(w, r.status)
+			_, _ = tui.ColorTasks.Fprint(w, r.status)
 		}
 		_, _ = fmt.Fprintf(w, "       %-*s  %s\n", tagsWidth, r.tags, r.file)
 	}
@@ -176,11 +139,11 @@ func printContextTable(w io.Writer, contexts []orchestration.Context, selection 
 
 // printAgentModel prints the Agent and Model lines with colour formatting.
 func printAgentModel(w io.Writer, agent orchestration.Agent, model, modelSource string) {
-	_, _ = colorAgents.Fprint(w, "Agent:")
+	_, _ = tui.ColorAgents.Fprint(w, "Agent:")
 	_, _ = fmt.Fprintf(w, " %s\n", agent.Name)
-	_, _ = colorAgents.Fprint(w, "Model:")
+	_, _ = tui.ColorAgents.Fprint(w, "Model:")
 	if model != "" {
-		_, _ = fmt.Fprintf(w, " %s %s%s%s\n", model, colorCyan.Sprint("("), colorDim.Sprintf("via %s", modelSource), colorCyan.Sprint(")"))
+		_, _ = fmt.Fprintf(w, " %s %s\n", model, tui.Annotate("via %s", modelSource))
 	} else {
 		_, _ = fmt.Fprintln(w, " -")
 	}
@@ -194,7 +157,7 @@ func printRoleTable(w io.Writer, resolutions []orchestration.RoleResolution) {
 		return
 	}
 
-	_, _ = colorRoles.Fprint(w, "Role:")
+	_, _ = tui.ColorRoles.Fprint(w, "Role:")
 	_, _ = fmt.Fprintln(w)
 
 	// Calculate column widths
@@ -206,7 +169,7 @@ func printRoleTable(w io.Writer, resolutions []orchestration.RoleResolution) {
 	}
 
 	// Print header
-	_, _ = colorDim.Fprintf(w, "  %-*s  %s  %s\n", nameWidth, "Name", "Status", "File")
+	_, _ = tui.ColorDim.Fprintf(w, "  %-*s  %s  %s\n", nameWidth, "Name", "Status", "File")
 
 	// Print rows
 	for _, r := range resolutions {
@@ -238,9 +201,9 @@ func printRoleTable(w io.Writer, resolutions []orchestration.RoleResolution) {
 		_, _ = fmt.Fprint(w, "  ")
 		_, _ = fmt.Fprintf(w, "%-*s  ", nameWidth, r.Name)
 		if status == "✓" {
-			_, _ = colorSuccess.Fprintf(w, "%s", status)
+			_, _ = tui.ColorSuccess.Fprintf(w, "%s", status)
 		} else {
-			_, _ = colorTasks.Fprint(w, status)
+			_, _ = tui.ColorTasks.Fprint(w, status)
 		}
 		_, _ = fmt.Fprintf(w, "       %s\n", file)
 	}

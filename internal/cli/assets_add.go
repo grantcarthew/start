@@ -15,6 +15,7 @@ import (
 	"github.com/grantcarthew/start/internal/config"
 	internalcue "github.com/grantcarthew/start/internal/cue"
 	"github.com/grantcarthew/start/internal/registry"
+	"github.com/grantcarthew/start/internal/tui"
 	"github.com/spf13/cobra"
 	"golang.org/x/mod/semver"
 )
@@ -144,27 +145,27 @@ func installAsset(ctx context.Context, cmd *cobra.Command, client *registry.Clie
 				if outdated {
 					_, _ = fmt.Fprint(w, "○ ")
 				} else {
-					_, _ = colorSuccess.Fprint(w, "✓ ")
+					_, _ = tui.ColorSuccess.Fprint(w, "✓ ")
 				}
-				_, _ = colorDim.Fprint(w, "Already installed: ")
-				_, _ = categoryColor(selected.Category).Fprint(w, selected.Category)
+				_, _ = tui.ColorDim.Fprint(w, "Already installed: ")
+				_, _ = tui.CategoryColor(selected.Category).Fprint(w, selected.Category)
 				_, _ = fmt.Fprintf(w, "/%s ", selected.Name)
-				_, _ = colorCyan.Fprint(w, "(")
+				_, _ = tui.ColorCyan.Fprint(w, "(")
 				if installedVer != "" {
-					_, _ = colorDim.Fprint(w, installedVer)
+					_, _ = tui.ColorDim.Fprint(w, installedVer)
 				}
 				if outdated {
 					_, _ = fmt.Fprint(w, " ")
-					_, _ = colorBlue.Fprint(w, "->")
+					_, _ = tui.ColorBlue.Fprint(w, "->")
 					_, _ = fmt.Fprint(w, " ")
-					_, _ = colorWarning.Fprint(w, latestVer)
+					_, _ = tui.ColorWarning.Fprint(w, latestVer)
 				} else {
 					_, _ = fmt.Fprint(w, " ")
-					_, _ = colorBlue.Fprint(w, "->")
+					_, _ = tui.ColorBlue.Fprint(w, "->")
 					_, _ = fmt.Fprint(w, " ")
-					_, _ = colorDim.Fprint(w, "current")
+					_, _ = tui.ColorDim.Fprint(w, "current")
 				}
-				_, _ = colorCyan.Fprintln(w, ")")
+				_, _ = tui.ColorCyan.Fprintln(w, ")")
 			}
 			return nil
 		}
@@ -217,21 +218,17 @@ func promptAssetSelection(w io.Writer, r io.Reader, results []assets.SearchResul
 	for i, res := range results {
 		marker := "  "
 		if assets.AssetExists(cfg, res.Category, res.Name) {
-			marker = colorInstalled.Sprint("★") + " "
+			marker = tui.ColorInstalled.Sprint("★") + " "
 		}
 		_, _ = fmt.Fprintf(w, "  %s%d. ", marker, i+1)
-		_, _ = categoryColor(res.Category).Fprint(w, res.Category)
+		_, _ = tui.CategoryColor(res.Category).Fprint(w, res.Category)
 		_, _ = fmt.Fprintf(w, "/%s ", res.Name)
-		_, _ = colorDim.Fprintf(w, "- %s", res.Entry.Description)
+		_, _ = tui.ColorDim.Fprintf(w, "- %s", res.Entry.Description)
 		_, _ = fmt.Fprintln(w)
 	}
 
 	_, _ = fmt.Fprintln(w)
-	_, _ = fmt.Fprint(w, "Select asset ")
-	_, _ = colorCyan.Fprint(w, "(")
-	_, _ = colorDim.Fprint(w, "number or name")
-	_, _ = colorCyan.Fprint(w, ")")
-	_, _ = fmt.Fprint(w, ": ")
+	_, _ = fmt.Fprintf(w, "Select asset %s: ", tui.Annotate("number or name"))
 
 	reader := bufio.NewReader(r)
 	input, err := reader.ReadString('\n')

@@ -15,6 +15,7 @@ import (
 	"github.com/grantcarthew/start/internal/config"
 	internalcue "github.com/grantcarthew/start/internal/cue"
 	"github.com/grantcarthew/start/internal/orchestration"
+	"github.com/grantcarthew/start/internal/tui"
 	"github.com/spf13/cobra"
 )
 
@@ -178,14 +179,14 @@ func runShowListing(cmd *cobra.Command) error {
 			continue
 		}
 
-		_, _ = categoryColor(cat.category).Fprint(w, cat.category)
+		_, _ = tui.CategoryColor(cat.category).Fprint(w, cat.category)
 		_, _ = fmt.Fprintln(w, "/")
 
 		for _, e := range entries {
 			if e.desc != "" {
 				padding := strings.Repeat(" ", maxNameLen-len(e.name)+2)
 				_, _ = fmt.Fprintf(w, "  %s%s", e.name, padding)
-				_, _ = colorDim.Fprintln(w, e.desc)
+				_, _ = tui.ColorDim.Fprintln(w, e.desc)
 			} else {
 				_, _ = fmt.Fprintf(w, "  %s\n", e.name)
 			}
@@ -371,9 +372,9 @@ func promptShowSelection(w io.Writer, stdin io.Reader, scope string, matches []A
 		padding := strings.Repeat(" ", maxDisplayLen-len(display)+2)
 		var sourceLabel string
 		if m.Source == AssetSourceInstalled {
-			sourceLabel = colorInstalled.Sprint(m.Source)
+			sourceLabel = tui.ColorInstalled.Sprint(m.Source)
 		} else {
-			sourceLabel = colorRegistry.Sprint(m.Source)
+			sourceLabel = tui.ColorRegistry.Sprint(m.Source)
 		}
 		_, _ = fmt.Fprintf(w, "  %2d. %s%s%s\n", i+1, display, padding, sourceLabel)
 	}
@@ -384,7 +385,7 @@ func promptShowSelection(w io.Writer, stdin io.Reader, scope string, matches []A
 	}
 
 	_, _ = fmt.Fprintln(w)
-	_, _ = fmt.Fprintf(w, "Select %s%s%s: ", colorCyan.Sprint("("), colorDim.Sprintf("1-%d", displayCount), colorCyan.Sprint(")"))
+	_, _ = fmt.Fprintf(w, "Select %s: ", tui.Annotate("1-%d", displayCount))
 
 	reader := bufio.NewReader(stdin)
 	input, err := reader.ReadString('\n')
@@ -530,17 +531,15 @@ func loadConfig(scope string) (internalcue.LoadResult, error) {
 // printVerboseDump writes the full verbose dump for a ShowResult.
 func printVerboseDump(w io.Writer, r ShowResult) {
 	cat := r.Category
-	label := colorDim.Sprint
+	label := tui.ColorDim.Sprint
 
 	// Header
 	_, _ = fmt.Fprintln(w)
-	_, _ = categoryColor(cat).Fprint(w, r.ItemType)
+	_, _ = tui.CategoryColor(cat).Fprint(w, r.ItemType)
 	_, _ = fmt.Fprintf(w, ": %s", r.Name)
 	if r.ShowReason != "" {
 		_, _ = fmt.Fprint(w, " ")
-		_, _ = colorCyan.Fprint(w, "(")
-		_, _ = colorDim.Fprint(w, r.ShowReason)
-		_, _ = colorCyan.Fprint(w, ")")
+		_, _ = fmt.Fprint(w, tui.Annotate("%s", r.ShowReason))
 	}
 	_, _ = fmt.Fprintln(w)
 	printSeparator(w)
@@ -548,9 +547,9 @@ func printVerboseDump(w io.Writer, r ShowResult) {
 	// Config source
 	configSource := findConfigSource(r.CueKey, r.Name)
 	if configSource != "" {
-		_, _ = fmt.Fprintf(w, "%s %s %s%s%s\n",
+		_, _ = fmt.Fprintf(w, "%s %s %s\n",
 			label("Config:"), configSource,
-			colorCyan.Sprint("("), colorDim.Sprint(r.Name), colorCyan.Sprint(")"))
+			tui.Annotate("%s", r.Name))
 	}
 
 	// Origin and cache

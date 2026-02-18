@@ -11,6 +11,7 @@ import (
 	"github.com/grantcarthew/start/internal/config"
 	internalcue "github.com/grantcarthew/start/internal/cue"
 	"github.com/grantcarthew/start/internal/registry"
+	"github.com/grantcarthew/start/internal/tui"
 	"github.com/spf13/cobra"
 )
 
@@ -141,22 +142,22 @@ func printSearchResults(w io.Writer, results []assets.SearchResult, verbose bool
 			continue
 		}
 
-		_, _ = categoryColor(cat).Fprint(w, cat)
+		_, _ = tui.CategoryColor(cat).Fprint(w, cat)
 		_, _ = fmt.Fprintln(w, "/")
 		for _, r := range catResults {
 			marker := "  "
 			if installed[r.Category+"/"+r.Name] {
-				marker = colorInstalled.Sprint("★") + " "
+				marker = tui.ColorInstalled.Sprint("★") + " "
 			}
 
 			if verbose {
-				_, _ = fmt.Fprintf(w, "  %s%-25s %s\n", marker, r.Name, colorDim.Sprint(r.Entry.Description))
-				_, _ = fmt.Fprintf(w, "      Module: %s\n", colorDim.Sprint(r.Entry.Module))
+				_, _ = fmt.Fprintf(w, "  %s%-25s %s\n", marker, r.Name, tui.ColorDim.Sprint(r.Entry.Description))
+				_, _ = fmt.Fprintf(w, "      Module: %s\n", tui.ColorDim.Sprint(r.Entry.Module))
 				if len(r.Entry.Tags) > 0 {
-					_, _ = fmt.Fprintf(w, "      Tags: %s\n", colorDim.Sprint(strings.Join(r.Entry.Tags, ", ")))
+					_, _ = fmt.Fprintf(w, "      Tags: %s\n", tui.ColorDim.Sprint(strings.Join(r.Entry.Tags, ", ")))
 				}
 			} else {
-				_, _ = fmt.Fprintf(w, "  %s%-25s %s\n", marker, r.Name, colorDim.Sprint(r.Entry.Description))
+				_, _ = fmt.Fprintf(w, "  %s%-25s %s\n", marker, r.Name, tui.ColorDim.Sprint(r.Entry.Description))
 			}
 		}
 		_, _ = fmt.Fprintln(w)

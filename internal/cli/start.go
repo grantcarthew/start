@@ -13,6 +13,7 @@ import (
 	"cuelang.org/go/cue"
 	"github.com/fatih/color"
 	"github.com/grantcarthew/start/internal/config"
+	"github.com/grantcarthew/start/internal/tui"
 	internalcue "github.com/grantcarthew/start/internal/cue"
 	"github.com/grantcarthew/start/internal/orchestration"
 	"github.com/grantcarthew/start/internal/shell"
@@ -133,7 +134,7 @@ func resolveAgentName(cfg internalcue.LoadResult, flags *Flags, stdout io.Writer
 		name := choices[0].Name
 		debugf(flags, dbgAgent, "Selected %q (first agent, non-TTY)", name)
 		if !flags.Quiet {
-			_, _ = fmt.Fprintf(stdout, "Using agent %q %s%s%s\n", name, colorCyan.Sprint("("), colorDim.Sprint("set default_agent or use --agent to specify"), colorCyan.Sprint(")"))
+			_, _ = fmt.Fprintf(stdout, "Using agent %q %s\n", name, tui.Annotate("set default_agent or use --agent to specify"))
 		}
 		return name, nil
 	}
@@ -240,7 +241,7 @@ func promptAgentSelection(w io.Writer, reader *bufio.Reader, choices []agentChoi
 	}
 
 	_, _ = fmt.Fprintln(w)
-	_, _ = fmt.Fprintf(w, "Select %s%s%s: ", colorCyan.Sprint("("), colorDim.Sprintf("1-%d", len(choices)), colorCyan.Sprint(")"))
+	_, _ = fmt.Fprintf(w, "Select %s: ", tui.Annotate("1-%d", len(choices)))
 
 	input, err := reader.ReadString('\n')
 	if err != nil {
@@ -284,7 +285,7 @@ func promptAgentSelection(w io.Writer, reader *bufio.Reader, choices []agentChoi
 // promptSetDefault asks the user whether to set the selected agent as default.
 // The caller is responsible for TTY detection; this function assumes interactive input.
 func promptSetDefault(w io.Writer, reader *bufio.Reader, agentName string) bool {
-	_, _ = fmt.Fprintf(w, "Set %q as default agent? %s%s%s: ", agentName, colorCyan.Sprint("["), colorDim.Sprint("y/N"), colorCyan.Sprint("]"))
+	_, _ = fmt.Fprintf(w, "Set %q as default agent? %s: ", agentName, tui.Bracket("y/N"))
 
 	input, err := reader.ReadString('\n')
 	if err != nil {
@@ -513,17 +514,17 @@ func printDryRunSummary(w io.Writer, agent orchestration.Agent, model, modelSour
 
 	// Show role preview
 	if result.Role != "" {
-		printContentPreview(w, "Role", colorRoles, result.Role, 5)
+		printContentPreview(w, "Role", tui.ColorRoles, result.Role, 5)
 		_, _ = fmt.Fprintln(w)
 	}
 
 	// Show prompt preview
 	if result.Prompt != "" {
-		printContentPreview(w, "Prompt", colorPrompts, result.Prompt, 5)
+		printContentPreview(w, "Prompt", tui.ColorPrompts, result.Prompt, 5)
 		_, _ = fmt.Fprintln(w)
 	}
 
-	_, _ = colorDim.Fprint(w, "Files:")
+	_, _ = tui.ColorDim.Fprint(w, "Files:")
 	_, _ = fmt.Fprintf(w, " %s\n", dir)
 	_, _ = fmt.Fprintln(w, "  role.md")
 	_, _ = fmt.Fprintln(w, "  prompt.md")
@@ -536,7 +537,7 @@ func printComposeError(w io.Writer, agent orchestration.Agent, result orchestrat
 	printHeader(w, "Starting AI Agent")
 	printSeparator(w)
 
-	_, _ = colorAgents.Fprint(w, "Agent:")
+	_, _ = tui.ColorAgents.Fprint(w, "Agent:")
 	_, _ = fmt.Fprintf(w, " %s\n", agent.Name)
 	_, _ = fmt.Fprintln(w)
 
@@ -554,7 +555,7 @@ func printContentPreview(w io.Writer, label string, labelColor *color.Color, tex
 
 	if truncated {
 		_, _ = labelColor.Fprint(w, label)
-		_, _ = fmt.Fprintf(w, " %s%s%s:\n", colorCyan.Sprint("("), colorDim.Sprintf("%d lines", maxLines), colorCyan.Sprint(")"))
+		_, _ = fmt.Fprintf(w, " %s:\n", tui.Annotate("%d lines", maxLines))
 	} else {
 		_, _ = labelColor.Fprint(w, label)
 		_, _ = fmt.Fprintln(w, ":")
@@ -564,7 +565,7 @@ func printContentPreview(w io.Writer, label string, labelColor *color.Color, tex
 		for i := 0; i < maxLines; i++ {
 			_, _ = fmt.Fprintf(w, "  %s\n", lines[i])
 		}
-		_, _ = fmt.Fprintf(w, "  ... %s%s%s\n", colorCyan.Sprint("("), colorDim.Sprintf("%d more lines", len(lines)-maxLines), colorCyan.Sprint(")"))
+		_, _ = fmt.Fprintf(w, "  ... %s\n", tui.Annotate("%d more lines", len(lines)-maxLines))
 	} else {
 		for _, line := range lines {
 			_, _ = fmt.Fprintf(w, "  %s\n", line)

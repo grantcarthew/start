@@ -13,6 +13,7 @@ import (
 	"cuelang.org/go/cue"
 	"github.com/grantcarthew/start/internal/assets"
 	"github.com/grantcarthew/start/internal/config"
+	"github.com/grantcarthew/start/internal/tui"
 )
 
 // loadForScope loads entities from the appropriate scope using a generic merge strategy.
@@ -85,18 +86,12 @@ func promptString(w io.Writer, r io.Reader, label, defaultVal string) (string, e
 	// Print label with cyan () delimiters for "(optional)"
 	if base, found := strings.CutSuffix(label, " (optional)"); found {
 		_, _ = fmt.Fprint(w, base)
-		_, _ = fmt.Fprint(w, " ")
-		_, _ = colorCyan.Fprint(w, "(")
-		_, _ = colorDim.Fprint(w, "optional")
-		_, _ = colorCyan.Fprint(w, ")")
+		_, _ = fmt.Fprintf(w, " %s", tui.Annotate("optional"))
 	} else {
 		_, _ = fmt.Fprint(w, label)
 	}
 	if defaultVal != "" {
-		_, _ = fmt.Fprint(w, " ")
-		_, _ = colorCyan.Fprint(w, "[")
-		_, _ = colorDim.Fprint(w, defaultVal)
-		_, _ = colorCyan.Fprint(w, "]")
+		_, _ = fmt.Fprintf(w, " %s", tui.Bracket("%s", defaultVal))
 	}
 	_, _ = fmt.Fprint(w, ": ")
 
@@ -118,11 +113,11 @@ func promptString(w io.Writer, r io.Reader, label, defaultVal string) (string, e
 // currentPrompt is passed to promptText as the default value for option 3.
 // Returns the selected file, command, and prompt values (only one will be non-empty).
 func promptContentSource(w io.Writer, r io.Reader, defaultChoice, currentPrompt string) (file, command, prompt string, err error) {
-	_, _ = fmt.Fprintf(w, "\nContent source %s%s%s:\n", colorCyan.Sprint("("), colorDim.Sprint("choose one"), colorCyan.Sprint(")"))
+	_, _ = fmt.Fprintf(w, "\nContent source %s:\n", tui.Annotate("choose one"))
 	_, _ = fmt.Fprintln(w, "  1. File path")
 	_, _ = fmt.Fprintln(w, "  2. Command")
 	_, _ = fmt.Fprintln(w, "  3. Inline prompt")
-	_, _ = fmt.Fprintf(w, "Choice %s%s%s: ", colorCyan.Sprint("["), colorDim.Sprint(defaultChoice), colorCyan.Sprint("]"))
+	_, _ = fmt.Fprintf(w, "Choice %s: ", tui.Bracket("%s", defaultChoice))
 
 	reader := bufio.NewReader(r)
 	choice, err := reader.ReadString('\n')
@@ -168,14 +163,11 @@ func promptText(w io.Writer, r io.Reader, label, defaultVal string) (string, err
 
 	_, _ = fmt.Fprint(w, label)
 	if defaultVal != "" && !strings.Contains(defaultVal, "\n") {
-		_, _ = fmt.Fprint(w, " ")
-		_, _ = colorCyan.Fprint(w, "[")
-		_, _ = colorDim.Fprint(w, defaultVal)
-		_, _ = colorCyan.Fprint(w, "]")
+		_, _ = fmt.Fprintf(w, " %s", tui.Bracket("%s", defaultVal))
 	}
 	_, _ = fmt.Fprintln(w)
-	_, _ = colorDim.Fprintln(w, "  Type text, then press Enter on a blank line to finish")
-	_, _ = colorDim.Fprintln(w, "  Or press Enter now to open $EDITOR")
+	_, _ = tui.ColorDim.Fprintln(w, "  Type text, then press Enter on a blank line to finish")
+	_, _ = tui.ColorDim.Fprintln(w, "  Or press Enter now to open $EDITOR")
 	_, _ = fmt.Fprint(w, "> ")
 
 	reader := bufio.NewReader(r)
@@ -257,17 +249,17 @@ func promptDefaultModel(w io.Writer, r io.Reader, current string, models map[str
 	_, _ = fmt.Fprintln(w, "Default model:")
 	for i, alias := range aliases {
 		if alias == current {
-			_, _ = fmt.Fprintf(w, "  %d. %s - %s %s%s%s\n", i+1, alias, colorDim.Sprint(models[alias]), colorCyan.Sprint("("), colorInstalled.Sprint("current"), colorCyan.Sprint(")"))
+			_, _ = fmt.Fprintf(w, "  %d. %s - %s %s\n", i+1, alias, tui.ColorDim.Sprint(models[alias]), tui.Annotate("%s", tui.ColorInstalled.Sprint("current")))
 		} else {
-			_, _ = fmt.Fprintf(w, "  %d. %s - %s\n", i+1, alias, colorDim.Sprint(models[alias]))
+			_, _ = fmt.Fprintf(w, "  %d. %s - %s\n", i+1, alias, tui.ColorDim.Sprint(models[alias]))
 		}
 	}
 
 	_, _ = fmt.Fprintln(w)
 	if current != "" {
-		_, _ = fmt.Fprintf(w, "Select model %s%s%s: ", colorCyan.Sprint("("), colorDim.Sprintf("number, alias, or Enter to keep %q", current), colorCyan.Sprint(")"))
+		_, _ = fmt.Fprintf(w, "Select model %s: ", tui.Annotate("number, alias, or Enter to keep %q", current))
 	} else {
-		_, _ = fmt.Fprintf(w, "Select model %s%s%s: ", colorCyan.Sprint("("), colorDim.Sprint("number or alias"), colorCyan.Sprint(")"))
+		_, _ = fmt.Fprintf(w, "Select model %s: ", tui.Annotate("number or alias"))
 	}
 
 	reader := bufio.NewReader(r)
@@ -303,11 +295,11 @@ func promptDefaultModel(w io.Writer, r io.Reader, current string, models map[str
 // Shows current tags and allows: comma-separated input to replace, empty to clear, Enter to keep.
 func promptTags(w io.Writer, r io.Reader, current []string) ([]string, error) {
 	if len(current) > 0 {
-		_, _ = fmt.Fprintf(w, "Current tags: %s%s%s\n", colorCyan.Sprint("["), colorDim.Sprint(strings.Join(current, ", ")), colorCyan.Sprint("]"))
+		_, _ = fmt.Fprintf(w, "Current tags: %s\n", tui.Bracket("%s", strings.Join(current, ", ")))
 	} else {
-		_, _ = fmt.Fprintf(w, "Current tags: %s%s%s\n", colorCyan.Sprint("("), colorDim.Sprint("none"), colorCyan.Sprint(")"))
+		_, _ = fmt.Fprintf(w, "Current tags: %s\n", tui.Annotate("none"))
 	}
-	_, _ = fmt.Fprintf(w, "Tags %s%s%s: ", colorCyan.Sprint("("), colorDim.Sprint("comma-separated, - to clear, Enter to keep"), colorCyan.Sprint(")"))
+	_, _ = fmt.Fprintf(w, "Tags %s: ", tui.Annotate("comma-separated, - to clear, Enter to keep"))
 
 	reader := bufio.NewReader(r)
 	input, err := reader.ReadString('\n')
@@ -352,17 +344,15 @@ func promptModels(w io.Writer, r io.Reader, current map[string]string) (map[stri
 		}
 		sort.Strings(aliases)
 		for _, alias := range aliases {
-			_, _ = fmt.Fprintf(w, "  %s: %s\n", alias, colorDim.Sprint(current[alias]))
+			_, _ = fmt.Fprintf(w, "  %s: %s\n", alias, tui.ColorDim.Sprint(current[alias]))
 		}
 	} else {
-		_, _ = fmt.Fprintf(w, "Current models: %s%s%s\n", colorCyan.Sprint("("), colorDim.Sprint("none"), colorCyan.Sprint(")"))
+		_, _ = fmt.Fprintf(w, "Current models: %s\n", tui.Annotate("none"))
 	}
 
-	_, _ = fmt.Fprintf(w, "Models: %sk%seep, %sc%slear, %se%sdit %s%s%s: ",
-		colorCyan.Sprint("("), colorCyan.Sprint(")"),
-		colorCyan.Sprint("("), colorCyan.Sprint(")"),
-		colorCyan.Sprint("("), colorCyan.Sprint(")"),
-		colorCyan.Sprint("["), colorDim.Sprint("k"), colorCyan.Sprint("]"))
+	_, _ = fmt.Fprintf(w, "Models: %skeep, %sclear, %sedit %s: ",
+		tui.Annotate("k"), tui.Annotate("c"), tui.Annotate("e"),
+		tui.Bracket("k"))
 	choice, err := reader.ReadString('\n')
 	if err != nil {
 		return nil, fmt.Errorf("reading input: %w", err)
@@ -396,7 +386,7 @@ func promptModelsEdit(w io.Writer, reader *bufio.Reader, current map[string]stri
 
 		for _, alias := range aliases {
 			currentVal := current[alias]
-			_, _ = fmt.Fprintf(w, "  %s %s%s%s: ", alias, colorCyan.Sprint("["), colorDim.Sprint(currentVal), colorCyan.Sprint("]"))
+			_, _ = fmt.Fprintf(w, "  %s %s: ", alias, tui.Bracket("%s", currentVal))
 
 			input, err := reader.ReadString('\n')
 			if err != nil {
@@ -539,7 +529,7 @@ func confirmRemoval(w io.Writer, r io.Reader, entityType, name string, local boo
 		return false, fmt.Errorf("--yes flag required in non-interactive mode")
 	}
 
-	_, _ = fmt.Fprintf(w, "Remove %s %q from %s config? %s%s%s ", entityType, name, scopeString(local), colorCyan.Sprint("["), colorDim.Sprint("y/N"), colorCyan.Sprint("]"))
+	_, _ = fmt.Fprintf(w, "Remove %s %q from %s config? %s ", entityType, name, scopeString(local), tui.Bracket("y/N"))
 	reader := bufio.NewReader(r)
 	input, err := reader.ReadString('\n')
 	if err != nil {
