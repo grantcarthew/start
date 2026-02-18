@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/grantcarthew/start/internal/config"
+	"github.com/grantcarthew/start/internal/tui"
 	"github.com/spf13/cobra"
 )
 
@@ -42,7 +43,7 @@ func runConfigOrder(cmd *cobra.Command, _ []string) error {
 	_, _ = fmt.Fprintln(stdout, "Reorder:")
 	_, _ = fmt.Fprintln(stdout, "  1. Contexts")
 	_, _ = fmt.Fprintln(stdout, "  2. Roles")
-	_, _ = fmt.Fprintf(stdout, "Choice %s%s%s: ", colorCyan.Sprint("["), colorDim.Sprint("1"), colorCyan.Sprint("]"))
+	_, _ = fmt.Fprintf(stdout, "Choice %s: ", tui.Bracket("1"))
 
 	reader := bufio.NewReader(stdin)
 	choice, err := reader.ReadString('\n')
@@ -112,16 +113,16 @@ func reorderContexts(stdout io.Writer, stdin io.Reader, local bool) error {
 	}
 
 	contextPath := filepath.Join(configDir, "contexts.cue")
-	heading := fmt.Sprintf("Reorder Contexts %s%s%s:", colorCyan.Sprint("("), colorDim.Sprintf("%s - %s", scopeString(local), contextPath), colorCyan.Sprint(")"))
+	heading := fmt.Sprintf("Reorder Contexts %s:", tui.Annotate("%s - %s", scopeString(local), contextPath))
 
 	formatItem := func(i int, name string) string {
 		ctx := contexts[name]
 		markers := ""
 		if ctx.Required {
-			markers += " " + colorCyan.Sprint("[") + colorDim.Sprint("required") + colorCyan.Sprint("]")
+			markers += " " + tui.Bracket("required")
 		}
 		if ctx.Default {
-			markers += " " + colorCyan.Sprint("[") + colorDim.Sprint("default") + colorCyan.Sprint("]")
+			markers += " " + tui.Bracket("default")
 		}
 		return fmt.Sprintf("  %d. %s%s", i+1, name, markers)
 	}
@@ -192,13 +193,13 @@ func reorderRoles(stdout io.Writer, stdin io.Reader, local bool) error {
 	}
 
 	rolePath := filepath.Join(configDir, "roles.cue")
-	heading := fmt.Sprintf("Reorder Roles %s%s%s:", colorCyan.Sprint("("), colorDim.Sprintf("%s - %s", scopeString(local), rolePath), colorCyan.Sprint(")"))
+	heading := fmt.Sprintf("Reorder Roles %s:", tui.Annotate("%s - %s", scopeString(local), rolePath))
 
 	formatItem := func(i int, name string) string {
 		role := roles[name]
 		markers := ""
 		if role.Optional {
-			markers += " " + colorCyan.Sprint("[") + colorDim.Sprint("optional") + colorCyan.Sprint("]")
+			markers += " " + tui.Bracket("optional")
 		}
 		return fmt.Sprintf("  %d. %s%s", i+1, name, markers)
 	}
@@ -239,7 +240,7 @@ func runReorderLoop(w io.Writer, r io.Reader, heading string, order []string, fo
 
 	for {
 		_, _ = fmt.Fprintln(w)
-		_, _ = fmt.Fprintf(w, "Move up %s%s%s, Enter to save, q to cancel: ", colorCyan.Sprint("("), colorDim.Sprint("number"), colorCyan.Sprint(")"))
+		_, _ = fmt.Fprintf(w, "Move up %s, Enter to save, q to cancel: ", tui.Annotate("number"))
 
 		input, err := reader.ReadString('\n')
 		if err != nil {
@@ -266,7 +267,7 @@ func runReorderLoop(w io.Writer, r io.Reader, heading string, order []string, fo
 		}
 
 		if num < 1 || num > len(current) {
-			_, _ = fmt.Fprintf(w, "Invalid number: %d %s%s%s\n", num, colorCyan.Sprint("("), colorDim.Sprintf("must be 1-%d", len(current)), colorCyan.Sprint(")"))
+			_, _ = fmt.Fprintf(w, "Invalid number: %d %s\n", num, tui.Annotate("must be 1-%d", len(current)))
 			continue
 		}
 

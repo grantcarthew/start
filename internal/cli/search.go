@@ -12,6 +12,7 @@ import (
 	"github.com/grantcarthew/start/internal/config"
 	internalcue "github.com/grantcarthew/start/internal/cue"
 	"github.com/grantcarthew/start/internal/registry"
+	"github.com/grantcarthew/start/internal/tui"
 	"github.com/spf13/cobra"
 )
 
@@ -195,7 +196,7 @@ func printSearchSections(w io.Writer, sections []searchSection, verbose bool, in
 			_, _ = fmt.Fprintln(w)
 		}
 		if section.Path != "" {
-			_, _ = fmt.Fprintf(w, "%s %s%s%s\n", section.Label, colorCyan.Sprint("("), colorDim.Sprint(section.Path), colorCyan.Sprint(")"))
+			_, _ = fmt.Fprintf(w, "%s %s\n", section.Label, tui.Annotate("%s", section.Path))
 		} else {
 			_, _ = fmt.Fprintln(w, section.Label)
 		}
@@ -215,22 +216,22 @@ func printSearchSections(w io.Writer, sections []searchSection, verbose bool, in
 			}
 
 			_, _ = fmt.Fprint(w, "  ")
-			_, _ = categoryColor(cat).Fprint(w, cat)
+			_, _ = tui.CategoryColor(cat).Fprint(w, cat)
 			_, _ = fmt.Fprintln(w, "/")
 
 			for _, r := range catResults {
 				marker := "  "
 				if section.ShowInstalled && installed[r.Category+"/"+r.Name] {
-					marker = colorInstalled.Sprint("★") + " "
+					marker = tui.ColorInstalled.Sprint("★") + " "
 				}
 
-				_, _ = fmt.Fprintf(w, "    %s%-25s %s\n", marker, r.Name, colorDim.Sprint(r.Entry.Description))
+				_, _ = fmt.Fprintf(w, "    %s%-25s %s\n", marker, r.Name, tui.ColorDim.Sprint(r.Entry.Description))
 				if verbose {
 					if r.Entry.Module != "" {
-						_, _ = fmt.Fprintf(w, "      Module: %s\n", colorDim.Sprint(r.Entry.Module))
+						_, _ = fmt.Fprintf(w, "      Module: %s\n", tui.ColorDim.Sprint(r.Entry.Module))
 					}
 					if len(r.Entry.Tags) > 0 {
-						_, _ = fmt.Fprintf(w, "      Tags: %s\n", colorDim.Sprint(strings.Join(r.Entry.Tags, ", ")))
+						_, _ = fmt.Fprintf(w, "      Tags: %s\n", tui.ColorDim.Sprint(strings.Join(r.Entry.Tags, ", ")))
 					}
 				}
 			}

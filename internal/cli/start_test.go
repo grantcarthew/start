@@ -12,6 +12,7 @@ import (
 	internalcue "github.com/grantcarthew/start/internal/cue"
 	"github.com/grantcarthew/start/internal/orchestration"
 	"github.com/grantcarthew/start/internal/registry"
+	"github.com/grantcarthew/start/internal/tui"
 )
 
 // chdir changes to the given directory and registers a cleanup to restore the original.
@@ -421,7 +422,7 @@ func TestPrintContentPreview(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			buf := new(bytes.Buffer)
-			printContentPreview(buf, "Test", colorDim, tt.text, tt.maxLines)
+			printContentPreview(buf, "Test", tui.ColorDim, tt.text, tt.maxLines)
 			output := buf.String()
 
 			if tt.wantTruncated {

@@ -11,6 +11,7 @@ import (
 	"cuelang.org/go/cue"
 	"github.com/grantcarthew/start/internal/config"
 	internalcue "github.com/grantcarthew/start/internal/cue"
+	"github.com/grantcarthew/start/internal/tui"
 	"github.com/spf13/cobra"
 )
 
@@ -84,7 +85,7 @@ func runConfigAgentList(cmd *cobra.Command, _ []string) error {
 	}
 
 	w := cmd.OutOrStdout()
-	_, _ = colorAgents.Fprint(w, "agents")
+	_, _ = tui.ColorAgents.Fprint(w, "agents")
 	_, _ = fmt.Fprintln(w, "/")
 	_, _ = fmt.Fprintln(w)
 
@@ -92,7 +93,7 @@ func runConfigAgentList(cmd *cobra.Command, _ []string) error {
 		agent := agents[name]
 		marker := "  "
 		if name == defaultAgent {
-			marker = colorInstalled.Sprint("→") + " "
+			marker = tui.ColorInstalled.Sprint("→") + " "
 		}
 		source := agent.Source
 		if agent.Origin != "" {
@@ -100,15 +101,11 @@ func runConfigAgentList(cmd *cobra.Command, _ []string) error {
 		}
 		if agent.Description != "" {
 			_, _ = fmt.Fprintf(w, "%s%s ", marker, name)
-			_, _ = colorDim.Fprint(w, "- "+agent.Description+" ")
-			_, _ = colorCyan.Fprint(w, "(")
-			_, _ = colorDim.Fprint(w, source)
-			_, _ = colorCyan.Fprintln(w, ")")
+			_, _ = tui.ColorDim.Fprint(w, "- "+agent.Description+" ")
+			_, _ = fmt.Fprintln(w, tui.Annotate("%s", source))
 		} else {
 			_, _ = fmt.Fprintf(w, "%s%s ", marker, name)
-			_, _ = colorCyan.Fprint(w, "(")
-			_, _ = colorDim.Fprint(w, source)
-			_, _ = colorCyan.Fprintln(w, ")")
+			_, _ = fmt.Fprintln(w, tui.Annotate("%s", source))
 		}
 	}
 
@@ -312,39 +309,39 @@ func runConfigAgentInfo(cmd *cobra.Command, args []string) error {
 
 	w := cmd.OutOrStdout()
 	_, _ = fmt.Fprintln(w)
-	_, _ = colorAgents.Fprint(w, "agents")
+	_, _ = tui.ColorAgents.Fprint(w, "agents")
 	_, _ = fmt.Fprintf(w, "/%s\n", resolvedName)
 	printSeparator(w)
 
-	_, _ = colorDim.Fprint(w, "Source:")
+	_, _ = tui.ColorDim.Fprint(w, "Source:")
 	_, _ = fmt.Fprintf(w, " %s\n", agent.Source)
 	if agent.Origin != "" {
-		_, _ = colorDim.Fprint(w, "Origin:")
+		_, _ = tui.ColorDim.Fprint(w, "Origin:")
 		_, _ = fmt.Fprintf(w, " %s\n", agent.Origin)
 	}
 	if agent.Bin != "" {
-		_, _ = colorDim.Fprint(w, "Bin:")
+		_, _ = tui.ColorDim.Fprint(w, "Bin:")
 		_, _ = fmt.Fprintf(w, " %s\n", agent.Bin)
 	}
-	_, _ = colorDim.Fprint(w, "Command:")
+	_, _ = tui.ColorDim.Fprint(w, "Command:")
 	_, _ = fmt.Fprintf(w, " %s\n", agent.Command)
 
 	if agent.DefaultModel != "" {
-		_, _ = colorDim.Fprint(w, "Default Model:")
+		_, _ = tui.ColorDim.Fprint(w, "Default Model:")
 		_, _ = fmt.Fprintf(w, " %s\n", agent.DefaultModel)
 	}
 	if agent.Description != "" {
 		_, _ = fmt.Fprintln(w)
-		_, _ = colorDim.Fprint(w, "Description:")
+		_, _ = tui.ColorDim.Fprint(w, "Description:")
 		_, _ = fmt.Fprintf(w, " %s\n", agent.Description)
 	}
 	if len(agent.Tags) > 0 {
-		_, _ = colorDim.Fprint(w, "Tags:")
+		_, _ = tui.ColorDim.Fprint(w, "Tags:")
 		_, _ = fmt.Fprintf(w, " %s\n", strings.Join(agent.Tags, ", "))
 	}
 	if len(agent.Models) > 0 {
 		_, _ = fmt.Fprintln(w)
-		_, _ = colorDim.Fprintln(w, "Models:")
+		_, _ = tui.ColorDim.Fprintln(w, "Models:")
 		var aliases []string
 		for alias := range agent.Models {
 			aliases = append(aliases, alias)
@@ -352,9 +349,9 @@ func runConfigAgentInfo(cmd *cobra.Command, args []string) error {
 		sort.Strings(aliases)
 		for _, alias := range aliases {
 			_, _ = fmt.Fprintf(w, "  %s ", alias)
-			_, _ = colorBlue.Fprint(w, "->")
+			_, _ = tui.ColorBlue.Fprint(w, "->")
 			_, _ = fmt.Fprint(w, " ")
-			_, _ = colorDim.Fprintf(w, "%s\n", agent.Models[alias])
+			_, _ = tui.ColorDim.Fprintf(w, "%s\n", agent.Models[alias])
 		}
 	}
 	printSeparator(w)
@@ -477,7 +474,7 @@ func runConfigAgentEdit(cmd *cobra.Command, args []string) error {
 	}
 
 	// Prompt for each field with current value as default
-	_, _ = fmt.Fprintf(stdout, "Editing agent %q %s%s%s\n\n", resolvedName, colorCyan.Sprint("("), colorDim.Sprint("press Enter to keep current value"), colorCyan.Sprint(")"))
+	_, _ = fmt.Fprintf(stdout, "Editing agent %q %s\n\n", resolvedName, tui.Annotate("press Enter to keep current value"))
 
 	newBin, err := promptString(stdout, stdin, "Binary", agent.Bin)
 	if err != nil {

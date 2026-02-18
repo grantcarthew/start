@@ -11,6 +11,7 @@ import (
 	"cuelang.org/go/cue"
 	"github.com/grantcarthew/start/internal/config"
 	internalcue "github.com/grantcarthew/start/internal/cue"
+	"github.com/grantcarthew/start/internal/tui"
 	"github.com/spf13/cobra"
 )
 
@@ -78,7 +79,7 @@ func runConfigContextList(cmd *cobra.Command, _ []string) error {
 	}
 
 	w := cmd.OutOrStdout()
-	_, _ = colorContexts.Fprint(w, "contexts")
+	_, _ = tui.ColorContexts.Fprint(w, "contexts")
 	_, _ = fmt.Fprintln(w, "/")
 	_, _ = fmt.Fprintln(w)
 
@@ -90,27 +91,17 @@ func runConfigContextList(cmd *cobra.Command, _ []string) error {
 		}
 		if ctx.Description != "" {
 			_, _ = fmt.Fprintf(w, "  %s ", name)
-			_, _ = colorDim.Fprint(w, "- "+ctx.Description+" ")
-			_, _ = colorCyan.Fprint(w, "(")
-			_, _ = colorDim.Fprint(w, source)
-			_, _ = colorCyan.Fprint(w, ")")
+			_, _ = tui.ColorDim.Fprint(w, "- "+ctx.Description+" ")
+			_, _ = fmt.Fprint(w, tui.Annotate("%s", source))
 		} else {
 			_, _ = fmt.Fprintf(w, "  %s ", name)
-			_, _ = colorCyan.Fprint(w, "(")
-			_, _ = colorDim.Fprint(w, source)
-			_, _ = colorCyan.Fprint(w, ")")
+			_, _ = fmt.Fprint(w, tui.Annotate("%s", source))
 		}
 		if ctx.Required {
-			_, _ = fmt.Fprint(w, " ")
-			_, _ = colorCyan.Fprint(w, "[")
-			_, _ = colorDim.Fprint(w, "required")
-			_, _ = colorCyan.Fprint(w, "]")
+			_, _ = fmt.Fprintf(w, " %s", tui.Bracket("required"))
 		}
 		if ctx.Default {
-			_, _ = fmt.Fprint(w, " ")
-			_, _ = colorCyan.Fprint(w, "[")
-			_, _ = colorDim.Fprint(w, "default")
-			_, _ = colorCyan.Fprint(w, "]")
+			_, _ = fmt.Fprintf(w, " %s", tui.Bracket("default"))
 		}
 		_, _ = fmt.Fprintln(w)
 	}
@@ -233,7 +224,7 @@ func runConfigContextAdd(cmd *cobra.Command, _ []string) error {
 	required, _ := cmd.Flags().GetBool("required")
 	isDefault, _ := cmd.Flags().GetBool("default")
 	if isTTY && !required && !isDefault {
-		_, _ = fmt.Fprintf(stdout, "Required %s%s%s? %s%s%s ", colorCyan.Sprint("("), colorDim.Sprint("always include"), colorCyan.Sprint(")"), colorCyan.Sprint("["), colorDim.Sprint("y/N"), colorCyan.Sprint("]"))
+		_, _ = fmt.Fprintf(stdout, "Required %s? %s ", tui.Annotate("always include"), tui.Bracket("y/N"))
 		reader := bufio.NewReader(stdin)
 		input, err := reader.ReadString('\n')
 		if err != nil {
@@ -243,7 +234,7 @@ func runConfigContextAdd(cmd *cobra.Command, _ []string) error {
 		required = input == "y" || input == "yes"
 
 		if !required {
-			_, _ = fmt.Fprintf(stdout, "Default %s%s%s? %s%s%s ", colorCyan.Sprint("("), colorDim.Sprint("include by default"), colorCyan.Sprint(")"), colorCyan.Sprint("["), colorDim.Sprint("y/N"), colorCyan.Sprint("]"))
+			_, _ = fmt.Fprintf(stdout, "Default %s? %s ", tui.Annotate("include by default"), tui.Bracket("y/N"))
 			input, err := reader.ReadString('\n')
 			if err != nil {
 				return fmt.Errorf("reading input: %w", err)
@@ -341,39 +332,39 @@ func runConfigContextInfo(cmd *cobra.Command, args []string) error {
 
 	w := cmd.OutOrStdout()
 	_, _ = fmt.Fprintln(w)
-	_, _ = colorContexts.Fprint(w, "contexts")
+	_, _ = tui.ColorContexts.Fprint(w, "contexts")
 	_, _ = fmt.Fprintf(w, "/%s\n", resolvedName)
 	printSeparator(w)
 
-	_, _ = colorDim.Fprint(w, "Source:")
+	_, _ = tui.ColorDim.Fprint(w, "Source:")
 	_, _ = fmt.Fprintf(w, " %s\n", ctx.Source)
 	if ctx.Origin != "" {
-		_, _ = colorDim.Fprint(w, "Origin:")
+		_, _ = tui.ColorDim.Fprint(w, "Origin:")
 		_, _ = fmt.Fprintf(w, " %s\n", ctx.Origin)
 	}
 	if ctx.Description != "" {
 		_, _ = fmt.Fprintln(w)
-		_, _ = colorDim.Fprint(w, "Description:")
+		_, _ = tui.ColorDim.Fprint(w, "Description:")
 		_, _ = fmt.Fprintf(w, " %s\n", ctx.Description)
 	}
 	if ctx.File != "" {
-		_, _ = colorDim.Fprint(w, "File:")
+		_, _ = tui.ColorDim.Fprint(w, "File:")
 		_, _ = fmt.Fprintf(w, " %s\n", ctx.File)
 	}
 	if ctx.Command != "" {
-		_, _ = colorDim.Fprint(w, "Command:")
+		_, _ = tui.ColorDim.Fprint(w, "Command:")
 		_, _ = fmt.Fprintf(w, " %s\n", ctx.Command)
 	}
 	if ctx.Prompt != "" {
-		_, _ = colorDim.Fprint(w, "Prompt:")
+		_, _ = tui.ColorDim.Fprint(w, "Prompt:")
 		_, _ = fmt.Fprintf(w, " %s\n", truncatePrompt(ctx.Prompt, 100))
 	}
-	_, _ = colorDim.Fprint(w, "Required:")
+	_, _ = tui.ColorDim.Fprint(w, "Required:")
 	_, _ = fmt.Fprintf(w, " %t\n", ctx.Required)
-	_, _ = colorDim.Fprint(w, "Default:")
+	_, _ = tui.ColorDim.Fprint(w, "Default:")
 	_, _ = fmt.Fprintf(w, " %t\n", ctx.Default)
 	if len(ctx.Tags) > 0 {
-		_, _ = colorDim.Fprint(w, "Tags:")
+		_, _ = tui.ColorDim.Fprint(w, "Tags:")
 		_, _ = fmt.Fprintf(w, " %s\n", strings.Join(ctx.Tags, ", "))
 	}
 	printSeparator(w)
@@ -491,7 +482,7 @@ func runConfigContextEdit(cmd *cobra.Command, args []string) error {
 	}
 
 	// Prompt for each field with current value as default
-	_, _ = fmt.Fprintf(stdout, "Editing context %q %s%s%s\n\n", resolvedName, colorCyan.Sprint("("), colorDim.Sprint("press Enter to keep current value"), colorCyan.Sprint(")"))
+	_, _ = fmt.Fprintf(stdout, "Editing context %q %s\n\n", resolvedName, tui.Annotate("press Enter to keep current value"))
 
 	newDescription, err := promptString(stdout, stdin, "Description", ctx.Description)
 	if err != nil {
@@ -510,7 +501,7 @@ func runConfigContextEdit(cmd *cobra.Command, args []string) error {
 		_, _ = fmt.Fprintf(stdout, "  Prompt: %s\n", truncatePrompt(ctx.Prompt, 50))
 	}
 
-	_, _ = fmt.Fprintf(stdout, "Keep current? %s%s%s ", colorCyan.Sprint("["), colorDim.Sprint("Y/n"), colorCyan.Sprint("]"))
+	_, _ = fmt.Fprintf(stdout, "Keep current? %s ", tui.Bracket("Y/n"))
 	reader := bufio.NewReader(stdin)
 	input, err := reader.ReadString('\n')
 	if err != nil {
@@ -530,7 +521,7 @@ func runConfigContextEdit(cmd *cobra.Command, args []string) error {
 	}
 
 	// Required/default flags
-	_, _ = fmt.Fprintf(stdout, "\nRequired %s%s%s? %s%s%s ", colorCyan.Sprint("("), colorDim.Sprintf("currently %t", ctx.Required), colorCyan.Sprint(")"), colorCyan.Sprint("["), colorDim.Sprint("y/N"), colorCyan.Sprint("]"))
+	_, _ = fmt.Fprintf(stdout, "\nRequired %s? %s ", tui.Annotate("currently %t", ctx.Required), tui.Bracket("y/N"))
 	input, err = reader.ReadString('\n')
 	if err != nil {
 		return fmt.Errorf("reading input: %w", err)
@@ -540,7 +531,7 @@ func runConfigContextEdit(cmd *cobra.Command, args []string) error {
 
 	newDefault := ctx.Default
 	if !newRequired {
-		_, _ = fmt.Fprintf(stdout, "Default %s%s%s? %s%s%s ", colorCyan.Sprint("("), colorDim.Sprintf("currently %t", ctx.Default), colorCyan.Sprint(")"), colorCyan.Sprint("["), colorDim.Sprint("y/N"), colorCyan.Sprint("]"))
+		_, _ = fmt.Fprintf(stdout, "Default %s? %s ", tui.Annotate("currently %t", ctx.Default), tui.Bracket("y/N"))
 		input, err = reader.ReadString('\n')
 		if err != nil {
 			return fmt.Errorf("reading input: %w", err)

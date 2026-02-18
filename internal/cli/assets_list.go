@@ -12,6 +12,7 @@ import (
 	"github.com/grantcarthew/start/internal/config"
 	internalcue "github.com/grantcarthew/start/internal/cue"
 	"github.com/grantcarthew/start/internal/registry"
+	"github.com/grantcarthew/start/internal/tui"
 	"github.com/spf13/cobra"
 	"golang.org/x/mod/semver"
 )
@@ -251,19 +252,15 @@ func printInstalledAssets(w io.Writer, installed []InstalledAsset, verbose bool)
 			continue
 		}
 
-		_, _ = categoryColor(cat).Fprint(w, cat)
+		_, _ = tui.CategoryColor(cat).Fprint(w, cat)
 		_, _ = fmt.Fprintln(w, "/")
 		for _, a := range assets {
 			if verbose && a.LatestVer != "" {
 				_, _ = fmt.Fprintf(w, "  %-25s ", a.Name)
 				if a.UpdateAvail {
-					_, _ = colorCyan.Fprint(w, "(")
-					_, _ = colorDim.Fprintf(w, "update available: %s", a.LatestVer)
-					_, _ = colorCyan.Fprint(w, ")")
+					_, _ = fmt.Fprint(w, tui.Annotate("update available: %s", a.LatestVer))
 				} else {
-					_, _ = colorCyan.Fprint(w, "(")
-					_, _ = colorDim.Fprint(w, "latest")
-					_, _ = colorCyan.Fprint(w, ")")
+					_, _ = fmt.Fprint(w, tui.Annotate("latest"))
 				}
 				_, _ = fmt.Fprintln(w)
 			} else {
@@ -272,11 +269,7 @@ func printInstalledAssets(w io.Writer, installed []InstalledAsset, verbose bool)
 					scopeIndicator = fmt.Sprintf(" [%s]", a.Scope)
 				}
 				if a.InstalledVer != "" {
-					_, _ = fmt.Fprintf(w, "  %-25s ", a.Name)
-					_, _ = colorCyan.Fprint(w, "(")
-					_, _ = colorDim.Fprint(w, a.InstalledVer)
-					_, _ = colorCyan.Fprint(w, ")")
-					_, _ = fmt.Fprintf(w, "%s\n", scopeIndicator)
+					_, _ = fmt.Fprintf(w, "  %-25s %s%s\n", a.Name, tui.Annotate("%s", a.InstalledVer), scopeIndicator)
 				} else {
 					_, _ = fmt.Fprintf(w, "  %s%s\n", a.Name, scopeIndicator)
 				}

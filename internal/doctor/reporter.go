@@ -6,23 +6,7 @@ import (
 	"strings"
 
 	"github.com/fatih/color"
-)
-
-// Colour definitions per DR-042
-var (
-	colorHeader    = color.New(color.FgGreen)
-	colorSeparator = color.New(color.FgMagenta)
-	colorSuccess   = color.New(color.FgGreen)
-	colorError     = color.New(color.FgRed)
-	colorWarning   = color.New(color.FgYellow)
-	colorDim       = color.New(color.Faint)
-	colorCyan      = color.New(color.FgCyan)
-
-	// Asset category colours per DR-042
-	colorAgents   = color.New(color.FgBlue)
-	colorRoles    = color.New(color.FgGreen)
-	colorContexts = color.New(color.FgCyan)
-	colorTasks    = color.New(color.FgHiYellow)
+	"github.com/grantcarthew/start/internal/tui"
 )
 
 // fprintDim writes text with dim styling and cyan parenthetical delimiters per DR-042.
@@ -32,30 +16,14 @@ func fprintDim(w io.Writer, s string) {
 	for i := 0; i < len(s); i++ {
 		if s[i] == '(' || s[i] == ')' {
 			if i > start {
-				_, _ = colorDim.Fprint(w, s[start:i])
+				_, _ = tui.ColorDim.Fprint(w, s[start:i])
 			}
-			_, _ = colorCyan.Fprintf(w, "%c", s[i])
+			_, _ = tui.ColorCyan.Fprintf(w, "%c", s[i])
 			start = i + 1
 		}
 	}
 	if start < len(s) {
-		_, _ = colorDim.Fprint(w, s[start:])
-	}
-}
-
-// sectionColor returns the colour for a section name.
-func sectionColor(name string) *color.Color {
-	switch name {
-	case "Agents":
-		return colorAgents
-	case "Roles":
-		return colorRoles
-	case "Contexts":
-		return colorContexts
-	case "Tasks":
-		return colorTasks
-	default:
-		return nil
+		_, _ = tui.ColorDim.Fprint(w, s[start:])
 	}
 }
 
@@ -94,15 +62,15 @@ func (r *Reporter) Print(report Report) {
 // printHeader prints the doctor header.
 func (r *Reporter) printHeader() {
 	_, _ = fmt.Fprintln(r.w)
-	_, _ = colorHeader.Fprintln(r.w, "start doctor")
-	_, _ = colorSeparator.Fprintln(r.w, strings.Repeat("═", 59))
+	_, _ = tui.ColorHeader.Fprintln(r.w, "start doctor")
+	_, _ = tui.ColorSeparator.Fprintln(r.w, strings.Repeat("═", 59))
 	_, _ = fmt.Fprintln(r.w)
 }
 
 // printSection prints a single section.
 func (r *Reporter) printSection(section SectionResult) {
 	// Section header
-	sc := sectionColor(section.Name)
+	sc := tui.CategoryColor(section.Name)
 	if sc != nil {
 		_, _ = sc.Fprintf(r.w, "%s", section.Name)
 	} else {
@@ -126,13 +94,13 @@ func (r *Reporter) printSection(section SectionResult) {
 func statusColor(s Status) *color.Color {
 	switch s {
 	case StatusPass:
-		return colorSuccess
+		return tui.ColorSuccess
 	case StatusFail:
-		return colorError
+		return tui.ColorError
 	case StatusWarn:
-		return colorWarning
+		return tui.ColorWarning
 	default:
-		return colorDim
+		return tui.ColorDim
 	}
 }
 
@@ -175,21 +143,21 @@ func (r *Reporter) printResult(result CheckResult, noIcons bool) {
 	// Print details in verbose mode
 	if r.verbose && len(result.Details) > 0 {
 		for _, detail := range result.Details {
-			_, _ = colorDim.Fprintf(r.w, "    %s\n", detail)
+			_, _ = tui.ColorDim.Fprintf(r.w, "    %s\n", detail)
 		}
 	}
 }
 
 // printSummary prints the summary section.
 func (r *Reporter) printSummary(report Report) {
-	_, _ = colorHeader.Fprintln(r.w, "Summary")
-	_, _ = colorSeparator.Fprintln(r.w, strings.Repeat("─", 59))
+	_, _ = tui.ColorHeader.Fprintln(r.w, "Summary")
+	_, _ = tui.ColorSeparator.Fprintln(r.w, strings.Repeat("─", 59))
 
 	errCount := report.ErrorCount()
 	warnings := report.WarnCount()
 
 	if errCount == 0 && warnings == 0 {
-		_, _ = colorSuccess.Fprintln(r.w, "  No issues found")
+		_, _ = tui.ColorSuccess.Fprintln(r.w, "  No issues found")
 		_, _ = fmt.Fprintln(r.w)
 		return
 	}
@@ -201,7 +169,7 @@ func (r *Reporter) printSummary(report Report) {
 		if errCount > 1 {
 			label = "errors"
 		}
-		_, _ = colorError.Fprintf(r.w, "%d %s", errCount, label)
+		_, _ = tui.ColorError.Fprintf(r.w, "%d %s", errCount, label)
 		if warnings > 0 {
 			_, _ = fmt.Fprint(r.w, ", ")
 		}
@@ -211,7 +179,7 @@ func (r *Reporter) printSummary(report Report) {
 		if warnings > 1 {
 			label = "warnings"
 		}
-		_, _ = colorWarning.Fprintf(r.w, "%d %s", warnings, label)
+		_, _ = tui.ColorWarning.Fprintf(r.w, "%d %s", warnings, label)
 	}
 	_, _ = fmt.Fprintln(r.w, " found")
 	_, _ = fmt.Fprintln(r.w)

@@ -14,6 +14,7 @@ import (
 	"cuelang.org/go/cue/cuecontext"
 	"github.com/grantcarthew/start/internal/config"
 	internalcue "github.com/grantcarthew/start/internal/cue"
+	"github.com/grantcarthew/start/internal/tui"
 	"github.com/spf13/cobra"
 )
 
@@ -106,7 +107,7 @@ func listSettings(w io.Writer, localOnly bool) error {
 	sort.Strings(keys)
 
 	for _, k := range keys {
-		_, _ = colorDim.Fprintf(w, "%s: ", k)
+		_, _ = tui.ColorDim.Fprintf(w, "%s: ", k)
 		_, _ = fmt.Fprintln(w, settings[k])
 	}
 
@@ -123,23 +124,19 @@ func showSetting(w io.Writer, key string, localOnly bool) error {
 	settings, err := loadSettingsForScope(localOnly)
 	if err != nil {
 		if errors.Is(err, errNoConfig) {
-			_, _ = colorDim.Fprintf(w, "%s: ", key)
-			_, _ = colorCyan.Fprint(w, "(")
-			_, _ = colorDim.Fprint(w, "not set")
-			_, _ = colorCyan.Fprintln(w, ")")
+			_, _ = tui.ColorDim.Fprintf(w, "%s: ", key)
+			_, _ = fmt.Fprintln(w, tui.Annotate("not set"))
 			return nil
 		}
 		return err
 	}
 
 	if val, exists := settings[key]; exists {
-		_, _ = colorDim.Fprintf(w, "%s: ", key)
+		_, _ = tui.ColorDim.Fprintf(w, "%s: ", key)
 		_, _ = fmt.Fprintln(w, val)
 	} else {
-		_, _ = colorDim.Fprintf(w, "%s: ", key)
-		_, _ = colorCyan.Fprint(w, "(")
-		_, _ = colorDim.Fprint(w, "not set")
-		_, _ = colorCyan.Fprintln(w, ")")
+		_, _ = tui.ColorDim.Fprintf(w, "%s: ", key)
+		_, _ = fmt.Fprintln(w, tui.Annotate("not set"))
 	}
 
 	return nil
