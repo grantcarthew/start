@@ -638,13 +638,6 @@ func (c *Composer) selectDefaultRole(cfg cue.Value) (roleName string, resolution
 	return "", nil, nil
 }
 
-// getDefaultRole returns the default role name from config.
-// Deprecated: Use selectDefaultRole for optional role support.
-func (c *Composer) getDefaultRole(cfg cue.Value) string {
-	roleName, _, _ := c.selectDefaultRole(cfg)
-	return roleName
-}
-
 // ExtractUTDFields extracts UTD fields from a CUE value.
 func ExtractUTDFields(v cue.Value) UTDFields {
 	var fields UTDFields
