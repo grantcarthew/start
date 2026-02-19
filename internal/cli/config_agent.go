@@ -538,13 +538,13 @@ func runConfigAgentEdit(cmd *cobra.Command, args []string) error {
 // addConfigAgentRemoveCommand adds the remove subcommand.
 func addConfigAgentRemoveCommand(parent *cobra.Command) {
 	removeCmd := &cobra.Command{
-		Use:     "remove <name>",
+		Use:     "remove <name>...",
 		Aliases: []string{"rm", "delete"},
-		Short:   "Remove an agent",
-		Long: `Remove an agent configuration.
+		Short:   "Remove one or more agents",
+		Long: `Remove one or more agent configurations.
 
-Removes the specified agent from the configuration file.`,
-		Args: cobra.ExactArgs(1),
+Removes the specified agents from the configuration file.`,
+		Args: cobra.MinimumNArgs(1),
 		RunE: runConfigAgentRemove,
 	}
 
@@ -553,9 +553,8 @@ Removes the specified agent from the configuration file.`,
 	parent.AddCommand(removeCmd)
 }
 
-// runConfigAgentRemove removes an agent configuration.
+// runConfigAgentRemove removes one or more agent configurations.
 func runConfigAgentRemove(cmd *cobra.Command, args []string) error {
-	name := args[0]
 	stdin := cmd.InOrStdin()
 	stdout := cmd.OutOrStdout()
 	local := getFlags(cmd).Local
@@ -573,15 +572,19 @@ func runConfigAgentRemove(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("loading agents: %w", err)
 	}
 
-	resolvedName, _, err := resolveInstalledName(agents, "agent", name)
+	skipConfirm, _ := cmd.Flags().GetBool("yes")
+
+	resolvedNames, err := resolveRemoveNames(agents, "agent", args, skipConfirm, stdout, stdin)
 	if err != nil {
 		return err
 	}
+	if resolvedNames == nil {
+		return nil // user cancelled
+	}
 
 	// Confirm removal unless --yes flag is set
-	skipConfirm, _ := cmd.Flags().GetBool("yes")
 	if !skipConfirm {
-		confirmed, err := confirmRemoval(stdout, stdin, "agent", resolvedName, local)
+		confirmed, err := confirmMultiRemoval(stdout, stdin, "agent", resolvedNames, local)
 		if err != nil {
 			return err
 		}
@@ -590,10 +593,12 @@ func runConfigAgentRemove(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Remove agent
-	delete(agents, resolvedName)
+	// Remove all agents
+	for _, name := range resolvedNames {
+		delete(agents, name)
+	}
 
-	// Write updated file
+	// Write updated file once
 	agentPath := filepath.Join(configDir, "agents.cue")
 	if err := writeAgentsFile(agentPath, agents); err != nil {
 		return fmt.Errorf("writing agents file: %w", err)
@@ -601,7 +606,9 @@ func runConfigAgentRemove(cmd *cobra.Command, args []string) error {
 
 	flags := getFlags(cmd)
 	if !flags.Quiet {
-		_, _ = fmt.Fprintf(stdout, "Removed agent %q\n", resolvedName)
+		for _, name := range resolvedNames {
+			_, _ = fmt.Fprintf(stdout, "Removed agent %q\n", name)
+		}
 	}
 
 	return nil

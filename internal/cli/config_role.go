@@ -507,13 +507,13 @@ func runConfigRoleEdit(cmd *cobra.Command, args []string) error {
 // addConfigRoleRemoveCommand adds the remove subcommand.
 func addConfigRoleRemoveCommand(parent *cobra.Command) {
 	removeCmd := &cobra.Command{
-		Use:     "remove <name>",
+		Use:     "remove <name>...",
 		Aliases: []string{"rm", "delete"},
-		Short:   "Remove a role",
-		Long: `Remove a role configuration.
+		Short:   "Remove one or more roles",
+		Long: `Remove one or more role configurations.
 
-Removes the specified role from the configuration file.`,
-		Args: cobra.ExactArgs(1),
+Removes the specified roles from the configuration file.`,
+		Args: cobra.MinimumNArgs(1),
 		RunE: runConfigRoleRemove,
 	}
 
@@ -522,9 +522,8 @@ Removes the specified role from the configuration file.`,
 	parent.AddCommand(removeCmd)
 }
 
-// runConfigRoleRemove removes a role configuration.
+// runConfigRoleRemove removes one or more role configurations.
 func runConfigRoleRemove(cmd *cobra.Command, args []string) error {
-	name := args[0]
 	stdin := cmd.InOrStdin()
 	stdout := cmd.OutOrStdout()
 	local := getFlags(cmd).Local
@@ -542,15 +541,19 @@ func runConfigRoleRemove(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("loading roles: %w", err)
 	}
 
-	resolvedName, _, err := resolveInstalledName(roles, "role", name)
+	skipConfirm, _ := cmd.Flags().GetBool("yes")
+
+	resolvedNames, err := resolveRemoveNames(roles, "role", args, skipConfirm, stdout, stdin)
 	if err != nil {
 		return err
 	}
+	if resolvedNames == nil {
+		return nil // user cancelled
+	}
 
 	// Confirm removal unless --yes flag is set
-	skipConfirm, _ := cmd.Flags().GetBool("yes")
 	if !skipConfirm {
-		confirmed, err := confirmRemoval(stdout, stdin, "role", resolvedName, local)
+		confirmed, err := confirmMultiRemoval(stdout, stdin, "role", resolvedNames, local)
 		if err != nil {
 			return err
 		}
@@ -559,16 +562,24 @@ func runConfigRoleRemove(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Remove role and its order entry
-	delete(roles, resolvedName)
+	// Build set of names to remove for order filtering
+	toRemove := make(map[string]bool, len(resolvedNames))
+	for _, name := range resolvedNames {
+		toRemove[name] = true
+	}
+
+	// Remove all roles and their order entries
+	for _, name := range resolvedNames {
+		delete(roles, name)
+	}
 	newOrder := make([]string, 0, len(order))
 	for _, n := range order {
-		if n != resolvedName {
+		if !toRemove[n] {
 			newOrder = append(newOrder, n)
 		}
 	}
 
-	// Write updated file
+	// Write updated file once
 	rolePath := filepath.Join(configDir, "roles.cue")
 	if err := writeRolesFile(rolePath, roles, newOrder); err != nil {
 		return fmt.Errorf("writing roles file: %w", err)
@@ -576,7 +587,9 @@ func runConfigRoleRemove(cmd *cobra.Command, args []string) error {
 
 	flags := getFlags(cmd)
 	if !flags.Quiet {
-		_, _ = fmt.Fprintf(stdout, "Removed role %q\n", resolvedName)
+		for _, name := range resolvedNames {
+			_, _ = fmt.Fprintf(stdout, "Removed role %q\n", name)
+		}
 	}
 
 	return nil

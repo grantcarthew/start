@@ -762,4 +762,334 @@ func TestConfigTask_SubstringResolution(t *testing.T) {
 			t.Errorf("create-role should be removed: %s", content)
 		}
 	})
+
+}
+
+func TestConfigRemove_MultipleArgs(t *testing.T) {
+	t.Run("task remove ambiguous query with --yes expands all", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		t.Setenv("XDG_CONFIG_HOME", tmpDir)
+		chdir(t, tmpDir)
+
+		globalDir := filepath.Join(tmpDir, "start")
+		if err := os.MkdirAll(globalDir, 0755); err != nil {
+			t.Fatal(err)
+		}
+
+		for _, args := range [][]string{
+			{"config", "task", "add", "--name", "golang/review/architecture", "--prompt", "Arch"},
+			{"config", "task", "add", "--name", "golang/review/code", "--prompt", "Code"},
+			{"config", "task", "add", "--name", "golang/review/security", "--prompt", "Security"},
+			{"config", "task", "add", "--name", "confluence/read-doc", "--prompt", "Read"},
+		} {
+			cmd := NewRootCmd()
+			cmd.SetOut(&bytes.Buffer{})
+			cmd.SetErr(&bytes.Buffer{})
+			cmd.SetIn(strings.NewReader(""))
+			cmd.SetArgs(args)
+			if err := cmd.Execute(); err != nil {
+				t.Fatalf("add %v failed: %v", args, err)
+			}
+		}
+
+		// Ambiguous query with --yes should remove all three golang/review/* tasks
+		cmd := NewRootCmd()
+		stdout := &bytes.Buffer{}
+		cmd.SetOut(stdout)
+		cmd.SetErr(&bytes.Buffer{})
+		cmd.SetArgs([]string{"config", "task", "remove", "golang/review", "--yes"})
+
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("ambiguous remove with --yes failed: %v", err)
+		}
+
+		content, _ := os.ReadFile(filepath.Join(globalDir, "tasks.cue"))
+		s := string(content)
+		if strings.Contains(s, "golang/review/architecture") {
+			t.Errorf("architecture should be removed: %s", s)
+		}
+		if strings.Contains(s, "golang/review/code") {
+			t.Errorf("code should be removed: %s", s)
+		}
+		if strings.Contains(s, "golang/review/security") {
+			t.Errorf("security should be removed: %s", s)
+		}
+		if !strings.Contains(s, "confluence/read-doc") {
+			t.Errorf("read-doc should still exist: %s", s)
+		}
+	})
+
+	t.Run("agent remove multiple with --yes", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		t.Setenv("XDG_CONFIG_HOME", tmpDir)
+		chdir(t, tmpDir)
+
+		globalDir := filepath.Join(tmpDir, "start")
+		if err := os.MkdirAll(globalDir, 0755); err != nil {
+			t.Fatal(err)
+		}
+
+		for _, args := range [][]string{
+			{"config", "agent", "add", "--name", "alpha", "--bin", "alpha", "--command", `alpha "{{.prompt}}"`},
+			{"config", "agent", "add", "--name", "beta", "--bin", "beta", "--command", `beta "{{.prompt}}"`},
+			{"config", "agent", "add", "--name", "gamma", "--bin", "gamma", "--command", `gamma "{{.prompt}}"`},
+		} {
+			cmd := NewRootCmd()
+			cmd.SetOut(&bytes.Buffer{})
+			cmd.SetErr(&bytes.Buffer{})
+			cmd.SetIn(strings.NewReader(""))
+			cmd.SetArgs(args)
+			if err := cmd.Execute(); err != nil {
+				t.Fatalf("add %v failed: %v", args, err)
+			}
+		}
+
+		cmd := NewRootCmd()
+		stdout := &bytes.Buffer{}
+		cmd.SetOut(stdout)
+		cmd.SetErr(&bytes.Buffer{})
+		cmd.SetArgs([]string{"config", "agent", "remove", "alpha", "beta", "--yes"})
+
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("multi-remove failed: %v", err)
+		}
+
+		content, _ := os.ReadFile(filepath.Join(globalDir, "agents.cue"))
+		s := string(content)
+		if strings.Contains(s, `"alpha"`) {
+			t.Errorf("alpha should be removed: %s", s)
+		}
+		if strings.Contains(s, `"beta"`) {
+			t.Errorf("beta should be removed: %s", s)
+		}
+		if !strings.Contains(s, `"gamma"`) {
+			t.Errorf("gamma should still exist: %s", s)
+		}
+
+		out := stdout.String()
+		if !strings.Contains(out, "alpha") {
+			t.Errorf("output should mention alpha: %s", out)
+		}
+		if !strings.Contains(out, "beta") {
+			t.Errorf("output should mention beta: %s", out)
+		}
+	})
+
+	t.Run("context remove multiple with --yes", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		t.Setenv("XDG_CONFIG_HOME", tmpDir)
+		chdir(t, tmpDir)
+
+		globalDir := filepath.Join(tmpDir, "start")
+		if err := os.MkdirAll(globalDir, 0755); err != nil {
+			t.Fatal(err)
+		}
+
+		for _, args := range [][]string{
+			{"config", "context", "add", "--name", "project/alpha", "--prompt", "Alpha"},
+			{"config", "context", "add", "--name", "project/beta", "--prompt", "Beta"},
+			{"config", "context", "add", "--name", "project/gamma", "--prompt", "Gamma"},
+		} {
+			cmd := NewRootCmd()
+			cmd.SetOut(&bytes.Buffer{})
+			cmd.SetErr(&bytes.Buffer{})
+			cmd.SetIn(strings.NewReader(""))
+			cmd.SetArgs(args)
+			if err := cmd.Execute(); err != nil {
+				t.Fatalf("add %v failed: %v", args, err)
+			}
+		}
+
+		cmd := NewRootCmd()
+		stdout := &bytes.Buffer{}
+		cmd.SetOut(stdout)
+		cmd.SetErr(&bytes.Buffer{})
+		cmd.SetArgs([]string{"config", "context", "remove", "project/alpha", "project/beta", "--yes"})
+
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("multi-remove failed: %v", err)
+		}
+
+		content, _ := os.ReadFile(filepath.Join(globalDir, "contexts.cue"))
+		s := string(content)
+		if strings.Contains(s, "project/alpha") {
+			t.Errorf("project/alpha should be removed: %s", s)
+		}
+		if strings.Contains(s, "project/beta") {
+			t.Errorf("project/beta should be removed: %s", s)
+		}
+		if !strings.Contains(s, "project/gamma") {
+			t.Errorf("project/gamma should still exist: %s", s)
+		}
+
+		out := stdout.String()
+		if !strings.Contains(out, "alpha") {
+			t.Errorf("output should mention alpha: %s", out)
+		}
+		if !strings.Contains(out, "beta") {
+			t.Errorf("output should mention beta: %s", out)
+		}
+	})
+
+	t.Run("role remove multiple with --yes", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		t.Setenv("XDG_CONFIG_HOME", tmpDir)
+		chdir(t, tmpDir)
+
+		globalDir := filepath.Join(tmpDir, "start")
+		if err := os.MkdirAll(globalDir, 0755); err != nil {
+			t.Fatal(err)
+		}
+
+		for _, args := range [][]string{
+			{"config", "role", "add", "--name", "project/alpha", "--prompt", "Alpha"},
+			{"config", "role", "add", "--name", "project/beta", "--prompt", "Beta"},
+			{"config", "role", "add", "--name", "project/gamma", "--prompt", "Gamma"},
+		} {
+			cmd := NewRootCmd()
+			cmd.SetOut(&bytes.Buffer{})
+			cmd.SetErr(&bytes.Buffer{})
+			cmd.SetIn(strings.NewReader(""))
+			cmd.SetArgs(args)
+			if err := cmd.Execute(); err != nil {
+				t.Fatalf("add %v failed: %v", args, err)
+			}
+		}
+
+		cmd := NewRootCmd()
+		stdout := &bytes.Buffer{}
+		cmd.SetOut(stdout)
+		cmd.SetErr(&bytes.Buffer{})
+		cmd.SetArgs([]string{"config", "role", "remove", "project/alpha", "project/beta", "--yes"})
+
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("multi-remove failed: %v", err)
+		}
+
+		content, _ := os.ReadFile(filepath.Join(globalDir, "roles.cue"))
+		s := string(content)
+		if strings.Contains(s, "project/alpha") {
+			t.Errorf("project/alpha should be removed: %s", s)
+		}
+		if strings.Contains(s, "project/beta") {
+			t.Errorf("project/beta should be removed: %s", s)
+		}
+		if !strings.Contains(s, "project/gamma") {
+			t.Errorf("project/gamma should still exist: %s", s)
+		}
+
+		out := stdout.String()
+		if !strings.Contains(out, "alpha") {
+			t.Errorf("output should mention alpha: %s", out)
+		}
+		if !strings.Contains(out, "beta") {
+			t.Errorf("output should mention beta: %s", out)
+		}
+	})
+
+	t.Run("task remove multiple by substring with --yes", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		t.Setenv("XDG_CONFIG_HOME", tmpDir)
+		chdir(t, tmpDir)
+
+		globalDir := filepath.Join(tmpDir, "start")
+		if err := os.MkdirAll(globalDir, 0755); err != nil {
+			t.Fatal(err)
+		}
+
+		for _, args := range [][]string{
+			{"config", "task", "add", "--name", "confluence/read-doc", "--prompt", "Read a doc"},
+			{"config", "task", "add", "--name", "golang/review/architecture", "--prompt", "Review arch"},
+			{"config", "task", "add", "--name", "golang/review/code", "--prompt", "Review code"},
+		} {
+			cmd := NewRootCmd()
+			cmd.SetOut(&bytes.Buffer{})
+			cmd.SetErr(&bytes.Buffer{})
+			cmd.SetIn(strings.NewReader(""))
+			cmd.SetArgs(args)
+			if err := cmd.Execute(); err != nil {
+				t.Fatalf("add %v failed: %v", args, err)
+			}
+		}
+
+		cmd := NewRootCmd()
+		stdout := &bytes.Buffer{}
+		cmd.SetOut(stdout)
+		cmd.SetErr(&bytes.Buffer{})
+		cmd.SetArgs([]string{"config", "task", "remove", "read-doc", "architecture", "--yes"})
+
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("multi-remove failed: %v", err)
+		}
+
+		content, _ := os.ReadFile(filepath.Join(globalDir, "tasks.cue"))
+		s := string(content)
+		if strings.Contains(s, "read-doc") {
+			t.Errorf("read-doc should be removed: %s", s)
+		}
+		if strings.Contains(s, "architecture") {
+			t.Errorf("architecture should be removed: %s", s)
+		}
+		if !strings.Contains(s, "golang/review/code") {
+			t.Errorf("golang/review/code should still exist: %s", s)
+		}
+
+		out := stdout.String()
+		if !strings.Contains(out, "read-doc") {
+			t.Errorf("output should mention read-doc: %s", out)
+		}
+		if !strings.Contains(out, "architecture") {
+			t.Errorf("output should mention architecture: %s", out)
+		}
+	})
+
+	t.Run("task remove ambiguous query without --yes errors", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		t.Setenv("XDG_CONFIG_HOME", tmpDir)
+		chdir(t, tmpDir)
+
+		globalDir := filepath.Join(tmpDir, "start")
+		if err := os.MkdirAll(globalDir, 0755); err != nil {
+			t.Fatal(err)
+		}
+
+		for _, args := range [][]string{
+			{"config", "task", "add", "--name", "golang/review/architecture", "--prompt", "Arch"},
+			{"config", "task", "add", "--name", "golang/review/code", "--prompt", "Code"},
+			{"config", "task", "add", "--name", "confluence/read-doc", "--prompt", "Read"},
+		} {
+			cmd := NewRootCmd()
+			cmd.SetOut(&bytes.Buffer{})
+			cmd.SetErr(&bytes.Buffer{})
+			cmd.SetIn(strings.NewReader(""))
+			cmd.SetArgs(args)
+			if err := cmd.Execute(); err != nil {
+				t.Fatalf("add %v failed: %v", args, err)
+			}
+		}
+
+		// Ambiguous arg alongside another arg without --yes must error
+		cmd := NewRootCmd()
+		cmd.SetOut(&bytes.Buffer{})
+		cmd.SetErr(&bytes.Buffer{})
+		cmd.SetArgs([]string{"config", "task", "remove", "golang/review", "confluence/read-doc"})
+
+		err := cmd.Execute()
+		if err == nil {
+			t.Fatal("expected error for ambiguous multi-arg remove without --yes")
+		}
+		if !strings.Contains(err.Error(), "--yes") {
+			t.Errorf("expected '--yes' hint in error, got: %v", err)
+		}
+
+		// No tasks should have been removed
+		content, _ := os.ReadFile(filepath.Join(globalDir, "tasks.cue"))
+		s := string(content)
+		if !strings.Contains(s, "golang/review/architecture") {
+			t.Errorf("architecture should still exist after failed remove: %s", s)
+		}
+		if !strings.Contains(s, "confluence/read-doc") {
+			t.Errorf("read-doc should still exist after failed remove: %s", s)
+		}
+	})
 }

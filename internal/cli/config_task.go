@@ -527,13 +527,13 @@ func runConfigTaskEdit(cmd *cobra.Command, args []string) error {
 // addConfigTaskRemoveCommand adds the remove subcommand.
 func addConfigTaskRemoveCommand(parent *cobra.Command) {
 	removeCmd := &cobra.Command{
-		Use:     "remove <name>",
+		Use:     "remove <name>...",
 		Aliases: []string{"rm", "delete"},
-		Short:   "Remove a task",
-		Long: `Remove a task configuration.
+		Short:   "Remove one or more tasks",
+		Long: `Remove one or more task configurations.
 
-Removes the specified task from the configuration file.`,
-		Args: cobra.ExactArgs(1),
+Removes the specified tasks from the configuration file.`,
+		Args: cobra.MinimumNArgs(1),
 		RunE: runConfigTaskRemove,
 	}
 
@@ -542,9 +542,8 @@ Removes the specified task from the configuration file.`,
 	parent.AddCommand(removeCmd)
 }
 
-// runConfigTaskRemove removes a task configuration.
+// runConfigTaskRemove removes one or more task configurations.
 func runConfigTaskRemove(cmd *cobra.Command, args []string) error {
-	name := args[0]
 	stdin := cmd.InOrStdin()
 	stdout := cmd.OutOrStdout()
 	local := getFlags(cmd).Local
@@ -562,15 +561,19 @@ func runConfigTaskRemove(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("loading tasks: %w", err)
 	}
 
-	resolvedName, _, err := resolveInstalledName(tasks, "task", name)
+	skipConfirm, _ := cmd.Flags().GetBool("yes")
+
+	resolvedNames, err := resolveRemoveNames(tasks, "task", args, skipConfirm, stdout, stdin)
 	if err != nil {
 		return err
 	}
+	if resolvedNames == nil {
+		return nil // user cancelled
+	}
 
 	// Confirm removal unless --yes flag is set
-	skipConfirm, _ := cmd.Flags().GetBool("yes")
 	if !skipConfirm {
-		confirmed, err := confirmRemoval(stdout, stdin, "task", resolvedName, local)
+		confirmed, err := confirmMultiRemoval(stdout, stdin, "task", resolvedNames, local)
 		if err != nil {
 			return err
 		}
@@ -579,10 +582,12 @@ func runConfigTaskRemove(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Remove task
-	delete(tasks, resolvedName)
+	// Remove all tasks
+	for _, name := range resolvedNames {
+		delete(tasks, name)
+	}
 
-	// Write updated file
+	// Write updated file once
 	taskPath := filepath.Join(configDir, "tasks.cue")
 	if err := writeTasksFile(taskPath, tasks); err != nil {
 		return fmt.Errorf("writing tasks file: %w", err)
@@ -590,7 +595,9 @@ func runConfigTaskRemove(cmd *cobra.Command, args []string) error {
 
 	flags := getFlags(cmd)
 	if !flags.Quiet {
-		_, _ = fmt.Fprintf(stdout, "Removed task %q\n", resolvedName)
+		for _, name := range resolvedNames {
+			_, _ = fmt.Fprintf(stdout, "Removed task %q\n", name)
+		}
 	}
 
 	return nil

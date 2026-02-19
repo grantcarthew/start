@@ -569,13 +569,13 @@ func runConfigContextEdit(cmd *cobra.Command, args []string) error {
 // addConfigContextRemoveCommand adds the remove subcommand.
 func addConfigContextRemoveCommand(parent *cobra.Command) {
 	removeCmd := &cobra.Command{
-		Use:     "remove <name>",
+		Use:     "remove <name>...",
 		Aliases: []string{"rm", "delete"},
-		Short:   "Remove a context",
-		Long: `Remove a context configuration.
+		Short:   "Remove one or more contexts",
+		Long: `Remove one or more context configurations.
 
-Removes the specified context from the configuration file.`,
-		Args: cobra.ExactArgs(1),
+Removes the specified contexts from the configuration file.`,
+		Args: cobra.MinimumNArgs(1),
 		RunE: runConfigContextRemove,
 	}
 
@@ -584,9 +584,8 @@ Removes the specified context from the configuration file.`,
 	parent.AddCommand(removeCmd)
 }
 
-// runConfigContextRemove removes a context configuration.
+// runConfigContextRemove removes one or more context configurations.
 func runConfigContextRemove(cmd *cobra.Command, args []string) error {
-	name := args[0]
 	stdin := cmd.InOrStdin()
 	stdout := cmd.OutOrStdout()
 	local := getFlags(cmd).Local
@@ -604,15 +603,19 @@ func runConfigContextRemove(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("loading contexts: %w", err)
 	}
 
-	resolvedName, _, err := resolveInstalledName(contexts, "context", name)
+	skipConfirm, _ := cmd.Flags().GetBool("yes")
+
+	resolvedNames, err := resolveRemoveNames(contexts, "context", args, skipConfirm, stdout, stdin)
 	if err != nil {
 		return err
 	}
+	if resolvedNames == nil {
+		return nil // user cancelled
+	}
 
 	// Confirm removal unless --yes flag is set
-	skipConfirm, _ := cmd.Flags().GetBool("yes")
 	if !skipConfirm {
-		confirmed, err := confirmRemoval(stdout, stdin, "context", resolvedName, local)
+		confirmed, err := confirmMultiRemoval(stdout, stdin, "context", resolvedNames, local)
 		if err != nil {
 			return err
 		}
@@ -621,16 +624,24 @@ func runConfigContextRemove(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Remove context and its order entry
-	delete(contexts, resolvedName)
+	// Build set of names to remove for order filtering
+	toRemove := make(map[string]bool, len(resolvedNames))
+	for _, name := range resolvedNames {
+		toRemove[name] = true
+	}
+
+	// Remove all contexts and their order entries
+	for _, name := range resolvedNames {
+		delete(contexts, name)
+	}
 	newOrder := make([]string, 0, len(order))
 	for _, n := range order {
-		if n != resolvedName {
+		if !toRemove[n] {
 			newOrder = append(newOrder, n)
 		}
 	}
 
-	// Write updated file
+	// Write updated file once
 	contextPath := filepath.Join(configDir, "contexts.cue")
 	if err := writeContextsFile(contextPath, contexts, newOrder); err != nil {
 		return fmt.Errorf("writing contexts file: %w", err)
@@ -638,7 +649,9 @@ func runConfigContextRemove(cmd *cobra.Command, args []string) error {
 
 	flags := getFlags(cmd)
 	if !flags.Quiet {
-		_, _ = fmt.Fprintf(stdout, "Removed context %q\n", resolvedName)
+		for _, name := range resolvedNames {
+			_, _ = fmt.Fprintf(stdout, "Removed context %q\n", name)
+		}
 	}
 
 	return nil
