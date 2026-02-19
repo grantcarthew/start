@@ -1565,3 +1565,186 @@ func TestPromptText_ShowsSingleLineDefault(t *testing.T) {
 		t.Errorf("single-line default should not show 'Current value:', got: %s", output)
 	}
 }
+
+func TestConfigSearch_NoConfig(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+	chdir(t, tmpDir)
+
+	cmd := NewRootCmd()
+	stdout := &bytes.Buffer{}
+	cmd.SetOut(stdout)
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"config", "search", "golang"})
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := stdout.String()
+	if !strings.Contains(output, "No matches found") {
+		t.Errorf("expected 'No matches found', got: %s", output)
+	}
+}
+
+func TestConfigSearch_TooShortQuery(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+	chdir(t, tmpDir)
+
+	cmd := NewRootCmd()
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"config", "search", "go"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error for query shorter than 3 characters")
+	}
+}
+
+func TestConfigSearch_GlobalMatch(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	globalDir := filepath.Join(tmpDir, "start")
+	if err := os.MkdirAll(globalDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	rolesContent := `roles: {
+	"golang-expert": {
+		description: "Go language expert"
+		prompt: "You are a Go expert"
+	}
+}`
+	if err := os.WriteFile(filepath.Join(globalDir, "roles.cue"), []byte(rolesContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	chdir(t, tmpDir)
+
+	cmd := NewRootCmd()
+	stdout := &bytes.Buffer{}
+	cmd.SetOut(stdout)
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"config", "search", "golang"})
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := stdout.String()
+	if !strings.Contains(output, "golang-expert") {
+		t.Errorf("expected 'golang-expert' in output, got: %s", output)
+	}
+	if !strings.Contains(output, "global") {
+		t.Errorf("expected 'global' section label in output, got: %s", output)
+	}
+}
+
+func TestConfigSearch_LocalFlag(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	// Write a role into global config
+	globalDir := filepath.Join(tmpDir, "start")
+	if err := os.MkdirAll(globalDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	globalContent := `roles: {
+	"golang-expert": {
+		description: "Go language expert"
+		prompt: "You are a Go expert"
+	}
+}`
+	if err := os.WriteFile(filepath.Join(globalDir, "roles.cue"), []byte(globalContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Write a different role into local config
+	localDir := filepath.Join(tmpDir, ".start")
+	if err := os.MkdirAll(localDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	localContent := `roles: {
+	"project-reviewer": {
+		description: "Project-specific reviewer"
+		prompt: "Review this project"
+	}
+}`
+	if err := os.WriteFile(filepath.Join(localDir, "roles.cue"), []byte(localContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	chdir(t, tmpDir)
+
+	cmd := NewRootCmd()
+	stdout := &bytes.Buffer{}
+	cmd.SetOut(stdout)
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"config", "search", "--local", "reviewer"})
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := stdout.String()
+	if !strings.Contains(output, "project-reviewer") {
+		t.Errorf("expected 'project-reviewer' in output, got: %s", output)
+	}
+	// Global role must not appear when --local is set
+	if strings.Contains(output, "golang-expert") {
+		t.Errorf("expected global role to be excluded with --local, got: %s", output)
+	}
+}
+
+func TestConfigSearch_TagFilter(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	globalDir := filepath.Join(tmpDir, "start")
+	if err := os.MkdirAll(globalDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	tasksContent := `tasks: {
+	"review": {
+		description: "Code review task"
+		prompt: "Review this code"
+		tags: ["review", "code"]
+	}
+	"deploy": {
+		description: "Deploy task"
+		prompt: "Deploy the app"
+		tags: ["ops"]
+	}
+}`
+	if err := os.WriteFile(filepath.Join(globalDir, "tasks.cue"), []byte(tasksContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	chdir(t, tmpDir)
+
+	cmd := NewRootCmd()
+	stdout := &bytes.Buffer{}
+	cmd.SetOut(stdout)
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"config", "search", "--tag", "review"})
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := stdout.String()
+	if !strings.Contains(output, "review") {
+		t.Errorf("expected 'review' task in output, got: %s", output)
+	}
+	if strings.Contains(output, "deploy") {
+		t.Errorf("expected 'deploy' task to be excluded by tag filter, got: %s", output)
+	}
+}
