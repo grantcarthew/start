@@ -41,28 +41,18 @@ func runConfigOrder(cmd *cobra.Command, _ []string) error {
 	local := getFlags(cmd).Local
 
 	_, _ = fmt.Fprintln(stdout, "Reorder:")
-	_, _ = fmt.Fprintln(stdout, "  1. Contexts")
-	_, _ = fmt.Fprintln(stdout, "  2. Roles")
-	_, _ = fmt.Fprintf(stdout, "Choice %s: ", tui.Bracket("1"))
-
-	reader := bufio.NewReader(stdin)
-	choice, err := reader.ReadString('\n')
-	if err != nil {
-		return fmt.Errorf("reading input: %w", err)
-	}
-	choice = strings.TrimSpace(choice)
-	if choice == "" {
-		choice = "1"
+	category, err := promptSelectCategory(stdout, stdin, []string{"contexts", "roles"})
+	if err != nil || category == "" {
+		return err
 	}
 
-	switch choice {
-	case "1":
+	switch category {
+	case "contexts":
 		return reorderContexts(stdout, stdin, local)
-	case "2":
+	case "roles":
 		return reorderRoles(stdout, stdin, local)
-	default:
-		return fmt.Errorf("invalid choice: %s", choice)
 	}
+	return nil
 }
 
 // addConfigContextOrderCommand adds the order subcommand to the context command.

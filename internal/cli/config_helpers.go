@@ -627,6 +627,67 @@ func resolveAllMatchingNames[T any](items map[string]T, typeName, query string) 
 	return names, nil
 }
 
+// promptSelectCategory displays a colour-coded numbered list of config categories
+// and returns the chosen category name. Returns "" and nil if the user cancels
+// (empty input).
+func promptSelectCategory(w io.Writer, r io.Reader, categories []string) (string, error) {
+	for i, cat := range categories {
+		_, _ = fmt.Fprintf(w, "  %d. %s\n", i+1, tui.CategoryColor(cat).Sprint(cat))
+	}
+	_, _ = fmt.Fprintln(w)
+	_, _ = fmt.Fprintf(w, "Select %s: ", tui.Annotate("1-%d", len(categories)))
+
+	reader := bufio.NewReader(r)
+	input, err := reader.ReadString('\n')
+	if err != nil {
+		return "", fmt.Errorf("reading input: %w", err)
+	}
+	input = strings.TrimSpace(input)
+
+	if input == "" {
+		_, _ = fmt.Fprintln(w, "Cancelled.")
+		return "", nil
+	}
+
+	n, err := strconv.Atoi(input)
+	if err != nil || n < 1 || n > len(categories) {
+		return "", fmt.Errorf("invalid selection %q: enter a number between 1 and %d", input, len(categories))
+	}
+	return categories[n-1], nil
+}
+
+// promptSelectOneFromList displays a numbered list and lets the user pick a
+// single entry by number. Returns "" and nil if the user cancels (empty input).
+func promptSelectOneFromList(w io.Writer, r io.Reader, entityType string, names []string) (string, error) {
+	if len(names) == 0 {
+		return "", nil
+	}
+	_, _ = fmt.Fprintf(w, "%d %ss:\n\n", len(names), entityType)
+	for i, name := range names {
+		_, _ = fmt.Fprintf(w, "  %2d. %s\n", i+1, name)
+	}
+	_, _ = fmt.Fprintln(w)
+	_, _ = fmt.Fprintf(w, "Select %s: ", tui.Annotate("1-%d", len(names)))
+
+	reader := bufio.NewReader(r)
+	input, err := reader.ReadString('\n')
+	if err != nil {
+		return "", fmt.Errorf("reading input: %w", err)
+	}
+	input = strings.TrimSpace(input)
+
+	if input == "" {
+		_, _ = fmt.Fprintln(w, "Cancelled.")
+		return "", nil
+	}
+
+	n, err := strconv.Atoi(input)
+	if err != nil || n < 1 || n > len(names) {
+		return "", fmt.Errorf("invalid selection %q: enter a number between 1 and %d", input, len(names))
+	}
+	return names[n-1], nil
+}
+
 // promptSelectFromList displays a numbered list of candidates and lets the user
 // choose which to include. The user may enter comma-separated numbers, ranges
 // (e.g. "1-3"), or "all". Returns the chosen names in list order, or nil if
@@ -635,7 +696,11 @@ func promptSelectFromList(w io.Writer, r io.Reader, entityType, query string, na
 	if len(names) == 0 {
 		return nil, nil
 	}
-	_, _ = fmt.Fprintf(w, "Found %d %ss matching %q:\n\n", len(names), entityType, query)
+	if query != "" {
+		_, _ = fmt.Fprintf(w, "Found %d %ss matching %q:\n\n", len(names), entityType, query)
+	} else {
+		_, _ = fmt.Fprintf(w, "%d %ss:\n\n", len(names), entityType)
+	}
 
 	for i, name := range names {
 		_, _ = fmt.Fprintf(w, "  %2d. %s\n", i+1, name)
