@@ -41,6 +41,11 @@ Use --local to target project-specific configuration.`,
 	addConfigOrderCommand(configCmd)
 	addConfigSearchCommand(configCmd)
 
+	// Add top-level interactive commands
+	addConfigInteractiveAddCommand(configCmd)
+	addConfigInteractiveEditCommand(configCmd)
+	addConfigInteractiveRemoveCommand(configCmd)
+
 	parent.AddCommand(configCmd)
 }
 

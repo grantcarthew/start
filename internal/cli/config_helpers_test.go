@@ -254,6 +254,188 @@ func TestPromptSelectFromList(t *testing.T) {
 	})
 }
 
+func TestPromptSelectCategory(t *testing.T) {
+	categories := []string{"agents", "roles", "contexts", "tasks"}
+
+	tests := []struct {
+		name       string
+		input      string
+		wantResult string
+		wantErr    string
+	}{
+		{
+			name:       "first item",
+			input:      "1\n",
+			wantResult: "agents",
+		},
+		{
+			name:       "middle item",
+			input:      "2\n",
+			wantResult: "roles",
+		},
+		{
+			name:       "last item",
+			input:      "4\n",
+			wantResult: "tasks",
+		},
+		{
+			name:       "empty input cancels",
+			input:      "\n",
+			wantResult: "",
+		},
+		{
+			name:    "zero is out of range",
+			input:   "0\n",
+			wantErr: "invalid selection",
+		},
+		{
+			name:    "exceeds list length",
+			input:   "5\n",
+			wantErr: "invalid selection",
+		},
+		{
+			name:    "non-numeric input errors",
+			input:   "agents\n",
+			wantErr: "invalid selection",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := &bytes.Buffer{}
+			got, err := promptSelectCategory(w, strings.NewReader(tt.input), categories)
+
+			if tt.wantErr != "" {
+				if err == nil {
+					t.Fatalf("expected error containing %q, got nil", tt.wantErr)
+				}
+				if !strings.Contains(err.Error(), tt.wantErr) {
+					t.Errorf("expected error %q, got %v", tt.wantErr, err)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != tt.wantResult {
+				t.Errorf("got %q, want %q", got, tt.wantResult)
+			}
+		})
+	}
+}
+
+func TestPromptSelectOneFromList(t *testing.T) {
+	names := []string{"alpha", "beta", "gamma"}
+
+	t.Run("empty list returns empty string", func(t *testing.T) {
+		w := &bytes.Buffer{}
+		got, err := promptSelectOneFromList(w, strings.NewReader(""), "item", nil)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got != "" {
+			t.Errorf("expected empty string, got %q", got)
+		}
+	})
+
+	tests := []struct {
+		name       string
+		input      string
+		wantResult string
+		wantErr    string
+	}{
+		{
+			name:       "first item",
+			input:      "1\n",
+			wantResult: "alpha",
+		},
+		{
+			name:       "middle item",
+			input:      "2\n",
+			wantResult: "beta",
+		},
+		{
+			name:       "last item",
+			input:      "3\n",
+			wantResult: "gamma",
+		},
+		{
+			name:       "empty input cancels",
+			input:      "\n",
+			wantResult: "",
+		},
+		{
+			name:    "zero is out of range",
+			input:   "0\n",
+			wantErr: "invalid selection",
+		},
+		{
+			name:    "exceeds list length",
+			input:   "4\n",
+			wantErr: "invalid selection",
+		},
+		{
+			name:    "non-numeric input errors",
+			input:   "beta\n",
+			wantErr: "invalid selection",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := &bytes.Buffer{}
+			got, err := promptSelectOneFromList(w, strings.NewReader(tt.input), "item", names)
+
+			if tt.wantErr != "" {
+				if err == nil {
+					t.Fatalf("expected error containing %q, got nil", tt.wantErr)
+				}
+				if !strings.Contains(err.Error(), tt.wantErr) {
+					t.Errorf("expected error %q, got %v", tt.wantErr, err)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != tt.wantResult {
+				t.Errorf("got %q, want %q", got, tt.wantResult)
+			}
+		})
+	}
+}
+
+func TestPromptSelectFromList_EmptyQuery(t *testing.T) {
+	names := []string{"alpha", "beta"}
+
+	t.Run("empty query shows plain header", func(t *testing.T) {
+		w := &bytes.Buffer{}
+		selected, err := promptSelectFromList(w, strings.NewReader("1\n"), "item", "", names)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(selected) != 1 || selected[0] != "alpha" {
+			t.Errorf("got %v, want [alpha]", selected)
+		}
+		if strings.Contains(w.String(), "matching") {
+			t.Errorf("output should not contain 'matching' for empty query: %s", w.String())
+		}
+	})
+
+	t.Run("non-empty query shows matching header", func(t *testing.T) {
+		w := &bytes.Buffer{}
+		_, err := promptSelectFromList(w, strings.NewReader("\n"), "item", "al", names)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !strings.Contains(w.String(), "matching") {
+			t.Errorf("output should contain 'matching' for non-empty query: %s", w.String())
+		}
+	})
+}
+
 func TestConfirmMultiRemoval_SingleItem(t *testing.T) {
 	w := &bytes.Buffer{}
 	// Non-TTY reader returns error, so just test the single-item prompt format
