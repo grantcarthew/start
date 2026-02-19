@@ -7,10 +7,22 @@ import (
 	"strings"
 	"testing"
 
+	"cuelang.org/go/cue/ast"
+	"cuelang.org/go/cue/parser"
 	"github.com/grantcarthew/start/internal/assets"
 	"github.com/grantcarthew/start/internal/registry"
 	"github.com/spf13/cobra"
 )
+
+// parseCUEStruct parses a CUE struct literal string into an ast.Expr for test input.
+func parseCUEStruct(t *testing.T, src string) ast.Expr {
+	t.Helper()
+	f, err := parser.ParseFile("test", "a: "+src)
+	if err != nil {
+		t.Fatalf("parsing CUE struct: %v", err)
+	}
+	return f.Decls[0].(*ast.Field).Value
+}
 
 // TestSearchIndex tests the assets.SearchIndex function.
 func TestSearchIndex(t *testing.T) {
@@ -434,10 +446,10 @@ func TestUpdateAssetInConfig(t *testing.T) {
 	prompt: "new prompt"
 }`,
 			wantContain: []string{
-				`"my/task": {`,
-				`origin: "new/origin"`,
-				`description: "new description"`,
-				`prompt: "new prompt"`,
+				`"my/task"`,
+				`"new/origin"`,
+				`"new description"`,
+				`"new prompt"`,
 			},
 		},
 		{
@@ -463,8 +475,8 @@ func TestUpdateAssetInConfig(t *testing.T) {
 		"""
 }`,
 			wantContain: []string{
-				`"project/start": {`,
-				`origin: "new/origin"`,
+				`"project/start"`,
+				`"new/origin"`,
 				`{{if .instructions}}`,
 				`{{end}}`,
 			},
@@ -489,10 +501,10 @@ func TestUpdateAssetInConfig(t *testing.T) {
 	prompt: "updated"
 }`,
 			wantContain: []string{
-				`"first/task": {`,
-				`origin: "updated/origin"`,
-				`"second/task": {`,
-				`origin: "second/origin"`,
+				`"first/task"`,
+				`"updated/origin"`,
+				`"second/task"`,
+				`"second/origin"`,
 			},
 		},
 		{
@@ -513,10 +525,10 @@ func TestUpdateAssetInConfig(t *testing.T) {
 	prompt: "new prompt"
 }`,
 			wantContain: []string{
-				`"my/task": {`,
-				`origin: "new/origin"`,
-				`description: "Updated: { and } are important"`,
-				`prompt: "new prompt"`,
+				`"my/task"`,
+				`"new/origin"`,
+				`"Updated: { and } are important"`,
+				`"new prompt"`,
 			},
 		},
 		{
@@ -537,9 +549,9 @@ func TestUpdateAssetInConfig(t *testing.T) {
 	description: "new description"
 }`,
 			wantContain: []string{
-				`"my/task": {`,
-				`origin: "new/origin"`,
-				`description: "new description"`,
+				`"my/task"`,
+				`"new/origin"`,
+				`"new description"`,
 			},
 		},
 		{
@@ -561,9 +573,9 @@ func TestUpdateAssetInConfig(t *testing.T) {
 }`,
 			wantContain: []string{
 				`// NOTE: Configure "my/task": see docs`,
-				`"my/task": {`,
-				`origin: "new/origin"`,
-				`description: "updated"`,
+				`"my/task"`,
+				`"new/origin"`,
+				`"updated"`,
 			},
 		},
 		{
@@ -583,9 +595,9 @@ func TestUpdateAssetInConfig(t *testing.T) {
 	description: "updated"
 }`,
 			wantContain: []string{
-				`"my/task": {`,
-				`origin: "new/origin"`,
-				`description: "updated"`,
+				`"my/task"`,
+				`"new/origin"`,
+				`"updated"`,
 			},
 		},
 		{
@@ -609,10 +621,10 @@ func TestUpdateAssetInConfig(t *testing.T) {
 	description: "updated"
 }`,
 			wantContain: []string{
-				`"other/task": {`,
-				`description: "This relates to my/task: the foundation"`,
-				`"my/task": {`,
-				`origin: "new/origin"`,
+				`"other/task"`,
+				`"This relates to my/task: the foundation"`,
+				`"my/task"`,
+				`"new/origin"`,
 			},
 		},
 		{
@@ -639,7 +651,8 @@ func TestUpdateAssetInConfig(t *testing.T) {
 				t.Fatalf("failed to write initial config: %v", err)
 			}
 
-			err := assets.UpdateAssetInConfig(configPath, tt.category, tt.assetName, tt.newContent)
+			content := parseCUEStruct(t, tt.newContent)
+			err := assets.UpdateAssetInConfig(configPath, tt.category, tt.assetName, content)
 
 			if tt.wantErr {
 				if err == nil {
@@ -661,161 +674,6 @@ func TestUpdateAssetInConfig(t *testing.T) {
 				if !strings.Contains(string(result), want) {
 					t.Errorf("result missing %q\ngot:\n%s", want, result)
 				}
-			}
-		})
-	}
-}
-
-// TestFindOpeningBrace tests the assets.FindOpeningBrace function.
-func TestFindOpeningBrace(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name     string
-		content  string
-		startPos int
-		wantPos  int
-		wantErr  bool
-	}{
-		{
-			name:     "simple case - immediate brace",
-			content:  `"key": {`,
-			startPos: 7, // After ": "
-			wantPos:  7,
-			wantErr:  false,
-		},
-		{
-			name:     "whitespace before brace",
-			content:  `"key":   {`,
-			startPos: 6, // After ":"
-			wantPos:  9,
-			wantErr:  false,
-		},
-		{
-			name: "newline before brace",
-			content: `"key":
-{`,
-			startPos: 6, // After ":"
-			wantPos:  7,
-			wantErr:  false,
-		},
-		{
-			name: "comment with brace before actual brace",
-			content: `"key": // NOTE: see details { v2 }
-{`,
-			startPos: 7,  // After ": "
-			wantPos:  35, // After newline, at the real {
-			wantErr:  false,
-		},
-		{
-			name: "multiple comments with braces",
-			content: `"key": // First comment { brace }
-    // Second comment { another }
-    {`,
-			startPos: 7,
-			wantPos:  72, // At the real {
-			wantErr:  false,
-		},
-		{
-			name:     "brace in single-line string",
-			content:  `"key": "description with { brace }" {`,
-			startPos: 7,
-			wantPos:  36,
-			wantErr:  false,
-		},
-		{
-			name: "brace in multi-line string",
-			content: `"key": """
-			Template: {{.field}}
-			More: { and }
-			""" {`,
-			startPos: 7,
-			wantPos:  59, // After """
-			wantErr:  false,
-		},
-		{
-			name: "complex case - comment and string with braces",
-			content: `"key": // comment { brace }
-    "description": "has { brace }"
-    {`,
-			startPos: 7,
-			wantPos:  67,
-			wantErr:  false,
-		},
-		{
-			name:     "escaped quote in string",
-			content:  `"key": "value with \" and { brace }" {`,
-			startPos: 7,
-			wantPos:  37,
-			wantErr:  false,
-		},
-		{
-			name: "multi-line string with escaped quotes",
-			content: `"key": """
-			Value: "quoted { brace }"
-			""" {`,
-			startPos: 7,
-			wantPos:  47,
-			wantErr:  false,
-		},
-		{
-			name:     "no brace found",
-			content:  `"key": "value"`,
-			startPos: 7,
-			wantPos:  0,
-			wantErr:  true,
-		},
-		{
-			name:     "brace only in comment - not found",
-			content:  `"key": // only { in } comment`,
-			startPos: 7,
-			wantPos:  0,
-			wantErr:  true,
-		},
-		{
-			name:     "brace only in string - not found",
-			content:  `"key": "only { in } string"`,
-			startPos: 7,
-			wantPos:  0,
-			wantErr:  true,
-		},
-		{
-			name: "real-world example",
-			content: `tasks: {
-	"my/task": // Needs review { important }
-	{
-		origin: "test"
-		description: "Task with { braces } in description"
-	}
-}`,
-			startPos: 19, // After "my/task":
-			wantPos:  52, // At the real opening brace
-			wantErr:  false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			pos, err := assets.FindOpeningBrace(tt.content, tt.startPos)
-
-			if tt.wantErr {
-				if err == nil {
-					t.Error("expected error, got nil")
-				}
-				return
-			}
-
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-
-			if pos != tt.wantPos {
-				t.Errorf("assets.FindOpeningBrace() = %d, want %d\nContent: %q", pos, tt.wantPos, tt.content)
-			}
-
-			// Verify that the position actually points to '{'
-			if tt.content[pos] != '{' {
-				t.Errorf("position %d does not point to '{', got %q", pos, tt.content[pos])
 			}
 		})
 	}

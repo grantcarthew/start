@@ -12,7 +12,7 @@ Avoid references to the prototype in new documentation. This is a new design.
 
 Projects are stored in `.ai/projects/`. Continue by reading the active project.
 
-Active Project: .ai/projects/p-022-assets-ast-refactor.md
+Active Project: None
 
 Other Projects (paused):
 - None
@@ -189,5 +189,6 @@ start-assets/
 - p-027: CLI Content Source Menu Extraction (normalised and extracted promptContentSource helper)
 - p-028: TUI Shared Package (shared colour definitions, Annotate/Bracket helpers, cli+doctor migration)
 - p-029: CLI Show Verbose Inspection (comprehensive resource inspection, cross-category search, verbose dump)
+- p-022: Assets AST Refactor (CUE AST-based config manipulation replacing string parsing)
 
 The prototype validated that this tool solves a real problem. This version will implement it properly.

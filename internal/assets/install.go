@@ -1,9 +1,3 @@
-// NOTE(design): This file contains multiple concerns (install orchestration, role
-// dependency resolution, asset extraction, config file text manipulation). The Find*
-// functions implement character-by-character CUE syntax state machines which are the
-// most complex code in the repository. This complexity is inherent to text-level CUE
-// manipulation without an AST API. The state machines share cueParseState and could be
-// unified behind a common scanner, but are well-tested (see install_test.go).
 package assets
 
 import (
@@ -15,24 +9,15 @@ import (
 	"strings"
 
 	"cuelang.org/go/cue"
+	"cuelang.org/go/cue/ast"
 	"cuelang.org/go/cue/cuecontext"
 	"cuelang.org/go/cue/format"
 	"cuelang.org/go/cue/load"
+	"cuelang.org/go/cue/parser"
 	"cuelang.org/go/mod/modconfig"
 	"cuelang.org/go/mod/modfile"
 	internalcue "github.com/grantcarthew/start/internal/cue"
 	"github.com/grantcarthew/start/internal/registry"
-)
-
-// cueParseState tracks CUE syntax context during character-by-character scanning
-// used by the Find* functions.
-type cueParseState int
-
-const (
-	stateNormal        cueParseState = iota
-	stateInString                    // Inside "..." string
-	stateInMultiString               // Inside """...""" string
-	stateInComment                   // After // until newline
 )
 
 // InstallAsset installs an asset from the registry to the config directory.
@@ -153,10 +138,10 @@ func assetTypeToConfigFile(category string) string {
 	}
 }
 
-// ExtractAssetContent loads the asset module and extracts its content as CUE.
+// ExtractAssetContent loads the asset module and extracts its content as a CUE AST struct.
 // originPath is the module path (without version) to store in the origin field.
 // roleName, if non-empty, replaces an inline role struct with a string reference.
-func ExtractAssetContent(moduleDir string, asset SearchResult, reg interface{}, originPath, roleName string) (string, error) {
+func ExtractAssetContent(moduleDir string, asset SearchResult, reg interface{}, originPath, roleName string) (*ast.StructLit, error) {
 	cctx := cuecontext.New()
 
 	cfg := &load.Config{
@@ -170,17 +155,17 @@ func ExtractAssetContent(moduleDir string, asset SearchResult, reg interface{}, 
 
 	insts := load.Instances([]string{"."}, cfg)
 	if len(insts) == 0 {
-		return "", fmt.Errorf("no CUE instances found in %s", moduleDir)
+		return nil, fmt.Errorf("no CUE instances found in %s", moduleDir)
 	}
 
 	inst := insts[0]
 	if inst.Err != nil {
-		return "", fmt.Errorf("loading module: %w", inst.Err)
+		return nil, fmt.Errorf("loading module: %w", inst.Err)
 	}
 
 	v := cctx.BuildInstance(inst)
 	if err := v.Err(); err != nil {
-		return "", fmt.Errorf("building module: %w", err)
+		return nil, fmt.Errorf("building module: %w", err)
 	}
 
 	// Extract the asset definition - try singular field name first
@@ -192,22 +177,24 @@ func ExtractAssetContent(moduleDir string, asset SearchResult, reg interface{}, 
 		assetVal = v.LookupPath(cue.MakePath(cue.Str(asset.Name)))
 	}
 	if !assetVal.Exists() {
-		return "", fmt.Errorf("asset definition not found in module (tried %q)", singular)
+		return nil, fmt.Errorf("asset definition not found in module (tried %q)", singular)
 	}
 
 	// Build a concrete struct with just the fields we need
 	return formatAssetStruct(assetVal, asset.Category, originPath, roleName)
 }
 
-// formatAssetStruct formats a CUE value as a concrete struct.
+// formatAssetStruct builds a CUE AST struct from a CUE value.
 // originPath is written as the origin field to track registry provenance.
 // roleName, if non-empty, replaces an inline role struct with a string reference.
-func formatAssetStruct(v cue.Value, category, originPath, roleName string) (string, error) {
-	var sb strings.Builder
-	sb.WriteString("{\n")
+func formatAssetStruct(v cue.Value, category, originPath, roleName string) (*ast.StructLit, error) {
+	s := &ast.StructLit{}
 
-	// Write origin field first (tracks registry provenance)
-	sb.WriteString(fmt.Sprintf("\torigin: %q\n", originPath))
+	// Origin field first (tracks registry provenance)
+	s.Elts = append(s.Elts, &ast.Field{
+		Label: ast.NewIdent("origin"),
+		Value: ast.NewString(originPath),
+	})
 
 	// Define which fields to extract based on category
 	var fields []string
@@ -227,7 +214,10 @@ func formatAssetStruct(v cue.Value, category, originPath, roleName string) (stri
 	for _, field := range fields {
 		// Replace inline role struct with string reference when a role name is available
 		if field == "role" && roleName != "" {
-			sb.WriteString(fmt.Sprintf("\trole: %q\n", roleName))
+			s.Elts = append(s.Elts, &ast.Field{
+				Label: ast.NewIdent("role"),
+				Value: ast.NewString(roleName),
+			})
 			continue
 		}
 
@@ -236,87 +226,77 @@ func formatAssetStruct(v cue.Value, category, originPath, roleName string) (stri
 			continue
 		}
 
-		// Format the field value
-		formatted, err := formatFieldValue(field, fieldVal)
+		expr, err := formatFieldExpr(fieldVal)
 		if err != nil {
-			return "", fmt.Errorf("formatting field %q: %w", field, err)
+			return nil, fmt.Errorf("formatting field %q: %w", field, err)
 		}
-		sb.WriteString(formatted)
+		s.Elts = append(s.Elts, &ast.Field{
+			Label: ast.NewIdent(field),
+			Value: expr,
+		})
 	}
 
-	sb.WriteString("}")
-	return sb.String(), nil
+	return s, nil
 }
 
-// formatFieldValue formats a single field value as CUE syntax.
-func formatFieldValue(name string, v cue.Value) (string, error) {
-	var sb strings.Builder
-
+// formatFieldExpr converts a CUE value into an AST expression node.
+func formatFieldExpr(v cue.Value) (ast.Expr, error) {
 	switch v.Kind() {
 	case cue.StringKind:
 		s, err := v.String()
 		if err != nil {
-			return "", err
+			return nil, err
 		}
-		// Use multi-line string for prompts and long strings
-		if strings.Contains(s, "\n") || len(s) > 80 {
-			sb.WriteString(fmt.Sprintf("\t%s: \"\"\"\n", name))
-			for _, line := range strings.Split(s, "\n") {
-				sb.WriteString(fmt.Sprintf("\t\t%s\n", line))
-			}
-			sb.WriteString("\t\t\"\"\"\n")
-		} else {
-			sb.WriteString(fmt.Sprintf("\t%s: %q\n", name, s))
-		}
+		return ast.NewString(s), nil
 
 	case cue.BoolKind:
 		b, err := v.Bool()
 		if err != nil {
-			return "", err
+			return nil, err
 		}
-		sb.WriteString(fmt.Sprintf("\t%s: %t\n", name, b))
+		return ast.NewBool(b), nil
 
 	case cue.ListKind:
 		iter, err := v.List()
 		if err != nil {
-			return "", err
+			return nil, err
 		}
-		var items []string
+		var items []ast.Expr
 		for iter.Next() {
-			if s, err := iter.Value().String(); err == nil {
-				items = append(items, fmt.Sprintf("%q", s))
+			item, err := formatFieldExpr(iter.Value())
+			if err != nil {
+				return nil, fmt.Errorf("list element: %w", err)
 			}
+			items = append(items, item)
 		}
-		if len(items) > 0 {
-			sb.WriteString(fmt.Sprintf("\t%s: [%s]\n", name, strings.Join(items, ", ")))
-		}
+		return ast.NewList(items...), nil
 
 	case cue.StructKind:
-		// For maps like "models"
-		sb.WriteString(fmt.Sprintf("\t%s: {\n", name))
 		iter, err := v.Fields()
 		if err != nil {
-			return "", err
+			return nil, err
 		}
+		inner := &ast.StructLit{}
 		for iter.Next() {
 			key := iter.Selector().Unquoted()
-			if s, err := iter.Value().String(); err == nil {
-				sb.WriteString(fmt.Sprintf("\t\t%q: %q\n", key, s))
+			val, err := formatFieldExpr(iter.Value())
+			if err != nil {
+				return nil, fmt.Errorf("struct field %q: %w", key, err)
 			}
+			inner.Elts = append(inner.Elts, &ast.Field{
+				Label: ast.NewStringLabel(key),
+				Value: val,
+			})
 		}
-		sb.WriteString("\t}\n")
+		return inner, nil
 
 	default:
-		// Try to get string representation
 		syn := v.Syntax()
-		formatted, err := format.Node(syn, format.Simplify())
-		if err != nil {
-			return "", err
+		if expr, ok := syn.(ast.Expr); ok {
+			return expr, nil
 		}
-		sb.WriteString(fmt.Sprintf("\t%s: %s\n", name, string(formatted)))
+		return nil, fmt.Errorf("unsupported value kind: %v", v.Kind())
 	}
-
-	return sb.String(), nil
 }
 
 // findRoleDependency reads a task module's cue.mod/module.cue and returns
@@ -395,357 +375,140 @@ func VersionFromOrigin(origin string) string {
 
 // writeAssetToConfig writes the asset content to the config file.
 // If the asset already exists, it is updated in place (upsert).
-func writeAssetToConfig(configPath string, asset SearchResult, content, modulePath string) error {
+func writeAssetToConfig(configPath string, asset SearchResult, content ast.Expr, modulePath string) error {
 	// Read existing content if file exists
-	var existingContent string
-	if data, err := os.ReadFile(configPath); err == nil {
-		existingContent = string(data)
-	}
-
-	// If the asset already exists, update it in place rather than appending a duplicate
-	if existingContent != "" {
-		_, _, err := FindAssetKey(existingContent, asset.Name)
-		if err == nil {
-			return UpdateAssetInConfig(configPath, asset.Category, asset.Name, content)
+	var file *ast.File
+	if data, err := os.ReadFile(configPath); err == nil && len(data) > 0 {
+		file, err = parser.ParseFile(configPath, data, parser.ParseComments)
+		if err != nil {
+			return fmt.Errorf("parsing config file: %w", err)
 		}
 	}
 
-	// Build new content
-	var sb strings.Builder
+	assetField := &ast.Field{
+		Label: ast.NewStringLabel(asset.Name),
+		Value: content,
+	}
 
-	// categoryClosingBrace tracks the position after the category's '}' so we
-	// can append the remainder of the file after inserting the new asset.
-	// A value of -1 means no existing category block was found.
-	categoryClosingBrace := -1
-
-	if existingContent == "" {
-		// New file
-		sb.WriteString("// start configuration\n")
-		sb.WriteString("// Managed by 'start assets add'\n\n")
-		sb.WriteString(fmt.Sprintf("%s: {\n", asset.Category))
+	if file == nil {
+		// New file: build with comment header and category struct
+		categoryStruct := &ast.StructLit{
+			Elts: []ast.Decl{assetField},
+		}
+		categoryField := &ast.Field{
+			Label: ast.NewIdent(asset.Category),
+			Value: categoryStruct,
+		}
+		ast.AddComment(categoryField, &ast.CommentGroup{
+			Doc: true,
+			List: []*ast.Comment{
+				{Text: "// start configuration"},
+				{Text: "// Managed by 'start assets add'"},
+			},
+		})
+		file = &ast.File{Decls: []ast.Decl{categoryField}}
 	} else {
-		// Append to existing - find the category block
-		categoryStart := strings.Index(existingContent, asset.Category+":")
-		if categoryStart == -1 {
-			// Category doesn't exist, append it
-			sb.WriteString(existingContent)
-			if !strings.HasSuffix(existingContent, "\n") {
-				sb.WriteString("\n")
+		// Find or create category
+		catField := findCategoryField(file, asset.Category)
+		if catField != nil {
+			catStruct, ok := catField.Value.(*ast.StructLit)
+			if !ok {
+				return fmt.Errorf("category %q is not a struct", asset.Category)
 			}
-			sb.WriteString(fmt.Sprintf("\n%s: {\n", asset.Category))
-		} else {
-			// Find the opening brace of this category using context-aware parsing
-			openBrace, err := FindOpeningBrace(existingContent, categoryStart+len(asset.Category)+1)
-			if err != nil {
-				sb.WriteString(existingContent)
-				sb.WriteString(fmt.Sprintf("\n%s: {\n", asset.Category))
+			// Upsert: update if exists, append if not
+			if existing := findAssetField(catStruct, asset.Name); existing != nil {
+				existing.Value = content
 			} else {
-				// Find the matching closing brace for this specific category
-				closeBrace, err := FindMatchingBrace(existingContent, openBrace)
-				if err != nil {
-					sb.WriteString(existingContent)
-					sb.WriteString(fmt.Sprintf("\n%s: {\n", asset.Category))
-				} else {
-					categoryClosingBrace = closeBrace
-					// closeBrace is the position after '}', insert before it
-					sb.WriteString(existingContent[:closeBrace-1])
-					sb.WriteString("\n")
-				}
+				catStruct.Elts = append(catStruct.Elts, assetField)
 			}
-		}
-	}
-
-	// Add the asset definition
-	sb.WriteString(fmt.Sprintf("\t%q: ", asset.Name))
-
-	// Indent the content
-	lines := strings.Split(content, "\n")
-	for i, line := range lines {
-		if i == 0 {
-			sb.WriteString(line)
 		} else {
-			if line != "" {
-				sb.WriteString("\n\t" + line)
-			} else {
-				sb.WriteString("\n")
+			// New category
+			categoryStruct := &ast.StructLit{
+				Elts: []ast.Decl{assetField},
 			}
+			categoryField := &ast.Field{
+				Label: ast.NewIdent(asset.Category),
+				Value: categoryStruct,
+			}
+			file.Decls = append(file.Decls, categoryField)
 		}
 	}
 
-	sb.WriteString("\n}\n")
-
-	// Append the remainder of the file after the category block
-	if categoryClosingBrace != -1 {
-		sb.WriteString(existingContent[categoryClosingBrace:])
+	formatted, err := format.Node(file, format.Simplify())
+	if err != nil {
+		return fmt.Errorf("formatting config: %w", err)
 	}
-
-	return os.WriteFile(configPath, []byte(sb.String()), 0644)
+	return os.WriteFile(configPath, formatted, 0644)
 }
 
-// FindAssetKey finds the position of an asset key in CUE content, ignoring occurrences
-// in comments and strings. Returns the start position and length of the matched key pattern.
-//
-// Supported CUE syntax:
-//   - Single-line strings: "..."
-//   - Multi-line strings: """..."""
-//   - Line comments: // (CUE does not support block comments /* */)
-//   - Escape sequences: \" inside strings
-//
-// Searches for both quoted ("key":) and unquoted (key:) patterns.
-// Returns the first match found in normal state (not inside strings/comments).
-func FindAssetKey(content, assetKey string) (keyStart, keyLen int, err error) {
-	if assetKey == "" {
-		return 0, 0, fmt.Errorf("asset key must not be empty")
-	}
-
-	quotedKey := fmt.Sprintf("%q:", assetKey)
-	unquotedKey := assetKey + ":"
-	currentState := stateNormal
-	pos := 0
-
-	for pos < len(content) {
-		ch := content[pos]
-
-		switch currentState {
-		case stateNormal:
-			// Check for matches only in normal state
-			if pos+len(quotedKey) <= len(content) && content[pos:pos+len(quotedKey)] == quotedKey {
-				return pos, len(quotedKey), nil
-			}
-			if pos+len(unquotedKey) <= len(content) && content[pos:pos+len(unquotedKey)] == unquotedKey {
-				return pos, len(unquotedKey), nil
-			}
-
-			// Check for string start
-			if ch == '"' {
-				if pos+2 < len(content) && content[pos:pos+3] == `"""` {
-					currentState = stateInMultiString
-					pos += 2
-				} else {
-					currentState = stateInString
-				}
-			} else if ch == '/' && pos+1 < len(content) && content[pos+1] == '/' {
-				currentState = stateInComment
-				pos++
-			}
-
-		case stateInString:
-			if ch == '\\' && pos+1 < len(content) {
-				pos++
-			} else if ch == '"' {
-				currentState = stateNormal
-			}
-
-		case stateInMultiString:
-			if ch == '"' && pos+2 < len(content) && content[pos:pos+3] == `"""` {
-				currentState = stateNormal
-				pos += 2
-			}
-
-		case stateInComment:
-			if ch == '\n' {
-				currentState = stateNormal
-			}
+// findCategoryField finds a top-level field in a CUE file by name.
+func findCategoryField(file *ast.File, category string) *ast.Field {
+	for _, decl := range file.Decls {
+		field, ok := decl.(*ast.Field)
+		if !ok {
+			continue
 		}
-
-		pos++
+		name, _, err := ast.LabelName(field.Label)
+		if err != nil {
+			continue
+		}
+		if name == category {
+			return field
+		}
 	}
-
-	return 0, 0, fmt.Errorf("asset %q not found in config", assetKey)
+	return nil
 }
 
-// FindMatchingBrace finds the position after the matching closing brace for an opening brace.
-// It respects CUE syntax: strings (both " and """), comments (//), and only counts braces
-// that are part of the actual structure, not those inside strings or comments.
-//
-// Supported CUE syntax (same as FindAssetKey):
-//   - Single-line strings: "..."
-//   - Multi-line strings: """..."""
-//   - Line comments: // (CUE does not support block comments /* */)
-//   - Escape sequences: \" inside strings
-//
-// Returns the position immediately after the matching closing brace.
-func FindMatchingBrace(content string, openBracePos int) (int, error) {
-	currentState := stateNormal
-	braceCount := 1
-	pos := openBracePos + 1
-
-	for pos < len(content) && braceCount > 0 {
-		ch := content[pos]
-
-		switch currentState {
-		case stateNormal:
-			// Check for string start
-			if ch == '"' {
-				// Check if it's a triple-quote
-				if pos+2 < len(content) && content[pos:pos+3] == `"""` {
-					currentState = stateInMultiString
-					pos += 2 // Skip next 2 quotes (we'll increment at end of loop)
-				} else {
-					currentState = stateInString
-				}
-			} else if ch == '/' && pos+1 < len(content) && content[pos+1] == '/' {
-				// Start of comment
-				currentState = stateInComment
-				pos++ // Skip second /
-			} else if ch == '{' {
-				braceCount++
-			} else if ch == '}' {
-				braceCount--
-			}
-
-		case stateInString:
-			// Check for escape sequences
-			if ch == '\\' && pos+1 < len(content) {
-				pos++ // Skip next character
-			} else if ch == '"' {
-				currentState = stateNormal
-			}
-
-		case stateInMultiString:
-			// Check for end of multi-line string
-			if ch == '"' && pos+2 < len(content) && content[pos:pos+3] == `"""` {
-				currentState = stateNormal
-				pos += 2 // Skip next 2 quotes
-			}
-
-		case stateInComment:
-			// Comment ends at newline
-			if ch == '\n' {
-				currentState = stateNormal
-			}
+// findAssetField finds a field in a struct by name.
+func findAssetField(s *ast.StructLit, name string) *ast.Field {
+	for _, elt := range s.Elts {
+		field, ok := elt.(*ast.Field)
+		if !ok {
+			continue
 		}
-
-		pos++
-	}
-
-	if braceCount != 0 {
-		return 0, fmt.Errorf("unmatched braces (count: %d)", braceCount)
-	}
-
-	return pos, nil
-}
-
-// FindOpeningBrace finds the position of the first opening brace '{' after startPos,
-// while respecting CUE syntax (ignoring braces inside comments and strings).
-//
-// Supported CUE syntax (same as FindAssetKey and FindMatchingBrace):
-//   - Single-line strings: "..."
-//   - Multi-line strings: """..."""
-//   - Line comments: // (CUE does not support block comments /* */)
-//   - Escape sequences: \" inside strings
-//
-// Returns the position of the opening brace, or error if not found.
-func FindOpeningBrace(content string, startPos int) (int, error) {
-	currentState := stateNormal
-	pos := startPos
-
-	for pos < len(content) {
-		ch := content[pos]
-
-		switch currentState {
-		case stateNormal:
-			// Found opening brace in normal state - this is what we're looking for
-			if ch == '{' {
-				return pos, nil
-			}
-
-			// Check for string start
-			if ch == '"' {
-				if pos+2 < len(content) && content[pos:pos+3] == `"""` {
-					currentState = stateInMultiString
-					pos += 2 // Skip next 2 quotes (we'll increment at end of loop)
-				} else {
-					currentState = stateInString
-				}
-			} else if ch == '/' && pos+1 < len(content) && content[pos+1] == '/' {
-				currentState = stateInComment
-				pos++ // Skip second /
-			}
-
-		case stateInString:
-			if ch == '\\' && pos+1 < len(content) {
-				pos++ // Skip next character (escape sequence)
-			} else if ch == '"' {
-				currentState = stateNormal
-			}
-
-		case stateInMultiString:
-			if ch == '"' && pos+2 < len(content) && content[pos:pos+3] == `"""` {
-				currentState = stateNormal
-				pos += 2 // Skip next 2 quotes
-			}
-
-		case stateInComment:
-			if ch == '\n' {
-				currentState = stateNormal
-			}
+		labelName, _, err := ast.LabelName(field.Label)
+		if err != nil {
+			continue
 		}
-
-		pos++
+		if labelName == name {
+			return field
+		}
 	}
-
-	return 0, fmt.Errorf("opening brace not found")
+	return nil
 }
 
 // UpdateAssetInConfig replaces an existing asset entry in the config file.
-func UpdateAssetInConfig(configPath, category, name, newContent string) error {
+func UpdateAssetInConfig(configPath, category, name string, newContent ast.Expr) error {
 	data, err := os.ReadFile(configPath)
 	if err != nil {
 		return fmt.Errorf("reading config file: %w", err)
 	}
 
-	content := string(data)
-	// Find the asset entry using context-aware search (ignores keys in comments/strings)
-	keyStart, keyLen, err := FindAssetKey(content, name)
+	file, err := parser.ParseFile(configPath, data, parser.ParseComments)
 	if err != nil {
-		return err
+		return fmt.Errorf("parsing config file: %w", err)
 	}
 
-	// Find the opening brace after the key using context-aware search
-	// This properly handles comments and strings between the key and brace
-	// (e.g., "key": // comment { with brace } \n {)
-	braceStart, err := FindOpeningBrace(content, keyStart+keyLen)
+	catField := findCategoryField(file, category)
+	if catField == nil {
+		return fmt.Errorf("asset %q not found in config", name)
+	}
+
+	catStruct, ok := catField.Value.(*ast.StructLit)
+	if !ok {
+		return fmt.Errorf("asset %q not found in config", name)
+	}
+
+	assetField := findAssetField(catStruct, name)
+	if assetField == nil {
+		return fmt.Errorf("asset %q not found in config", name)
+	}
+
+	assetField.Value = newContent
+
+	formatted, err := format.Node(file, format.Simplify())
 	if err != nil {
-		return fmt.Errorf("invalid config format: no opening brace for %q", name)
+		return fmt.Errorf("formatting config: %w", err)
 	}
-
-	// Find the matching closing brace using context-aware parsing
-	braceEnd, err := FindMatchingBrace(content, braceStart)
-	if err != nil {
-		return fmt.Errorf("finding closing brace for %q: %w", name, err)
-	}
-
-	// Build the new content - preserve key and replace value
-	var sb strings.Builder
-	sb.WriteString(content[:keyStart])
-	// NOTE: Always uses quoted key format ("key":) even if original was unquoted (key:).
-	// CUE accepts both formats, but this normalizes to quoted for consistency.
-	sb.WriteString(fmt.Sprintf("%q: ", name))
-
-	// Indent the new content
-	// LIMITATION: This assumes a flat config structure where assets are direct children
-	// of the category (e.g., tasks: { "name": { ... } }). It adds exactly one tab to
-	// each line (except the first). If configs ever use nested structures, this would
-	// need to detect the current indentation level from content[:keyStart].
-	//
-	// Current structure: category: { asset: { fields } }
-	// - Line 0: '{' (no indent added, inherits position after key)
-	// - Line 1+: Add one tab to match category level
-	lines := strings.Split(newContent, "\n")
-	for i, line := range lines {
-		if i == 0 {
-			sb.WriteString(line)
-		} else {
-			if line != "" {
-				sb.WriteString("\n\t" + line)
-			} else {
-				sb.WriteString("\n")
-			}
-		}
-	}
-
-	sb.WriteString(content[braceEnd:])
-
-	return os.WriteFile(configPath, []byte(sb.String()), 0644)
+	return os.WriteFile(configPath, formatted, 0644)
 }

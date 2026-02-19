@@ -6,10 +6,34 @@ import (
 	"strings"
 	"testing"
 
+	"cuelang.org/go/cue"
+	"cuelang.org/go/cue/ast"
 	"cuelang.org/go/cue/cuecontext"
+	"cuelang.org/go/cue/format"
+	"cuelang.org/go/cue/parser"
 	internalcue "github.com/grantcarthew/start/internal/cue"
 	"github.com/grantcarthew/start/internal/registry"
 )
+
+// formatAST formats an AST node to a string for test assertions.
+func formatAST(t *testing.T, node ast.Node) string {
+	t.Helper()
+	b, err := format.Node(node, format.Simplify())
+	if err != nil {
+		t.Fatalf("formatting AST: %v", err)
+	}
+	return string(b)
+}
+
+// parseCUEStruct parses a CUE struct literal string into an ast.Expr for test input.
+func parseCUEStruct(t *testing.T, src string) ast.Expr {
+	t.Helper()
+	f, err := parser.ParseFile("test", "a: "+src)
+	if err != nil {
+		t.Fatalf("parsing CUE struct: %v", err)
+	}
+	return f.Decls[0].(*ast.Field).Value
+}
 
 // TestAssetExists tests the AssetExists function.
 func TestAssetExists(t *testing.T) {
@@ -103,346 +127,6 @@ func TestAssetTypeToConfigFile(t *testing.T) {
 	}
 }
 
-// TestFindAssetKey tests the FindAssetKey function.
-func TestFindAssetKey(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name      string
-		content   string
-		assetKey  string
-		wantFound bool
-		wantPos   int
-	}{
-		{
-			name:      "quoted key",
-			content:   `contexts: {\n\t"cwd/agents-md": {`,
-			assetKey:  "cwd/agents-md",
-			wantFound: true,
-		},
-		{
-			name:      "unquoted key",
-			content:   `contexts: {\n\tsimple: {`,
-			assetKey:  "simple",
-			wantFound: true,
-		},
-		{
-			name:      "key in comment ignored",
-			content:   "// \"cwd/agents-md\": comment\ncontexts: {\n",
-			assetKey:  "cwd/agents-md",
-			wantFound: false,
-		},
-		{
-			name:      "key in string ignored",
-			content:   "description: \"has cwd/agents-md in it\"\ncontexts: {\n",
-			assetKey:  "cwd/agents-md",
-			wantFound: false,
-		},
-		{
-			name:      "key in multi-line string ignored",
-			content:   "description: \"\"\"\n\tcwd/agents-md: is mentioned here\n\t\"\"\"\ncontexts: {\n",
-			assetKey:  "cwd/agents-md",
-			wantFound: false,
-		},
-		{
-			name:      "key not found",
-			content:   `contexts: {\n\t"other": {`,
-			assetKey:  "cwd/agents-md",
-			wantFound: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			_, _, err := FindAssetKey(tt.content, tt.assetKey)
-			found := err == nil
-
-			if found != tt.wantFound {
-				t.Errorf("FindAssetKey() found = %v, want %v", found, tt.wantFound)
-			}
-		})
-	}
-}
-
-// TestFindMatchingBrace tests the FindMatchingBrace function.
-func TestFindMatchingBrace(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name         string
-		content      string
-		openBracePos int
-		wantEndPos   int
-		wantErr      bool
-	}{
-		{
-			name:         "simple nested",
-			content:      "{ { } }",
-			openBracePos: 0,
-			wantEndPos:   7,
-			wantErr:      false,
-		},
-		{
-			name:         "with strings",
-			content:      `{ "key": "value { }" }`,
-			openBracePos: 0,
-			wantEndPos:   22,
-			wantErr:      false,
-		},
-		{
-			name:         "with comments",
-			content:      "{ // comment { \n }",
-			openBracePos: 0,
-			wantEndPos:   18,
-			wantErr:      false,
-		},
-		{
-			name:         "unmatched",
-			content:      "{ { }",
-			openBracePos: 0,
-			wantErr:      true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			gotPos, err := FindMatchingBrace(tt.content, tt.openBracePos)
-
-			if tt.wantErr {
-				if err == nil {
-					t.Error("FindMatchingBrace() expected error, got nil")
-				}
-				return
-			}
-
-			if err != nil {
-				t.Errorf("FindMatchingBrace() unexpected error: %v", err)
-				return
-			}
-
-			if gotPos != tt.wantEndPos {
-				t.Errorf("FindMatchingBrace() = %d, want %d", gotPos, tt.wantEndPos)
-			}
-		})
-	}
-}
-
-// TestFindOpeningBrace tests the FindOpeningBrace function.
-func TestFindOpeningBrace(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name     string
-		content  string
-		startPos int
-		wantPos  int
-		wantErr  bool
-	}{
-		{
-			name:     "immediate brace",
-			content:  "{ }",
-			startPos: 0,
-			wantPos:  0,
-			wantErr:  false,
-		},
-		{
-			name:     "skip whitespace",
-			content:  "   { }",
-			startPos: 0,
-			wantPos:  3,
-			wantErr:  false,
-		},
-		{
-			name:     "skip string",
-			content:  `"{ }" {`,
-			startPos: 0,
-			wantPos:  6,
-			wantErr:  false,
-		},
-		{
-			name:     "skip comment",
-			content:  "// { \n {",
-			startPos: 0,
-			wantPos:  7,
-			wantErr:  false,
-		},
-		{
-			name:     "not found",
-			content:  "no brace here",
-			startPos: 0,
-			wantErr:  true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			gotPos, err := FindOpeningBrace(tt.content, tt.startPos)
-
-			if tt.wantErr {
-				if err == nil {
-					t.Error("FindOpeningBrace() expected error, got nil")
-				}
-				return
-			}
-
-			if err != nil {
-				t.Errorf("FindOpeningBrace() unexpected error: %v", err)
-				return
-			}
-
-			if gotPos != tt.wantPos {
-				t.Errorf("FindOpeningBrace() = %d, want %d", gotPos, tt.wantPos)
-			}
-		})
-	}
-}
-
-// TestFindAssetKey_EmptyKey documents Bug: empty assetKey matches any colon.
-// When assetKey is "", unquotedKey becomes ":", matching any colon in normal state.
-func TestFindAssetKey_EmptyKey(t *testing.T) {
-	t.Parallel()
-
-	content := `contexts: {
-	"existing": {
-		origin: "test"
-	}
-}`
-
-	_, _, err := FindAssetKey(content, "")
-	if err == nil {
-		t.Error("FindAssetKey() with empty key should return error, but matched a colon")
-	}
-}
-
-// TestFindAssetKey_EmptyContent tests FindAssetKey with empty content.
-func TestFindAssetKey_EmptyContent(t *testing.T) {
-	t.Parallel()
-
-	_, _, err := FindAssetKey("", "my/asset")
-	if err == nil {
-		t.Error("FindAssetKey() with empty content should return error")
-	}
-}
-
-// TestFindMatchingBrace_MultiLineString tests FindMatchingBrace with multi-line
-// strings containing triple quotes.
-func TestFindMatchingBrace_MultiLineString(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name         string
-		content      string
-		openBracePos int
-		wantEndPos   int
-		wantErr      bool
-	}{
-		{
-			name:         "multi-line string with braces inside",
-			content:      "{\n\tprompt: \"\"\"\n\t\tif (x) { return }\n\t\t\"\"\"\n}",
-			openBracePos: 0,
-			wantErr:      false,
-		},
-		{
-			name:         "multi-line string with nested triple quotes pattern",
-			content:      "{\n\tprompt: \"\"\"\n\t\tuse {{.field}} here\n\t\t\"\"\"\n}",
-			openBracePos: 0,
-			wantErr:      false,
-		},
-		{
-			name:         "multi-line string at end of content",
-			content:      "{\n\tprompt: \"\"\"\n\t\thello\n\t\t\"\"\"\n}",
-			openBracePos: 0,
-			wantErr:      false,
-		},
-		{
-			name:         "unterminated multi-line string",
-			content:      "{\n\tprompt: \"\"\"\n\t\thello\n",
-			openBracePos: 0,
-			wantErr:      true,
-		},
-		{
-			name:         "braces in both comments and multi-line strings",
-			content:      "{\n\t// comment with { brace }\n\tprompt: \"\"\"\n\t\t{ and } in string\n\t\t\"\"\"\n}",
-			openBracePos: 0,
-			wantErr:      false,
-		},
-		{
-			name:         "escaped quotes in single-line string before brace",
-			content:      `{ "key": "value with \" and { brace }" }`,
-			openBracePos: 0,
-			wantErr:      false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			endPos, err := FindMatchingBrace(tt.content, tt.openBracePos)
-			if tt.wantErr {
-				if err == nil {
-					t.Error("FindMatchingBrace() expected error, got nil")
-				}
-				return
-			}
-			if err != nil {
-				t.Errorf("FindMatchingBrace() unexpected error: %v", err)
-				return
-			}
-			if tt.wantEndPos != 0 && endPos != tt.wantEndPos {
-				t.Errorf("FindMatchingBrace() = %d, want %d", endPos, tt.wantEndPos)
-			}
-			// Verify the content up to endPos has balanced braces
-			// (the closing brace should be at endPos-1)
-			if tt.content[endPos-1] != '}' {
-				t.Errorf("position before endPos (%d) is %q, want '}'", endPos-1, tt.content[endPos-1])
-			}
-		})
-	}
-}
-
-// TestFindOpeningBrace_MultiLineString tests FindOpeningBrace with multi-line strings.
-func TestFindOpeningBrace_MultiLineString(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name     string
-		content  string
-		startPos int
-		wantErr  bool
-	}{
-		{
-			name:     "brace after multi-line string",
-			content:  "\"\"\"\n\t{ not this }\n\t\"\"\" {",
-			startPos: 0,
-			wantErr:  false,
-		},
-		{
-			name:     "only braces inside multi-line string",
-			content:  "\"\"\"\n\t{ not this }\n\t\"\"\"",
-			startPos: 0,
-			wantErr:  true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			pos, err := FindOpeningBrace(tt.content, tt.startPos)
-			if tt.wantErr {
-				if err == nil {
-					t.Error("FindOpeningBrace() expected error, got nil")
-				}
-				return
-			}
-			if err != nil {
-				t.Errorf("FindOpeningBrace() unexpected error: %v", err)
-				return
-			}
-			if tt.content[pos] != '{' {
-				t.Errorf("position %d is %q, want '{'", pos, tt.content[pos])
-			}
-		})
-	}
-}
-
 // TestWriteAssetToConfig_NewCategory tests adding an asset with a category
 // that doesn't exist yet in an existing file.
 func TestWriteAssetToConfig_NewCategory(t *testing.T) {
@@ -466,10 +150,10 @@ contexts: {
 		Name:     "new/task",
 		Entry:    registry.IndexEntry{Module: "github.com/test/tasks/new/task@v0"},
 	}
-	assetContent := `{
+	assetContent := parseCUEStruct(t, `{
 	origin: "github.com/test/tasks/new/task@v0.1.0"
 	description: "A new task"
-}`
+}`)
 
 	err := writeAssetToConfig(configPath, asset, assetContent, asset.Entry.Module)
 	if err != nil {
@@ -486,11 +170,11 @@ contexts: {
 	if !strings.Contains(result, "contexts:") {
 		t.Error("result missing existing contexts block")
 	}
-	if !strings.Contains(result, `"existing":`) {
+	if !strings.Contains(result, "existing:") {
 		t.Error("result missing existing asset")
 	}
 	// Should have the new tasks block
-	if !strings.Contains(result, "tasks: {") {
+	if !strings.Contains(result, "tasks:") {
 		t.Error("result missing new tasks category")
 	}
 	if !strings.Contains(result, `"new/task":`) {
@@ -520,12 +204,12 @@ contexts: {
 		t.Fatalf("Failed to write initial config: %v", err)
 	}
 
-	newContent := `{
+	newContent := parseCUEStruct(t, `{
 	origin: "github.com/test/contexts/cwd/agents-md@v0.2.0"
 	description: "New description"
 	file: "AGENTS.md"
 	required: true
-}`
+}`)
 
 	// Update the asset
 	err := UpdateAssetInConfig(configPath, "contexts", "cwd/agents-md", newContent)
@@ -548,7 +232,7 @@ contexts: {
 	if !strings.Contains(updatedContent, "New description") {
 		t.Error("Updated config missing new description")
 	}
-	if !strings.Contains(updatedContent, "required: true") {
+	if !strings.Contains(updatedContent, "required:") || !strings.Contains(updatedContent, "true") {
 		t.Error("Updated config missing new field")
 	}
 
@@ -558,6 +242,130 @@ contexts: {
 	}
 	if strings.Contains(updatedContent, "Old description") {
 		t.Error("Updated config still contains old description")
+	}
+}
+
+// TestUpdateAssetInConfig_CategoryNotFound tests that updating an asset
+// in a non-existent category returns an error.
+func TestUpdateAssetInConfig_CategoryNotFound(t *testing.T) {
+	t.Parallel()
+
+	configPath := filepath.Join(t.TempDir(), "contexts.cue")
+	content := `contexts: {
+	"existing": {
+		origin: "test"
+	}
+}
+`
+	if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
+		t.Fatalf("Failed to write config: %v", err)
+	}
+
+	newContent := parseCUEStruct(t, `{origin: "new"}`)
+	err := UpdateAssetInConfig(configPath, "roles", "existing", newContent)
+	if err == nil {
+		t.Fatal("expected error for non-existent category, got nil")
+	}
+	if !strings.Contains(err.Error(), "not found") {
+		t.Errorf("expected 'not found' in error, got: %v", err)
+	}
+}
+
+// TestWriteAssetToConfig_RoundTrip verifies that written config files have
+// correct CUE structure by parsing the output back and checking paths.
+func TestWriteAssetToConfig_RoundTrip(t *testing.T) {
+	t.Parallel()
+
+	ctx := cuecontext.New()
+	configPath := filepath.Join(t.TempDir(), "contexts.cue")
+
+	// Write first asset to new file
+	first := SearchResult{
+		Category: "contexts",
+		Name:     "cwd/agents-md",
+		Entry:    registry.IndexEntry{Module: "github.com/test/contexts/cwd/agents-md@v0"},
+	}
+	firstContent := parseCUEStruct(t, `{
+	origin: "github.com/test/contexts/cwd/agents-md@v0.1.0"
+	description: "AGENTS.md context"
+	tags: ["agents", "cwd"]
+	default: true
+}`)
+	if err := writeAssetToConfig(configPath, first, firstContent, first.Entry.Module); err != nil {
+		t.Fatalf("first write: %v", err)
+	}
+
+	// Write second asset to same file
+	second := SearchResult{
+		Category: "contexts",
+		Name:     "cwd/project",
+		Entry:    registry.IndexEntry{Module: "github.com/test/contexts/cwd/project@v0"},
+	}
+	secondContent := parseCUEStruct(t, `{
+	origin: "github.com/test/contexts/cwd/project@v0.2.0"
+	description: "Project context"
+	required: false
+}`)
+	if err := writeAssetToConfig(configPath, second, secondContent, second.Entry.Module); err != nil {
+		t.Fatalf("second write: %v", err)
+	}
+
+	// Parse back with CUE and verify structure
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatalf("reading result: %v", err)
+	}
+	v := ctx.CompileBytes(data)
+	if v.Err() != nil {
+		t.Fatalf("output is not valid CUE: %v", v.Err())
+	}
+
+	// Verify first asset at correct path
+	origin1, err := v.LookupPath(cue.ParsePath(`contexts."cwd/agents-md".origin`)).String()
+	if err != nil {
+		t.Fatalf("looking up first asset origin: %v", err)
+	}
+	if origin1 != "github.com/test/contexts/cwd/agents-md@v0.1.0" {
+		t.Errorf("first asset origin = %q, want v0.1.0 path", origin1)
+	}
+
+	desc1, _ := v.LookupPath(cue.ParsePath(`contexts."cwd/agents-md".description`)).String()
+	if desc1 != "AGENTS.md context" {
+		t.Errorf("first asset description = %q", desc1)
+	}
+
+	default1, _ := v.LookupPath(cue.ParsePath(`contexts."cwd/agents-md".default`)).Bool()
+	if !default1 {
+		t.Error("first asset default should be true")
+	}
+
+	// Verify second asset at correct path
+	origin2, err := v.LookupPath(cue.ParsePath(`contexts."cwd/project".origin`)).String()
+	if err != nil {
+		t.Fatalf("looking up second asset origin: %v", err)
+	}
+	if origin2 != "github.com/test/contexts/cwd/project@v0.2.0" {
+		t.Errorf("second asset origin = %q, want v0.2.0 path", origin2)
+	}
+
+	required2, _ := v.LookupPath(cue.ParsePath(`contexts."cwd/project".required`)).Bool()
+	if required2 {
+		t.Error("second asset required should be false")
+	}
+
+	// Verify tags list round-trips correctly
+	tagsVal := v.LookupPath(cue.ParsePath(`contexts."cwd/agents-md".tags`))
+	iter, err := tagsVal.List()
+	if err != nil {
+		t.Fatalf("listing tags: %v", err)
+	}
+	var tags []string
+	for iter.Next() {
+		s, _ := iter.Value().String()
+		tags = append(tags, s)
+	}
+	if len(tags) != 2 || tags[0] != "agents" || tags[1] != "cwd" {
+		t.Errorf("tags = %v, want [agents cwd]", tags)
 	}
 }
 
@@ -594,7 +402,9 @@ func TestWriteAssetToConfig(t *testing.T) {
 }`,
 			wantErr: false,
 			wantContains: []string{
-				"contexts: {",
+				"// start configuration",
+				"// Managed by 'start assets add'",
+				"contexts:",
 				`"cwd/agents-md":`,
 				"origin:",
 				"v0.1.0",
@@ -604,6 +414,7 @@ func TestWriteAssetToConfig(t *testing.T) {
 			name:         "append to existing file",
 			existingFile: "contexts.cue",
 			existingContent: `// start configuration
+// Managed by 'start assets add'
 contexts: {
 	"other": {
 		origin: "test"
@@ -623,8 +434,34 @@ contexts: {
 }`,
 			wantErr: false,
 			wantContains: []string{
-				"contexts: {",
-				`"other":`,
+				"// start configuration",
+				"// Managed by 'start assets add'",
+				"contexts:",
+				"other:",
+				`"cwd/agents-md":`,
+				"v0.1.0",
+			},
+		},
+		{
+			name:            "empty existing file",
+			existingFile:    "contexts.cue",
+			existingContent: "",
+			asset: SearchResult{
+				Category: "contexts",
+				Name:     "cwd/agents-md",
+				Entry: registry.IndexEntry{
+					Module: "github.com/test/contexts/cwd/agents-md@v0",
+				},
+			},
+			assetContent: `{
+	origin: "github.com/test/contexts/cwd/agents-md@v0.1.0"
+	description: "Test context"
+}`,
+			wantErr: false,
+			wantContains: []string{
+				"// start configuration",
+				"// Managed by 'start assets add'",
+				"contexts:",
 				`"cwd/agents-md":`,
 				"v0.1.0",
 			},
@@ -649,7 +486,7 @@ contexts: {
 }`,
 			wantErr: false,
 			wantContains: []string{
-				"contexts: {",
+				"contexts:",
 				`"cwd/agents-md":`,
 				"new-origin",
 				"New description",
@@ -679,7 +516,8 @@ contexts: {
 				}
 			}
 
-			err := writeAssetToConfig(configPath, tt.asset, tt.assetContent, tt.asset.Entry.Module)
+			content := parseCUEStruct(t, tt.assetContent)
+			err := writeAssetToConfig(configPath, tt.asset, content, tt.asset.Entry.Module)
 
 			if tt.wantErr {
 				if err == nil {
@@ -699,15 +537,15 @@ contexts: {
 				t.Fatalf("Failed to read config file: %v", err)
 			}
 
-			content := string(data)
+			result := string(data)
 			for _, want := range tt.wantContains {
-				if !strings.Contains(content, want) {
-					t.Errorf("writeAssetToConfig() result missing %q\nGot:\n%s", want, content)
+				if !strings.Contains(result, want) {
+					t.Errorf("writeAssetToConfig() result missing %q\nGot:\n%s", want, result)
 				}
 			}
 			for _, exclude := range tt.wantExcludes {
-				if strings.Contains(content, exclude) {
-					t.Errorf("writeAssetToConfig() result should not contain %q\nGot:\n%s", exclude, content)
+				if strings.Contains(result, exclude) {
+					t.Errorf("writeAssetToConfig() result should not contain %q\nGot:\n%s", exclude, result)
 				}
 			}
 		})
@@ -743,10 +581,10 @@ settings: {
 			Module: "github.com/test/contexts/new-asset@v0",
 		},
 	}
-	assetContent := `{
+	assetContent := parseCUEStruct(t, `{
 	origin: "github.com/test/contexts/new-asset@v0.1.0"
 	description: "New asset"
-}`
+}`)
 
 	err := writeAssetToConfig(configPath, asset, assetContent, asset.Entry.Module)
 	if err != nil {
@@ -761,7 +599,7 @@ settings: {
 	result := string(data)
 
 	// The result should contain both the existing and new assets
-	if !strings.Contains(result, `"existing":`) {
+	if !strings.Contains(result, "existing:") {
 		t.Error("result missing existing asset")
 	}
 	if !strings.Contains(result, `"new-asset":`) {
@@ -981,9 +819,9 @@ func TestFormatAssetStruct_RoleNameOverride(t *testing.T) {
 			name:     "role name replaces struct",
 			roleName: "golang/agent",
 			wantContains: []string{
-				`role: "golang/agent"`,
-				`description: "Test task"`,
-				`file: "@module/task.md"`,
+				`"golang/agent"`,
+				`"Test task"`,
+				`"@module/task.md"`,
 			},
 			wantExcludes: []string{
 				"@module/role.md",
@@ -1004,10 +842,11 @@ func TestFormatAssetStruct_RoleNameOverride(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := formatAssetStruct(v, "tasks", "github.com/test@v0.1.0", tt.roleName)
+			astResult, err := formatAssetStruct(v, "tasks", "github.com/test@v0.1.0", tt.roleName)
 			if err != nil {
 				t.Fatalf("formatAssetStruct() error: %v", err)
 			}
+			result := formatAST(t, astResult)
 
 			for _, want := range tt.wantContains {
 				if !strings.Contains(result, want) {
@@ -1067,17 +906,18 @@ task: {
 		Name:     "golang/debug",
 	}
 
-	result, err := ExtractAssetContent(moduleDir, asset, nil, "test.example/asset@v0.1.0", "")
+	astResult, err := ExtractAssetContent(moduleDir, asset, nil, "test.example/asset@v0.1.0", "")
 	if err != nil {
 		t.Fatalf("ExtractAssetContent() error: %v", err)
 	}
+	result := formatAST(t, astResult)
 
 	// Should contain origin from originPath
-	if !strings.Contains(result, `origin: "test.example/asset@v0.1.0"`) {
+	if !strings.Contains(result, "origin:") || !strings.Contains(result, `"test.example/asset@v0.1.0"`) {
 		t.Errorf("missing origin field\nGot:\n%s", result)
 	}
 	// Should contain description
-	if !strings.Contains(result, `description: "Debug Go code"`) {
+	if !strings.Contains(result, "description:") || !strings.Contains(result, `"Debug Go code"`) {
 		t.Errorf("missing description\nGot:\n%s", result)
 	}
 	// Should contain tags
@@ -1107,15 +947,16 @@ role: {
 		Name:     "golang/expert",
 	}
 
-	result, err := ExtractAssetContent(moduleDir, asset, nil, "test.example/role@v0.2.0", "")
+	astResult, err := ExtractAssetContent(moduleDir, asset, nil, "test.example/role@v0.2.0", "")
 	if err != nil {
 		t.Fatalf("ExtractAssetContent() error: %v", err)
 	}
+	result := formatAST(t, astResult)
 
-	if !strings.Contains(result, `origin: "test.example/role@v0.2.0"`) {
+	if !strings.Contains(result, "origin:") || !strings.Contains(result, `"test.example/role@v0.2.0"`) {
 		t.Errorf("missing origin\nGot:\n%s", result)
 	}
-	if !strings.Contains(result, `description: "Go programming expert"`) {
+	if !strings.Contains(result, "description:") || !strings.Contains(result, `"Go programming expert"`) {
 		t.Errorf("missing description\nGot:\n%s", result)
 	}
 	if !strings.Contains(result, "You are an expert in Go") {
@@ -1145,18 +986,19 @@ agent: {
 		Name:     "claude",
 	}
 
-	result, err := ExtractAssetContent(moduleDir, asset, nil, "test.example/agent@v0.1.0", "")
+	astResult, err := ExtractAssetContent(moduleDir, asset, nil, "test.example/agent@v0.1.0", "")
 	if err != nil {
 		t.Fatalf("ExtractAssetContent() error: %v", err)
 	}
+	result := formatAST(t, astResult)
 
-	if !strings.Contains(result, `bin: "claude"`) {
+	if !strings.Contains(result, "bin:") || !strings.Contains(result, `"claude"`) {
 		t.Errorf("missing bin\nGot:\n%s", result)
 	}
-	if !strings.Contains(result, `default_model: "sonnet"`) {
+	if !strings.Contains(result, "default_model:") || !strings.Contains(result, `"sonnet"`) {
 		t.Errorf("missing default_model\nGot:\n%s", result)
 	}
-	if !strings.Contains(result, "models: {") {
+	if !strings.Contains(result, "models:") {
 		t.Errorf("missing models map\nGot:\n%s", result)
 	}
 }
@@ -1181,13 +1023,14 @@ task: {
 		Name:     "review",
 	}
 
-	result, err := ExtractAssetContent(moduleDir, asset, nil, "test.example/task@v0.1.0", "golang/reviewer")
+	astResult, err := ExtractAssetContent(moduleDir, asset, nil, "test.example/task@v0.1.0", "golang/reviewer")
 	if err != nil {
 		t.Fatalf("ExtractAssetContent() error: %v", err)
 	}
+	result := formatAST(t, astResult)
 
 	// Role should be replaced with string reference
-	if !strings.Contains(result, `role: "golang/reviewer"`) {
+	if !strings.Contains(result, "role:") || !strings.Contains(result, `"golang/reviewer"`) {
 		t.Errorf("expected role name override\nGot:\n%s", result)
 	}
 	// Inline role content should not appear
@@ -1240,10 +1083,11 @@ task: {
 		Name:     "multiline",
 	}
 
-	result, err := ExtractAssetContent(moduleDir, asset, nil, "test.example/task@v0.1.0", "")
+	astResult, err := ExtractAssetContent(moduleDir, asset, nil, "test.example/task@v0.1.0", "")
 	if err != nil {
 		t.Fatalf("ExtractAssetContent() error: %v", err)
 	}
+	result := formatAST(t, astResult)
 
 	if !strings.Contains(result, "Line one") {
 		t.Errorf("missing multi-line content\nGot:\n%s", result)
@@ -1270,12 +1114,13 @@ role: {
 		Name:     "optional-role",
 	}
 
-	result, err := ExtractAssetContent(moduleDir, asset, nil, "test.example/role@v0.1.0", "")
+	astResult, err := ExtractAssetContent(moduleDir, asset, nil, "test.example/role@v0.1.0", "")
 	if err != nil {
 		t.Fatalf("ExtractAssetContent() error: %v", err)
 	}
+	result := formatAST(t, astResult)
 
-	if !strings.Contains(result, "optional: true") {
+	if !strings.Contains(result, "optional:") || !strings.Contains(result, "true") {
 		t.Errorf("missing optional field\nGot:\n%s", result)
 	}
 }
@@ -1355,6 +1200,125 @@ contexts: {
 }
 
 // TestVersionFromOrigin tests the VersionFromOrigin function.
+// TestFormatFieldExpr tests each branch of the formatFieldExpr value-to-AST converter.
+func TestFormatFieldExpr(t *testing.T) {
+	t.Parallel()
+
+	ctx := cuecontext.New()
+
+	tests := []struct {
+		name string
+		cue  string
+		want string
+	}{
+		{
+			name: "string value",
+			cue:  `"hello world"`,
+			want: `"hello world"`,
+		},
+		{
+			name: "bool true",
+			cue:  `true`,
+			want: `true`,
+		},
+		{
+			name: "bool false",
+			cue:  `false`,
+			want: `false`,
+		},
+		{
+			name: "string list",
+			cue:  `["a", "b", "c"]`,
+			want: `["a", "b", "c"]`,
+		},
+		{
+			name: "empty list",
+			cue:  `[]`,
+			want: `[]`,
+		},
+		{
+			name: "struct with string values",
+			cue:  `{flash: "gemini-2.5-flash", pro: "gemini-2.5-pro"}`,
+			want: `flash: "gemini-2.5-flash"`,
+		},
+		{
+			name: "struct with mixed types",
+			cue:  `{name: "test", enabled: true, tags: ["a", "b"]}`,
+			want: `enabled: true`,
+		},
+		{
+			name: "nested struct",
+			cue:  `{outer: {inner: "value"}}`,
+			want: `inner: "value"`,
+		},
+		{
+			name: "int via default fallback",
+			cue:  `42`,
+			want: `42`,
+		},
+		{
+			name: "float via default fallback",
+			cue:  `3.14`,
+			want: `3.14`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			v := ctx.CompileString(tt.cue)
+			if v.Err() != nil {
+				t.Fatalf("compiling CUE: %v", v.Err())
+			}
+
+			expr, err := formatFieldExpr(v)
+			if err != nil {
+				t.Fatalf("formatFieldExpr() error: %v", err)
+			}
+
+			result := formatAST(t, expr)
+			if !strings.Contains(result, tt.want) {
+				t.Errorf("formatFieldExpr() result missing %q\nGot:\n%s", tt.want, result)
+			}
+		})
+	}
+}
+
+// TestFormatFieldExpr_StructMixedTypes verifies the recursive struct branch
+// produces a complete struct with all value types preserved.
+func TestFormatFieldExpr_StructMixedTypes(t *testing.T) {
+	t.Parallel()
+
+	ctx := cuecontext.New()
+	v := ctx.CompileString(`{
+		name: "test"
+		enabled: true
+		tags: ["a", "b"]
+		nested: {key: "val"}
+	}`)
+	if v.Err() != nil {
+		t.Fatalf("compiling CUE: %v", v.Err())
+	}
+
+	expr, err := formatFieldExpr(v)
+	if err != nil {
+		t.Fatalf("formatFieldExpr() error: %v", err)
+	}
+
+	result := formatAST(t, expr)
+	for _, want := range []string{
+		`"test"`,
+		`true`,
+		`"a"`,
+		`"b"`,
+		`key:`,
+		`"val"`,
+	} {
+		if !strings.Contains(result, want) {
+			t.Errorf("result missing %q\nGot:\n%s", want, result)
+		}
+	}
+}
+
 func TestVersionFromOrigin(t *testing.T) {
 	t.Parallel()
 
