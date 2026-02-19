@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -520,16 +521,27 @@ func extractTags(val cue.Value) []string {
 	return tags
 }
 
-// confirmRemoval prompts the user to confirm removal of a config entity.
-// Returns true if confirmed, false if cancelled. Requires --yes flag in non-interactive mode.
-func confirmRemoval(w io.Writer, r io.Reader, entityType, name string, local bool) (bool, error) {
+// confirmMultiRemoval prompts the user to confirm removal of one or more config entities.
+// For a single name it mirrors the old single-item prompt. For multiple names it lists
+// them all and asks once. Requires --yes flag in non-interactive mode.
+func confirmMultiRemoval(w io.Writer, r io.Reader, entityType string, names []string, local bool) (bool, error) {
 	isTTY := isTerminal(r)
 
 	if !isTTY {
 		return false, fmt.Errorf("--yes flag required in non-interactive mode")
 	}
 
-	_, _ = fmt.Fprintf(w, "Remove %s %q from %s config? %s ", entityType, name, scopeString(local), tui.Bracket("y/N"))
+	scope := scopeString(local)
+	if len(names) == 1 {
+		_, _ = fmt.Fprintf(w, "Remove %s %q from %s config? %s ", entityType, names[0], scope, tui.Bracket("y/N"))
+	} else {
+		_, _ = fmt.Fprintf(w, "Remove the following %ss from %s config?\n", entityType, scope)
+		for _, name := range names {
+			_, _ = fmt.Fprintf(w, "  - %s\n", name)
+		}
+		_, _ = fmt.Fprintf(w, "%s ", tui.Bracket("y/N"))
+	}
+
 	reader := bufio.NewReader(r)
 	input, err := reader.ReadString('\n')
 	if err != nil {
@@ -549,6 +561,179 @@ func scopeString(local bool) string {
 		return "local"
 	}
 	return "global"
+}
+
+// scoreAndSortNames scores each map key against the compiled patterns and
+// returns matching keys sorted by score descending then name ascending.
+// Each pattern that matches a key contributes 3 to its score, so keys
+// matching more query terms rank higher. Keys with score zero are excluded.
+func scoreAndSortNames[T any](items map[string]T, patterns []*regexp.Regexp) []string {
+	type match struct {
+		name  string
+		score int
+	}
+	var matches []match
+
+	for name := range items {
+		score := 0
+		for _, pattern := range patterns {
+			if pattern.MatchString(name) {
+				score += 3 // Each matching pattern adds weight; higher score = more query terms matched
+			}
+		}
+		if score > 0 {
+			matches = append(matches, match{name: name, score: score})
+		}
+	}
+
+	sort.Slice(matches, func(i, j int) bool {
+		if matches[i].score != matches[j].score {
+			return matches[i].score > matches[j].score
+		}
+		return matches[i].name < matches[j].name
+	})
+
+	names := make([]string, len(matches))
+	for i, m := range matches {
+		names[i] = m.name
+	}
+	return names
+}
+
+// resolveAllMatchingNames resolves a query to all matching names in a map.
+// Unlike resolveInstalledName, it returns every match when a query is ambiguous
+// rather than erroring. On zero matches it returns a "not found" error.
+// Results are sorted by score descending then name ascending.
+func resolveAllMatchingNames[T any](items map[string]T, typeName, query string) ([]string, error) {
+	// Fast path: exact match
+	if _, ok := items[query]; ok {
+		return []string{query}, nil
+	}
+
+	terms := assets.ParseSearchPatterns(query)
+	if len(terms) == 0 {
+		return nil, fmt.Errorf("%s %q not found", typeName, query)
+	}
+
+	patterns, err := assets.CompileSearchTerms(terms)
+	if err != nil {
+		return nil, fmt.Errorf("%s %q not found (invalid pattern: %w)", typeName, query, err)
+	}
+
+	names := scoreAndSortNames(items, patterns)
+	if len(names) == 0 {
+		return nil, fmt.Errorf("%s %q not found", typeName, query)
+	}
+	return names, nil
+}
+
+// promptSelectFromList displays a numbered list of candidates and lets the user
+// choose which to include. The user may enter comma-separated numbers, ranges
+// (e.g. "1-3"), or "all". Returns the chosen names in list order, or nil if
+// the user cancels (empty input).
+func promptSelectFromList(w io.Writer, r io.Reader, entityType, query string, names []string) ([]string, error) {
+	if len(names) == 0 {
+		return nil, nil
+	}
+	_, _ = fmt.Fprintf(w, "Found %d %ss matching %q:\n\n", len(names), entityType, query)
+
+	for i, name := range names {
+		_, _ = fmt.Fprintf(w, "  %2d. %s\n", i+1, name)
+	}
+
+	_, _ = fmt.Fprintln(w)
+	_, _ = fmt.Fprintf(w, "Select %s or all: ", tui.Annotate("1-%d", len(names)))
+
+	reader := bufio.NewReader(r)
+	input, err := reader.ReadString('\n')
+	if err != nil {
+		return nil, fmt.Errorf("reading input: %w", err)
+	}
+	input = strings.TrimSpace(strings.ToLower(input))
+
+	if input == "" {
+		_, _ = fmt.Fprintln(w, "Cancelled.")
+		return nil, nil
+	}
+	if input == "all" {
+		return names, nil
+	}
+
+	seen := make(map[int]bool)
+	var selected []string
+
+	for _, part := range strings.Split(input, ",") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		if dashIdx := strings.Index(part, "-"); dashIdx > 0 {
+			start, err1 := strconv.Atoi(strings.TrimSpace(part[:dashIdx]))
+			end, err2 := strconv.Atoi(strings.TrimSpace(part[dashIdx+1:]))
+			if err1 != nil || err2 != nil || start < 1 || end > len(names) || start > end {
+				return nil, fmt.Errorf("invalid range %q: enter numbers between 1 and %d", part, len(names))
+			}
+			for i := start; i <= end; i++ {
+				if !seen[i] {
+					seen[i] = true
+					selected = append(selected, names[i-1])
+				}
+			}
+		} else {
+			n, err := strconv.Atoi(part)
+			if err != nil || n < 1 || n > len(names) {
+				return nil, fmt.Errorf("invalid selection %q: enter a number between 1 and %d", part, len(names))
+			}
+			if !seen[n] {
+				seen[n] = true
+				selected = append(selected, names[n-1])
+			}
+		}
+	}
+
+	if len(selected) == 0 {
+		_, _ = fmt.Fprintln(w, "Cancelled.")
+		return nil, nil
+	}
+	return selected, nil
+}
+
+// resolveRemoveNames resolves CLI args to a deduplicated list of names to remove.
+// With a single ambiguous arg and an interactive terminal, it shows a picker.
+// With multiple args, any ambiguous arg without --yes returns an error.
+// Returns (nil, nil) when the user cancels the interactive picker (caller should
+// return nil). Returns (nil, err) on any other failure.
+func resolveRemoveNames[T any](items map[string]T, typeName string, args []string, skipConfirm bool, stdout io.Writer, stdin io.Reader) ([]string, error) {
+	seen := make(map[string]bool)
+	var resolvedNames []string
+	for _, arg := range args {
+		candidates, err := resolveAllMatchingNames(items, typeName, arg)
+		if err != nil {
+			return nil, err
+		}
+		if len(candidates) > 1 && !skipConfirm {
+			if len(args) > 1 {
+				return nil, fmt.Errorf("%q matches multiple %ss — use an exact name or pass --yes to remove all matches", arg, typeName)
+			}
+			if !isTerminal(stdin) {
+				return nil, fmt.Errorf("--yes flag required in non-interactive mode for ambiguous %s %q", typeName, arg)
+			}
+			candidates, err = promptSelectFromList(stdout, stdin, typeName, arg, candidates)
+			if err != nil {
+				return nil, err
+			}
+			if len(candidates) == 0 {
+				return nil, nil // user cancelled
+			}
+		}
+		for _, name := range candidates {
+			if !seen[name] {
+				seen[name] = true
+				resolvedNames = append(resolvedNames, name)
+			}
+		}
+	}
+	return resolvedNames, nil
 }
 
 // resolveInstalledName resolves a name from a map using exact match first,
@@ -574,43 +759,13 @@ func resolveInstalledName[T any](items map[string]T, typeName, query string) (st
 		return "", zero, fmt.Errorf("%s %q not found (invalid pattern: %w)", typeName, query, err)
 	}
 
-	type match struct {
-		name  string
-		score int
-	}
-	var matches []match
-
-	for name := range items {
-		score := 0
-		for _, pattern := range patterns {
-			if pattern.MatchString(name) {
-				score += 3 // Each matching pattern adds weight; higher score = more query terms matched
-			}
-		}
-		if score > 0 {
-			matches = append(matches, match{name: name, score: score})
-		}
-	}
-
-	// Sort by score descending, then name ascending
-	sort.Slice(matches, func(i, j int) bool {
-		if matches[i].score != matches[j].score {
-			return matches[i].score > matches[j].score
-		}
-		return matches[i].name < matches[j].name
-	})
-
-	switch len(matches) {
+	names := scoreAndSortNames(items, patterns)
+	switch len(names) {
 	case 0:
 		return "", zero, fmt.Errorf("%s %q not found", typeName, query)
 	case 1:
-		name := matches[0].name
-		return name, items[name], nil
+		return names[0], items[names[0]], nil
 	default:
-		names := make([]string, len(matches))
-		for i, m := range matches {
-			names[i] = m.name
-		}
 		return "", zero, fmt.Errorf("ambiguous %s %q matches multiple entries: %s",
 			typeName, query, strings.Join(names, ", "))
 	}
