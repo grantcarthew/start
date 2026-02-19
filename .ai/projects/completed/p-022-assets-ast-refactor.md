@@ -1,8 +1,8 @@
 # p-022: Assets AST Refactor
 
-- Status: Pending
-- Started: (not yet started)
-- Completed: (not yet completed)
+- Status: Complete
+- Started: 2026-02-19
+- Completed: 2026-02-19
 
 ## Overview
 
@@ -47,15 +47,15 @@ Out of Scope:
 ## Success Criteria
 
 - [x] AssetExists uses CUE value lookup (already done)
-- [ ] writeAssetToConfig builds proper AST nodes and uses format.Node()
-- [ ] UpdateAssetInConfig manipulates AST directly
-- [ ] FindAssetKey, FindMatchingBrace, FindOpeningBrace removed
-- [ ] cueParseState type and constants removed
-- [ ] Fuzz tests for deleted functions removed
-- [ ] All tests pass with AST-based implementation
-- [ ] Manual test: install, update, and check asset existence work correctly
-- [ ] No hardcoded indentation logic remains
-- [ ] Code review confirms no string manipulation of CUE content
+- [x] writeAssetToConfig builds proper AST nodes and uses format.Node()
+- [x] UpdateAssetInConfig manipulates AST directly
+- [x] FindAssetKey, FindMatchingBrace, FindOpeningBrace removed
+- [x] cueParseState type and constants removed
+- [x] Fuzz tests for deleted functions removed
+- [x] All tests pass with AST-based implementation
+- [x] Manual test: install, update, and check asset existence work correctly
+- [x] No hardcoded indentation logic remains
+- [x] Code review confirms no string manipulation of CUE content
 
 ## Current State
 
@@ -206,48 +206,38 @@ Manual Tests:
 Update this section as each stage completes. If a session runs out of context, the next session resumes from the last completed stage.
 
 1. Refactor `formatAssetStruct` to build `*ast.StructLit` directly
-   - Status: pending
-   - Update callers to handle new return type
-   - Run tests: note failures (expected at this stage)
+   - Status: complete
 
 2. Refactor `writeAssetToConfig` to use AST
-   - Status: pending
-   - Parse file with `parser.ParseFile`, find/create category, append field, `format.Node()`
-   - Update signature to accept `ast.Expr`
-   - Update callers
-   - Run tests: writeAssetToConfig tests should pass
+   - Status: complete
 
 3. Refactor `UpdateAssetInConfig` to use AST
-   - Status: pending
-   - Parse file, walk to find field by `ast.LabelName()`, replace value, `format.Node()`
-   - Update signature to accept `ast.Expr`
-   - Update callers
-   - Run tests: UpdateAssetInConfig tests should pass
+   - Status: complete
 
 4. Remove dead code
-   - Status: pending
-   - Delete FindAssetKey, FindMatchingBrace, FindOpeningBrace
-   - Delete cueParseState type and constants
-   - Delete file header NOTE comment
-   - Run tests: confirm no compilation errors
+   - Status: complete
 
 5. Remove obsolete tests
-   - Status: pending
-   - Delete 7 Find* tests from install_test.go
-   - Delete fuzz_test.go
-   - Delete TestFindOpeningBrace from cli/assets_test.go
-   - Run full test suite: all tests should pass
+   - Status: complete
 
 6. Update surviving tests if needed
-   - Status: pending
-   - Fix any test expectation mismatches from formatter output differences
+   - Status: complete
+   - Fixed alignment-sensitive assertions (CUE formatter aligns field values)
+   - Fixed Simplify()-induced label changes (quoted to unquoted for valid identifiers)
 
 7. Manual testing
-   - Status: pending
-   - Fresh install: `start assets add cwd/agents-md` into empty config
-   - Update: `start assets update cwd/agents-md`
-   - Duplicate check: add same asset twice (should error)
-   - Validate output: `cue vet` on generated config files
+   - Status: complete
+   - Fresh install into empty config: pass
+   - Append to existing category: pass
+   - Install to new category (new file): pass
+   - Update (current detection): pass
+   - Force update (re-write preserving siblings): pass
+   - Duplicate add (already installed report): pass
+   - Update all (global + local configs): pass
+   - Dry-run (preview without applying): pass
+   - CUE vet validation on all generated files: pass
+   - Local config (--local flag): pass
+   - Supporting commands (list, search, info, index): pass
 
 ## Notes
 
