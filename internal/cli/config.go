@@ -39,6 +39,7 @@ Use --local to target project-specific configuration.`,
 	addConfigTaskCommand(configCmd)
 	addConfigSettingsCommand(configCmd)
 	addConfigOrderCommand(configCmd)
+	addConfigSearchCommand(configCmd)
 
 	parent.AddCommand(configCmd)
 }
