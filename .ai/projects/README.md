@@ -14,6 +14,7 @@ See [p-writing-guide.md](./p-writing-guide.md) for guidelines on creating and ma
 |---------|-------|---------|
 | [p-022](./p-022-assets-ast-refactor.md) | Assets AST Refactor | Pending |
 | [p-029](./p-029-cli-show-verbose-inspection.md) | CLI Show Verbose Inspection | Pending |
+| [p-030](./p-030-assets-index-setting.md) | Assets Index Setting | Pending |
 
 ### Completed Projects
 
@@ -57,6 +58,14 @@ Refactor asset installation code to use CUE's AST APIs instead of fragile string
 **Key Deliverables:** AST-based `internal/assets/install.go`, removed string manipulation, updated tests
 
 **Dependencies:** p-021
+
+#### p-030: Assets Index Setting
+
+Make the CUE module path for the start-assets index configurable via `assets_index` in `#Settings`. All `assets` subcommands and `doctor` read this setting and fall back to the hardcoded `IndexModulePath` constant when absent. Prerequisite for issue #46 (assets validate command).
+
+**Key Deliverables:** `assets_index` in settings schema and `validSettingsKeys`, `EffectiveIndexPath` helper, updated `FetchIndex` signature, updated asset commands and doctor
+
+**Dependencies:** None
 
 #### p-029: CLI Show Verbose Inspection
 
