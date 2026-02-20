@@ -23,9 +23,20 @@ var errNoConfig = errors.New("no config found")
 
 // Valid settings keys
 var validSettingsKeys = map[string]string{
+	"assets_index":  "string",
 	"default_agent": "string",
 	"shell":         "string",
 	"timeout":       "int",
+}
+
+// validSettingsKeysString returns a sorted, comma-separated list of valid setting keys.
+func validSettingsKeysString() string {
+	keys := make([]string, 0, len(validSettingsKeys))
+	for k := range validSettingsKeys {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return strings.Join(keys, ", ")
 }
 
 // addConfigSettingsCommand adds the settings subcommand to config.
@@ -37,16 +48,27 @@ func addConfigSettingsCommand(parent *cobra.Command) {
 		Long: `Manage settings for start.
 
 Available settings:
+  assets_index   CUE module path for the assets index (default: built-in)
   default_agent  Agent to use when --agent not specified
   shell          Shell for command execution (default: auto-detect)
   timeout        Command timeout in seconds`,
-		Example: `  start config settings              List all settings
-  start config settings <key>        Show a setting value
-  start config settings <key> <val>  Set a setting value
-  start config settings edit         Open settings.cue in $EDITOR`,
+		Example: `  start config settings                                               List all settings
+  start config settings <key>                                         Show a setting value
+  start config settings <key> <val>                                   Set a setting value
+  start config settings <key> --unset                                 Remove a setting value
+  start config settings edit                                          Open settings.cue in $EDITOR
+
+  start config settings assets_index                                  Show current index path
+  start config settings assets_index "github.com/grantcarthew/start-assets/index@v0"
+  start config settings assets_index --unset                          Restore default index
+  start config settings default_agent claude
+  start config settings shell /bin/bash
+  start config settings timeout 120`,
 		Args: cobra.MaximumNArgs(2),
 		RunE: executeConfigSettings,
 	}
+
+	settingsCmd.Flags().Bool("unset", false, "Remove a setting value")
 
 	parent.AddCommand(settingsCmd)
 }
@@ -59,7 +81,18 @@ func executeConfigSettings(cmd *cobra.Command, args []string) error {
 
 	stdout := cmd.OutOrStdout()
 	flags := getFlags(cmd)
-	local := getFlags(cmd).Local
+	local := flags.Local
+	unset, _ := cmd.Flags().GetBool("unset")
+
+	if unset {
+		if len(args) == 0 {
+			return fmt.Errorf("--unset requires a setting key")
+		}
+		if len(args) > 1 {
+			return fmt.Errorf("--unset takes only one argument")
+		}
+		return unsetSetting(stdout, flags, args[0], local)
+	}
 
 	switch len(args) {
 	case 0:
@@ -118,7 +151,7 @@ func listSettings(w io.Writer, localOnly bool) error {
 func showSetting(w io.Writer, key string, localOnly bool) error {
 	// Validate key
 	if _, valid := validSettingsKeys[key]; !valid {
-		return fmt.Errorf("unknown setting %q\n\nValid settings: default_agent, shell, timeout", key)
+		return fmt.Errorf("unknown setting %q\n\nValid settings: %s", key, validSettingsKeysString())
 	}
 
 	settings, err := loadSettingsForScope(localOnly)
@@ -147,7 +180,7 @@ func setSetting(w io.Writer, flags *Flags, key, value string, localOnly bool) er
 	// Validate key
 	keyType, valid := validSettingsKeys[key]
 	if !valid {
-		return fmt.Errorf("unknown setting %q\n\nValid settings: default_agent, shell, timeout", key)
+		return fmt.Errorf("unknown setting %q\n\nValid settings: %s", key, validSettingsKeysString())
 	}
 
 	// Validate value type
@@ -368,4 +401,68 @@ func writeSettingsFile(path string, settings map[string]string) error {
 	sb.WriteString("}\n")
 
 	return os.WriteFile(path, []byte(sb.String()), 0644)
+}
+
+// unsetSetting removes a setting key from the settings file.
+func unsetSetting(w io.Writer, flags *Flags, key string, localOnly bool) error {
+	if _, valid := validSettingsKeys[key]; !valid {
+		return fmt.Errorf("unknown setting %q\n\nValid settings: %s", key, validSettingsKeysString())
+	}
+
+	paths, err := config.ResolvePaths("")
+	if err != nil {
+		return fmt.Errorf("resolving config paths: %w", err)
+	}
+
+	configDir := paths.Dir(localOnly)
+
+	// Only load (and propagate errors from) the settings file if it exists.
+	// Absence of the file is not an error — it means nothing is configured.
+	settingsPath := filepath.Join(configDir, "settings.cue")
+	if _, statErr := os.Stat(settingsPath); os.IsNotExist(statErr) {
+		if !flags.Quiet {
+			_, _ = fmt.Fprintf(w, "%s is not set\n", key)
+		}
+		return nil
+	}
+
+	settings, err := loadSettingsFromDir(configDir)
+	if err != nil {
+		return fmt.Errorf("loading settings: %w", err)
+	}
+	if len(settings) == 0 {
+		if !flags.Quiet {
+			_, _ = fmt.Fprintf(w, "%s is not set\n", key)
+		}
+		return nil
+	}
+
+	if _, exists := settings[key]; !exists {
+		if !flags.Quiet {
+			_, _ = fmt.Fprintf(w, "%s is not set\n", key)
+		}
+		return nil
+	}
+
+	delete(settings, key)
+
+	if err := writeSettingsFile(settingsPath, settings); err != nil {
+		return fmt.Errorf("writing settings file: %w", err)
+	}
+
+	if !flags.Quiet {
+		_, _ = fmt.Fprintf(w, "Unset %s\n", key)
+	}
+	return nil
+}
+
+// resolveAssetsIndexPath returns the configured assets_index setting value,
+// or empty string if not set or on any error. Callers should pass the result
+// to registry.EffectiveIndexPath to get the final module path.
+func resolveAssetsIndexPath() string {
+	settings, err := loadSettingsForScope(false)
+	if err != nil {
+		return ""
+	}
+	return settings["assets_index"]
 }

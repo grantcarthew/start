@@ -31,10 +31,19 @@ type Index struct {
 	Contexts map[string]IndexEntry `json:"contexts,omitempty"`
 }
 
+// EffectiveIndexPath returns configured if non-empty, otherwise IndexModulePath.
+func EffectiveIndexPath(configured string) string {
+	if configured != "" {
+		return configured
+	}
+	return IndexModulePath
+}
+
 // FetchIndex fetches and parses the index from the registry.
-func (c *Client) FetchIndex(ctx context.Context) (*Index, error) {
+// indexPath is the CUE module path to use; pass empty string to use IndexModulePath.
+func (c *Client) FetchIndex(ctx context.Context, indexPath string) (*Index, error) {
 	// Resolve to latest version
-	resolvedPath, err := c.ResolveLatestVersion(ctx, IndexModulePath)
+	resolvedPath, err := c.ResolveLatestVersion(ctx, EffectiveIndexPath(indexPath))
 	if err != nil {
 		return nil, fmt.Errorf("resolving index version: %w", err)
 	}

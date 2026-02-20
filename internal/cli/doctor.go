@@ -75,13 +75,15 @@ func prepareDoctor() (doctor.Report, error) {
 	report.Sections = append(report.Sections, doctor.CheckIntro())
 
 	// Version section
+	indexPath := resolveAssetsIndexPath()
 	buildInfo := doctor.BuildInfo{
 		Version:      cliVersion,
 		Commit:       commit,
 		BuildDate:    buildDate,
 		GoVersion:    doctor.DefaultBuildInfo().GoVersion,
 		Platform:     doctor.DefaultBuildInfo().Platform,
-		IndexVersion: resolveIndexVersion(),
+		IndexVersion: resolveIndexVersion(indexPath),
+		IndexPath:    indexPath,
 	}
 	report.Sections = append(report.Sections, doctor.CheckVersion(buildInfo))
 
@@ -163,7 +165,7 @@ func prepareDoctor() (doctor.Report, error) {
 
 // resolveIndexVersion queries the registry for the latest index version.
 // Returns the version string (e.g., "v0.3.2") or empty string on failure.
-func resolveIndexVersion() string {
+func resolveIndexVersion(indexPath string) string {
 	client, err := registry.NewClient()
 	if err != nil {
 		return ""
@@ -172,7 +174,7 @@ func resolveIndexVersion() string {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	resolved, err := client.ResolveLatestVersion(ctx, registry.IndexModulePath)
+	resolved, err := client.ResolveLatestVersion(ctx, registry.EffectiveIndexPath(indexPath))
 	if err != nil {
 		return ""
 	}

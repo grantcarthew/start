@@ -63,7 +63,7 @@ func (a *AutoSetup) Run(ctx context.Context) (*AutoSetupResult, error) {
 
 	// Fetch index
 	_, _ = fmt.Fprintln(a.stdout, "Fetching agent index...")
-	index, err := client.FetchIndex(ctx)
+	index, err := client.FetchIndex(ctx, "") // use built-in default; auto-setup runs before user settings exist
 	if err != nil {
 		return nil, fmt.Errorf("fetching index: %w", err)
 	}
