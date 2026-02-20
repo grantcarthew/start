@@ -128,7 +128,7 @@ func runAssetsUpdate(cmd *cobra.Command, args []string) error {
 		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "Checking for updates...")
 	}
 
-	index, err := client.FetchIndex(ctx)
+	index, err := client.FetchIndex(ctx, resolveAssetsIndexPath())
 	if err != nil {
 		return fmt.Errorf("fetching index: %w", err)
 	}

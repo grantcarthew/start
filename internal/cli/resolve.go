@@ -681,7 +681,7 @@ func (r *resolver) ensureIndex() (*registry.Index, *registry.Client, error) {
 		}()
 	}
 
-	index, err := client.FetchIndex(ctx)
+	index, err := client.FetchIndex(ctx, resolveAssetsIndexPath())
 	if err != nil {
 		debugf(r.flags, dbgResolve, "Index fetch failed: %v", err)
 		r.indexErr = err

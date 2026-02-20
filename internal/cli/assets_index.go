@@ -59,7 +59,8 @@ func runAssetsIndex(cmd *cobra.Command, args []string) error {
 	}
 
 	// Resolve latest version
-	resolvedPath, err := client.ResolveLatestVersion(ctx, registry.IndexModulePath)
+	indexPath := registry.EffectiveIndexPath(resolveAssetsIndexPath())
+	resolvedPath, err := client.ResolveLatestVersion(ctx, indexPath)
 	if err != nil {
 		return fmt.Errorf("resolving index version: %w", err)
 	}

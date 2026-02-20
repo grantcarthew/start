@@ -114,7 +114,7 @@ func runAssetsList(cmd *cobra.Command, args []string) error {
 	if flags.Verbose {
 		client, err := registry.NewClient()
 		if err == nil {
-			checkForUpdates(ctx, client, installed)
+			checkForUpdates(ctx, client, installed, resolveAssetsIndexPath())
 		}
 	}
 
@@ -197,9 +197,9 @@ func determineScopeAndFile(localCfg cue.Value, paths config.Paths, category, nam
 }
 
 // checkForUpdates checks registry for available updates.
-func checkForUpdates(ctx context.Context, client *registry.Client, installed []InstalledAsset) {
+func checkForUpdates(ctx context.Context, client *registry.Client, installed []InstalledAsset, indexPath string) {
 	// Fetch index for version info
-	index, err := client.FetchIndex(ctx)
+	index, err := client.FetchIndex(ctx, indexPath)
 	if err != nil {
 		return
 	}

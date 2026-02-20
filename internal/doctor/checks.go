@@ -48,6 +48,12 @@ func CheckVersion(info BuildInfo) SectionResult {
 		})
 	}
 
+	if info.IndexPath != "" {
+		section.Results = append(section.Results, CheckResult{
+			Status: StatusInfo, Label: "Index Source", Message: info.IndexPath,
+		})
+	}
+
 	return section
 }
 

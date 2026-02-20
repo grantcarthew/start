@@ -142,7 +142,7 @@ func runSearch(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		registryErr = err
 	} else {
-		index, err := client.FetchIndex(ctx)
+		index, err := client.FetchIndex(ctx, resolveAssetsIndexPath())
 		if err != nil {
 			registryErr = err
 		} else {

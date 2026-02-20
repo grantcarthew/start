@@ -48,7 +48,7 @@ func runAssetsInfo(cmd *cobra.Command, args []string) error {
 	if !flags.Quiet {
 		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "Fetching index...")
 	}
-	index, err := client.FetchIndex(ctx)
+	index, err := client.FetchIndex(ctx, resolveAssetsIndexPath())
 	if err != nil {
 		return fmt.Errorf("fetching index: %w", err)
 	}

@@ -190,5 +190,6 @@ start-assets/
 - p-028: TUI Shared Package (shared colour definitions, Annotate/Bracket helpers, cli+doctor migration)
 - p-029: CLI Show Verbose Inspection (comprehensive resource inspection, cross-category search, verbose dump)
 - p-022: Assets AST Refactor (CUE AST-based config manipulation replacing string parsing)
+- p-030: Assets Index Setting (assets_index setting, EffectiveIndexPath helper, all consumers updated)
 
 The prototype validated that this tool solves a real problem. This version will implement it properly.

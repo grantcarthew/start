@@ -63,7 +63,7 @@ func runAssetsSearch(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("creating registry client: %w", err)
 	}
 
-	index, err := client.FetchIndex(ctx)
+	index, err := client.FetchIndex(ctx, resolveAssetsIndexPath())
 	if err != nil {
 		return fmt.Errorf("fetching index: %w", err)
 	}

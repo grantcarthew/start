@@ -129,6 +129,7 @@ type BuildInfo struct {
 	GoVersion    string
 	Platform     string
 	IndexVersion string // Registry index version (empty if unavailable)
+	IndexPath    string // Configured assets_index path (empty if using built-in default)
 }
 
 // DefaultBuildInfo returns build info with runtime defaults.

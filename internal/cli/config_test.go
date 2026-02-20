@@ -834,6 +834,94 @@ func TestConfigSettingsShow_InvalidKey(t *testing.T) {
 	if !strings.Contains(err.Error(), "unknown setting") {
 		t.Errorf("expected 'unknown setting' error, got: %v", err)
 	}
+	if !strings.Contains(err.Error(), "Valid settings:") {
+		t.Errorf("expected valid settings list in error, got: %v", err)
+	}
+}
+
+func TestValidSettingsKeysString(t *testing.T) {
+	result := validSettingsKeysString()
+
+	// Must contain all known keys
+	for key := range validSettingsKeys {
+		if !strings.Contains(result, key) {
+			t.Errorf("validSettingsKeysString() missing key %q, got: %s", key, result)
+		}
+	}
+
+	// Must be sorted (first key alphabetically should appear before last)
+	keys := strings.Split(result, ", ")
+	if len(keys) != len(validSettingsKeys) {
+		t.Errorf("validSettingsKeysString() returned %d keys, want %d", len(keys), len(validSettingsKeys))
+	}
+	for i := 1; i < len(keys); i++ {
+		if keys[i] < keys[i-1] {
+			t.Errorf("validSettingsKeysString() not sorted: %q before %q", keys[i-1], keys[i])
+		}
+	}
+}
+
+func TestConfigSettingsSet_AssetsIndex(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	chdir(t, tmpDir)
+
+	cmd := NewRootCmd()
+	stdout := &bytes.Buffer{}
+	cmd.SetOut(stdout)
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"config", "settings", "assets_index", "github.com/example/custom/index@v0"})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify file has quoted string value (not integer-style)
+	settingsPath := filepath.Join(tmpDir, "start", "settings.cue")
+	content, err := os.ReadFile(settingsPath)
+	if err != nil {
+		t.Fatalf("failed to read settings file: %v", err)
+	}
+
+	if !strings.Contains(string(content), `assets_index: "github.com/example/custom/index@v0"`) {
+		t.Errorf("settings file missing quoted assets_index, content: %s", content)
+	}
+}
+
+func TestResolveAssetsIndexPath(t *testing.T) {
+	t.Run("returns configured value when set", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+		chdir(t, tmpDir)
+
+		// Write settings via command
+		cmd := NewRootCmd()
+		cmd.SetOut(&bytes.Buffer{})
+		cmd.SetErr(&bytes.Buffer{})
+		cmd.SetArgs([]string{"config", "settings", "assets_index", "github.com/example/custom/index@v0"})
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("set failed: %v", err)
+		}
+
+		got := resolveAssetsIndexPath()
+		if got != "github.com/example/custom/index@v0" {
+			t.Errorf("resolveAssetsIndexPath() = %q, want %q", got, "github.com/example/custom/index@v0")
+		}
+	})
+
+	t.Run("returns empty string when not set", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+		chdir(t, tmpDir)
+
+		got := resolveAssetsIndexPath()
+		if got != "" {
+			t.Errorf("resolveAssetsIndexPath() = %q, want empty string", got)
+		}
+	})
 }
 
 func TestConfigSettingsSet(t *testing.T) {
@@ -1030,6 +1118,141 @@ agents: {
 	}
 	if !strings.Contains(string(content), "agents:") {
 		t.Error("original file content should be preserved")
+	}
+}
+
+func TestConfigSettingsUnset(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	chdir(t, tmpDir)
+
+	// First set a value
+	setCmd := NewRootCmd()
+	setCmd.SetOut(&bytes.Buffer{})
+	setCmd.SetErr(&bytes.Buffer{})
+	setCmd.SetArgs([]string{"config", "settings", "default_agent", "claude"})
+	if err := setCmd.Execute(); err != nil {
+		t.Fatalf("set failed: %v", err)
+	}
+
+	// Now unset it
+	unsetCmd := NewRootCmd()
+	stdout := &bytes.Buffer{}
+	unsetCmd.SetOut(stdout)
+	unsetCmd.SetErr(&bytes.Buffer{})
+	unsetCmd.SetArgs([]string{"config", "settings", "default_agent", "--unset"})
+	if err := unsetCmd.Execute(); err != nil {
+		t.Fatalf("unset failed: %v", err)
+	}
+
+	if !strings.Contains(stdout.String(), "Unset default_agent") {
+		t.Errorf("expected unset confirmation, got: %s", stdout.String())
+	}
+
+	// Verify key is gone from file
+	settingsPath := filepath.Join(tmpDir, "start", "settings.cue")
+	content, err := os.ReadFile(settingsPath)
+	if err != nil {
+		t.Fatalf("failed to read settings file: %v", err)
+	}
+	if strings.Contains(string(content), "default_agent") {
+		t.Errorf("settings.cue should not contain default_agent after unset, content: %s", content)
+	}
+}
+
+func TestConfigSettingsUnset_NotSet(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	chdir(t, tmpDir)
+
+	// Unset a key that was never set — should succeed gracefully
+	cmd := NewRootCmd()
+	stdout := &bytes.Buffer{}
+	cmd.SetOut(stdout)
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"config", "settings", "default_agent", "--unset"})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error unsetting non-existent key: %v", err)
+	}
+
+	if !strings.Contains(stdout.String(), "not set") {
+		t.Errorf("expected 'not set' message, got: %s", stdout.String())
+	}
+}
+
+func TestConfigSettingsUnset_MalformedCUE(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	chdir(t, tmpDir)
+
+	// Write a malformed settings.cue directly
+	configDir := filepath.Join(tmpDir, "start")
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		t.Fatalf("creating config dir: %v", err)
+	}
+	malformed := []byte("settings: { this is not valid cue !!!")
+	if err := os.WriteFile(filepath.Join(configDir, "settings.cue"), malformed, 0644); err != nil {
+		t.Fatalf("writing malformed settings.cue: %v", err)
+	}
+
+	cmd := NewRootCmd()
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"config", "settings", "default_agent", "--unset"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error for malformed settings.cue, got nil")
+	}
+	if !strings.Contains(err.Error(), "loading settings") {
+		t.Errorf("expected 'loading settings' error, got: %v", err)
+	}
+}
+
+func TestConfigSettingsUnset_InvalidKey(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	chdir(t, tmpDir)
+
+	cmd := NewRootCmd()
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"config", "settings", "badkey", "--unset"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error for unknown key")
+	}
+	if !strings.Contains(err.Error(), "unknown setting") {
+		t.Errorf("expected unknown setting error, got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "Valid settings:") {
+		t.Errorf("expected valid settings list in error, got: %v", err)
+	}
+}
+
+func TestConfigSettingsUnset_NoKey(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	chdir(t, tmpDir)
+
+	cmd := NewRootCmd()
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"config", "settings", "--unset"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error when --unset used without a key")
+	}
+	if !strings.Contains(err.Error(), "--unset requires a setting key") {
+		t.Errorf("expected requires key error, got: %v", err)
 	}
 }
 

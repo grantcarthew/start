@@ -97,6 +97,59 @@ func TestCheckVersion_IndexUnavailable(t *testing.T) {
 	}
 }
 
+func TestCheckVersion_WithCustomIndexPath(t *testing.T) {
+	t.Parallel()
+	info := BuildInfo{
+		Version:      "v1.0.0",
+		Commit:       "abc123",
+		BuildDate:    "2025-01-01",
+		GoVersion:    "go1.23.0",
+		Platform:     "linux/amd64",
+		IndexVersion: "v0.3.2",
+		IndexPath:    "github.com/example/custom-assets/index@v0",
+	}
+
+	section := CheckVersion(info)
+
+	var sourceResult *CheckResult
+	for i := range section.Results {
+		if section.Results[i].Label == "Index Source" {
+			sourceResult = &section.Results[i]
+			break
+		}
+	}
+	if sourceResult == nil {
+		t.Fatal("CheckVersion() missing 'Index Source' result")
+	}
+	if sourceResult.Message != "github.com/example/custom-assets/index@v0" {
+		t.Errorf("Index Source message = %q, want %q", sourceResult.Message, "github.com/example/custom-assets/index@v0")
+	}
+	if sourceResult.Status != StatusInfo {
+		t.Errorf("Index Source status = %v, want StatusInfo", sourceResult.Status)
+	}
+}
+
+func TestCheckVersion_NoIndexPath(t *testing.T) {
+	t.Parallel()
+	info := BuildInfo{
+		Version:      "v1.0.0",
+		Commit:       "abc123",
+		BuildDate:    "2025-01-01",
+		GoVersion:    "go1.23.0",
+		Platform:     "linux/amd64",
+		IndexVersion: "v0.3.2",
+		// IndexPath not set — default behaviour
+	}
+
+	section := CheckVersion(info)
+
+	for _, r := range section.Results {
+		if r.Label == "Index Source" {
+			t.Errorf("CheckVersion() without IndexPath should not include 'Index Source' result")
+		}
+	}
+}
+
 func TestCheckConfiguration_NoConfig(t *testing.T) {
 	t.Parallel()
 	tmpDir := t.TempDir()

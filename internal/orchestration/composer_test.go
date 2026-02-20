@@ -611,9 +611,12 @@ func TestGetDefaultRole(t *testing.T) {
 			processor := NewTemplateProcessor(nil, nil, "")
 			composer := NewComposer(processor, "")
 
-			result := composer.getDefaultRole(cfg)
+			result, _, err := composer.selectDefaultRole(cfg)
+			if err != nil {
+				t.Fatalf("selectDefaultRole() error: %v", err)
+			}
 			if result != tt.wantRole {
-				t.Errorf("getDefaultRole() = %q, want %q", result, tt.wantRole)
+				t.Errorf("selectDefaultRole() = %q, want %q", result, tt.wantRole)
 			}
 		})
 	}

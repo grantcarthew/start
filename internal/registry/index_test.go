@@ -6,6 +6,37 @@ import (
 	"testing"
 )
 
+func TestEffectiveIndexPath(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		configured string
+		want       string
+	}{
+		{
+			name:       "empty string returns default",
+			configured: "",
+			want:       IndexModulePath,
+		},
+		{
+			name:       "non-empty string returns configured value",
+			configured: "github.com/example/custom-assets/index@v0",
+			want:       "github.com/example/custom-assets/index@v0",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := EffectiveIndexPath(tt.configured)
+			if got != tt.want {
+				t.Errorf("EffectiveIndexPath(%q) = %q, want %q", tt.configured, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestLoadIndex_ValidIndex(t *testing.T) {
 	t.Parallel()
 	tmpDir := t.TempDir()
