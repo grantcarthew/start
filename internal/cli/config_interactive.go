@@ -20,14 +20,17 @@ func addConfigInteractiveAddCommand(parent *cobra.Command) {
 		Long: `Interactively add a new agent, role, context, or task.
 
 Prompts for the category then runs the interactive add flow for that type.`,
-		Args: cobra.NoArgs,
+		Args: noArgsOrHelp,
 		RunE: runConfigInteractiveAdd,
 	}
 	parent.AddCommand(cmd)
 }
 
 // runConfigInteractiveAdd picks a category then delegates to the category add command.
-func runConfigInteractiveAdd(cmd *cobra.Command, _ []string) error {
+func runConfigInteractiveAdd(cmd *cobra.Command, args []string) error {
+	if shown, err := checkHelpArg(cmd, args); shown || err != nil {
+		return err
+	}
 	stdin := cmd.InOrStdin()
 	stdout := cmd.OutOrStdout()
 
@@ -62,14 +65,17 @@ func addConfigInteractiveEditCommand(parent *cobra.Command) {
 
 Prompts for the category, shows a numbered list, then runs the interactive
 edit flow for the selected item.`,
-		Args: cobra.NoArgs,
+		Args: noArgsOrHelp,
 		RunE: runConfigInteractiveEdit,
 	}
 	parent.AddCommand(cmd)
 }
 
 // runConfigInteractiveEdit picks a category and item then delegates to the category edit command.
-func runConfigInteractiveEdit(cmd *cobra.Command, _ []string) error {
+func runConfigInteractiveEdit(cmd *cobra.Command, args []string) error {
+	if shown, err := checkHelpArg(cmd, args); shown || err != nil {
+		return err
+	}
 	stdin := cmd.InOrStdin()
 	stdout := cmd.OutOrStdout()
 	local := getFlags(cmd).Local
@@ -121,14 +127,17 @@ func addConfigInteractiveRemoveCommand(parent *cobra.Command) {
 
 Prompts for the category, shows a numbered list for item selection, then
 confirms before removing.`,
-		Args: cobra.NoArgs,
+		Args: noArgsOrHelp,
 		RunE: runConfigInteractiveRemove,
 	}
 	parent.AddCommand(cmd)
 }
 
 // runConfigInteractiveRemove picks a category and items then delegates to the category remove command.
-func runConfigInteractiveRemove(cmd *cobra.Command, _ []string) error {
+func runConfigInteractiveRemove(cmd *cobra.Command, args []string) error {
+	if shown, err := checkHelpArg(cmd, args); shown || err != nil {
+		return err
+	}
 	stdin := cmd.InOrStdin()
 	stdout := cmd.OutOrStdout()
 	local := getFlags(cmd).Local

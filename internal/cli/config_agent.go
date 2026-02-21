@@ -125,7 +125,7 @@ Examples:
   start config agent add
   start config agent add --name gemini --bin gemini --command 'gemini "{{.prompt}}"'
   start config agent add --local --name project-agent --bin claude --command 'claude "{{.prompt}}"'`,
-		Args: cobra.NoArgs,
+		Args: noArgsOrHelp,
 		RunE: runConfigAgentAdd,
 	}
 
@@ -141,7 +141,10 @@ Examples:
 }
 
 // runConfigAgentAdd adds a new agent configuration.
-func runConfigAgentAdd(cmd *cobra.Command, _ []string) error {
+func runConfigAgentAdd(cmd *cobra.Command, args []string) error {
+	if shown, err := checkHelpArg(cmd, args); shown || err != nil {
+		return err
+	}
 	stdin := cmd.InOrStdin()
 	stdout := cmd.OutOrStdout()
 	local := getFlags(cmd).Local

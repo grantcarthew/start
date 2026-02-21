@@ -124,7 +124,7 @@ Examples:
   start config context add
   start config context add --name project --file PROJECT.md --required
   start config context add --local --name readme --file README.md --default`,
-		Args: cobra.NoArgs,
+		Args: noArgsOrHelp,
 		RunE: runConfigContextAdd,
 	}
 
@@ -141,7 +141,10 @@ Examples:
 }
 
 // runConfigContextAdd adds a new context configuration.
-func runConfigContextAdd(cmd *cobra.Command, _ []string) error {
+func runConfigContextAdd(cmd *cobra.Command, args []string) error {
+	if shown, err := checkHelpArg(cmd, args); shown || err != nil {
+		return err
+	}
 	stdin := cmd.InOrStdin()
 	stdout := cmd.OutOrStdout()
 	local := getFlags(cmd).Local

@@ -117,7 +117,7 @@ Examples:
   start config role add
   start config role add --name go-expert --file ~/.config/start/roles/go-expert.md
   start config role add --name reviewer --prompt "You are a code reviewer..."`,
-		Args: cobra.NoArgs,
+		Args: noArgsOrHelp,
 		RunE: runConfigRoleAdd,
 	}
 
@@ -133,7 +133,10 @@ Examples:
 }
 
 // runConfigRoleAdd adds a new role configuration.
-func runConfigRoleAdd(cmd *cobra.Command, _ []string) error {
+func runConfigRoleAdd(cmd *cobra.Command, args []string) error {
+	if shown, err := checkHelpArg(cmd, args); shown || err != nil {
+		return err
+	}
 	stdin := cmd.InOrStdin()
 	stdout := cmd.OutOrStdout()
 	local := getFlags(cmd).Local

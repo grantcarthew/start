@@ -35,7 +35,7 @@ Installed assets are marked with ★.
 
 Use --json to output machine-readable JSON, or --raw to display the
 raw CUE source files from the index module.`,
-		Args: cobra.NoArgs,
+		Args: noArgsOrHelp,
 		RunE: runAssetsIndex,
 	}
 
@@ -47,6 +47,9 @@ raw CUE source files from the index module.`,
 
 // runAssetsIndex fetches and displays the full registry asset catalog.
 func runAssetsIndex(cmd *cobra.Command, args []string) error {
+	if shown, err := checkHelpArg(cmd, args); shown || err != nil {
+		return err
+	}
 	ctx := context.Background()
 	flags := getFlags(cmd)
 	jsonFlag, _ := cmd.Flags().GetBool("json")
