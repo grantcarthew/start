@@ -32,6 +32,7 @@ Use these commands to discover, install, and update assets.`,
 	addAssetsListCommand(assetsCmd)
 	addAssetsInfoCommand(assetsCmd)
 	addAssetsUpdateCommand(assetsCmd)
+	addAssetsValidateCommand(assetsCmd)
 
 	parent.AddCommand(assetsCmd)
 }
