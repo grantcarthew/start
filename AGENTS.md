@@ -12,7 +12,7 @@ Avoid references to the prototype in new documentation. This is a new design.
 
 Projects are stored in `.ai/projects/`. Continue by reading the active project.
 
-Active Project: None
+Active Project: `.ai/projects/p-031-cli-workingdir-threading.md`
 
 Other Projects (paused):
 - None
@@ -191,5 +191,9 @@ start-assets/
 - p-029: CLI Show Verbose Inspection (comprehensive resource inspection, cross-category search, verbose dump)
 - p-022: Assets AST Refactor (CUE AST-based config manipulation replacing string parsing)
 - p-030: Assets Index Setting (assets_index setting, EffectiveIndexPath helper, all consumers updated)
+
+In Progress:
+
+- p-031: CLI workingDir Threading (thread workingDir through config functions, eliminate os.Chdir in tests, enable t.Parallel())
 
 The prototype validated that this tool solves a real problem. This version will implement it properly.
