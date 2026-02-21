@@ -29,30 +29,6 @@ func TestScope_String(t *testing.T) {
 	}
 }
 
-func TestParseScope(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name  string
-		input string
-		want  Scope
-	}{
-		{"global string", "global", ScopeGlobal},
-		{"local string", "local", ScopeLocal},
-		{"merged string", "merged", ScopeMerged},
-		{"empty defaults to merged", "", ScopeMerged},
-		{"unknown defaults to merged", "unknown", ScopeMerged},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := ParseScope(tt.input)
-			if got != tt.want {
-				t.Errorf("ParseScope(%q) = %v, want %v", tt.input, got, tt.want)
-			}
-		})
-	}
-}
 
 func TestResolvePaths(t *testing.T) {
 	// Create a temporary working directory

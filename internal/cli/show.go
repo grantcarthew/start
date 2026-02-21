@@ -68,7 +68,11 @@ func addShowCommand(parent *cobra.Command) {
 		Long: `Display resolved configuration content after UTD processing and config merging.
 
 Without arguments, lists all configured items with descriptions.
-With an argument, searches across all categories and displays a verbose dump.`,
+With an argument, searches across all categories and displays a verbose dump.
+
+Use --global to restrict output to the global config (~/.config/start/) or
+--local to restrict to the local config (./.start/). These flags are mutually
+exclusive; omitting both shows the effective merged configuration.`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: runShow,
 	}
@@ -109,8 +113,8 @@ With an argument, searches across all categories and displays a verbose dump.`,
 		RunE:    runShowItem(internalcue.KeyTasks, "Task"),
 	}
 
-	// Add --scope flag to show command
-	showCmd.PersistentFlags().String("scope", "", "Show from specific scope: global or local")
+	// Add --global flag to show command (show-specific scope restriction)
+	showCmd.PersistentFlags().Bool("global", false, "Show from global scope only")
 
 	// Add subcommands
 	showCmd.AddCommand(showRoleCmd)
@@ -138,8 +142,11 @@ func runShow(cmd *cobra.Command, args []string) error {
 // runShowListing displays all items grouped by category with descriptions.
 func runShowListing(cmd *cobra.Command) error {
 	w := cmd.OutOrStdout()
-	scope, _ := cmd.Flags().GetString("scope")
 
+	scope, err := showScopeFromCmd(cmd)
+	if err != nil {
+		return err
+	}
 	cfg, err := loadConfig(scope)
 	if err != nil {
 		return err
@@ -201,8 +208,11 @@ func runShowListing(cmd *cobra.Command) error {
 // runShowSearch handles cross-category search for `start show <name>`.
 func runShowSearch(cmd *cobra.Command, name string) error {
 	w := cmd.OutOrStdout()
-	scope, _ := cmd.Flags().GetString("scope")
 	flags := getFlags(cmd)
+	scope, err := showScopeFromCmd(cmd)
+	if err != nil {
+		return err
+	}
 	stdin := cmd.InOrStdin()
 
 	cfg, err := loadConfig(scope)
@@ -287,7 +297,7 @@ func runShowSearch(cmd *cobra.Command, name string) error {
 					return err
 				}
 				// After install, use merged scope to see the new item
-				return showVerboseItem(w, result.Name, "", cat.key, cat.itemType)
+				return showVerboseItem(w, result.Name, config.ScopeMerged, cat.key, cat.itemType)
 			}
 		}
 	}
@@ -321,7 +331,7 @@ func runShowSearch(cmd *cobra.Command, name string) error {
 }
 
 // displayShowMatch handles auto-install (if needed) and displays a verbose dump.
-func displayShowMatch(w io.Writer, scope string, m AssetMatch, r *resolver) error {
+func displayShowMatch(w io.Writer, scope config.Scope, m AssetMatch, r *resolver) error {
 	cat := showCategoryFor(m.Category)
 	if m.Source == AssetSourceRegistry && r != nil {
 		if err := r.autoInstall(r.client, assets.SearchResult{
@@ -332,13 +342,13 @@ func displayShowMatch(w io.Writer, scope string, m AssetMatch, r *resolver) erro
 			return err
 		}
 		// After install, use merged scope to see the new item
-		scope = ""
+		return showVerboseItem(w, m.Name, config.ScopeMerged, cat.key, cat.itemType)
 	}
 	return showVerboseItem(w, m.Name, scope, cat.key, cat.itemType)
 }
 
 // promptShowSelection handles interactive selection from multiple cross-category matches.
-func promptShowSelection(w io.Writer, stdin io.Reader, scope string, matches []AssetMatch, query string, r *resolver) error {
+func promptShowSelection(w io.Writer, stdin io.Reader, scope config.Scope, matches []AssetMatch, query string, r *resolver) error {
 	isTTY := isTerminal(stdin)
 
 	if !isTTY {
@@ -406,7 +416,7 @@ func promptShowSelection(w io.Writer, stdin io.Reader, scope string, matches []A
 }
 
 // showVerboseItem prepares and displays a verbose dump for a single item.
-func showVerboseItem(w io.Writer, name, scope, cueKey, itemType string) error {
+func showVerboseItem(w io.Writer, name string, scope config.Scope, cueKey, itemType string) error {
 	result, err := prepareShow(name, scope, cueKey, itemType)
 	if err != nil {
 		return err
@@ -423,7 +433,10 @@ func runShowItem(cueKey, itemType string) func(*cobra.Command, []string) error {
 			name = args[0]
 		}
 
-		scope, _ := cmd.Flags().GetString("scope")
+		scope, err := showScopeFromCmd(cmd)
+		if err != nil {
+			return err
+		}
 		result, err := prepareShow(name, scope, cueKey, itemType)
 		if err != nil {
 			return err
@@ -437,7 +450,7 @@ func runShowItem(cueKey, itemType string) func(*cobra.Command, []string) error {
 // prepareShow prepares show output for an item type.
 // cueKey is the top-level CUE key (e.g., internalcue.KeyRoles).
 // itemType is the display name (e.g., "Role").
-func prepareShow(name, scope, cueKey, itemType string) (ShowResult, error) {
+func prepareShow(name string, scope config.Scope, cueKey, itemType string) (ShowResult, error) {
 	cfg, err := loadConfig(scope)
 	if err != nil {
 		return ShowResult{}, err
@@ -503,18 +516,37 @@ func prepareShow(name, scope, cueKey, itemType string) (ShowResult, error) {
 	}, nil
 }
 
-// loadConfig loads CUE configuration based on scope.
-func loadConfig(scope string) (internalcue.LoadResult, error) {
+// showScopeFromCmd derives the config scope from show command flags.
+// Returns an error if --local and --global are both set.
+func showScopeFromCmd(cmd *cobra.Command) (config.Scope, error) {
+	var global bool
+	if f := cmd.Flags().Lookup("global"); f != nil {
+		global, _ = cmd.Flags().GetBool("global")
+	}
+	local := getFlags(cmd).Local
+	if local && global {
+		return config.ScopeMerged, fmt.Errorf("--local and --global are mutually exclusive")
+	}
+	if global {
+		return config.ScopeGlobal, nil
+	}
+	if local {
+		return config.ScopeLocal, nil
+	}
+	return config.ScopeMerged, nil
+}
+
+// loadConfig loads CUE configuration for the given scope.
+func loadConfig(scope config.Scope) (internalcue.LoadResult, error) {
 	paths, err := config.ResolvePaths("")
 	if err != nil {
 		return internalcue.LoadResult{}, fmt.Errorf("resolving config paths: %w", err)
 	}
 
-	s := config.ParseScope(scope)
-	dirs := paths.ForScope(s)
+	dirs := paths.ForScope(scope)
 
 	if len(dirs) == 0 {
-		switch s {
+		switch scope {
 		case config.ScopeGlobal:
 			return internalcue.LoadResult{}, fmt.Errorf("no global configuration found at %s", paths.Global)
 		case config.ScopeLocal:

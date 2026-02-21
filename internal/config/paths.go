@@ -30,18 +30,6 @@ func (s Scope) String() string {
 	}
 }
 
-// ParseScope parses a string into a Scope value.
-func ParseScope(s string) Scope {
-	switch s {
-	case "global":
-		return ScopeGlobal
-	case "local":
-		return ScopeLocal
-	default:
-		return ScopeMerged
-	}
-}
-
 // Paths holds the resolved configuration directory paths.
 type Paths struct {
 	// Global is the path to the global config directory (~/.config/start/).
