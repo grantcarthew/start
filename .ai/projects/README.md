@@ -12,9 +12,7 @@ See [p-writing-guide.md](./p-writing-guide.md) for guidelines on creating and ma
 
 | Project | Title | Started |
 |---------|-------|---------|
-| [p-022](./p-022-assets-ast-refactor.md) | Assets AST Refactor | Pending |
-| [p-029](./p-029-cli-show-verbose-inspection.md) | CLI Show Verbose Inspection | Pending |
-| [p-030](./p-030-assets-index-setting.md) | Assets Index Setting | Pending |
+| [p-031](./p-031-cli-workingdir-threading.md) | CLI workingDir Threading | Pending |
 
 ### Completed Projects
 
@@ -44,6 +42,12 @@ See [p-writing-guide.md](./p-writing-guide.md) for guidelines on creating and ma
 | [p-023](./completed/p-023-cli-config-reorder.md) | CLI Config Reorder | 2026-02-08 |
 | [p-024](./completed/p-024-cli-flag-asset-search.md) | CLI Flag Asset Search | 2026-02-13 |
 | [p-025](./completed/p-025-terminal-colour-standard.md) | Terminal Colour Standard | 2026-02-13 |
+| [p-026](./completed/p-026-cli-config-loader-return-type.md) | CLI Config Loader Return Type Alignment | 2026-02-19 |
+| [p-027](./completed/p-027-cli-content-source-menu.md) | CLI Content Source Menu Extraction | 2026-02-19 |
+| [p-028](./completed/p-028-tui-shared-package.md) | TUI Shared Package | 2026-02-19 |
+| [p-029](./completed/p-029-cli-show-verbose-inspection.md) | CLI Show Verbose Inspection | 2026-02-20 |
+| [p-022](./completed/p-022-assets-ast-refactor.md) | Assets AST Refactor | 2026-02-20 |
+| [p-030](./completed/p-030-assets-index-setting.md) | Assets Index Setting | 2026-02-20 |
 
 ---
 
@@ -51,31 +55,63 @@ See [p-writing-guide.md](./p-writing-guide.md) for guidelines on creating and ma
 
 ### Active
 
-#### p-022: Assets AST Refactor
+#### p-031: CLI workingDir Threading
 
-Refactor asset installation code to use CUE's AST APIs instead of fragile string manipulation. Replace 160+ lines of manual parsing with proper AST operations.
+Thread `workingDir` through CLI config functions to eliminate `os.Chdir` in tests. Removes process-global hazard that bars tests from running in parallel. Completes partially-done infrastructure in `ResolvePaths` and `loadMergedConfigFromDir`. Addresses GitHub issue #51.
 
-**Key Deliverables:** AST-based `internal/assets/install.go`, removed string manipulation, updated tests
+**Key Deliverables:** Updated `loadMergedConfig`, `loadConfig`, `prepareShow`, `reorderContexts`, `reorderRoles` with `workingDir` param; all `chdir` helpers deleted; `t.Parallel()` added throughout
 
-**Dependencies:** p-021
+**Dependencies:** None
+
+### Completed
 
 #### p-030: Assets Index Setting
 
-Make the CUE module path for the start-assets index configurable via `assets_index` in `#Settings`. All `assets` subcommands and `doctor` read this setting and fall back to the hardcoded `IndexModulePath` constant when absent. Prerequisite for issue #46 (assets validate command).
+Made the CUE module path for the start-assets index configurable via `assets_index` in `#Settings`. All `assets` subcommands and `doctor` read this setting and fall back to the hardcoded `IndexModulePath` constant when absent.
 
 **Key Deliverables:** `assets_index` in settings schema and `validSettingsKeys`, `EffectiveIndexPath` helper, updated `FetchIndex` signature, updated asset commands and doctor
 
 **Dependencies:** None
 
+#### p-022: Assets AST Refactor
+
+Refactored asset installation code to use CUE's AST APIs instead of fragile string manipulation. Replaced 160+ lines of manual parsing with proper AST operations.
+
+**Key Deliverables:** AST-based `internal/assets/install.go`, removed string manipulation, updated tests
+
+**Dependencies:** p-021
+
 #### p-029: CLI Show Verbose Inspection
 
-Enhance `start show` into a comprehensive resource inspection tool with cross-category search, verbose dump (CUE definitions, file contents, origin/cache metadata), and enhanced listing with descriptions. Addresses GitHub issue #42.
+Enhanced `start show` into a comprehensive resource inspection tool with cross-category search, verbose dump (CUE definitions, file contents, origin/cache metadata), and enhanced listing with descriptions.
 
 **Key Deliverables:** Rewritten `show.go` with verbose dump and cross-category search, exported wrappers in `composer.go`, updated tests
 
 **Dependencies:** p-024, p-025
 
-### Completed
+#### p-028: TUI Shared Package
+
+Extracted shared colour definitions and `Annotate`/`Bracket` helpers into `internal/tui` package. Migrated CLI and doctor output to use the shared package.
+
+**Key Deliverables:** `internal/tui` package, migrated cli and doctor packages
+
+**Dependencies:** None
+
+#### p-027: CLI Content Source Menu Extraction
+
+Normalised and extracted `promptContentSource` helper to reduce duplication across config commands.
+
+**Key Deliverables:** Shared `promptContentSource` helper, updated config commands
+
+**Dependencies:** None
+
+#### p-026: CLI Config Loader Return Type Alignment
+
+Updated agents and tasks config loaders to return definition order alongside the map, matching the pattern established for contexts and roles.
+
+**Key Deliverables:** Updated loader return types, updated consumers
+
+**Dependencies:** None
 
 #### p-025: Terminal Colour Standard
 
