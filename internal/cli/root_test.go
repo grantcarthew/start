@@ -4,14 +4,9 @@ import (
 	"bytes"
 	"strings"
 	"testing"
-)
 
-func TestExecute_NoConfig(t *testing.T) {
-	// Skip: This test triggers auto-setup which requires network access
-	// and creates CUE cache with read-only directories that can't be cleaned up.
-	// The auto-setup flow is tested in integration tests instead.
-	t.Skip("Skipping: auto-setup requires network access and creates uncleanable cache")
-}
+	"github.com/spf13/cobra"
+)
 
 func TestExecute_Help(t *testing.T) {
 	t.Parallel()
@@ -271,15 +266,30 @@ func TestNoArgsOrHelpRejectsInvalidArgs(t *testing.T) {
 
 func TestDebugImpliesVerbose(t *testing.T) {
 	t.Parallel()
-	// Each NewRootCmd() creates its own Flags - no reset needed
+	var capturedFlags *Flags
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"--debug", "--help"})
+	// Add a probe subcommand so PersistentPreRunE runs and we can inspect flags.
+	probe := &cobra.Command{
+		Use:   "probe",
+		Short: "test probe",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			capturedFlags = getFlags(cmd)
+			return nil
+		},
+	}
+	cmd.AddCommand(probe)
+	cmd.SetArgs([]string{"--debug", "probe"})
+	buf := new(bytes.Buffer)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
 
-	// Execute triggers PersistentPreRunE which sets verbose
-	_ = cmd.Execute()
-
-	// After parsing, debug should imply verbose is set
-	// Since flags are scoped to the command instance, we verify
-	// by checking the command executed without error (--help exits cleanly)
-	// The actual flag checking is internal to the command now
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	if capturedFlags == nil {
+		t.Fatal("probe RunE was not called; PersistentPreRunE did not run")
+	}
+	if !capturedFlags.Verbose {
+		t.Error("--debug should set Verbose=true, but Verbose was false")
+	}
 }
