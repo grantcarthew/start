@@ -23,7 +23,7 @@ func addConfigOrderCommand(parent *cobra.Command) {
 
 Prompts to choose between contexts or roles, then provides
 an interactive reorder flow.`,
-		Args: cobra.NoArgs,
+		Args: noArgsOrHelp,
 		RunE: runConfigOrder,
 	}
 
@@ -31,7 +31,10 @@ an interactive reorder flow.`,
 }
 
 // runConfigOrder prompts the user to select contexts or roles, then runs reorder.
-func runConfigOrder(cmd *cobra.Command, _ []string) error {
+func runConfigOrder(cmd *cobra.Command, args []string) error {
+	if shown, err := checkHelpArg(cmd, args); shown || err != nil {
+		return err
+	}
 	stdin := cmd.InOrStdin()
 	if !isTerminal(stdin) {
 		return fmt.Errorf("interactive reordering requires a terminal")
@@ -67,7 +70,7 @@ Displays a numbered list of contexts. Enter a number to move that
 item up one position. Repeat to achieve the desired order.
 
 Press Enter to save the new order, or q to cancel.`,
-		Args: cobra.NoArgs,
+		Args: noArgsOrHelp,
 		RunE: runConfigContextOrder,
 	}
 
@@ -75,7 +78,10 @@ Press Enter to save the new order, or q to cancel.`,
 }
 
 // runConfigContextOrder runs the interactive reorder flow for contexts.
-func runConfigContextOrder(cmd *cobra.Command, _ []string) error {
+func runConfigContextOrder(cmd *cobra.Command, args []string) error {
+	if shown, err := checkHelpArg(cmd, args); shown || err != nil {
+		return err
+	}
 	stdin := cmd.InOrStdin()
 	if !isTerminal(stdin) {
 		return fmt.Errorf("interactive reordering requires a terminal")
@@ -147,7 +153,7 @@ Displays a numbered list of roles. Enter a number to move that
 item up one position. Repeat to achieve the desired order.
 
 Press Enter to save the new order, or q to cancel.`,
-		Args: cobra.NoArgs,
+		Args: noArgsOrHelp,
 		RunE: runConfigRoleOrder,
 	}
 
@@ -155,7 +161,10 @@ Press Enter to save the new order, or q to cancel.`,
 }
 
 // runConfigRoleOrder runs the interactive reorder flow for roles.
-func runConfigRoleOrder(cmd *cobra.Command, _ []string) error {
+func runConfigRoleOrder(cmd *cobra.Command, args []string) error {
+	if shown, err := checkHelpArg(cmd, args); shown || err != nil {
+		return err
+	}
 	stdin := cmd.InOrStdin()
 	if !isTerminal(stdin) {
 		return fmt.Errorf("interactive reordering requires a terminal")

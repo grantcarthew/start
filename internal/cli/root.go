@@ -142,7 +142,7 @@ func Execute() error {
 
 // checkHelpArg checks if the first argument is "help" and shows help if so.
 // Returns true if help was shown, false otherwise.
-// Use this in parent commands that have both RunE and subcommands.
+// Use this at the top of RunE on commands that use noArgsOrHelp as their Args validator.
 func checkHelpArg(cmd *cobra.Command, args []string) (bool, error) {
 	if len(args) > 0 && args[0] == "help" {
 		return true, cmd.Help()
@@ -153,6 +153,16 @@ func checkHelpArg(cmd *cobra.Command, args []string) (bool, error) {
 // unknownCommandError returns a formatted error for unknown subcommands.
 func unknownCommandError(cmdPath, arg string) error {
 	return fmt.Errorf("unknown command %q for %q\nRun '%s --help' for usage", arg, cmdPath, cmdPath)
+}
+
+// noArgsOrHelp is like cobra.NoArgs but allows "help" as a single argument.
+// When combined with checkHelpArg in RunE, it enables "cmd help" as an alias
+// for "cmd --help" on leaf commands that take no positional arguments.
+func noArgsOrHelp(cmd *cobra.Command, args []string) error {
+	if len(args) == 1 && args[0] == "help" {
+		return nil
+	}
+	return cobra.NoArgs(cmd, args)
 }
 
 // resolveDirectory expands and validates the directory path.

@@ -44,7 +44,7 @@ func addAssetsListCommand(parent *cobra.Command) {
 
 Shows all assets installed via the registry with their current version
 and whether updates are available.`,
-		Args: cobra.NoArgs,
+		Args: noArgsOrHelp,
 		RunE: runAssetsList,
 	}
 
@@ -55,6 +55,9 @@ and whether updates are available.`,
 
 // runAssetsList lists installed assets with update status.
 func runAssetsList(cmd *cobra.Command, args []string) error {
+	if shown, err := checkHelpArg(cmd, args); shown || err != nil {
+		return err
+	}
 	ctx := context.Background()
 
 	// Load configuration

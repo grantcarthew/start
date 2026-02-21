@@ -50,9 +50,12 @@ macOS:
     start completion bash > $(brew --prefix)/etc/bash_completion.d/start
 
 You will need to start a new shell for this setup to take effect.`,
-		Args:              cobra.NoArgs,
+		Args:              noArgsOrHelp,
 		ValidArgsFunction: cobra.NoFileCompletions,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if shown, err := checkHelpArg(cmd, args); shown || err != nil {
+				return err
+			}
 			return cmd.Root().GenBashCompletionV2(cmd.OutOrStdout(), true)
 		},
 	}
@@ -84,9 +87,12 @@ macOS:
     start completion zsh > $(brew --prefix)/share/zsh/site-functions/_start
 
 You will need to start a new shell for this setup to take effect.`,
-		Args:              cobra.NoArgs,
+		Args:              noArgsOrHelp,
 		ValidArgsFunction: cobra.NoFileCompletions,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if shown, err := checkHelpArg(cmd, args); shown || err != nil {
+				return err
+			}
 			return cmd.Root().GenZshCompletion(cmd.OutOrStdout())
 		},
 	}
@@ -107,9 +113,12 @@ To load completions for every new session, execute once:
     start completion fish > ~/.config/fish/completions/start.fish
 
 You will need to start a new shell for this setup to take effect.`,
-		Args:              cobra.NoArgs,
+		Args:              noArgsOrHelp,
 		ValidArgsFunction: cobra.NoFileCompletions,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if shown, err := checkHelpArg(cmd, args); shown || err != nil {
+				return err
+			}
 			return cmd.Root().GenFishCompletion(cmd.OutOrStdout(), true)
 		},
 	}

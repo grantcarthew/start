@@ -117,7 +117,7 @@ Examples:
   start config task add
   start config task add --name review --prompt "Review this code for bugs"
   start config task add --name commit --file ~/.config/start/tasks/commit.md --role git-expert`,
-		Args: cobra.NoArgs,
+		Args: noArgsOrHelp,
 		RunE: runConfigTaskAdd,
 	}
 
@@ -133,7 +133,10 @@ Examples:
 }
 
 // runConfigTaskAdd adds a new task configuration.
-func runConfigTaskAdd(cmd *cobra.Command, _ []string) error {
+func runConfigTaskAdd(cmd *cobra.Command, args []string) error {
+	if shown, err := checkHelpArg(cmd, args); shown || err != nil {
+		return err
+	}
 	stdin := cmd.InOrStdin()
 	stdout := cmd.OutOrStdout()
 	local := getFlags(cmd).Local
