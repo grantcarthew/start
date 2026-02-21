@@ -184,12 +184,13 @@ func TestFetch_ContextCancellation(t *testing.T) {
 	client := &Client{
 		registry: mock,
 		retries:  5,
-		baseWait: 100 * time.Millisecond,
+		baseWait: time.Second, // Long retry wait so the 50 ms cancel always arrives first.
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	// Cancel after a short delay
+	// Cancel after a short delay; the large baseWait gives a ~950 ms margin
+	// so goroutine scheduling variance cannot cause the retry timer to fire first.
 	go func() {
 		time.Sleep(50 * time.Millisecond)
 		cancel()

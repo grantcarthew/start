@@ -3,6 +3,7 @@ package cue
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	cuelib "cuelang.org/go/cue"
@@ -383,10 +384,15 @@ func TestHasCUEFiles(t *testing.T) {
 
 func TestLoader_MergeWithTestdataFixtures(t *testing.T) {
 	t.Parallel()
-	// This test uses the actual testdata/merge fixtures to verify merge behaviour
-	// Skip if fixtures don't exist (allows test to run in isolation)
-	globalDir := "../../test/testdata/merge/global"
-	localDir := "../../test/testdata/merge/local"
+	// Derive fixture paths from this file's location so the test is not sensitive
+	// to the working directory at invocation time.
+	_, currentFile, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("runtime.Caller failed")
+	}
+	repoRoot := filepath.Join(filepath.Dir(currentFile), "../..")
+	globalDir := filepath.Join(repoRoot, "test/testdata/merge/global")
+	localDir := filepath.Join(repoRoot, "test/testdata/merge/local")
 
 	if _, err := os.Stat(globalDir); os.IsNotExist(err) {
 		t.Skip("testdata/merge fixtures not found")
