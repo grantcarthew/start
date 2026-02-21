@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/grantcarthew/start/internal/config"
 	internalcue "github.com/grantcarthew/start/internal/cue"
 )
 
@@ -23,7 +24,7 @@ func setupTestConfig(t *testing.T) string {
 		t.Fatalf("creating .start dir: %v", err)
 	}
 
-	config := `
+	cueConfig := `
 agents: {
 	claude: {
 		bin:         "claude"
@@ -74,7 +75,7 @@ tasks: {
 }
 `
 	configPath := filepath.Join(startDir, "settings.cue")
-	if err := os.WriteFile(configPath, []byte(config), 0644); err != nil {
+	if err := os.WriteFile(configPath, []byte(cueConfig), 0644); err != nil {
 		t.Fatalf("writing config: %v", err)
 	}
 
@@ -107,7 +108,7 @@ func setupTestConfigWithFiles(t *testing.T) string {
 		t.Fatalf("writing context file: %v", err)
 	}
 
-	config := `
+	cueConfig := `
 agents: {
 	claude: {
 		bin:         "claude"
@@ -140,7 +141,7 @@ tasks: {
 }
 `
 	configPath := filepath.Join(startDir, "settings.cue")
-	if err := os.WriteFile(configPath, []byte(config), 0644); err != nil {
+	if err := os.WriteFile(configPath, []byte(cueConfig), 0644); err != nil {
 		t.Fatalf("writing config: %v", err)
 	}
 
@@ -161,7 +162,7 @@ func setupTestConfigWithOrigin(t *testing.T) string {
 		t.Fatalf("creating .start dir: %v", err)
 	}
 
-	config := `
+	cueConfig := `
 roles: {
 	"golang/assistant": {
 		description: "Go assistant"
@@ -171,7 +172,7 @@ roles: {
 }
 `
 	configPath := filepath.Join(startDir, "settings.cue")
-	if err := os.WriteFile(configPath, []byte(config), 0644); err != nil {
+	if err := os.WriteFile(configPath, []byte(cueConfig), 0644); err != nil {
 		t.Fatalf("writing config: %v", err)
 	}
 
@@ -188,7 +189,7 @@ func TestPrepareShowAgent(t *testing.T) {
 	tests := []struct {
 		name           string
 		agentName      string
-		scope          string
+		scope          config.Scope
 		wantType       string
 		wantName       string
 		wantAllNames   []string
@@ -198,7 +199,6 @@ func TestPrepareShowAgent(t *testing.T) {
 		{
 			name:           "no name shows first agent",
 			agentName:      "",
-			scope:          "",
 			wantType:       "Agent",
 			wantName:       "claude",
 			wantAllNames:   []string{"claude"},
@@ -207,14 +207,12 @@ func TestPrepareShowAgent(t *testing.T) {
 		{
 			name:      "named agent",
 			agentName: "claude",
-			scope:     "",
 			wantType:  "Agent",
 			wantName:  "claude",
 		},
 		{
 			name:      "substring match",
 			agentName: "clau",
-			scope:     "",
 			wantType:  "Agent",
 			wantName:  "claude",
 		},
@@ -224,9 +222,16 @@ func TestPrepareShowAgent(t *testing.T) {
 			wantErr:   true,
 		},
 		{
-			name:      "scope global no config",
-			agentName: "",
-			scope:     "global",
+			name:      "local flag returns local config",
+			agentName: "claude",
+			scope:     config.ScopeLocal,
+			wantType:  "Agent",
+			wantName:  "claude",
+		},
+		{
+			name:      "global scope with no global config errors",
+			agentName: "claude",
+			scope:     config.ScopeGlobal,
 			wantErr:   true,
 		},
 	}
@@ -310,7 +315,7 @@ func TestPrepareShowRole(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := prepareShow(tt.roleName, "", internalcue.KeyRoles, "Role")
+			result, err := prepareShow(tt.roleName, config.ScopeMerged, internalcue.KeyRoles, "Role")
 
 			if tt.wantErr {
 				if err == nil {
@@ -383,7 +388,7 @@ func TestPrepareShowContext(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := prepareShow(tt.contextName, "", internalcue.KeyContexts, "Context")
+			result, err := prepareShow(tt.contextName, config.ScopeMerged, internalcue.KeyContexts, "Context")
 
 			if tt.wantErr {
 				if err == nil {
@@ -456,7 +461,7 @@ func TestPrepareShowTask(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := prepareShow(tt.taskName, "", internalcue.KeyTasks, "Task")
+			result, err := prepareShow(tt.taskName, config.ScopeMerged, internalcue.KeyTasks, "Task")
 
 			if tt.wantErr {
 				if err == nil {
@@ -487,11 +492,128 @@ func TestPrepareShowTask(t *testing.T) {
 	}
 }
 
+// TestPrepareShowLocalNoConfig verifies that ScopeLocal returns an error when no local config exists.
+func TestPrepareShowLocalNoConfig(t *testing.T) {
+	dir := t.TempDir()
+	// No .start directory created — local config is absent
+	chdir(t, dir)
+	t.Setenv("HOME", dir)
+
+	_, err := prepareShow("claude", config.ScopeLocal, internalcue.KeyAgents, "Agent")
+	if err == nil {
+		t.Fatal("expected error when no local config exists")
+	}
+	if !strings.Contains(err.Error(), "no local configuration found") {
+		t.Errorf("error should mention missing local config, got: %v", err)
+	}
+}
+
+// TestPrepareShowGlobalNoConfig verifies that ScopeGlobal returns an error when no global config exists.
+func TestPrepareShowGlobalNoConfig(t *testing.T) {
+	dir := t.TempDir()
+	// No ~/.config/start directory — global config is absent
+	chdir(t, dir)
+	t.Setenv("HOME", dir)
+
+	_, err := prepareShow("claude", config.ScopeGlobal, internalcue.KeyAgents, "Agent")
+	if err == nil {
+		t.Fatal("expected error when no global config exists")
+	}
+	if !strings.Contains(err.Error(), "no global configuration found") {
+		t.Errorf("error should mention missing global config, got: %v", err)
+	}
+}
+
+// TestShowGlobalFlag verifies --global flag behaviour: listing and subcommands
+// show only global config, excluding local items.
+func TestShowGlobalFlag(t *testing.T) {
+	dir := t.TempDir()
+
+	// Global config at ~/.config/start/
+	globalStartDir := filepath.Join(dir, ".config", "start")
+	if err := os.MkdirAll(globalStartDir, 0755); err != nil {
+		t.Fatalf("creating global config dir: %v", err)
+	}
+	globalCueConfig := `
+agents: {
+	"global-agent": {
+		bin:         "global"
+		command:     "{{.bin}}"
+		description: "Global agent"
+	}
+}
+`
+	if err := os.WriteFile(filepath.Join(globalStartDir, "settings.cue"), []byte(globalCueConfig), 0644); err != nil {
+		t.Fatalf("writing global config: %v", err)
+	}
+
+	// Local config at ./.start/ with a different agent
+	localStartDir := filepath.Join(dir, ".start")
+	if err := os.MkdirAll(localStartDir, 0755); err != nil {
+		t.Fatalf("creating local config dir: %v", err)
+	}
+	localCueConfig := `
+agents: {
+	"local-agent": {
+		bin:         "local"
+		command:     "{{.bin}}"
+		description: "Local agent"
+	}
+}
+`
+	if err := os.WriteFile(filepath.Join(localStartDir, "settings.cue"), []byte(localCueConfig), 0644); err != nil {
+		t.Fatalf("writing local config: %v", err)
+	}
+
+	chdir(t, dir)
+	t.Setenv("HOME", dir)
+
+	t.Run("listing shows only global items", func(t *testing.T) {
+		buf := new(bytes.Buffer)
+		cmd := NewRootCmd()
+		cmd.SetOut(buf)
+		cmd.SetErr(buf)
+		cmd.SetArgs([]string{"show", "--global"})
+
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		output := buf.String()
+		if !strings.Contains(output, "global-agent") {
+			t.Errorf("output missing global-agent\ngot: %s", output)
+		}
+		if strings.Contains(output, "local-agent") {
+			t.Errorf("output should not contain local-agent\ngot: %s", output)
+		}
+	})
+
+	t.Run("show agent subcommand with --global", func(t *testing.T) {
+		buf := new(bytes.Buffer)
+		cmd := NewRootCmd()
+		cmd.SetOut(buf)
+		cmd.SetErr(buf)
+		cmd.SetArgs([]string{"show", "agent", "--global"})
+
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		output := buf.String()
+		if !strings.Contains(output, "global-agent") {
+			t.Errorf("output missing global-agent\ngot: %s", output)
+		}
+		if strings.Contains(output, "local-agent") {
+			t.Errorf("output should not contain local-agent\ngot: %s", output)
+		}
+	})
+}
+
 // TestVerboseDumpCUEDefinition verifies CUE definition output in verbose dump.
 func TestVerboseDumpCUEDefinition(t *testing.T) {
 	setupTestConfig(t)
 
-	result, err := prepareShow("claude", "", internalcue.KeyAgents, "Agent")
+	result, err := prepareShow("claude", config.ScopeMerged, internalcue.KeyAgents, "Agent")
 	if err != nil {
 		t.Fatalf("prepareShow: %v", err)
 	}
@@ -521,7 +643,7 @@ func TestVerboseDumpCUEDefinition(t *testing.T) {
 func TestVerboseDumpConfigSource(t *testing.T) {
 	dir := setupTestConfig(t)
 
-	result, err := prepareShow("claude", "", internalcue.KeyAgents, "Agent")
+	result, err := prepareShow("claude", config.ScopeMerged, internalcue.KeyAgents, "Agent")
 	if err != nil {
 		t.Fatalf("prepareShow: %v", err)
 	}
@@ -546,7 +668,7 @@ func TestVerboseDumpConfigSource(t *testing.T) {
 func TestVerboseDumpOriginCache(t *testing.T) {
 	setupTestConfigWithOrigin(t)
 
-	result, err := prepareShow("golang/assistant", "", internalcue.KeyRoles, "Role")
+	result, err := prepareShow("golang/assistant", config.ScopeMerged, internalcue.KeyRoles, "Role")
 	if err != nil {
 		t.Fatalf("prepareShow: %v", err)
 	}
@@ -570,7 +692,7 @@ func TestVerboseDumpOriginCache(t *testing.T) {
 func TestVerboseDumpFileContent(t *testing.T) {
 	setupTestConfigWithFiles(t)
 
-	result, err := prepareShow("go-expert", "", internalcue.KeyRoles, "Role")
+	result, err := prepareShow("go-expert", config.ScopeMerged, internalcue.KeyRoles, "Role")
 	if err != nil {
 		t.Fatalf("prepareShow: %v", err)
 	}
@@ -593,7 +715,7 @@ func TestVerboseDumpFileError(t *testing.T) {
 		t.Fatalf("creating .start dir: %v", err)
 	}
 
-	config := `
+	cueConfig := `
 roles: {
 	broken: {
 		description: "Broken role"
@@ -602,14 +724,14 @@ roles: {
 }
 `
 	configPath := filepath.Join(startDir, "settings.cue")
-	if err := os.WriteFile(configPath, []byte(config), 0644); err != nil {
+	if err := os.WriteFile(configPath, []byte(cueConfig), 0644); err != nil {
 		t.Fatalf("writing config: %v", err)
 	}
 
 	chdir(t, dir)
 	t.Setenv("HOME", dir)
 
-	result, err := prepareShow("broken", "", internalcue.KeyRoles, "Role")
+	result, err := prepareShow("broken", config.ScopeMerged, internalcue.KeyRoles, "Role")
 	if err != nil {
 		t.Fatalf("prepareShow: %v", err)
 	}
@@ -628,7 +750,7 @@ roles: {
 func TestVerboseDumpCommand(t *testing.T) {
 	setupTestConfig(t)
 
-	result, err := prepareShow("review", "", internalcue.KeyTasks, "Task")
+	result, err := prepareShow("review", config.ScopeMerged, internalcue.KeyTasks, "Task")
 	if err != nil {
 		t.Fatalf("prepareShow: %v", err)
 	}
@@ -647,7 +769,7 @@ func TestVerboseDumpCommand(t *testing.T) {
 func TestVerboseDumpSeparators(t *testing.T) {
 	setupTestConfig(t)
 
-	result, err := prepareShow("claude", "", internalcue.KeyAgents, "Agent")
+	result, err := prepareShow("claude", config.ScopeMerged, internalcue.KeyAgents, "Agent")
 	if err != nil {
 		t.Fatalf("prepareShow: %v", err)
 	}
@@ -721,14 +843,14 @@ func TestShowListingNoDescriptions(t *testing.T) {
 		t.Fatalf("creating .start dir: %v", err)
 	}
 
-	config := `
+	cueConfig := `
 roles: {
 	minimal: {
 		prompt: "You are minimal."
 	}
 }
 `
-	if err := os.WriteFile(filepath.Join(startDir, "settings.cue"), []byte(config), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(startDir, "settings.cue"), []byte(cueConfig), 0644); err != nil {
 		t.Fatalf("writing config: %v", err)
 	}
 
@@ -788,7 +910,7 @@ func TestShowCrossCategoryMultipleExact(t *testing.T) {
 	}
 
 	// "helper" exists as both a role and a task
-	config := `
+	cueConfig := `
 roles: {
 	helper: {
 		description: "Helper role"
@@ -802,7 +924,7 @@ tasks: {
 	}
 }
 `
-	if err := os.WriteFile(filepath.Join(startDir, "settings.cue"), []byte(config), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(startDir, "settings.cue"), []byte(cueConfig), 0644); err != nil {
 		t.Fatalf("writing config: %v", err)
 	}
 
@@ -880,6 +1002,21 @@ func TestShowCommandIntegration(t *testing.T) {
 			args:       []string{"show", "claude"},
 			wantOutput: []string{"Agent: claude"},
 		},
+		{
+			name:       "show --local lists only local items",
+			args:       []string{"show", "--local"},
+			wantOutput: []string{"agents/", "claude"},
+		},
+		{
+			name:    "show --global errors when no global config",
+			args:    []string{"show", "--global"},
+			wantErr: true,
+		},
+		{
+			name:    "show --local and --global are mutually exclusive",
+			args:    []string{"show", "--local", "--global"},
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -917,7 +1054,7 @@ func TestShowCommandIntegration(t *testing.T) {
 func TestFormatCUEDefinition(t *testing.T) {
 	setupTestConfig(t)
 
-	result, err := prepareShow("assistant", "", internalcue.KeyRoles, "Role")
+	result, err := prepareShow("assistant", config.ScopeMerged, internalcue.KeyRoles, "Role")
 	if err != nil {
 		t.Fatalf("prepareShow: %v", err)
 	}

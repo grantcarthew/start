@@ -62,8 +62,8 @@ Display resolved role content after UTD processing.
 ```bash
 start show role              # List roles, show first/default
 start show role <name>       # Show named role
-start show role --scope global
-start show role --scope local
+start show role --global
+start show role --local
 ```
 
 Output (no name - shows list and first role):
@@ -97,8 +97,8 @@ Display resolved context content after UTD processing.
 ```bash
 start show context           # List contexts with metadata
 start show context <name>    # Show named context
-start show context --scope global
-start show context --scope local
+start show context --global
+start show context --local
 ```
 
 Output (no name - list only with metadata):
@@ -132,8 +132,8 @@ Display effective agent configuration after config merging.
 ```bash
 start show agent             # List agents, show first/default
 start show agent <name>      # Show named agent
-start show agent --scope global
-start show agent --scope local
+start show agent --global
+start show agent --local
 ```
 
 Output (no name - shows list and first agent):
@@ -160,8 +160,8 @@ Display resolved task prompt template.
 ```bash
 start show task              # List tasks
 start show task <name>       # Show named task
-start show task --scope global
-start show task --scope local
+start show task --global
+start show task --local
 ```
 
 Output (no name - list only):
@@ -197,38 +197,41 @@ Note: Task show displays the template with placeholders visible. Use `start task
 
 ## Flags
 
+Show-specific flags:
+
 | Flag | Short | Description |
 |------|-------|-------------|
-| `--scope` | | Show from specific scope: `global` or `local` |
-
-If `--scope` is omitted, shows effective/merged configuration.
+| `--global` | | Show from global scope only (~/.config/start/) |
 
 Global flags that apply:
 
 | Flag | Short | Description |
 |------|-------|-------------|
+| `--local` | `-l` | Show from local scope only (./.start/) |
 | `--verbose` | | Show additional metadata and resolution details |
 | `--debug` | | Show full resolution trace |
 | `--quiet` | `-q` | Minimal output |
 | `--directory` | `-d` | Override working directory |
 
+`--local` and `--global` are mutually exclusive. If neither is set, shows effective merged configuration.
+
 ## Resolution Behavior
 
-Without `--scope`:
+Without `--local` or `--global`:
 
 - Shows effective configuration after merging
 - Local overrides global for matching keys
 - Indicates source in output header
 
-With `--scope global`:
+With `--global`:
 
-- Shows only global configuration
+- Shows only global configuration (~/.config/start/)
 - Ignores local config entirely
 - Useful for understanding base configuration
 
-With `--scope local`:
+With `--local`:
 
-- Shows only local configuration
+- Shows only local configuration (./.start/)
 - Ignores global config
 - Useful for understanding project overrides
 
@@ -288,8 +291,8 @@ Subcommand structure:
 
 Default behavior by type:
 
-- **agent/role**: List all + show first/default with content
-- **context/task**: List only (no content unless name specified)
+- agent/role: List all + show first/default with content
+- context/task: List only (no content unless name specified)
 
 Rationale: Agents and roles have a "current" concept (first in config or default), so showing one makes sense. Contexts and tasks are collections selected by name or tag, so listing is more useful.
 
@@ -309,3 +312,4 @@ Output formatting:
 
 - 2025-12-12: Added --scope flag and resolution behavior
 - 2025-12-22: Aligned exit codes with unified policy (0 success, 1 failure)
+- 2026-02-21: Replaced --scope string flag with --global/--local boolean flags
