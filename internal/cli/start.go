@@ -13,11 +13,11 @@ import (
 	"cuelang.org/go/cue"
 	"github.com/fatih/color"
 	"github.com/grantcarthew/start/internal/config"
-	"github.com/grantcarthew/start/internal/tui"
 	internalcue "github.com/grantcarthew/start/internal/cue"
 	"github.com/grantcarthew/start/internal/orchestration"
 	"github.com/grantcarthew/start/internal/shell"
 	"github.com/grantcarthew/start/internal/temp"
+	"github.com/grantcarthew/start/internal/tui"
 	"github.com/spf13/cobra"
 )
 
@@ -27,17 +27,17 @@ type flagsKey struct{}
 // Flags holds all CLI flag values. Each command instance gets its own Flags,
 // enabling parallel test execution without shared state.
 type Flags struct {
-	Agent     string
-	Role      string
-	Model     string
-	Context   []string
-	DryRun bool
-	Quiet     bool
-	Verbose   bool
-	Debug     bool
-	NoColor   bool
-	Local     bool
-	NoRole    bool
+	Agent   string
+	Role    string
+	Model   string
+	Context []string
+	DryRun  bool
+	Quiet   bool
+	Verbose bool
+	Debug   bool
+	NoColor bool
+	Local   bool
+	NoRole  bool
 }
 
 // getFlags retrieves Flags from the command context.

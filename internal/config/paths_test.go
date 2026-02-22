@@ -29,7 +29,6 @@ func TestScope_String(t *testing.T) {
 	}
 }
 
-
 func TestResolvePaths(t *testing.T) {
 	// Create a temporary working directory
 	workDir := t.TempDir()
