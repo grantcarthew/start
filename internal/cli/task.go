@@ -49,7 +49,7 @@ func addTaskCommand(parent *cobra.Command) {
 The name can be a config task name or a file path (starting with ./, /, or ~).
 Tasks are reusable workflows defined in configuration.
 Instructions are passed to the task template via the {{.instructions}} placeholder.`,
-		Args: cobra.RangeArgs(1, 2),
+		Args: cobra.RangeArgs(0, 2),
 		RunE: runTask,
 	}
 	taskCmd.Flags().StringSlice("tag", nil, "Filter task selection by tags (comma-separated)")
@@ -58,6 +58,15 @@ Instructions are passed to the task template via the {{.instructions}} placehold
 
 // runTask executes the task command.
 func runTask(cmd *cobra.Command, args []string) error {
+	if len(args) == 0 {
+		if err := runConfigTaskList(cmd, args); err != nil {
+			return err
+		}
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "\nRun %s to search and run a task.\n", tui.Annotate("start task <name>"))
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Run %s to search for installable tasks.\n", tui.Annotate("start assets search <name>"))
+		return nil
+	}
+
 	taskName := args[0]
 	instructions := ""
 	if len(args) > 1 {
@@ -156,7 +165,9 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 		// Step 1: Check for exact or short name match in installed config (fast path, no registry fetch)
 		resolved, err := findExactInstalledName(env.Cfg.Value, internalcue.KeyTasks, taskName)
 		if err != nil {
-			return err
+			// Ambiguous short name - fall through to substring search and interactive picker
+			debugf(stderr, flags, dbgTask, "Short name %q is ambiguous, falling through to search: %v", taskName, err)
+			resolved = ""
 		}
 
 		// For tasks: when an exact/short name match exists, also check if a
