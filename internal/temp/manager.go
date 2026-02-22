@@ -13,6 +13,9 @@ import (
 // unsafeCharsRe matches characters not safe for filenames.
 var unsafeCharsRe = regexp.MustCompile(`[^a-zA-Z0-9-_.]`)
 
+// consecutiveDashesRe matches runs of two or more consecutive dashes.
+var consecutiveDashesRe = regexp.MustCompile(`-{2,}`)
+
 // Manager handles temporary file creation and management.
 type Manager struct {
 	// BaseDir is the base directory for temp files.
@@ -41,14 +44,19 @@ func (m *Manager) DryRunDir() (string, error) {
 	dirPath := filepath.Join(m.BaseDir, dirName)
 
 	// Handle collision by appending suffix
-	suffix := 0
+	const maxSuffixAttempts = 1000
 	originalPath := dirPath
-	for {
+	for suffix := 1; ; suffix++ {
 		_, err := os.Stat(dirPath)
 		if os.IsNotExist(err) {
 			break
 		}
-		suffix++
+		if err != nil {
+			return "", fmt.Errorf("checking dry-run directory: %w", err)
+		}
+		if suffix > maxSuffixAttempts {
+			return "", fmt.Errorf("could not create unique dry-run directory after %d attempts", maxSuffixAttempts)
+		}
 		dirPath = fmt.Sprintf("%s-%d", originalPath, suffix)
 	}
 
@@ -117,9 +125,7 @@ func deriveFileName(entityType, name string) string {
 	safeName = unsafeCharsRe.ReplaceAllString(safeName, "-")
 
 	// Remove consecutive dashes
-	for strings.Contains(safeName, "--") {
-		safeName = strings.ReplaceAll(safeName, "--", "-")
-	}
+	safeName = consecutiveDashesRe.ReplaceAllString(safeName, "-")
 
 	// Trim leading/trailing dashes
 	safeName = strings.Trim(safeName, "-")

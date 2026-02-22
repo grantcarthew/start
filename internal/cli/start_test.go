@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -1815,7 +1816,7 @@ func TestBuildExecutionEnv_SingleAgent_AutoSelect(t *testing.T) {
 	var buf bytes.Buffer
 	r := strings.NewReader("")
 
-	env, err := buildExecutionEnv(cfg, t.TempDir(), "", flags, &buf, r)
+	env, err := buildExecutionEnv(cfg, t.TempDir(), "", flags, &buf, io.Discard, r)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1846,7 +1847,7 @@ func TestBuildExecutionEnv_DefaultAgentSet(t *testing.T) {
 	var buf bytes.Buffer
 	r := strings.NewReader("")
 
-	env, err := buildExecutionEnv(cfg, t.TempDir(), "", flags, &buf, r)
+	env, err := buildExecutionEnv(cfg, t.TempDir(), "", flags, &buf, io.Discard, r)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1874,7 +1875,7 @@ func TestBuildExecutionEnv_MultipleAgents_NonTTY(t *testing.T) {
 	var buf bytes.Buffer
 	r := strings.NewReader("") // non-TTY: falls back to first agent
 
-	env, err := buildExecutionEnv(cfg, t.TempDir(), "", flags, &buf, r)
+	env, err := buildExecutionEnv(cfg, t.TempDir(), "", flags, &buf, io.Discard, r)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

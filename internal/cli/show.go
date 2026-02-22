@@ -208,6 +208,7 @@ func runShowListing(cmd *cobra.Command) error {
 // runShowSearch handles cross-category search for `start show <name>`.
 func runShowSearch(cmd *cobra.Command, name string) error {
 	w := cmd.OutOrStdout()
+	stderr := cmd.ErrOrStderr()
 	flags := getFlags(cmd)
 	scope, err := showScopeFromCmd(cmd)
 	if err != nil {
@@ -278,7 +279,7 @@ func runShowSearch(cmd *cobra.Command, name string) error {
 	}
 
 	// Step 3: Registry search
-	r := newResolver(cfg, flags, w, stdin)
+	r := newResolver(cfg, flags, w, stderr, stdin)
 	index, _, _ := r.ensureIndex()
 
 	// Exact registry match (only when no installed matches)
