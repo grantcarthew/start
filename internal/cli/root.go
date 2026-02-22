@@ -8,7 +8,6 @@ import (
 	"runtime"
 
 	"github.com/fatih/color"
-	"github.com/grantcarthew/start/internal/orchestration"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )
@@ -71,14 +70,6 @@ It manages prompt composition, context injection, and workflow automation.`,
 			if flags.Debug {
 				flags.Verbose = true
 			}
-			// Validate and resolve directory flag
-			if flags.Directory != "" {
-				dir, err := resolveDirectory(flags.Directory)
-				if err != nil {
-					return err
-				}
-				flags.Directory = dir
-			}
 			return nil
 		},
 	}
@@ -91,7 +82,6 @@ It manages prompt composition, context injection, and workflow automation.`,
 	cmd.PersistentFlags().StringVarP(&flags.Role, "role", "r", "", "Override role (config name or file path)")
 	cmd.PersistentFlags().StringVarP(&flags.Model, "model", "m", "", "Override model selection")
 	cmd.PersistentFlags().StringSliceVarP(&flags.Context, "context", "c", nil, "Select contexts (tags or file paths)")
-	cmd.PersistentFlags().StringVarP(&flags.Directory, "directory", "d", "", "Working directory for context detection")
 	cmd.PersistentFlags().BoolVar(&flags.DryRun, "dry-run", false, "Preview execution without launching agent")
 	cmd.PersistentFlags().BoolVarP(&flags.Quiet, "quiet", "q", false, "Suppress output")
 	cmd.PersistentFlags().BoolVar(&flags.Verbose, "verbose", false, "Detailed output")
@@ -163,29 +153,6 @@ func noArgsOrHelp(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 	return cobra.NoArgs(cmd, args)
-}
-
-// resolveDirectory expands and validates the directory path.
-func resolveDirectory(path string) (string, error) {
-	abs, err := orchestration.ExpandFilePath(path)
-	if err != nil {
-		return "", fmt.Errorf("resolving path: %w", err)
-	}
-
-	// Verify directory exists
-	info, err := os.Stat(abs)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return "", fmt.Errorf("directory not found: %s", abs)
-		}
-		return "", fmt.Errorf("accessing directory: %w", err)
-	}
-
-	if !info.IsDir() {
-		return "", fmt.Errorf("not a directory: %s", abs)
-	}
-
-	return abs, nil
 }
 
 // isTerminal reports whether r is connected to a terminal.

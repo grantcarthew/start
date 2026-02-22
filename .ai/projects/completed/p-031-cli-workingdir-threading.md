@@ -1,8 +1,9 @@
 # P-031: CLI workingDir Threading
 
-- Status: Pending
-- Started:
-- Completed:
+- Status: Cancelled
+- Started: 2026-02-22
+- Completed: 2026-02-22
+- Reason: The --directory flag was removed from the CLI (partially implemented across 7/40 ResolvePaths call sites, completing it was not justified for a rarely-used feature). Without --directory, the workingDir threading has no production purpose. The loadMergedConfig() dead code wrapper was deleted separately.
 
 ## Overview
 

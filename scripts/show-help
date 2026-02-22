@@ -54,6 +54,7 @@ show "${BIN} assets add"
 show "${BIN} assets browse"
 show "${BIN} assets info"
 show "${BIN} assets update"
+show "${BIN} assets validate"
 
 show "${BIN} config"
 show "${BIN} config agent"

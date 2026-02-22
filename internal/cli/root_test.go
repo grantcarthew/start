@@ -61,47 +61,6 @@ func TestExecute_Version(t *testing.T) {
 	}
 }
 
-func TestResolveDirectory(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		name    string
-		path    string
-		wantErr bool
-		errMsg  string
-	}{
-		{
-			name:    "valid directory",
-			path:    t.TempDir(),
-			wantErr: false,
-		},
-		{
-			name:    "non-existent directory",
-			path:    "/nonexistent/path/that/does/not/exist",
-			wantErr: true,
-			errMsg:  "directory not found",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result, err := resolveDirectory(tt.path)
-			if tt.wantErr {
-				if err == nil {
-					t.Errorf("resolveDirectory() expected error, got nil")
-				} else if tt.errMsg != "" && !strings.Contains(err.Error(), tt.errMsg) {
-					t.Errorf("resolveDirectory() error = %v, want error containing %q", err, tt.errMsg)
-				}
-			} else {
-				if err != nil {
-					t.Errorf("resolveDirectory() unexpected error = %v", err)
-				}
-				if result == "" {
-					t.Error("resolveDirectory() returned empty path")
-				}
-			}
-		})
-	}
-}
 
 // TestHelpArgLeafCommands verifies that "help" as a positional argument works
 // on leaf commands (those with no subcommands) the same as --help.

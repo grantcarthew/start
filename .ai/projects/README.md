@@ -10,9 +10,7 @@ See [p-writing-guide.md](./p-writing-guide.md) for guidelines on creating and ma
 
 ### Active Projects
 
-| Project | Title | Started |
-|---------|-------|---------|
-| [p-031](./p-031-cli-workingdir-threading.md) | CLI workingDir Threading | Pending |
+None
 
 ### Completed Projects
 
@@ -55,13 +53,7 @@ See [p-writing-guide.md](./p-writing-guide.md) for guidelines on creating and ma
 
 ### Active
 
-#### p-031: CLI workingDir Threading
-
-Thread `workingDir` through CLI config functions to eliminate `os.Chdir` in tests. Removes process-global hazard that bars tests from running in parallel. Completes partially-done infrastructure in `ResolvePaths` and `loadMergedConfigFromDir`. Addresses GitHub issue #51.
-
-**Key Deliverables:** Updated `loadMergedConfig`, `loadConfig`, `prepareShow`, `reorderContexts`, `reorderRoles` with `workingDir` param; all `chdir` helpers deleted; `t.Parallel()` added throughout
-
-**Dependencies:** None
+None
 
 ### Completed
 

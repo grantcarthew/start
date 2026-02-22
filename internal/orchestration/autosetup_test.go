@@ -453,14 +453,8 @@ func TestWriteConfig(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// Override HOME and XDG_CONFIG_HOME to use temp directory
-	oldHome := os.Getenv("HOME")
-	oldXDG := os.Getenv("XDG_CONFIG_HOME")
-	_ = os.Setenv("HOME", tmpDir)
-	_ = os.Setenv("XDG_CONFIG_HOME", filepath.Join(tmpDir, ".config"))
-	defer func() {
-		_ = os.Setenv("HOME", oldHome)
-		_ = os.Setenv("XDG_CONFIG_HOME", oldXDG)
-	}()
+	t.Setenv("HOME", tmpDir)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmpDir, ".config"))
 
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
@@ -535,14 +529,8 @@ func TestWriteConfig(t *testing.T) {
 func TestWriteConfig_MinimalAgent(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	oldHome := os.Getenv("HOME")
-	oldXDG := os.Getenv("XDG_CONFIG_HOME")
-	_ = os.Setenv("HOME", tmpDir)
-	_ = os.Setenv("XDG_CONFIG_HOME", filepath.Join(tmpDir, ".config"))
-	defer func() {
-		_ = os.Setenv("HOME", oldHome)
-		_ = os.Setenv("XDG_CONFIG_HOME", oldXDG)
-	}()
+	t.Setenv("HOME", tmpDir)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmpDir, ".config"))
 
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}

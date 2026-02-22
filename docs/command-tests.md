@@ -37,10 +37,6 @@ start --debug --dry-run
 start --quiet --dry-run
 start -q --dry-run
 
-# Custom directory
-start --directory /path/to/project --dry-run
-start -d /path/to/project --dry-run
-start -d . --dry-run
 ```
 
 ## Dry Run Mode
@@ -197,9 +193,6 @@ start --dry-run --agent nonexistent
 
 # Unknown task
 start task nonexistent --dry-run
-
-# Invalid directory
-start --dry-run --directory /nonexistent/path
 
 # Missing task name
 start task --dry-run
