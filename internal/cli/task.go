@@ -43,8 +43,11 @@ func addTaskCommand(parent *cobra.Command) {
 		Use:     "task [name] [instructions]",
 		Aliases: []string{"tasks"},
 		GroupID: "commands",
-		Short:   "Run a predefined task",
-		Long: `Run a predefined task with optional instructions.
+		Short:   "List or run a predefined task",
+		Long: `List configured tasks or run one with optional instructions.
+
+Without arguments, lists all tasks from global and local configuration.
+With a name, searches for and runs the matching task.
 
 The name can be a config task name or a file path (starting with ./, /, or ~).
 Tasks are reusable workflows defined in configuration.
