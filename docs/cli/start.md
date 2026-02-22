@@ -22,7 +22,6 @@ By default, `start` includes required contexts and default contexts. Use flags t
 | `--role` | `-r` | Override role (config name or file path) |
 | `--model` | `-m` | Override model selection |
 | `--context` | `-c` | Select contexts (tags or file paths) |
-| `--directory` | `-d` | Working directory for context detection |
 | `--dry-run` | | Preview execution without launching agent |
 | `--quiet` | `-q` | Suppress output |
 | `--verbose` | | Detailed output |

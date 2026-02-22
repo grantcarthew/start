@@ -31,8 +31,7 @@ type Flags struct {
 	Role      string
 	Model     string
 	Context   []string
-	Directory string
-	DryRun    bool
+	DryRun bool
 	Quiet     bool
 	Verbose   bool
 	Debug     bool
@@ -84,18 +83,11 @@ type ExecutionEnv struct {
 // This is the first phase of execution environment setup, separated so the
 // resolver can search installed config before building the full environment.
 func loadExecutionConfig(flags *Flags) (internalcue.LoadResult, string, error) {
-	var workingDir string
-	var err error
-	if flags.Directory != "" {
-		workingDir = flags.Directory
-		debugf(flags, dbgConfig, "Working directory (from --directory): %s", workingDir)
-	} else {
-		workingDir, err = os.Getwd()
-		if err != nil {
-			return internalcue.LoadResult{}, "", fmt.Errorf("getting working directory: %w", err)
-		}
-		debugf(flags, dbgConfig, "Working directory (from pwd): %s", workingDir)
+	workingDir, err := os.Getwd()
+	if err != nil {
+		return internalcue.LoadResult{}, "", fmt.Errorf("getting working directory: %w", err)
 	}
+	debugf(flags, dbgConfig, "Working directory: %s", workingDir)
 
 	cfg, err := loadMergedConfigFromDirWithDebug(workingDir, flags)
 	if err != nil {
