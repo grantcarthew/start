@@ -65,7 +65,7 @@ func addShowCommand(parent *cobra.Command) {
 		Aliases: []string{"view"},
 		GroupID: "commands",
 		Short:   "Display resolved configuration content",
-		Long: `Display resolved configuration content after UTD processing and config merging.
+		Long: `Display resolved configuration content from merged global and local config.
 
 Without arguments, lists all configured items with descriptions.
 With an argument, searches across all categories and displays a verbose dump.
@@ -81,7 +81,10 @@ exclusive; omitting both shows the effective merged configuration.`,
 		Use:     "role [name]",
 		Aliases: []string{"roles"},
 		Short:   "Display resolved role content",
-		Long:    `Display resolved role content after UTD processing.`,
+		Long: `Display role content resolved from its configured source (file, command, or prompt).
+
+Without a name, shows the first configured role.
+With a name, searches roles by name and displays the full configuration and content.`,
 		Args:    cobra.MaximumNArgs(1),
 		RunE:    runShowItem(internalcue.KeyRoles, "Role"),
 	}
@@ -90,7 +93,10 @@ exclusive; omitting both shows the effective merged configuration.`,
 		Use:     "context [name]",
 		Aliases: []string{"contexts"},
 		Short:   "Display resolved context content",
-		Long:    `Display resolved context content after UTD processing.`,
+		Long: `Display context content resolved from its configured source (file, command, or prompt).
+
+Without a name, shows the first configured context.
+With a name, searches contexts by name and displays the full configuration and content.`,
 		Args:    cobra.MaximumNArgs(1),
 		RunE:    runShowItem(internalcue.KeyContexts, "Context"),
 	}
@@ -99,7 +105,10 @@ exclusive; omitting both shows the effective merged configuration.`,
 		Use:     "agent [name]",
 		Aliases: []string{"agents"},
 		Short:   "Display agent configuration",
-		Long:    `Display effective agent configuration after config merging.`,
+		Long: `Display effective agent configuration after merging global and local config.
+
+Without a name, shows the first configured agent.
+With a name, searches agents by name and displays the full configuration.`,
 		Args:    cobra.MaximumNArgs(1),
 		RunE:    runShowItem(internalcue.KeyAgents, "Agent"),
 	}
@@ -107,8 +116,11 @@ exclusive; omitting both shows the effective merged configuration.`,
 	showTaskCmd := &cobra.Command{
 		Use:     "task [name]",
 		Aliases: []string{"tasks"},
-		Short:   "Display task template",
-		Long:    `Display resolved task prompt template.`,
+		Short:   "Display resolved task content",
+		Long: `Display task content resolved from its configured source (file, command, or prompt).
+
+Without a name, shows the first configured task.
+With a name, searches tasks by name and displays the full configuration and content.`,
 		Args:    cobra.MaximumNArgs(1),
 		RunE:    runShowItem(internalcue.KeyTasks, "Task"),
 	}

@@ -42,14 +42,13 @@ func addAssetsUpdateCommand(parent *cobra.Command) {
 Without arguments, updates all installed assets.
 With a query, updates only matching assets.
 
-CUE's major version (@v0) automatically resolves to the latest compatible version
-when modules are re-fetched.`,
+Use --dry-run to preview what would be updated without applying changes.
+Use --force to re-fetch and update assets even when already at the latest version.`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: runAssetsUpdate,
 	}
 
-	updateCmd.Flags().Bool("dry-run", false, "Preview without applying")
-	updateCmd.Flags().Bool("force", false, "Re-fetch even if current")
+	updateCmd.Flags().Bool("force", false, "Re-fetch even if already at latest version")
 
 	parent.AddCommand(updateCmd)
 }
@@ -134,7 +133,7 @@ func runAssetsUpdate(cmd *cobra.Command, args []string) error {
 	}
 
 	// Check each asset for updates
-	dryRun, _ := cmd.Flags().GetBool("dry-run")
+	dryRun := getFlags(cmd).DryRun
 	force, _ := cmd.Flags().GetBool("force")
 	var results []UpdateResult
 	for _, asset := range installed {

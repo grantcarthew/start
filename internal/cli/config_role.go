@@ -127,7 +127,7 @@ Examples:
 	addCmd.Flags().String("command", "", "Command to generate prompt")
 	addCmd.Flags().String("prompt", "", "Inline prompt text")
 	addCmd.Flags().StringSlice("tag", nil, "Tags")
-	addCmd.Flags().Bool("optional", false, "Skip gracefully when file is missing")
+	addCmd.Flags().Bool("optional", false, "Silently skip if the role file does not exist at runtime")
 
 	parent.AddCommand(addCmd)
 }
@@ -348,7 +348,7 @@ func addConfigRoleEditCommand(parent *cobra.Command) {
 
 Without a name, opens the roles.cue file in $EDITOR.
 With a name and flags, updates only the specified fields.
-With a name and no flags in a terminal, provides interactive prompts.
+With a name and no flags, prompts interactively for values.
 
 Examples:
   start config role edit
@@ -363,7 +363,7 @@ Examples:
 	editCmd.Flags().String("command", "", "Command to generate prompt")
 	editCmd.Flags().String("prompt", "", "Inline prompt text")
 	editCmd.Flags().StringSlice("tag", nil, "Tags")
-	editCmd.Flags().Bool("optional", false, "Skip gracefully when file is missing")
+	editCmd.Flags().Bool("optional", false, "Silently skip if the role file does not exist at runtime")
 
 	parent.AddCommand(editCmd)
 }

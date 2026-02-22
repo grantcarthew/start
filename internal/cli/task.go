@@ -52,7 +52,7 @@ Instructions are passed to the task template via the {{.instructions}} placehold
 		Args: cobra.RangeArgs(1, 2),
 		RunE: runTask,
 	}
-	taskCmd.Flags().StringSlice("tag", nil, "Filter by tags (comma-separated)")
+	taskCmd.Flags().StringSlice("tag", nil, "Filter task selection by tags (comma-separated)")
 	parent.AddCommand(taskCmd)
 }
 

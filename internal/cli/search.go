@@ -36,7 +36,7 @@ func addSearchCommand(parent *cobra.Command) {
 Searches asset names, descriptions, and tags. Multiple words are combined
 with AND logic - all terms must match. Terms can be space-separated or
 comma-separated. Total query must be at least 3 characters.
-Terms support regex patterns (e.g. ^home, expert$, go.*review).
+Terms support regex patterns (e.g. '^home', 'expert$', 'go.*review').
 Results are grouped by source (local, global, registry) and category.
 
 Use --tag to filter by tags. Tags can be used alone or combined with a query.`,

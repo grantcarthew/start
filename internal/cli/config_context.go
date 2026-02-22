@@ -133,8 +133,8 @@ Examples:
 	addCmd.Flags().String("file", "", "Path to context file")
 	addCmd.Flags().String("command", "", "Command to generate content")
 	addCmd.Flags().String("prompt", "", "Inline content text")
-	addCmd.Flags().Bool("required", false, "Always include this context")
-	addCmd.Flags().Bool("default", false, "Include by default")
+	addCmd.Flags().Bool("required", false, "Always include regardless of context selection")
+	addCmd.Flags().Bool("default", false, "Include when no specific contexts are selected")
 	addCmd.Flags().StringSlice("tag", nil, "Tags")
 
 	parent.AddCommand(addCmd)
@@ -384,7 +384,7 @@ func addConfigContextEditCommand(parent *cobra.Command) {
 
 Without a name, opens the contexts.cue file in $EDITOR.
 With a name and flags, updates only the specified fields.
-With a name and no flags in a terminal, provides interactive prompts.
+With a name and no flags, prompts interactively for values.
 
 Examples:
   start config context edit
@@ -398,8 +398,8 @@ Examples:
 	editCmd.Flags().String("file", "", "Path to context file")
 	editCmd.Flags().String("command", "", "Command to generate content")
 	editCmd.Flags().String("prompt", "", "Inline content text")
-	editCmd.Flags().Bool("required", false, "Always include this context")
-	editCmd.Flags().Bool("default", false, "Include by default")
+	editCmd.Flags().Bool("required", false, "Always include regardless of context selection")
+	editCmd.Flags().Bool("default", false, "Include when no specific contexts are selected")
 	editCmd.Flags().StringSlice("tag", nil, "Tags")
 
 	parent.AddCommand(editCmd)
