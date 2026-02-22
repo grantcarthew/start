@@ -446,7 +446,7 @@ func TestTaskResolution(t *testing.T) {
 	chdir(t, tmpDir)
 
 	// Load config for testing
-	cfg, err := loadMergedConfig()
+	cfg, err := loadMergedConfigFromDir("")
 	if err != nil {
 		t.Fatalf("loading config: %v", err)
 	}
@@ -539,7 +539,7 @@ settings: {
 
 	chdir(t, tmpDir)
 
-	cfg, err := loadMergedConfig()
+	cfg, err := loadMergedConfigFromDir("")
 	if err != nil {
 		t.Fatalf("loading config: %v", err)
 	}
@@ -633,7 +633,7 @@ settings: {
 
 	chdir(t, tmpDir)
 
-	cfg, err := loadMergedConfig()
+	cfg, err := loadMergedConfigFromDir("")
 	if err != nil {
 		t.Fatalf("loading config: %v", err)
 	}
@@ -727,7 +727,7 @@ settings: {
 
 	chdir(t, tmpDir)
 
-	cfg, err := loadMergedConfig()
+	cfg, err := loadMergedConfigFromDir("")
 	if err != nil {
 		t.Fatalf("loading config: %v", err)
 	}
@@ -806,7 +806,7 @@ settings: {
 
 	chdir(t, tmpDir)
 
-	cfg, err := loadMergedConfig()
+	cfg, err := loadMergedConfigFromDir("")
 	if err != nil {
 		t.Fatalf("loading config: %v", err)
 	}
@@ -1160,7 +1160,7 @@ settings: {
 
 	chdir(t, tmpDir)
 
-	cfg, err := loadMergedConfig()
+	cfg, err := loadMergedConfigFromDir("")
 	if err != nil {
 		t.Fatalf("loading config: %v", err)
 	}
