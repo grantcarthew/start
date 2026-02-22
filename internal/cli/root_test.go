@@ -61,7 +61,6 @@ func TestExecute_Version(t *testing.T) {
 	}
 }
 
-
 // TestHelpArgLeafCommands verifies that "help" as a positional argument works
 // on leaf commands (those with no subcommands) the same as --help.
 // This covers all 17 commands updated with noArgsOrHelp in place of cobra.NoArgs.

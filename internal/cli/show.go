@@ -741,4 +741,3 @@ func deriveCacheDir(origin string) string {
 		filepath.Dir(modulePath),
 		filepath.Base(modulePath)+version)
 }
-

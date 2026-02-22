@@ -196,7 +196,7 @@ func TestIndexVersionFromPath(t *testing.T) {
 		want  string
 	}{
 		{"github.com/grantcarthew/start-assets/index@v0.1.8", "v0.1.8"},
-		{"github.com/grantcarthew/start-assets/index@v0", ""},    // major only — not canonical
+		{"github.com/grantcarthew/start-assets/index@v0", ""}, // major only — not canonical
 		{"github.com/grantcarthew/start-assets/index@v0.0.1", "v0.0.1"},
 		{"no-version-here", ""},
 	}
@@ -585,4 +585,3 @@ func TestPrintValidateStatsOutput(t *testing.T) {
 		}
 	}
 }
-
