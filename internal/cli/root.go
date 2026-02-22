@@ -116,14 +116,8 @@ Examples:
 	addDoctorCommand(cmd)
 	addCompletionCommand(cmd)
 
-	// Move built-in help command into utilities group
-	cmd.InitDefaultHelpCmd()
-	for _, c := range cmd.Commands() {
-		if c.Name() == "help" {
-			c.GroupID = "utilities"
-			break
-		}
-	}
+	// Replace default help command with one that includes agent-focused topic subcommands
+	addHelpCommand(cmd)
 
 	return cmd
 }
