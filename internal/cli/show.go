@@ -85,8 +85,8 @@ exclusive; omitting both shows the effective merged configuration.`,
 
 Without a name, shows the first configured role.
 With a name, searches roles by name and displays the full configuration and content.`,
-		Args:    cobra.MaximumNArgs(1),
-		RunE:    runShowItem(internalcue.KeyRoles, "Role"),
+		Args: cobra.MaximumNArgs(1),
+		RunE: runShowItem(internalcue.KeyRoles, "Role"),
 	}
 
 	showContextCmd := &cobra.Command{
@@ -97,8 +97,8 @@ With a name, searches roles by name and displays the full configuration and cont
 
 Without a name, shows the first configured context.
 With a name, searches contexts by name and displays the full configuration and content.`,
-		Args:    cobra.MaximumNArgs(1),
-		RunE:    runShowItem(internalcue.KeyContexts, "Context"),
+		Args: cobra.MaximumNArgs(1),
+		RunE: runShowItem(internalcue.KeyContexts, "Context"),
 	}
 
 	showAgentCmd := &cobra.Command{
@@ -109,8 +109,8 @@ With a name, searches contexts by name and displays the full configuration and c
 
 Without a name, shows the first configured agent.
 With a name, searches agents by name and displays the full configuration.`,
-		Args:    cobra.MaximumNArgs(1),
-		RunE:    runShowItem(internalcue.KeyAgents, "Agent"),
+		Args: cobra.MaximumNArgs(1),
+		RunE: runShowItem(internalcue.KeyAgents, "Agent"),
 	}
 
 	showTaskCmd := &cobra.Command{
@@ -121,8 +121,8 @@ With a name, searches agents by name and displays the full configuration.`,
 
 Without a name, shows the first configured task.
 With a name, searches tasks by name and displays the full configuration and content.`,
-		Args:    cobra.MaximumNArgs(1),
-		RunE:    runShowItem(internalcue.KeyTasks, "Task"),
+		Args: cobra.MaximumNArgs(1),
+		RunE: runShowItem(internalcue.KeyTasks, "Task"),
 	}
 
 	// Add --global flag to show command (show-specific scope restriction)
