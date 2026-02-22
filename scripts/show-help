@@ -52,6 +52,7 @@ show "${BIN} assets list"
 show "${BIN} assets search"
 show "${BIN} assets add"
 show "${BIN} assets browse"
+show "${BIN} assets index"
 show "${BIN} assets info"
 show "${BIN} assets update"
 show "${BIN} assets validate"
@@ -71,7 +72,6 @@ show "${BIN} config role add"
 show "${BIN} config role info"
 show "${BIN} config role edit"
 show "${BIN} config role remove"
-show "${BIN} config role default"
 show "${BIN} config role order"
 
 show "${BIN} config context"
@@ -92,6 +92,11 @@ show "${BIN} config task remove"
 show "${BIN} config settings"
 
 show "${BIN} config order"
+
+show "${BIN} config search"
+show "${BIN} config add"
+show "${BIN} config edit"
+show "${BIN} config remove"
 
 show "${BIN} doctor"
 
