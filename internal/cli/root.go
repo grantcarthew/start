@@ -48,7 +48,13 @@ func NewRootCmd() *cobra.Command {
 		Use:   "start",
 		Short: "AI agent CLI orchestrator",
 		Long: `start is a command-line orchestrator for AI agents built on CUE.
-It manages prompt composition, context injection, and workflow automation.`,
+It manages prompt composition, context injection, and workflow automation.
+
+Examples:
+  start                           Launch agent with default role and contexts
+  start --role go-expert          Launch with a specific role
+  start task pre-commit-review    Run a predefined task
+  start doctor                    Check installation and configuration`,
 		Version: cliVersion,
 		// SilenceUsage prevents usage from being printed on RunE errors.
 		// Usage is still shown for flag/argument parsing errors.

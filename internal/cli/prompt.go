@@ -12,12 +12,12 @@ func addPromptCommand(parent *cobra.Command) {
 	promptCmd := &cobra.Command{
 		Use:     "prompt [text]",
 		GroupID: "commands",
-		Short:   "Launch AI agent with custom prompt",
+		Short:   "Launch AI agent with a custom prompt",
 		Long: `Launch AI agent with a custom prompt and only required contexts.
 
 The argument can be inline text or a file path (starting with ./, /, or ~).
 Default contexts are excluded to keep the prompt focused.
-Use -c default to explicitly include default contexts.`,
+Use -c default to include contexts configured with default: true.`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: runPrompt,
 	}

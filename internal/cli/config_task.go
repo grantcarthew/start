@@ -361,7 +361,7 @@ func addConfigTaskEditCommand(parent *cobra.Command) {
 
 Without a name, opens the tasks.cue file in $EDITOR.
 With a name and flags, updates only the specified fields.
-With a name and no flags in a terminal, provides interactive prompts.
+With a name and no flags, prompts interactively for values.
 
 Examples:
   start config task edit

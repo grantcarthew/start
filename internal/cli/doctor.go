@@ -18,8 +18,8 @@ func addDoctorCommand(parent *cobra.Command) {
 		Use:     "doctor",
 		GroupID: "utilities",
 		Short:   "Diagnose start installation and configuration",
-		Long: `Performs comprehensive health check of start installation, configuration,
-and environment. Reports issues, warnings, and suggestions.
+		Long: `Check start installation, configuration, and environment for issues.
+Reports warnings and suggestions for any problems found.
 
 Checks performed:
   - Version and build information
