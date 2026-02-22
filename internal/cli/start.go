@@ -573,12 +573,6 @@ func printContentPreview(w io.Writer, label string, labelColor *color.Color, tex
 	}
 }
 
-// loadMergedConfig loads and merges global and local configuration.
-// If no configuration exists, it triggers auto-setup.
-func loadMergedConfig() (internalcue.LoadResult, error) {
-	return loadMergedConfigFromDir("")
-}
-
 // loadMergedConfigFromDir loads configuration using the specified working directory
 // for local config resolution. If workingDir is empty, uses current directory.
 func loadMergedConfigFromDir(workingDir string) (internalcue.LoadResult, error) {
