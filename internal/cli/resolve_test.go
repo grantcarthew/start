@@ -251,7 +251,7 @@ func TestMergeAssetMatches_Empty(t *testing.T) {
 
 // newTestResolver creates a resolver for testing that skips registry access.
 func newTestResolver(cfg internalcue.LoadResult) *resolver {
-	r := newResolver(cfg, &Flags{}, io.Discard, strings.NewReader(""))
+	r := newResolver(cfg, &Flags{}, io.Discard, io.Discard, strings.NewReader(""))
 	r.skipRegistry = true
 	return r
 }

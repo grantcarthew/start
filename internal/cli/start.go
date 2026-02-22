@@ -63,10 +63,10 @@ const (
 
 // debugf prints debug output if debug mode is enabled.
 // Format: [DEBUG HH:MM:SS.mmm] <category>: <message>
-func debugf(flags *Flags, category, format string, args ...interface{}) {
+func debugf(stderr io.Writer, flags *Flags, category, format string, args ...interface{}) {
 	if flags.Debug {
 		ts := time.Now().Format("15:04:05.000")
-		_, _ = fmt.Fprintf(os.Stderr, "[DEBUG %s] %s: "+format+"\n", append([]interface{}{ts, category}, args...)...)
+		_, _ = fmt.Fprintf(stderr, "[DEBUG %s] %s: "+format+"\n", append([]interface{}{ts, category}, args...)...)
 	}
 }
 
@@ -82,14 +82,14 @@ type ExecutionEnv struct {
 // loadExecutionConfig loads configuration and resolves the working directory.
 // This is the first phase of execution environment setup, separated so the
 // resolver can search installed config before building the full environment.
-func loadExecutionConfig(flags *Flags) (internalcue.LoadResult, string, error) {
+func loadExecutionConfig(stdout, stderr io.Writer, stdin io.Reader, flags *Flags) (internalcue.LoadResult, string, error) {
 	workingDir, err := os.Getwd()
 	if err != nil {
 		return internalcue.LoadResult{}, "", fmt.Errorf("getting working directory: %w", err)
 	}
-	debugf(flags, dbgConfig, "Working directory: %s", workingDir)
+	debugf(stderr, flags, dbgConfig, "Working directory: %s", workingDir)
 
-	cfg, err := loadMergedConfigFromDirWithDebug(workingDir, flags)
+	cfg, err := loadMergedConfigFromDirWithDebug(stdout, stderr, stdin, workingDir, flags)
 	if err != nil {
 		return internalcue.LoadResult{}, "", fmt.Errorf("loading configuration: %w", err)
 	}
@@ -100,11 +100,11 @@ func loadExecutionConfig(flags *Flags) (internalcue.LoadResult, string, error) {
 // resolveAgentName determines which agent to use when no --agent flag was provided.
 // It checks settings.default_agent, falls back to the only configured agent,
 // or prompts interactively when multiple agents exist and stdin is a TTY.
-func resolveAgentName(cfg internalcue.LoadResult, flags *Flags, stdout io.Writer, stdin io.Reader) (string, error) {
+func resolveAgentName(cfg internalcue.LoadResult, flags *Flags, stdout, stderr io.Writer, stdin io.Reader) (string, error) {
 	// Try settings.default_agent
 	if def := cfg.Value.LookupPath(cue.ParsePath(internalcue.KeySettings + ".default_agent")); def.Exists() {
 		if s, err := def.String(); err == nil && s != "" {
-			debugf(flags, dbgAgent, "Selected %q (config default)", s)
+			debugf(stderr, flags, dbgAgent, "Selected %q (config default)", s)
 			return s, nil
 		}
 	}
@@ -115,7 +115,7 @@ func resolveAgentName(cfg internalcue.LoadResult, flags *Flags, stdout io.Writer
 	case 0:
 		return "", fmt.Errorf("no agent configured")
 	case 1:
-		debugf(flags, dbgAgent, "Selected %q (only agent)", choices[0].Name)
+		debugf(stderr, flags, dbgAgent, "Selected %q (only agent)", choices[0].Name)
 		return choices[0].Name, nil
 	}
 
@@ -124,7 +124,7 @@ func resolveAgentName(cfg internalcue.LoadResult, flags *Flags, stdout io.Writer
 	if !isTTY {
 		// Non-TTY fallback: use first agent
 		name := choices[0].Name
-		debugf(flags, dbgAgent, "Selected %q (first agent, non-TTY)", name)
+		debugf(stderr, flags, dbgAgent, "Selected %q (first agent, non-TTY)", name)
 		if !flags.Quiet {
 			_, _ = fmt.Fprintf(stdout, "Using agent %q %s\n", name, tui.Annotate("set default_agent or use --agent to specify"))
 		}
@@ -138,7 +138,7 @@ func resolveAgentName(cfg internalcue.LoadResult, flags *Flags, stdout io.Writer
 	if err != nil {
 		return "", err
 	}
-	debugf(flags, dbgAgent, "Selected %q (interactive)", selected)
+	debugf(stderr, flags, dbgAgent, "Selected %q (interactive)", selected)
 	if promptSetDefault(stdout, reader, selected) {
 		if err := setSetting(stdout, flags, "default_agent", selected, false); err != nil {
 			printWarning(stdout, "could not save default: %v", err)
@@ -149,23 +149,23 @@ func resolveAgentName(cfg internalcue.LoadResult, flags *Flags, stdout io.Writer
 
 // buildExecutionEnv builds the execution environment from a loaded config and agent name.
 // This is the second phase, called after the resolver has resolved flag values.
-func buildExecutionEnv(cfg internalcue.LoadResult, workingDir string, agentName string, flags *Flags, stdout io.Writer, stdin io.Reader) (*ExecutionEnv, error) {
+func buildExecutionEnv(cfg internalcue.LoadResult, workingDir string, agentName string, flags *Flags, stdout, stderr io.Writer, stdin io.Reader) (*ExecutionEnv, error) {
 	if agentName == "" {
-		resolved, err := resolveAgentName(cfg, flags, stdout, stdin)
+		resolved, err := resolveAgentName(cfg, flags, stdout, stderr, stdin)
 		if err != nil {
 			return nil, err
 		}
 		agentName = resolved
 	} else {
-		debugf(flags, dbgAgent, "Selected %q (--agent flag)", agentName)
+		debugf(stderr, flags, dbgAgent, "Selected %q (--agent flag)", agentName)
 	}
 
 	agent, err := orchestration.ExtractAgent(cfg.Value, agentName)
 	if err != nil {
 		return nil, fmt.Errorf("loading agent: %w", err)
 	}
-	debugf(flags, dbgAgent, "Binary: %s", agent.Bin)
-	debugf(flags, dbgAgent, "Command template: %s", agent.Command)
+	debugf(stderr, flags, dbgAgent, "Binary: %s", agent.Bin)
+	debugf(stderr, flags, dbgAgent, "Command template: %s", agent.Command)
 
 	shellRunner := shell.NewRunner()
 	processor := orchestration.NewTemplateProcessor(nil, shellRunner, workingDir)
@@ -300,13 +300,13 @@ func runStart(cmd *cobra.Command, args []string) error {
 // executeStart is the shared execution logic for start commands.
 func executeStart(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, selection orchestration.ContextSelection, customText string) error {
 	// Phase 1: Load config
-	cfg, workingDir, err := loadExecutionConfig(flags)
+	cfg, workingDir, err := loadExecutionConfig(stdout, stderr, stdin, flags)
 	if err != nil {
 		return err
 	}
 
 	// Phase 2: Resolve asset flags
-	r := newResolver(cfg, flags, stdout, stdin)
+	r := newResolver(cfg, flags, stdout, stderr, stdin)
 
 	// Resolve --agent flag
 	agentName := flags.Agent
@@ -343,7 +343,7 @@ func executeStart(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, selec
 	}
 
 	// Phase 3: Build execution environment with resolved agent
-	env, err := buildExecutionEnv(cfg, workingDir, agentName, flags, stdout, stdin)
+	env, err := buildExecutionEnv(cfg, workingDir, agentName, flags, stdout, stderr, stdin)
 	if err != nil {
 		return err
 	}
@@ -354,14 +354,14 @@ func executeStart(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, selec
 		resolvedModel = r.resolveModelName(resolvedModel, env.Agent)
 	}
 
-	debugf(flags, dbgContext, "Selection: required=%t, defaults=%t, tags=%v",
+	debugf(stderr, flags, dbgContext, "Selection: required=%t, defaults=%t, tags=%v",
 		selection.IncludeRequired, selection.IncludeDefaults, selection.Tags)
 
 	// Compose prompt with or without role
 	var result orchestration.ComposeResult
 	var composeErr error
 	if flags.NoRole {
-		debugf(flags, dbgRole, "Skipping role (--no-role)")
+		debugf(stderr, flags, dbgRole, "Skipping role (--no-role)")
 		result, composeErr = env.Composer.Compose(env.Cfg.Value, selection, customText, "")
 	} else {
 		result, composeErr = env.Composer.ComposeWithRole(env.Cfg.Value, selection, roleName, customText, "")
@@ -374,12 +374,12 @@ func executeStart(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, selec
 		return fmt.Errorf("composing prompt: %w", composeErr)
 	}
 
-	debugf(flags, dbgRole, "Selected %q", result.RoleName)
+	debugf(stderr, flags, dbgRole, "Selected %q", result.RoleName)
 	for _, ctx := range result.Contexts {
-		debugf(flags, dbgContext, "Including %q", ctx.Name)
+		debugf(stderr, flags, dbgContext, "Including %q", ctx.Name)
 	}
-	debugf(flags, dbgCompose, "Role: %d bytes", len(result.Role))
-	debugf(flags, dbgCompose, "Prompt: %d bytes (%d contexts)", len(result.Prompt), len(result.Contexts))
+	debugf(stderr, flags, dbgCompose, "Role: %d bytes", len(result.Role))
+	debugf(stderr, flags, dbgCompose, "Prompt: %d bytes (%d contexts)", len(result.Prompt), len(result.Contexts))
 
 	// Print warnings
 	printWarnings(flags, stderr, result.Warnings)
@@ -387,9 +387,9 @@ func executeStart(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, selec
 	// Determine effective model and its source
 	model, modelSource := resolveModel(resolvedModel, env.Agent.DefaultModel)
 	if model != "" {
-		debugf(flags, dbgAgent, "Model: %s (%s)", model, modelSource)
+		debugf(stderr, flags, dbgAgent, "Model: %s (%s)", model, modelSource)
 	} else {
-		debugf(flags, dbgAgent, "Model: agent default (none specified)")
+		debugf(stderr, flags, dbgAgent, "Model: agent default (none specified)")
 	}
 
 	// Build execution config
@@ -408,10 +408,10 @@ func executeStart(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, selec
 	if err != nil {
 		return err
 	}
-	debugf(flags, dbgExec, "Final command: %s", cmdStr)
+	debugf(stderr, flags, dbgExec, "Final command: %s", cmdStr)
 
 	if flags.DryRun {
-		debugf(flags, dbgExec, "Dry-run mode, skipping execution")
+		debugf(stderr, flags, dbgExec, "Dry-run mode, skipping execution")
 		return executeDryRun(stdout, env.Executor, execConfig, result, env.Agent, model, modelSource)
 	}
 
@@ -420,7 +420,7 @@ func executeStart(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, selec
 		printExecutionInfo(stdout, env.Agent, model, modelSource, result)
 	}
 
-	debugf(flags, dbgExec, "Executing agent (process replacement)")
+	debugf(stderr, flags, dbgExec, "Executing agent (process replacement)")
 	// Execute agent (replaces current process) - command already validated
 	return env.Executor.ExecuteCommand(cmdStr, execConfig)
 }
@@ -572,18 +572,18 @@ func loadMergedConfigFromDir(workingDir string) (internalcue.LoadResult, error) 
 }
 
 // loadMergedConfigFromDirWithDebug loads configuration with debug logging.
-func loadMergedConfigFromDirWithDebug(workingDir string, flags *Flags) (internalcue.LoadResult, error) {
+func loadMergedConfigFromDirWithDebug(stdout, stderr io.Writer, stdin io.Reader, workingDir string, flags *Flags) (internalcue.LoadResult, error) {
 	// Resolve paths first for debug output
 	paths, err := config.ResolvePaths(workingDir)
 	if err != nil {
 		return internalcue.LoadResult{}, fmt.Errorf("resolving config paths: %w", err)
 	}
 
-	debugf(flags, dbgConfig, "Global: %s (exists: %t)", paths.Global, paths.GlobalExists)
-	debugf(flags, dbgConfig, "Local: %s (exists: %t)", paths.Local, paths.LocalExists)
+	debugf(stderr, flags, dbgConfig, "Global: %s (exists: %t)", paths.Global, paths.GlobalExists)
+	debugf(stderr, flags, dbgConfig, "Local: %s (exists: %t)", paths.Local, paths.LocalExists)
 
 	// Load using the standard function
-	result, err := loadMergedConfigWithIO(os.Stdout, os.Stderr, os.Stdin, workingDir)
+	result, err := loadMergedConfigWithIO(stdout, stderr, stdin, workingDir)
 	if err != nil {
 		return result, err
 	}
@@ -597,7 +597,7 @@ func loadMergedConfigFromDirWithDebug(workingDir string, flags *Flags) (internal
 		loaded = append(loaded, "local")
 	}
 	if len(loaded) > 0 {
-		debugf(flags, dbgConfig, "Loaded from: %s", strings.Join(loaded, ", "))
+		debugf(stderr, flags, dbgConfig, "Loaded from: %s", strings.Join(loaded, ", "))
 	}
 
 	return result, nil

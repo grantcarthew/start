@@ -47,6 +47,7 @@ const maxAssetResults = 20
 type resolver struct {
 	cfg          internalcue.LoadResult
 	flags        *Flags
+	stderr       io.Writer
 	stdout       io.Writer
 	stdin        io.Reader
 	index        *registry.Index
@@ -58,10 +59,11 @@ type resolver struct {
 }
 
 // newResolver creates a resolver for the given config.
-func newResolver(cfg internalcue.LoadResult, flags *Flags, stdout io.Writer, stdin io.Reader) *resolver {
+func newResolver(cfg internalcue.LoadResult, flags *Flags, stdout, stderr io.Writer, stdin io.Reader) *resolver {
 	return &resolver{
 		cfg:    cfg,
 		flags:  flags,
+		stderr: stderr,
 		stdout: stdout,
 		stdin:  stdin,
 	}
@@ -90,7 +92,7 @@ func (r *resolver) resolveAsset(name, cueKey, category, displayType string, allo
 
 	// File path bypass (per DR-038)
 	if allowFilePath && orchestration.IsFilePath(name) {
-		debugf(r.flags, dbgResolve, "%s %q: file path bypass", displayType, name)
+		debugf(r.stderr, r.flags, dbgResolve, "%s %q: file path bypass", displayType, name)
 		return name, nil
 	}
 
@@ -100,7 +102,7 @@ func (r *resolver) resolveAsset(name, cueKey, category, displayType string, allo
 	if resolved, err := findExactInstalledName(r.cfg.Value, cueKey, name); err != nil {
 		return "", err
 	} else if resolved != "" {
-		debugf(r.flags, dbgResolve, "%s %q: installed match -> %q", displayType, name, resolved)
+		debugf(r.stderr, r.flags, dbgResolve, "%s %q: installed match -> %q", displayType, name, resolved)
 		return resolved, nil
 	}
 
@@ -111,7 +113,7 @@ func (r *resolver) resolveAsset(name, cueKey, category, displayType string, allo
 		return "", err
 	}
 	if len(installedMatches) == 1 {
-		debugf(r.flags, dbgResolve, "%s %q: single installed substring match %q",
+		debugf(r.stderr, r.flags, dbgResolve, "%s %q: single installed substring match %q",
 			displayType, name, installedMatches[0].Name)
 		return installedMatches[0].Name, nil
 	}
@@ -130,7 +132,7 @@ func (r *resolver) resolveAsset(name, cueKey, category, displayType string, allo
 			return "", err
 		}
 		if result != nil {
-			debugf(r.flags, dbgResolve, "%s %q: exact registry match %q", displayType, name, result.Name)
+			debugf(r.stderr, r.flags, dbgResolve, "%s %q: exact registry match %q", displayType, name, result.Name)
 			if err := r.autoInstall(client, *result); err != nil {
 				return "", err
 			}
@@ -150,7 +152,7 @@ func (r *resolver) resolveAsset(name, cueKey, category, displayType string, allo
 	}
 	allMatches := mergeAssetMatches(installedMatches, registryMatches)
 
-	debugf(r.flags, dbgResolve, "%s %q: %d installed, %d registry, %d total matches",
+	debugf(r.stderr, r.flags, dbgResolve, "%s %q: %d installed, %d registry, %d total matches",
 		displayType, name, len(installedMatches), len(registryMatches), len(allMatches))
 
 	selected, err := r.selectSingleMatch(allMatches, searchType, name)
@@ -198,7 +200,7 @@ func (r *resolver) resolveModelName(name string, agent orchestration.Agent) stri
 
 	// Exact match
 	if _, ok := agent.Models[name]; ok {
-		debugf(r.flags, dbgResolve, "Model %q: exact match in models map", name)
+		debugf(r.stderr, r.flags, dbgResolve, "Model %q: exact match in models map", name)
 		return name
 	}
 
@@ -226,16 +228,16 @@ func (r *resolver) resolveModelName(name string, agent orchestration.Agent) stri
 	sort.Strings(matches) // Deterministic ordering for consistent output
 
 	if len(matches) == 1 {
-		debugf(r.flags, dbgResolve, "Model %q: match %q", name, matches[0])
+		debugf(r.stderr, r.flags, dbgResolve, "Model %q: match %q", name, matches[0])
 		return matches[0]
 	}
 
 	if len(matches) > 1 {
-		debugf(r.flags, dbgResolve, "Model %q: multiple matches %v, using passthrough", name, matches)
+		debugf(r.stderr, r.flags, dbgResolve, "Model %q: multiple matches %v, using passthrough", name, matches)
 	}
 
 	// Passthrough
-	debugf(r.flags, dbgResolve, "Model %q: passthrough", name)
+	debugf(r.stderr, r.flags, dbgResolve, "Model %q: passthrough", name)
 	return name
 }
 
@@ -251,14 +253,14 @@ func (r *resolver) resolveContexts(terms []string) ([]string, error) {
 	for _, term := range terms {
 		// File path bypass
 		if orchestration.IsFilePath(term) {
-			debugf(r.flags, dbgResolve, "Context %q: file path bypass", term)
+			debugf(r.stderr, r.flags, dbgResolve, "Context %q: file path bypass", term)
 			resolved = append(resolved, term)
 			continue
 		}
 
 		// "default" pseudo-tag passthrough
 		if term == "default" {
-			debugf(r.flags, dbgResolve, "Context %q: default passthrough", term)
+			debugf(r.stderr, r.flags, dbgResolve, "Context %q: default passthrough", term)
 			resolved = append(resolved, term)
 			continue
 		}
@@ -267,7 +269,7 @@ func (r *resolver) resolveContexts(terms []string) ([]string, error) {
 		if resolvedCtx, err := findExactInstalledName(r.cfg.Value, internalcue.KeyContexts, term); err != nil {
 			return nil, err
 		} else if resolvedCtx != "" {
-			debugf(r.flags, dbgResolve, "Context %q: installed match -> %q", term, resolvedCtx)
+			debugf(r.stderr, r.flags, dbgResolve, "Context %q: installed match -> %q", term, resolvedCtx)
 			resolved = append(resolved, resolvedCtx)
 			continue
 		}
@@ -276,7 +278,7 @@ func (r *resolver) resolveContexts(terms []string) ([]string, error) {
 		installedMatches, err := searchInstalled(r.cfg.Value, internalcue.KeyContexts, "contexts", term)
 		if err != nil {
 			// Invalid regex in context term - pass through as-is
-			debugf(r.flags, dbgResolve, "Context %q: invalid pattern, passing through", term)
+			debugf(r.stderr, r.flags, dbgResolve, "Context %q: invalid pattern, passing through", term)
 			resolved = append(resolved, term)
 			continue
 		}
@@ -301,7 +303,7 @@ func (r *resolver) resolveContexts(terms []string) ([]string, error) {
 				continue
 			}
 			if result != nil {
-				debugf(r.flags, dbgResolve, "Context %q: exact registry match %q", term, result.Name)
+				debugf(r.stderr, r.flags, dbgResolve, "Context %q: exact registry match %q", term, result.Name)
 				if err := r.autoInstall(client, *result); err != nil {
 					if !r.flags.Quiet {
 						printWarning(r.stdout, "context %q: auto-install failed: %s", term, err)
@@ -319,7 +321,7 @@ func (r *resolver) resolveContexts(terms []string) ([]string, error) {
 		if index != nil {
 			registryMatches, err = searchRegistryCategory(index.Contexts, "contexts", term)
 			if err != nil {
-				debugf(r.flags, dbgResolve, "Context %q: invalid pattern, passing through", term)
+				debugf(r.stderr, r.flags, dbgResolve, "Context %q: invalid pattern, passing through", term)
 				resolved = append(resolved, term)
 				continue
 			}
@@ -334,11 +336,11 @@ func (r *resolver) resolveContexts(terms []string) ([]string, error) {
 			}
 		}
 
-		debugf(r.flags, dbgResolve, "Context %q: %d matches above threshold", term, len(qualified))
+		debugf(r.stderr, r.flags, dbgResolve, "Context %q: %d matches above threshold", term, len(qualified))
 
 		if len(qualified) == 0 {
 			// No matches - pass through as-is (composer will warn)
-			debugf(r.flags, dbgResolve, "Context %q: no matches, passing through", term)
+			debugf(r.stderr, r.flags, dbgResolve, "Context %q: no matches, passing through", term)
 			resolved = append(resolved, term)
 			continue
 		}
@@ -657,7 +659,7 @@ func (r *resolver) ensureIndex() (*registry.Index, *registry.Client, error) {
 
 	client, err := registry.NewClient()
 	if err != nil {
-		debugf(r.flags, dbgResolve, "Registry unavailable: %v", err)
+		debugf(r.stderr, r.flags, dbgResolve, "Registry unavailable: %v", err)
 		r.indexErr = err
 		return nil, nil, nil // Graceful fallback
 	}
@@ -683,7 +685,7 @@ func (r *resolver) ensureIndex() (*registry.Index, *registry.Client, error) {
 
 	index, err := client.FetchIndex(ctx, resolveAssetsIndexPath())
 	if err != nil {
-		debugf(r.flags, dbgResolve, "Index fetch failed: %v", err)
+		debugf(r.stderr, r.flags, dbgResolve, "Index fetch failed: %v", err)
 		r.indexErr = err
 		return nil, client, nil // Graceful fallback
 	}
@@ -694,7 +696,7 @@ func (r *resolver) ensureIndex() (*registry.Index, *registry.Client, error) {
 
 // reloadConfig reloads the merged config after installs.
 func (r *resolver) reloadConfig(workingDir string) error {
-	cfg, err := loadMergedConfigFromDirWithDebug(workingDir, r.flags)
+	cfg, err := loadMergedConfigFromDirWithDebug(r.stdout, r.stderr, r.stdin, workingDir, r.flags)
 	if err != nil {
 		return fmt.Errorf("reloading configuration: %w", err)
 	}
