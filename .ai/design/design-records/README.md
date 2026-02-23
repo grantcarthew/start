@@ -22,7 +22,7 @@ Design Records (DRs) document architectural decisions, algorithms, breaking chan
 | dr-014 | CLI Prompt Command | CLI | Accepted | 2025-12-03 |
 | dr-015 | CLI Task Command | CLI | Accepted | 2025-12-03 |
 | dr-016 | CLI Dry Run Flag | CLI | Accepted | 2025-12-04 |
-| dr-017 | CLI Show Command | CLI | Accepted | 2025-12-04 |
+| dr-017 | CLI Show Command | CLI | Superseded by dr-044 | 2025-12-04 |
 | dr-018 | CLI Auto-Setup | CLI | Accepted | 2025-12-04 |
 | dr-019 | Index Bin Field for Agent Detection | Index | Accepted | 2025-12-04 |
 | dr-020 | Template Processing and File Resolution | UTD | Accepted | 2025-12-08 |
@@ -34,7 +34,7 @@ Design Records (DRs) document architectural decisions, algorithms, breaking chan
 | dr-026 | CLI Logic and I/O Separation | CLI | Accepted | 2025-12-12 |
 | dr-027 | Registry Module Fetching | Registry | Accepted | 2025-12-15 |
 | dr-028 | CLI Assets Command | CLI | Accepted | 2025-12-17 |
-| dr-029 | CLI Configuration Editing Commands | CLI | Accepted | 2025-12-18 |
+| dr-029 | CLI Configuration Editing Commands | CLI | Superseded by dr-044 | 2025-12-18 |
 | dr-030 | Settings Schema | Config | Accepted | 2025-12-18 |
 | dr-031 | CLI Doctor Command | CLI | Accepted | 2025-12-19 |
 | dr-032 | CLI Shell Completion | CLI | Accepted | 2025-12-19 |
@@ -49,6 +49,7 @@ Design Records (DRs) document architectural decisions, algorithms, breaking chan
 | dr-041 | CLI Flag Asset Search | CLI | Accepted | 2026-02-08 |
 | dr-042 | Terminal Colour Standard | CLI | Accepted | 2026-02-10 |
 | dr-043 | CLI Unified Search Command | CLI | Accepted | 2026-02-11 |
+| dr-044 | CLI Verb-First Command Structure | CLI | Accepted | 2026-02-23 |
 
 ## Process
 

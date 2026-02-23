@@ -12,7 +12,7 @@ Avoid references to the prototype in new documentation. This is a new design.
 
 Projects are stored in `.ai/projects/`. Continue by reading the active project.
 
-Active Project: None
+Active Project: .ai/projects/p-032-cli-config-verb-first-refactor.md
 
 Other Projects (paused):
 - None
@@ -82,11 +82,6 @@ Documentation is structured as:
 - `.ai/design/` - Design decisions and architecture (Design Records)
 - `.ai/projects/` - Project documents
 - `.ai/tasks/` - Task prompts
-- `docs/` - Human-facing documentation
-- `docs/cli/` - Command reference
-- `docs/cue/` - CUE schema reference and examples
-
-The prototype's CLI documentation (`../start-prototype/docs/cli/*.md`) provides a starting point for the user interface, though commands will evolve as CUE capabilities are integrated.
 
 ## Document Driven Development (DDD)
 

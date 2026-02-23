@@ -10,7 +10,10 @@ See [p-writing-guide.md](./p-writing-guide.md) for guidelines on creating and ma
 
 ### Active Projects
 
-None
+| Project | Title |
+|---------|-------|
+| [p-032](./p-032-cli-config-verb-first-refactor.md) | CLI Config Verb-First Refactor |
+
 
 ### Completed Projects
 
@@ -53,7 +56,11 @@ None
 
 ### Active
 
-None
+#### p-032: CLI Config Verb-First Refactor
+
+Restructure `start config` and `start show` from noun-first to verb-first to match `start assets`. Removes all noun-group subcommands, introduces search-by-name with menus, adds new verb commands: `list`, `info`, `open`. Breaking change to command interface.
+
+Dependencies: p-008, p-013, p-017, p-018, p-023, p-027
 
 ### Completed
 
