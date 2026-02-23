@@ -1,7 +1,7 @@
 # dr-029: CLI Configuration Editing Commands
 
 - Date: 2025-12-18
-- Status: Accepted
+- Status: Superseded by [dr-044](dr-044-cli-verb-first-command-structure.md)
 - Category: CLI
 
 ## Problem

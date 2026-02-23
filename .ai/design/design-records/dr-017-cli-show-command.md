@@ -1,7 +1,7 @@
 # dr-017: CLI Show Command
 
 - Date: 2025-12-04
-- Status: Accepted
+- Status: Superseded by [dr-044](dr-044-cli-verb-first-command-structure.md)
 - Category: CLI
 
 ## Problem

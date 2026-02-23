@@ -364,7 +364,7 @@ func promptModels(w io.Writer, r io.Reader, current map[string]string) (map[stri
 	case "", "k", "keep":
 		return current, nil
 	case "c", "clear":
-		return nil, nil
+		return promptModelsEdit(w, reader, nil)
 	case "e", "edit":
 		return promptModelsEdit(w, reader, current)
 	default:

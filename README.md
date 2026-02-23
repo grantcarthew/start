@@ -13,10 +13,10 @@ Context-aware AI agent launcher powered by CUE.
 
 Every time you open an AI coding session you provide the same background: what the project does, what role the agent should play, what you're working on today. start eliminates this by composing intelligent prompts from your project's context files and launching your configured AI agent — every time, consistently, with zero ceremony.
 
-- **Role-based sessions** - Define agent expertise once, reuse across projects (`go-expert`, `code-reviewer`, `security-auditor`)
-- **Reusable tasks** - Package common workflows as shareable prompts (`pre-commit-review`, `debug-help`, `write-docs`)
+- **Role-based sessions** - Define agent expertise once, reuse across projects (`golang/assistant`, `gitlab/teacher`, `cwd/role-md`)
+- **Reusable tasks** - Package common workflows as shareable prompts (`github/issue/triage`, `review/git-diff`, `jira/item/read`)
 - **Automatic context injection** - Project files, environment info, and documentation included without manual setup
-- **Multi-agent support** - Works with Claude, Gemini, aichat, opencode, or any AI CLI tool
+- **Multi-agent support** - Works with Claude, Gemini, aichat, aider, opencode, or any AI CLI tool
 - **CUE-powered configuration** - Type-safe, validated, order-preserving config with built-in schema enforcement
 - **Registry packages** - Install curated roles, tasks, and contexts from the CUE Central Registry
 
@@ -34,19 +34,20 @@ brew tap grantcarthew/tap
 brew install grantcarthew/tap/start
 
 # Auto-setup detects your installed AI agent and writes initial config
-start doctor
-
 # Launch an AI session with full project context
 start
 
 # Use a specific role
-start --role go-expert
+start --role golang/agent
 
 # Run a reusable task
-start task pre-commit-review
+start task review/security
+
+# Add extra context to a task
+start task git-diff "Only focus on the documentation changes."
 
 # Send a one-off prompt (minimal context, focused output)
-start prompt "Explain this error message"
+start prompt "Explain this error message: 404 Not Found"
 ```
 
 ## Installation
@@ -79,7 +80,7 @@ start is built around four concepts: **agents**, **roles**, **tasks**, and **con
 
 ### Agents
 
-An agent is your AI CLI tool — Claude Code, Gemini, aichat, or anything else. You configure which agent to use, and start handles the command construction and process handoff.
+An agent is your AI CLI tool — Claude Code, Gemini, or anything else. You configure which agent to use, and start handles the command construction and process handoff.
 
 ```bash
 # Use your default configured agent
@@ -89,24 +90,38 @@ start
 start --agent gemini
 ```
 
+_Note: start is not an agent harness, it is a launcher._
+
+To make this clear, here is the command configuration for the Claude Code Interactive agent:
+
+```
+command: "{{.bin}} --model {{.model}} --permission-mode default --append-system-prompt-file {{.role_file}} {{.prompt}}"
+```
+
 ### Roles
 
 A role defines how the AI agent should behave — its expertise, tone, and focus area. Roles become the system prompt for your session.
 
 ```bash
-# Start with a Go expert role
-start --role go-expert
+# Start with a Golang expert role
+start --role golang/assistant
 
-# Use a role from a local file
+# Use a role from a local file (must start with ./ or /)
 start --role ./prompts/senior-reviewer.md
 ```
 
 Roles are installed from the registry:
 
 ```bash
-start assets add role/go-expert
-start assets add role/code-reviewer
+start assets add golang/teacher
+start assets add git/agent
 ```
+
+Roles come in three modes:
+
+- agent mode: fully hands off operation
+- assistant mode: interactive sessions
+- teacher mode: to learn as you build
 
 ### Tasks
 
@@ -114,69 +129,96 @@ A task is a reusable, parameterisable prompt for a specific workflow. Run a task
 
 ```bash
 # Run a configured task
-start task pre-commit-review
+start task review/git-diff
 
 # Pass instructions to a parameterised task
-start task code-review "Focus on error handling"
+start task github/issue/triage "Implement the feature in issue #87"
 
-# Run a task from a local file
+# Run a task from a local file (must start with ./ or /)
 start task ./tasks/my-review.md
 ```
 
 Tasks only include required contexts by default, keeping prompts focused. Tasks are also available from the registry:
 
 ```bash
-start assets add task/pre-commit-review
-start assets add task/debug-help
+start assets add review/git-diff
+start assets add jira/item/research
 ```
 
 ### Contexts
 
-Contexts are document fragments injected into the prompt — project overviews, environment details, coding standards, or anything else the agent needs to know. Contexts are tagged and selectively included.
+Contexts are document fragments injected into the prompt such as project overviews, environment details, coding standards, or anything else the agent needs to know. Contexts are tagged and selectively included.
 
 ```bash
 # Include specific contexts by tag
 start --context security,performance
 
-# Include a context from a local file
+# Include a context from a local file (must start with ./ or /)
 start --context ./AGENTS.md
 ```
 
 Your project's context files (like `AGENTS.md`, `README.md`, or `PROJECT.md`) are mapped to context definitions in config, so start knows exactly what to include and when.
 
+```bash
+# Add the ./AGENTS.md context
+start assets add contexts cwd/agents-md
+
+# Use the ./AGENTS.md context (it is a required context)
+start
+```
+
 ### Configuration
 
-Configuration is stored in CUE format at `~/.start/config.cue` (global) and `./.start/config.cue` (project-local). The `--local` flag targets project config instead of global.
+Configuration is stored in CUE format at `~/.config/start/config.cue` (global) and `./.start/config.cue` (project-local). The `--local` flag targets project config instead of global.
 
 ```bash
 # View effective configuration
 start config
 
 # Edit agent settings interactively
-start config edit agent
+start config agent edit
 
 # Edit with flags (non-interactive)
 start config settings default_agent claude
 
 # Use project-local config
-start --local config
+start --local
 ```
+
+### Inspection
+
+Use `start show` to inspect resolved configuration — what roles, contexts, tasks, and agents are actually configured and what their content looks like after merging global and local config:
+
+```bash
+# List all configured items with descriptions
+start show
+
+# Search across all categories and dump full detail
+start show golang/assistant
+
+# Inspect specific resource types
+start show role golang/assistant
+start show context environment
+start show task git-diff
+start show agent claude
+```
+
+The `--global` and `--local` flags restrict output to a single config scope; omitting both shows the effective merged configuration.
 
 ### Dry Run
 
-Preview exactly what start would send to your agent before committing:
+Run the full composition pipeline without launching the agent:
 
 ```bash
-# See the composed prompt and command without launching
 start --dry-run
-start task code-review --dry-run
+start task review/duplication --dry-run
 start prompt "My question" --dry-run
 ```
 
-Dry run writes to `.start/temp/`:
+Dry run writes the composed inputs to `/tmp/start-<timestamp>/` for post-run inspection:
 
 ```
-.start/temp/
+/tmp/start-<timestamp>/
 ├── role.md       # System prompt (role content)
 ├── prompt.md     # Full composed prompt
 └── command.txt   # Exact command that would execute
@@ -197,6 +239,22 @@ start prompt [text] [flags]
 start task <name> [instructions] [flags]
 ```
 
+### Inspection
+
+```bash
+# List all configured items with descriptions
+start show
+
+# Inspect a specific resource by name (searches all categories)
+start show <name>
+
+# Inspect by category
+start show role <name>
+start show context <name>
+start show task <name>
+start show agent <name>
+```
+
 ### Assets Management
 
 ```bash
@@ -207,8 +265,8 @@ start assets browse
 start assets search go
 
 # Install a package
-start assets add role/go-expert
-start assets add task/pre-commit-review
+start assets add golang/teacher
+start assets add review/git-diff
 
 # List installed assets
 start assets list
@@ -224,11 +282,14 @@ start assets update
 start config
 
 # Edit specific sections interactively
-start config edit agent
-start config edit role
-start config edit context
-start config edit task
-start config edit settings
+start config agent edit
+start config role edit
+start config context edit
+start config task edit
+start config settings edit
+
+# Interactive edit
+start config agent edit gemini/interactive
 ```
 
 ### Search and Discovery
@@ -236,7 +297,10 @@ start config edit settings
 ```bash
 # Search across all installed and registry assets
 start search go
-start search review
+
+start search <query>        # search global and local config, and assets index
+start config search <query> # search global and local config
+start assets search <query> # search installable assets
 ```
 
 ### Diagnostics
@@ -259,18 +323,18 @@ start completion fish
 
 ### Global Flags
 
-| Flag | Short | Description |
-|------|-------|-------------|
-| `--agent` | `-a` | Override agent for this session |
-| `--role` | `-r` | Override role (config name or file path) |
-| `--model` | `-m` | Override model selection |
-| `--context` | `-c` | Select contexts (tags or file paths) |
-| `--dry-run` | | Preview execution without launching |
-| `--local` | `-l` | Use project-local config (`./.start/`) |
-| `--quiet` | `-q` | Suppress output |
-| `--verbose` | | Detailed output |
-| `--debug` | | Debug output (implies `--verbose`) |
-| `--no-color` | | Disable coloured output |
+| Flag         | Short | Description                              |
+| ------------ | ----- | ---------------------------------------- |
+| `--agent`    | `-a`  | Override agent for this session          |
+| `--role`     | `-r`  | Override role (config name or file path) |
+| `--model`    | `-m`  | Override model selection                 |
+| `--context`  | `-c`  | Select contexts (tags or file paths)     |
+| `--dry-run`  |       | Preview execution without launching      |
+| `--local`    | `-l`  | Use project-local config (`./.start/`)   |
+| `--quiet`    | `-q`  | Suppress output                          |
+| `--verbose`  |       | Detailed output                          |
+| `--debug`    |       | Debug output (implies `--verbose`)       |
+| `--no-color` |       | Disable coloured output                  |
 
 ### File Path Support
 
@@ -287,7 +351,7 @@ start task ./tasks/my-workflow.md "Additional instructions"
 
 1. Exact name match in configuration
 2. Substring match (e.g., `review` matches `code-review`)
-3. Registry lookup with auto-install prompt
+3. Registry lookup with auto-install
 
 ## Contributing
 
@@ -296,15 +360,6 @@ Contributions welcome! Please:
 1. Check existing issues: https://github.com/grantcarthew/start/issues
 2. Create an issue for bugs or feature requests
 3. Submit pull requests against the `main` branch
-
-### Reporting Issues
-
-Include:
-
-- start version: `start --version`
-- Operating system and version
-- Full command and error message
-- Output from `start doctor`
 
 ## License
 

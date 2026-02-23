@@ -1538,7 +1538,7 @@ func TestPromptModels_KeepDefault(t *testing.T) {
 func TestPromptModels_Clear(t *testing.T) {
 	current := map[string]string{"fast": "gpt-4", "smart": "gpt-4-turbo"}
 	stdout := &bytes.Buffer{}
-	stdin := strings.NewReader("c\n")
+	stdin := strings.NewReader("c\n\n") // clear then Enter to finish add-models loop
 
 	result, err := promptModels(stdout, stdin, current)
 	if err != nil {
@@ -1547,6 +1547,21 @@ func TestPromptModels_Clear(t *testing.T) {
 
 	if len(result) != 0 {
 		t.Errorf("expected empty models after clear, got: %v", result)
+	}
+}
+
+func TestPromptModels_ClearThenAdd(t *testing.T) {
+	current := map[string]string{"fast": "gpt-4", "smart": "gpt-4-turbo"}
+	stdout := &bytes.Buffer{}
+	stdin := strings.NewReader("c\nnew=gpt-5\n\n") // clear, add one model, finish
+
+	result, err := promptModels(stdout, stdin, current)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(result) != 1 || result["new"] != "gpt-5" {
+		t.Errorf("expected one new model after clear-then-add, got: %v", result)
 	}
 }
 
