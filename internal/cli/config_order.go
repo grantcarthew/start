@@ -16,18 +16,35 @@ import (
 // addConfigOrderCommand adds the bare order command to the config command.
 func addConfigOrderCommand(parent *cobra.Command) {
 	orderCmd := &cobra.Command{
-		Use:     "order",
+		Use:     "order [category]",
 		Aliases: []string{"reorder"},
 		Short:   "Reorder configuration items",
 		Long: `Reorder contexts or roles interactively.
 
-Prompts to choose between contexts or roles, then provides
-an interactive reorder flow.`,
-		Args: noArgsOrHelp,
+Provide a category (context, role) or omit it to be prompted
+interactively. Non-orderable categories (agent, task) fall back
+to the interactive menu.`,
+		Args: cobra.MaximumNArgs(1),
 		RunE: runConfigOrder,
 	}
 
 	parent.AddCommand(orderCmd)
+}
+
+// resolveOrderCategory maps a category argument to the canonical reorder target.
+// Returns ("contexts"/"roles", true) for orderable categories, ("", true) for known
+// non-orderable categories (agent, task), and ("", false) for unknown categories.
+func resolveOrderCategory(arg string) (string, bool) {
+	singular := strings.TrimSuffix(strings.ToLower(arg), "s")
+	switch singular {
+	case "context":
+		return "contexts", true
+	case "role":
+		return "roles", true
+	case "agent", "task":
+		return "", true
+	}
+	return "", false
 }
 
 // runConfigOrder prompts the user to select contexts or roles, then runs reorder.
@@ -43,10 +60,23 @@ func runConfigOrder(cmd *cobra.Command, args []string) error {
 	stdout := cmd.OutOrStdout()
 	local := getFlags(cmd).Local
 
-	_, _ = fmt.Fprintln(stdout, "Reorder:")
-	category, err := promptSelectCategory(stdout, stdin, []string{"contexts", "roles"})
-	if err != nil || category == "" {
-		return err
+	category := ""
+	if len(args) > 0 {
+		// Known non-orderable categories (agent, task) fall back silently; unknown categories get an error.
+		var known bool
+		category, known = resolveOrderCategory(args[0])
+		if category == "" && !known {
+			_, _ = fmt.Fprintf(stdout, "unknown category %q\n", args[0])
+		}
+	}
+
+	if category == "" {
+		_, _ = fmt.Fprintln(stdout, "Reorder:")
+		var err error
+		category, err = promptSelectCategory(stdout, stdin, []string{"contexts", "roles"})
+		if err != nil || category == "" {
+			return err
+		}
 	}
 
 	switch category {

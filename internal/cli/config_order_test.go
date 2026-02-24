@@ -8,6 +8,70 @@ import (
 	"testing"
 )
 
+func TestResolveOrderCategory(t *testing.T) {
+	tests := []struct {
+		arg   string
+		want  string
+		known bool
+	}{
+		// orderable — singular and plural, lowercase
+		{"context", "contexts", true},
+		{"contexts", "contexts", true},
+		{"role", "roles", true},
+		{"roles", "roles", true},
+		// orderable — mixed case
+		{"Context", "contexts", true},
+		{"Role", "roles", true},
+		{"ROLES", "roles", true},
+		{"CONTEXTS", "contexts", true},
+		// non-orderable known categories
+		{"agent", "", true},
+		{"agents", "", true},
+		{"task", "", true},
+		{"tasks", "", true},
+		// truly unknown
+		{"xyz", "", false},
+		{"", "", false},
+	}
+
+	for _, tc := range tests {
+		name := tc.arg
+		if name == "" {
+			name = "empty"
+		}
+		t.Run(name, func(t *testing.T) {
+			got, known := resolveOrderCategory(tc.arg)
+			if got != tc.want || known != tc.known {
+				t.Errorf("resolveOrderCategory(%q) = (%q, %v), want (%q, %v)", tc.arg, got, known, tc.want, tc.known)
+			}
+		})
+	}
+}
+
+func TestConfigOrder_NonTerminal_RejectsAllArgs(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+	chdir(t, tmpDir)
+
+	for _, arg := range []string{"context", "role", "agent", "task", "xyz"} {
+		t.Run(arg, func(t *testing.T) {
+			cmd := NewRootCmd()
+			cmd.SetIn(strings.NewReader(""))
+			cmd.SetOut(&bytes.Buffer{})
+			cmd.SetErr(&bytes.Buffer{})
+			cmd.SetArgs([]string{"config", "order", arg})
+
+			err := cmd.Execute()
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !strings.Contains(err.Error(), "interactive reordering requires a terminal") {
+				t.Errorf("expected terminal error, got %v", err)
+			}
+		})
+	}
+}
+
 func TestRunReorderLoop_MoveUp(t *testing.T) {
 	order := []string{"alpha", "beta", "gamma"}
 	formatItem := func(i int, name string) string {

@@ -66,7 +66,7 @@ func runConfigOpen(cmd *cobra.Command, args []string) error {
 // the given category. Both singular and plural forms are accepted.
 func resolveConfigOpenPath(local bool, category string) (string, error) {
 	// Normalise plural to singular by stripping a trailing "s".
-	singular := strings.TrimSuffix(category, "s")
+	singular := strings.TrimSuffix(strings.ToLower(category), "s")
 
 	var filename string
 	switch singular {
