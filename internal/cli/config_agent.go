@@ -3,6 +3,7 @@ package cli
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -119,23 +120,14 @@ func addConfigAgentAddCommand(parent *cobra.Command) {
 		Short: "Add a new agent",
 		Long: `Add a new agent configuration.
 
-Provide agent details via flags or run interactively to be prompted for values.
+Run interactively to be prompted for values.
 
 Examples:
   start config agent add
-  start config agent add --name gemini --bin gemini --command 'gemini "{{.prompt}}"'
-  start config agent add --local --name project-agent --bin claude --command 'claude "{{.prompt}}"'`,
+  start config agent add --local`,
 		Args: noArgsOrHelp,
 		RunE: runConfigAgentAdd,
 	}
-
-	addCmd.Flags().String("name", "", "Agent name (identifier)")
-	addCmd.Flags().String("bin", "", "Binary executable name")
-	addCmd.Flags().String("command", "", "Command template")
-	addCmd.Flags().String("default-model", "", "Default model alias")
-	addCmd.Flags().String("description", "", "Description")
-	addCmd.Flags().StringSlice("model", nil, "Model mapping (alias=model-id)")
-	addCmd.Flags().StringSlice("tag", nil, "Tags")
 
 	parent.AddCommand(addCmd)
 }
@@ -146,95 +138,53 @@ func runConfigAgentAdd(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	stdin := cmd.InOrStdin()
-	stdout := cmd.OutOrStdout()
-	local := getFlags(cmd).Local
+	if !isTerminal(stdin) {
+		return fmt.Errorf("interactive add requires a terminal")
+	}
+	return configAgentAdd(stdin, cmd.OutOrStdout(), getFlags(cmd).Local)
+}
 
-	// Check if interactive - only prompt for optional fields if no flags provided
-	isTTY := isTerminal(stdin)
-	// If any flags are set, skip prompts for optional fields
-	hasFlags := anyFlagChanged(cmd, "name", "bin", "command", "default-model", "description", "model", "tag")
-	interactive := isTTY && !hasFlags
-
-	// Get flag values
-	name, _ := cmd.Flags().GetString("name")
-	if name == "" {
-		if !isTTY {
-			return fmt.Errorf("--name is required (run interactively or provide flag)")
-		}
-		var err error
-		name, err = promptString(stdout, stdin, "Agent name", "")
-		if err != nil {
-			return err
-		}
+// configAgentAdd is the inner add logic for agents.
+func configAgentAdd(stdin io.Reader, stdout io.Writer, local bool) error {
+	name, err := promptString(stdout, stdin, "Agent name", "")
+	if err != nil {
+		return err
 	}
 	if name == "" {
 		return fmt.Errorf("agent name is required")
 	}
 
-	bin, _ := cmd.Flags().GetString("bin")
-	if bin == "" && interactive {
-		var err error
-		bin, err = promptString(stdout, stdin, "Binary (optional)", "")
-		if err != nil {
-			return err
-		}
+	bin, err := promptString(stdout, stdin, "Binary (optional)", "")
+	if err != nil {
+		return err
 	}
 
-	command, _ := cmd.Flags().GetString("command")
-	if command == "" {
-		if !isTTY {
-			return fmt.Errorf("--command is required (run interactively or provide flag)")
-		}
-		var err error
-		defaultCmd := fmt.Sprintf("%s \"{{.prompt}}\"", bin)
-		command, err = promptString(stdout, stdin, "Command template", defaultCmd)
-		if err != nil {
-			return err
-		}
+	defaultCmd := fmt.Sprintf("%s \"{{.prompt}}\"", bin)
+	command, err := promptString(stdout, stdin, "Command template", defaultCmd)
+	if err != nil {
+		return err
 	}
 	if command == "" {
 		return fmt.Errorf("command template is required")
 	}
 
-	defaultModel, _ := cmd.Flags().GetString("default-model")
-	if defaultModel == "" && interactive {
-		var err error
-		defaultModel, err = promptString(stdout, stdin, "Default model (optional)", "")
-		if err != nil {
-			return err
-		}
+	defaultModel, err := promptString(stdout, stdin, "Default model (optional)", "")
+	if err != nil {
+		return err
 	}
 
-	description, _ := cmd.Flags().GetString("description")
-	if description == "" && interactive {
-		var err error
-		description, err = promptString(stdout, stdin, "Description (optional)", "")
-		if err != nil {
-			return err
-		}
+	description, err := promptString(stdout, stdin, "Description (optional)", "")
+	if err != nil {
+		return err
 	}
 
-	// Parse models
-	agentModels, _ := cmd.Flags().GetStringSlice("model")
-	agentTags, _ := cmd.Flags().GetStringSlice("tag")
-	models := make(map[string]string)
-	for _, m := range agentModels {
-		parts := strings.SplitN(m, "=", 2)
-		if len(parts) != 2 {
-			return fmt.Errorf("invalid model format %q (expected alias=model-id)", m)
-		}
-		models[parts[0]] = parts[1]
-	}
-
-	// Build agent struct
+	// Build agent struct (models and tags are empty on add; use edit to add them)
 	agent := AgentConfig{
 		Name:         name,
 		Bin:          bin,
 		Command:      command,
 		DefaultModel: defaultModel,
 		Description:  description,
-		Models:       models,
-		Tags:         agentTags,
 	}
 
 	// Determine target directory
@@ -271,11 +221,8 @@ func runConfigAgentAdd(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("writing agents file: %w", err)
 	}
 
-	flags := getFlags(cmd)
-	if !flags.Quiet {
-		_, _ = fmt.Fprintf(stdout, "Added agent %q to %s config\n", name, scopeName)
-		_, _ = fmt.Fprintf(stdout, "Config: %s\n", agentPath)
-	}
+	_, _ = fmt.Fprintf(stdout, "Added agent %q to %s config\n", name, scopeName)
+	_, _ = fmt.Fprintf(stdout, "Config: %s\n", agentPath)
 
 	return nil
 }
@@ -370,23 +317,14 @@ func addConfigAgentEditCommand(parent *cobra.Command) {
 		Long: `Edit agent configuration.
 
 Without a name, opens the agents.cue file in $EDITOR.
-With a name and flags, updates only the specified fields.
-With a name and no flags, prompts interactively for values.
+With a name, prompts interactively for values.
 
 Examples:
   start config agent edit
-  start config agent edit claude --bin claude-code
-  start config agent edit gemini --default-model flash --tag ai,google`,
+  start config agent edit claude`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: runConfigAgentEdit,
 	}
-
-	editCmd.Flags().String("bin", "", "Binary executable name")
-	editCmd.Flags().String("command", "", "Command template")
-	editCmd.Flags().String("default-model", "", "Default model alias")
-	editCmd.Flags().String("description", "", "Description")
-	editCmd.Flags().StringSlice("model", nil, "Model mapping (alias=model-id)")
-	editCmd.Flags().StringSlice("tag", nil, "Tags")
 
 	parent.AddCommand(editCmd)
 }
@@ -398,9 +336,7 @@ func runConfigAgentEdit(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("resolving config paths: %w", err)
 	}
-
 	configDir := paths.Dir(local)
-
 	agentPath := filepath.Join(configDir, "agents.cue")
 
 	// No name: open file in editor
@@ -408,10 +344,22 @@ func runConfigAgentEdit(cmd *cobra.Command, args []string) error {
 		return openInEditor(agentPath)
 	}
 
-	// Named edit
-	name := args[0]
 	stdin := cmd.InOrStdin()
-	stdout := cmd.OutOrStdout()
+	if !isTerminal(stdin) {
+		return fmt.Errorf("interactive edit requires a terminal")
+	}
+	return configAgentEdit(stdin, cmd.OutOrStdout(), local, args[0])
+}
+
+// configAgentEdit is the inner edit logic for agents.
+func configAgentEdit(stdin io.Reader, stdout io.Writer, local bool, name string) error {
+	// Determine target directory
+	paths, err := config.ResolvePaths("")
+	if err != nil {
+		return fmt.Errorf("resolving config paths: %w", err)
+	}
+	configDir := paths.Dir(local)
+	agentPath := filepath.Join(configDir, "agents.cue")
 
 	// Load existing agents
 	agents, _, err := loadAgentsFromDir(configDir)
@@ -422,58 +370,6 @@ func runConfigAgentEdit(cmd *cobra.Command, args []string) error {
 	resolvedName, agent, err := resolveInstalledName(agents, "agent", name)
 	if err != nil {
 		return err
-	}
-
-	// Check if any edit flags are provided
-	hasEditFlags := anyFlagChanged(cmd, "bin", "command", "default-model", "description", "model", "tag")
-
-	if hasEditFlags {
-		// Non-interactive flag-based update
-		if cmd.Flags().Changed("bin") {
-			agent.Bin, _ = cmd.Flags().GetString("bin")
-		}
-		if cmd.Flags().Changed("command") {
-			agent.Command, _ = cmd.Flags().GetString("command")
-		}
-		if cmd.Flags().Changed("default-model") {
-			agent.DefaultModel, _ = cmd.Flags().GetString("default-model")
-		}
-		if cmd.Flags().Changed("description") {
-			agent.Description, _ = cmd.Flags().GetString("description")
-		}
-		if cmd.Flags().Changed("model") {
-			// Replace models entirely when specified
-			agentModels, _ := cmd.Flags().GetStringSlice("model")
-			agent.Models = make(map[string]string)
-			for _, m := range agentModels {
-				parts := strings.SplitN(m, "=", 2)
-				if len(parts) != 2 {
-					return fmt.Errorf("invalid model format %q (expected alias=model-id)", m)
-				}
-				agent.Models[parts[0]] = parts[1]
-			}
-		}
-		if cmd.Flags().Changed("tag") {
-			agent.Tags, _ = cmd.Flags().GetStringSlice("tag")
-		}
-
-		agents[resolvedName] = agent
-
-		if err := writeAgentsFile(agentPath, agents); err != nil {
-			return fmt.Errorf("writing agents file: %w", err)
-		}
-
-		flags := getFlags(cmd)
-		if !flags.Quiet {
-			_, _ = fmt.Fprintf(stdout, "Updated agent %q\n", resolvedName)
-		}
-		return nil
-	}
-
-	// No flags: require TTY for interactive editing
-	isTTY := isTerminal(stdin)
-	if !isTTY {
-		return fmt.Errorf("interactive editing requires a terminal")
 	}
 
 	// Prompt for each field with current value as default

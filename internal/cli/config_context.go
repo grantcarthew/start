@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -116,26 +117,16 @@ func addConfigContextAddCommand(parent *cobra.Command) {
 		Short: "Add a new context",
 		Long: `Add a new context configuration.
 
-Provide context details via flags or run interactively to be prompted for values.
+Run interactively to be prompted for values.
 
 A context must have exactly one content source: file, command, or prompt.
 
 Examples:
   start config context add
-  start config context add --name project --file PROJECT.md --required
-  start config context add --local --name readme --file README.md --default`,
+  start config context add --local`,
 		Args: noArgsOrHelp,
 		RunE: runConfigContextAdd,
 	}
-
-	addCmd.Flags().String("name", "", "Context name (identifier)")
-	addCmd.Flags().String("description", "", "Description")
-	addCmd.Flags().String("file", "", "Path to context file")
-	addCmd.Flags().String("command", "", "Command to generate content")
-	addCmd.Flags().String("prompt", "", "Inline content text")
-	addCmd.Flags().Bool("required", false, "Always include regardless of context selection")
-	addCmd.Flags().Bool("default", false, "Include when no specific contexts are selected")
-	addCmd.Flags().StringSlice("tag", nil, "Tags")
 
 	parent.AddCommand(addCmd)
 }
@@ -146,45 +137,34 @@ func runConfigContextAdd(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	stdin := cmd.InOrStdin()
-	stdout := cmd.OutOrStdout()
-	local := getFlags(cmd).Local
+	if !isTerminal(stdin) {
+		return fmt.Errorf("interactive add requires a terminal")
+	}
+	return configContextAdd(stdin, cmd.OutOrStdout(), getFlags(cmd).Local)
+}
 
-	// Check if interactive - only prompt for optional fields if no flags provided
-	isTTY := isTerminal(stdin)
-	// If any flags are set, skip prompts for optional fields
-	hasFlags := anyFlagChanged(cmd, "name", "description", "file", "command", "prompt", "required", "default", "tag")
-	interactive := isTTY && !hasFlags
-
-	// Get flag values
-	name, _ := cmd.Flags().GetString("name")
-	if name == "" {
-		if !isTTY {
-			return fmt.Errorf("--name is required (run interactively or provide flag)")
-		}
-		var err error
-		name, err = promptString(stdout, stdin, "Context name", "")
-		if err != nil {
-			return err
-		}
+// configContextAdd is the inner add logic for contexts.
+func configContextAdd(stdin io.Reader, stdout io.Writer, local bool) error {
+	name, err := promptString(stdout, stdin, "Context name", "")
+	if err != nil {
+		return err
 	}
 	if name == "" {
 		return fmt.Errorf("context name is required")
 	}
 
-	description, _ := cmd.Flags().GetString("description")
-	if description == "" && interactive {
-		var err error
-		description, err = promptString(stdout, stdin, "Description (optional)", "")
-		if err != nil {
-			return err
-		}
+	description, err := promptString(stdout, stdin, "Description (optional)", "")
+	if err != nil {
+		return err
 	}
 
 	// Content source
-	file, _ := cmd.Flags().GetString("file")
-	command, _ := cmd.Flags().GetString("command")
-	prompt, _ := cmd.Flags().GetString("prompt")
+	file, command, prompt, err := promptContentSource(stdout, stdin, "1", "")
+	if err != nil {
+		return err
+	}
 
+	// Validate content source
 	sourceCount := 0
 	if file != "" {
 		sourceCount++
@@ -196,37 +176,16 @@ func runConfigContextAdd(cmd *cobra.Command, args []string) error {
 		sourceCount++
 	}
 
-	if sourceCount == 0 && interactive {
-		var err error
-		file, command, prompt, err = promptContentSource(stdout, stdin, "1", "")
-		if err != nil {
-			return err
-		}
-	}
-
-	// Validate content source
-	sourceCount = 0
-	if file != "" {
-		sourceCount++
-	}
-	if command != "" {
-		sourceCount++
-	}
-	if prompt != "" {
-		sourceCount++
-	}
-
 	if sourceCount == 0 {
-		return fmt.Errorf("must specify one of: --file, --command, or --prompt")
+		return fmt.Errorf("must specify one of: file, command, or prompt")
 	}
 	if sourceCount > 1 {
-		return fmt.Errorf("specify only one of: --file, --command, or --prompt")
+		return fmt.Errorf("specify only one of: file, command, or prompt")
 	}
 
-	// Ask about required/default if interactive
-	required, _ := cmd.Flags().GetBool("required")
-	isDefault, _ := cmd.Flags().GetBool("default")
-	if isTTY && !required && !isDefault {
+	// Ask about required/default
+	var required, isDefault bool
+	{
 		_, _ = fmt.Fprintf(stdout, "Required %s? %s ", tui.Annotate("always include"), tui.Bracket("y/N"))
 		reader := bufio.NewReader(stdin)
 		input, err := reader.ReadString('\n')
@@ -247,8 +206,7 @@ func runConfigContextAdd(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Build context struct
-	tags, _ := cmd.Flags().GetStringSlice("tag")
+	// Build context struct (tags are empty on add; use edit to set them)
 	ctx := ContextConfig{
 		Name:        name,
 		Description: description,
@@ -257,7 +215,6 @@ func runConfigContextAdd(cmd *cobra.Command, args []string) error {
 		Prompt:      prompt,
 		Required:    required,
 		Default:     isDefault,
-		Tags:        tags,
 	}
 
 	// Determine target directory
@@ -294,11 +251,8 @@ func runConfigContextAdd(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("writing contexts file: %w", err)
 	}
 
-	flags := getFlags(cmd)
-	if !flags.Quiet {
-		_, _ = fmt.Fprintf(stdout, "Added context %q to %s config\n", name, scopeName)
-		_, _ = fmt.Fprintf(stdout, "Config: %s\n", contextPath)
-	}
+	_, _ = fmt.Fprintf(stdout, "Added context %q to %s config\n", name, scopeName)
+	_, _ = fmt.Fprintf(stdout, "Config: %s\n", contextPath)
 
 	return nil
 }
@@ -383,24 +337,14 @@ func addConfigContextEditCommand(parent *cobra.Command) {
 		Long: `Edit context configuration.
 
 Without a name, opens the contexts.cue file in $EDITOR.
-With a name and flags, updates only the specified fields.
-With a name and no flags, prompts interactively for values.
+With a name, prompts interactively for values.
 
 Examples:
   start config context edit
-  start config context edit project --file PROJECT.md
-  start config context edit readme --required=true --default=false`,
+  start config context edit project`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: runConfigContextEdit,
 	}
-
-	editCmd.Flags().String("description", "", "Description")
-	editCmd.Flags().String("file", "", "Path to context file")
-	editCmd.Flags().String("command", "", "Command to generate content")
-	editCmd.Flags().String("prompt", "", "Inline content text")
-	editCmd.Flags().Bool("required", false, "Always include regardless of context selection")
-	editCmd.Flags().Bool("default", false, "Include when no specific contexts are selected")
-	editCmd.Flags().StringSlice("tag", nil, "Tags")
 
 	parent.AddCommand(editCmd)
 }
@@ -412,9 +356,7 @@ func runConfigContextEdit(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("resolving config paths: %w", err)
 	}
-
 	configDir := paths.Dir(local)
-
 	contextPath := filepath.Join(configDir, "contexts.cue")
 
 	// No name: open file in editor
@@ -422,10 +364,22 @@ func runConfigContextEdit(cmd *cobra.Command, args []string) error {
 		return openInEditor(contextPath)
 	}
 
-	// Named edit
-	name := args[0]
 	stdin := cmd.InOrStdin()
-	stdout := cmd.OutOrStdout()
+	if !isTerminal(stdin) {
+		return fmt.Errorf("interactive edit requires a terminal")
+	}
+	return configContextEdit(stdin, cmd.OutOrStdout(), local, args[0])
+}
+
+// configContextEdit is the inner edit logic for contexts.
+func configContextEdit(stdin io.Reader, stdout io.Writer, local bool, name string) error {
+	// Determine target directory
+	paths, err := config.ResolvePaths("")
+	if err != nil {
+		return fmt.Errorf("resolving config paths: %w", err)
+	}
+	configDir := paths.Dir(local)
+	contextPath := filepath.Join(configDir, "contexts.cue")
 
 	// Load existing contexts
 	contexts, order, err := loadContextsFromDir(configDir)
@@ -436,52 +390,6 @@ func runConfigContextEdit(cmd *cobra.Command, args []string) error {
 	resolvedName, ctx, err := resolveInstalledName(contexts, "context", name)
 	if err != nil {
 		return err
-	}
-
-	// Check if any edit flags are provided
-	hasEditFlags := anyFlagChanged(cmd, "description", "file", "command", "prompt", "required", "default", "tag")
-
-	if hasEditFlags {
-		// Non-interactive flag-based update
-		if cmd.Flags().Changed("description") {
-			ctx.Description, _ = cmd.Flags().GetString("description")
-		}
-		if cmd.Flags().Changed("file") {
-			ctx.File, _ = cmd.Flags().GetString("file")
-		}
-		if cmd.Flags().Changed("command") {
-			ctx.Command, _ = cmd.Flags().GetString("command")
-		}
-		if cmd.Flags().Changed("prompt") {
-			ctx.Prompt, _ = cmd.Flags().GetString("prompt")
-		}
-		if cmd.Flags().Changed("required") {
-			ctx.Required, _ = cmd.Flags().GetBool("required")
-		}
-		if cmd.Flags().Changed("default") {
-			ctx.Default, _ = cmd.Flags().GetBool("default")
-		}
-		if cmd.Flags().Changed("tag") {
-			ctx.Tags, _ = cmd.Flags().GetStringSlice("tag")
-		}
-
-		contexts[resolvedName] = ctx
-
-		if err := writeContextsFile(contextPath, contexts, order); err != nil {
-			return fmt.Errorf("writing contexts file: %w", err)
-		}
-
-		flags := getFlags(cmd)
-		if !flags.Quiet {
-			_, _ = fmt.Fprintf(stdout, "Updated context %q\n", resolvedName)
-		}
-		return nil
-	}
-
-	// No flags: require TTY for interactive editing
-	isTTY := isTerminal(stdin)
-	if !isTTY {
-		return fmt.Errorf("interactive editing requires a terminal")
 	}
 
 	// Prompt for each field with current value as default

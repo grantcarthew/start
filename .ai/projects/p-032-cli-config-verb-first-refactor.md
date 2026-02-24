@@ -91,11 +91,11 @@ start show task [name]        # restrict to tasks
 
 Implementation:
 
-- `internal/cli/config.go` — 187 lines, root config command and noun-group registration
-- `internal/cli/config_agent.go` — 918 lines, agent noun group (add/edit/remove/list/info/default/order)
-- `internal/cli/config_role.go` — 722 lines, role noun group (add/edit/remove/list/info/order)
-- `internal/cli/config_context.go` — 789 lines, context noun group (add/edit/remove/list/info/order)
-- `internal/cli/config_task.go` — 735 lines, task noun group (add/edit/remove/list/info)
+- `internal/cli/config.go` — 177 lines, root config command and noun-group registration
+- `internal/cli/config_agent.go` — 801 lines, agent noun group (add/edit/remove/list/info/default/order)
+- `internal/cli/config_role.go` — 621 lines, role noun group (add/edit/remove/list/info/order)
+- `internal/cli/config_context.go` — 684 lines, context noun group (add/edit/remove/list/info/order)
+- `internal/cli/config_task.go` — 633 lines, task noun group (add/edit/remove/list/info)
 - `internal/cli/config_helpers.go` — 837 lines, shared CUE read/write helpers, field prompt helpers
 - `internal/cli/config_interactive.go` — 200 lines, shared interactive picker flows
 - `internal/cli/config_order.go` — 288 lines, top-level order command
@@ -104,11 +104,11 @@ Implementation:
 
 Tests:
 
-- `internal/cli/config_test.go` — 1988 lines
-- `internal/cli/config_integration_test.go` — 1095 lines
-- `internal/cli/config_order_test.go` — 774 lines
+- `internal/cli/config_test.go` — 1915 lines
+- `internal/cli/config_integration_test.go` — 1103 lines
+- `internal/cli/config_order_test.go` — 768 lines
 - `internal/cli/config_helpers_test.go` — 461 lines
-- `internal/cli/config_interactive_test.go` — 101 lines
+- `internal/cli/config_interactive_test.go` — 116 lines
 
 ### Codebase observations
 
@@ -125,7 +125,7 @@ All of the above must migrate to `config_types.go` (new file) as a prerequisite 
 
 `config_order.go` contains `addConfigContextOrderCommand` and `addConfigRoleOrderCommand` which are registered by the noun-group files. These registration functions become dead code after noun group deletion and should be removed from `config_order.go`. The reorder logic (`reorderContexts`, `reorderRoles`, `runReorderLoop`) is reusable and stays.
 
-Integration tests in `config_integration_test.go` use `--flag` style adds (e.g. `--name claude --bin claude`). Since `config add` is now always interactive with no flags, all integration tests must drive interactive prompts via stdin rather than flags.
+Integration tests in `config_integration_test.go` are converted to stdin-driven input by p-034, which is a prerequisite. By the time p-032 begins, the integration tests already use interactive input. The test rewrite in p-032 is therefore a command-path update rather than a full interactive conversion.
 
 `config_helpers.go` already contains the shared infrastructure the new verb commands will call directly:
 
@@ -145,9 +145,11 @@ The `promptModels` bug fix (clear option calls `promptModelsEdit` instead of ret
 
 `internal/orchestration` has a pre-existing test failure unrelated to p-032 (`TestBuildCommand_WithEnvVarPrefix` fails because the test environment has no `gemini` binary). This failure predates p-032. The success criterion "All tests pass via `scripts/invoke-tests`" should be read as "all CLI tests pass and no new failures are introduced". Verify with `go test ./internal/cli/...` to confirm CLI-scope test health independently.
 
-`go test ./internal/cli/...` passes — confirmed green baseline. Working tree is clean.
+`go test ./internal/cli/...` passes — confirmed green baseline. p-034 is complete; all add/edit commands are already always interactive with no field flags.
 
-The README was updated prior to p-032 start (agent/role/task name updates and added Inspection section). The config and show command examples in the README still use the old noun-first paths and will be updated in Phase 4 of this project.
+The README was updated prior to p-032 start (agent/role/task name updates and added Inspection section). The config and show command examples in the README still use the old noun-first paths and will be updated in Phase 3 of this project.
+
+p-033 is complete. `start show` noun subcommands (`show agent`, `show role`, `show context`, `show task`) have been removed. The prerequisite for p-032 is met.
 
 ## Goals
 
@@ -547,4 +549,5 @@ Requires all config-touching projects complete:
 - p-018 CLI Interactive Edit Completeness
 - p-023 CLI Config Reorder
 - p-027 CLI Content Source Menu Extraction
-- p-033 CLI Show Noun Subcommand Removal
+- p-033 CLI Show Noun Subcommand Removal (complete)
+- p-034 CLI Config Add/Edit Flags Removal

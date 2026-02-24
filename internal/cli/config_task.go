@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -109,25 +110,16 @@ func addConfigTaskAddCommand(parent *cobra.Command) {
 		Short: "Add a new task",
 		Long: `Add a new task configuration.
 
-Provide task details via flags or run interactively to be prompted for values.
+Run interactively to be prompted for values.
 
 A task must have exactly one content source: file, command, or prompt.
 
 Examples:
   start config task add
-  start config task add --name review --prompt "Review this code for bugs"
-  start config task add --name commit --file ~/.config/start/tasks/commit.md --role git-expert`,
+  start config task add --local`,
 		Args: noArgsOrHelp,
 		RunE: runConfigTaskAdd,
 	}
-
-	addCmd.Flags().String("name", "", "Task name (identifier)")
-	addCmd.Flags().String("description", "", "Description")
-	addCmd.Flags().String("file", "", "Path to task prompt file")
-	addCmd.Flags().String("command", "", "Command to generate prompt")
-	addCmd.Flags().String("prompt", "", "Inline prompt text")
-	addCmd.Flags().String("role", "", "Role to use for this task")
-	addCmd.Flags().StringSlice("tag", nil, "Tags")
 
 	parent.AddCommand(addCmd)
 }
@@ -138,45 +130,35 @@ func runConfigTaskAdd(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	stdin := cmd.InOrStdin()
-	stdout := cmd.OutOrStdout()
-	local := getFlags(cmd).Local
+	if !isTerminal(stdin) {
+		return fmt.Errorf("interactive add requires a terminal")
+	}
+	return configTaskAdd(stdin, cmd.OutOrStdout(), getFlags(cmd).Local)
+}
 
-	// Check if interactive - only prompt for optional fields if no flags provided
-	isTTY := isTerminal(stdin)
-	// If any flags are set, skip prompts for optional fields
-	hasFlags := anyFlagChanged(cmd, "name", "description", "file", "command", "prompt", "role", "tag")
-	interactive := isTTY && !hasFlags
-
+// configTaskAdd is the inner add logic for tasks.
+func configTaskAdd(stdin io.Reader, stdout io.Writer, local bool) error {
 	// Collect values
-	name, _ := cmd.Flags().GetString("name")
-	if name == "" {
-		if !isTTY {
-			return fmt.Errorf("--name is required (run interactively or provide flag)")
-		}
-		var err error
-		name, err = promptString(stdout, stdin, "Task name", "")
-		if err != nil {
-			return err
-		}
+	name, err := promptString(stdout, stdin, "Task name", "")
+	if err != nil {
+		return err
 	}
 	if name == "" {
 		return fmt.Errorf("task name is required")
 	}
 
-	description, _ := cmd.Flags().GetString("description")
-	if description == "" && interactive {
-		var err error
-		description, err = promptString(stdout, stdin, "Description (optional)", "")
-		if err != nil {
-			return err
-		}
+	description, err := promptString(stdout, stdin, "Description (optional)", "")
+	if err != nil {
+		return err
 	}
 
 	// Content source
-	file, _ := cmd.Flags().GetString("file")
-	command, _ := cmd.Flags().GetString("command")
-	prompt, _ := cmd.Flags().GetString("prompt")
+	file, command, prompt, err := promptContentSource(stdout, stdin, "3", "")
+	if err != nil {
+		return err
+	}
 
+	// Validate content source
 	sourceCount := 0
 	if file != "" {
 		sourceCount++
@@ -188,45 +170,20 @@ func runConfigTaskAdd(cmd *cobra.Command, args []string) error {
 		sourceCount++
 	}
 
-	if sourceCount == 0 && interactive {
-		var err error
-		file, command, prompt, err = promptContentSource(stdout, stdin, "3", "")
-		if err != nil {
-			return err
-		}
-	}
-
-	// Validate content source
-	sourceCount = 0
-	if file != "" {
-		sourceCount++
-	}
-	if command != "" {
-		sourceCount++
-	}
-	if prompt != "" {
-		sourceCount++
-	}
-
 	if sourceCount == 0 {
-		return fmt.Errorf("must specify one of: --file, --command, or --prompt")
+		return fmt.Errorf("must specify one of: file, command, or prompt")
 	}
 	if sourceCount > 1 {
-		return fmt.Errorf("specify only one of: --file, --command, or --prompt")
+		return fmt.Errorf("specify only one of: file, command, or prompt")
 	}
 
 	// Role (optional)
-	role, _ := cmd.Flags().GetString("role")
-	if role == "" && interactive {
-		var err error
-		role, err = promptString(stdout, stdin, "Role (optional)", "")
-		if err != nil {
-			return err
-		}
+	role, err := promptString(stdout, stdin, "Role (optional)", "")
+	if err != nil {
+		return err
 	}
 
-	// Build task struct
-	tags, _ := cmd.Flags().GetStringSlice("tag")
+	// Build task struct (tags are empty on add; use edit to set them)
 	task := TaskConfig{
 		Name:        name,
 		Description: description,
@@ -234,7 +191,6 @@ func runConfigTaskAdd(cmd *cobra.Command, args []string) error {
 		Command:     command,
 		Prompt:      prompt,
 		Role:        role,
-		Tags:        tags,
 	}
 
 	// Determine target directory
@@ -271,11 +227,8 @@ func runConfigTaskAdd(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("writing tasks file: %w", err)
 	}
 
-	flags := getFlags(cmd)
-	if !flags.Quiet {
-		_, _ = fmt.Fprintf(stdout, "Added task %q to %s config\n", name, scopeName)
-		_, _ = fmt.Fprintf(stdout, "Config: %s\n", taskPath)
-	}
+	_, _ = fmt.Fprintf(stdout, "Added task %q to %s config\n", name, scopeName)
+	_, _ = fmt.Fprintf(stdout, "Config: %s\n", taskPath)
 
 	return nil
 }
@@ -360,23 +313,14 @@ func addConfigTaskEditCommand(parent *cobra.Command) {
 		Long: `Edit task configuration.
 
 Without a name, opens the tasks.cue file in $EDITOR.
-With a name and flags, updates only the specified fields.
-With a name and no flags, prompts interactively for values.
+With a name, prompts interactively for values.
 
 Examples:
   start config task edit
-  start config task edit review --prompt "Review this code for bugs"
-  start config task edit commit --role git-expert`,
+  start config task edit review`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: runConfigTaskEdit,
 	}
-
-	editCmd.Flags().String("description", "", "Description")
-	editCmd.Flags().String("file", "", "Path to task prompt file")
-	editCmd.Flags().String("command", "", "Command to generate prompt")
-	editCmd.Flags().String("prompt", "", "Inline prompt text")
-	editCmd.Flags().String("role", "", "Role to use for this task")
-	editCmd.Flags().StringSlice("tag", nil, "Tags")
 
 	parent.AddCommand(editCmd)
 }
@@ -388,9 +332,7 @@ func runConfigTaskEdit(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("resolving config paths: %w", err)
 	}
-
 	configDir := paths.Dir(local)
-
 	taskPath := filepath.Join(configDir, "tasks.cue")
 
 	// No name: open file in editor
@@ -398,10 +340,22 @@ func runConfigTaskEdit(cmd *cobra.Command, args []string) error {
 		return openInEditor(taskPath)
 	}
 
-	// Named edit
-	name := args[0]
 	stdin := cmd.InOrStdin()
-	stdout := cmd.OutOrStdout()
+	if !isTerminal(stdin) {
+		return fmt.Errorf("interactive edit requires a terminal")
+	}
+	return configTaskEdit(stdin, cmd.OutOrStdout(), local, args[0])
+}
+
+// configTaskEdit is the inner edit logic for tasks.
+func configTaskEdit(stdin io.Reader, stdout io.Writer, local bool, name string) error {
+	// Determine target directory
+	paths, err := config.ResolvePaths("")
+	if err != nil {
+		return fmt.Errorf("resolving config paths: %w", err)
+	}
+	configDir := paths.Dir(local)
+	taskPath := filepath.Join(configDir, "tasks.cue")
 
 	// Load existing tasks
 	tasks, _, err := loadTasksFromDir(configDir)
@@ -412,49 +366,6 @@ func runConfigTaskEdit(cmd *cobra.Command, args []string) error {
 	resolvedName, task, err := resolveInstalledName(tasks, "task", name)
 	if err != nil {
 		return err
-	}
-
-	// Check if any edit flags are provided
-	hasEditFlags := anyFlagChanged(cmd, "description", "file", "command", "prompt", "role", "tag")
-
-	if hasEditFlags {
-		// Non-interactive flag-based update
-		if cmd.Flags().Changed("description") {
-			task.Description, _ = cmd.Flags().GetString("description")
-		}
-		if cmd.Flags().Changed("file") {
-			task.File, _ = cmd.Flags().GetString("file")
-		}
-		if cmd.Flags().Changed("command") {
-			task.Command, _ = cmd.Flags().GetString("command")
-		}
-		if cmd.Flags().Changed("prompt") {
-			task.Prompt, _ = cmd.Flags().GetString("prompt")
-		}
-		if cmd.Flags().Changed("role") {
-			task.Role, _ = cmd.Flags().GetString("role")
-		}
-		if cmd.Flags().Changed("tag") {
-			task.Tags, _ = cmd.Flags().GetStringSlice("tag")
-		}
-
-		tasks[resolvedName] = task
-
-		if err := writeTasksFile(taskPath, tasks); err != nil {
-			return fmt.Errorf("writing tasks file: %w", err)
-		}
-
-		flags := getFlags(cmd)
-		if !flags.Quiet {
-			_, _ = fmt.Fprintf(stdout, "Updated task %q\n", resolvedName)
-		}
-		return nil
-	}
-
-	// No flags: require TTY for interactive editing
-	isTTY := isTerminal(stdin)
-	if !isTTY {
-		return fmt.Errorf("interactive editing requires a terminal")
 	}
 
 	// Prompt for each field with current value as default

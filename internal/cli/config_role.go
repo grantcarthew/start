@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -109,25 +110,16 @@ func addConfigRoleAddCommand(parent *cobra.Command) {
 		Short: "Add a new role",
 		Long: `Add a new role configuration.
 
-Provide role details via flags or run interactively to be prompted for values.
+Run interactively to be prompted for values.
 
 A role must have exactly one content source: file, command, or prompt.
 
 Examples:
   start config role add
-  start config role add --name go-expert --file ~/.config/start/roles/go-expert.md
-  start config role add --name reviewer --prompt "You are a code reviewer..."`,
+  start config role add --local`,
 		Args: noArgsOrHelp,
 		RunE: runConfigRoleAdd,
 	}
-
-	addCmd.Flags().String("name", "", "Role name (identifier)")
-	addCmd.Flags().String("description", "", "Description")
-	addCmd.Flags().String("file", "", "Path to role prompt file")
-	addCmd.Flags().String("command", "", "Command to generate prompt")
-	addCmd.Flags().String("prompt", "", "Inline prompt text")
-	addCmd.Flags().StringSlice("tag", nil, "Tags")
-	addCmd.Flags().Bool("optional", false, "Silently skip if the role file does not exist at runtime")
 
 	parent.AddCommand(addCmd)
 }
@@ -138,45 +130,34 @@ func runConfigRoleAdd(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	stdin := cmd.InOrStdin()
-	stdout := cmd.OutOrStdout()
-	local := getFlags(cmd).Local
+	if !isTerminal(stdin) {
+		return fmt.Errorf("interactive add requires a terminal")
+	}
+	return configRoleAdd(stdin, cmd.OutOrStdout(), getFlags(cmd).Local)
+}
 
-	// Check if interactive - only prompt for optional fields if no flags provided
-	isTTY := isTerminal(stdin)
-	// If any flags are set, skip prompts for optional fields
-	hasFlags := anyFlagChanged(cmd, "name", "description", "file", "command", "prompt", "tag", "optional")
-	interactive := isTTY && !hasFlags
-
-	// Get flag values
-	name, _ := cmd.Flags().GetString("name")
-	if name == "" {
-		if !isTTY {
-			return fmt.Errorf("--name is required (run interactively or provide flag)")
-		}
-		var err error
-		name, err = promptString(stdout, stdin, "Role name", "")
-		if err != nil {
-			return err
-		}
+// configRoleAdd is the inner add logic for roles.
+func configRoleAdd(stdin io.Reader, stdout io.Writer, local bool) error {
+	name, err := promptString(stdout, stdin, "Role name", "")
+	if err != nil {
+		return err
 	}
 	if name == "" {
 		return fmt.Errorf("role name is required")
 	}
 
-	description, _ := cmd.Flags().GetString("description")
-	if description == "" && interactive {
-		var err error
-		description, err = promptString(stdout, stdin, "Description (optional)", "")
-		if err != nil {
-			return err
-		}
+	description, err := promptString(stdout, stdin, "Description (optional)", "")
+	if err != nil {
+		return err
 	}
 
 	// Content source: must have exactly one of file, command, or prompt
-	file, _ := cmd.Flags().GetString("file")
-	command, _ := cmd.Flags().GetString("command")
-	prompt, _ := cmd.Flags().GetString("prompt")
+	file, command, prompt, err := promptContentSource(stdout, stdin, "1", "")
+	if err != nil {
+		return err
+	}
 
+	// Validate content source
 	sourceCount := 0
 	if file != "" {
 		sourceCount++
@@ -188,44 +169,20 @@ func runConfigRoleAdd(cmd *cobra.Command, args []string) error {
 		sourceCount++
 	}
 
-	if sourceCount == 0 && interactive {
-		var err error
-		file, command, prompt, err = promptContentSource(stdout, stdin, "1", "")
-		if err != nil {
-			return err
-		}
-	}
-
-	// Validate content source
-	sourceCount = 0
-	if file != "" {
-		sourceCount++
-	}
-	if command != "" {
-		sourceCount++
-	}
-	if prompt != "" {
-		sourceCount++
-	}
-
 	if sourceCount == 0 {
-		return fmt.Errorf("must specify one of: --file, --command, or --prompt")
+		return fmt.Errorf("must specify one of: file, command, or prompt")
 	}
 	if sourceCount > 1 {
-		return fmt.Errorf("specify only one of: --file, --command, or --prompt")
+		return fmt.Errorf("specify only one of: file, command, or prompt")
 	}
 
-	// Build role struct
-	tags, _ := cmd.Flags().GetStringSlice("tag")
-	optional, _ := cmd.Flags().GetBool("optional")
+	// Build role struct (tags and optional are empty on add; use edit to set them)
 	role := RoleConfig{
 		Name:        name,
 		Description: description,
 		File:        file,
 		Command:     command,
 		Prompt:      prompt,
-		Tags:        tags,
-		Optional:    optional,
 	}
 
 	// Determine target directory
@@ -262,11 +219,8 @@ func runConfigRoleAdd(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("writing roles file: %w", err)
 	}
 
-	flags := getFlags(cmd)
-	if !flags.Quiet {
-		_, _ = fmt.Fprintf(stdout, "Added role %q to %s config\n", name, scopeName)
-		_, _ = fmt.Fprintf(stdout, "Config: %s\n", rolePath)
-	}
+	_, _ = fmt.Fprintf(stdout, "Added role %q to %s config\n", name, scopeName)
+	_, _ = fmt.Fprintf(stdout, "Config: %s\n", rolePath)
 
 	return nil
 }
@@ -347,23 +301,14 @@ func addConfigRoleEditCommand(parent *cobra.Command) {
 		Long: `Edit role configuration.
 
 Without a name, opens the roles.cue file in $EDITOR.
-With a name and flags, updates only the specified fields.
-With a name and no flags, prompts interactively for values.
+With a name, prompts interactively for values.
 
 Examples:
   start config role edit
-  start config role edit go-expert --description "Go programming expert"
-  start config role edit reviewer --prompt "You are a code reviewer"`,
+  start config role edit go-expert`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: runConfigRoleEdit,
 	}
-
-	editCmd.Flags().String("description", "", "Description")
-	editCmd.Flags().String("file", "", "Path to role prompt file")
-	editCmd.Flags().String("command", "", "Command to generate prompt")
-	editCmd.Flags().String("prompt", "", "Inline prompt text")
-	editCmd.Flags().StringSlice("tag", nil, "Tags")
-	editCmd.Flags().Bool("optional", false, "Silently skip if the role file does not exist at runtime")
 
 	parent.AddCommand(editCmd)
 }
@@ -375,9 +320,7 @@ func runConfigRoleEdit(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("resolving config paths: %w", err)
 	}
-
 	configDir := paths.Dir(local)
-
 	rolePath := filepath.Join(configDir, "roles.cue")
 
 	// No name: open file in editor
@@ -385,10 +328,22 @@ func runConfigRoleEdit(cmd *cobra.Command, args []string) error {
 		return openInEditor(rolePath)
 	}
 
-	// Named edit
-	name := args[0]
 	stdin := cmd.InOrStdin()
-	stdout := cmd.OutOrStdout()
+	if !isTerminal(stdin) {
+		return fmt.Errorf("interactive edit requires a terminal")
+	}
+	return configRoleEdit(stdin, cmd.OutOrStdout(), local, args[0])
+}
+
+// configRoleEdit is the inner edit logic for roles.
+func configRoleEdit(stdin io.Reader, stdout io.Writer, local bool, name string) error {
+	// Determine target directory
+	paths, err := config.ResolvePaths("")
+	if err != nil {
+		return fmt.Errorf("resolving config paths: %w", err)
+	}
+	configDir := paths.Dir(local)
+	rolePath := filepath.Join(configDir, "roles.cue")
 
 	// Load existing roles
 	roles, order, err := loadRolesFromDir(configDir)
@@ -399,49 +354,6 @@ func runConfigRoleEdit(cmd *cobra.Command, args []string) error {
 	resolvedName, role, err := resolveInstalledName(roles, "role", name)
 	if err != nil {
 		return err
-	}
-
-	// Check if any edit flags are provided
-	hasEditFlags := anyFlagChanged(cmd, "description", "file", "command", "prompt", "tag", "optional")
-
-	if hasEditFlags {
-		// Non-interactive flag-based update
-		if cmd.Flags().Changed("description") {
-			role.Description, _ = cmd.Flags().GetString("description")
-		}
-		if cmd.Flags().Changed("file") {
-			role.File, _ = cmd.Flags().GetString("file")
-		}
-		if cmd.Flags().Changed("command") {
-			role.Command, _ = cmd.Flags().GetString("command")
-		}
-		if cmd.Flags().Changed("prompt") {
-			role.Prompt, _ = cmd.Flags().GetString("prompt")
-		}
-		if cmd.Flags().Changed("tag") {
-			role.Tags, _ = cmd.Flags().GetStringSlice("tag")
-		}
-		if cmd.Flags().Changed("optional") {
-			role.Optional, _ = cmd.Flags().GetBool("optional")
-		}
-
-		roles[resolvedName] = role
-
-		if err := writeRolesFile(rolePath, roles, order); err != nil {
-			return fmt.Errorf("writing roles file: %w", err)
-		}
-
-		flags := getFlags(cmd)
-		if !flags.Quiet {
-			_, _ = fmt.Fprintf(stdout, "Updated role %q\n", resolvedName)
-		}
-		return nil
-	}
-
-	// No flags: require TTY for interactive editing
-	isTTY := isTerminal(stdin)
-	if !isTTY {
-		return fmt.Errorf("interactive editing requires a terminal")
 	}
 
 	// Prompt for each field with current value as default
