@@ -37,9 +37,9 @@ Restructure `start config` and `start show` to use verb-first commands. Remove a
 start config                          # list effective config (unchanged)
 start config add [category]           # add item; prompts for category if omitted
 start config edit [query]             # search by name, menu if multiple, then edit; prompts if no query
-start config remove <query>           # search by name, menu if multiple, confirm, delete
+start config remove [query]           # search by name, menu if multiple, confirm, delete; prompts if no query
 start config list [category]          # list items; all categories if omitted
-start config info [query]             # search by name, show raw config fields; list all if no query
+start config info [query]             # search by name, show raw config fields; prompts if no query
 start config open [category]          # open .cue file in $EDITOR; prompts if omitted
 start config order [category]         # reorder items; prompts if omitted (contexts/roles only)
 start config search [query]           # search by keyword across names, descriptions, tags
@@ -60,12 +60,12 @@ Noun subcommands (`show agent`, `show role`, `show context`, `show task`) remove
 | --- | --- |
 | `start config` | list all (unchanged) |
 | `start config list` | list all |
-| `start config info` | list all |
+| `start config info` | prompt category → item → display raw fields |
 | `start config add` | prompt for category |
 | `start config edit` | prompt interactively |
 | `start config open` | prompt for category |
 | `start config order` | prompt for category |
-| `start config remove` | usage message |
+| `start config remove` | prompt category → item picker → confirmation → delete |
 | `start show` | list all (unchanged) |
 
 ### Category arguments

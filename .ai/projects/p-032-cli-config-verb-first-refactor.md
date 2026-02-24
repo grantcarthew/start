@@ -92,12 +92,13 @@ start show task [name]        # restrict to tasks
 Implementation:
 
 - `internal/cli/config.go` — 177 lines, root config command and noun-group registration
-- `internal/cli/config_agent.go` — 801 lines, agent noun group (add/edit/remove/list/info/default/order)
-- `internal/cli/config_role.go` — 621 lines, role noun group (add/edit/remove/list/info/order)
-- `internal/cli/config_context.go` — 684 lines, context noun group (add/edit/remove/list/info/order)
-- `internal/cli/config_task.go` — 633 lines, task noun group (add/edit/remove/list/info)
+- `internal/cli/config_agent.go` — 814 lines, agent noun group (add/edit/remove/list/info/default/order)
+- `internal/cli/config_role.go` — 634 lines, role noun group (add/edit/remove/list/info/order)
+- `internal/cli/config_context.go` — 697 lines, context noun group (add/edit/remove/list/info/order)
+- `internal/cli/config_task.go` — 646 lines, task noun group (add/edit/remove/list/info)
 - `internal/cli/config_helpers.go` — 837 lines, shared CUE read/write helpers, field prompt helpers
 - `internal/cli/config_interactive.go` — 200 lines, shared interactive picker flows
+- `internal/cli/config_open.go` — 93 lines, open command (unchanged, delivered by p-035)
 - `internal/cli/config_order.go` — 288 lines, top-level order command
 - `internal/cli/config_settings.go` — 468 lines, settings command (unchanged)
 - `internal/cli/config_search.go` — 138 lines, search command (unchanged)
@@ -108,6 +109,7 @@ Tests:
 - `internal/cli/config_integration_test.go` — 952 lines (reduced from 1103 by p-034 interactive conversion)
 - `internal/cli/config_order_test.go` — 754 lines
 - `internal/cli/config_helpers_test.go` — 461 lines
+- `internal/cli/config_open_test.go` — 210 lines (unchanged, p-035)
 - `internal/cli/config_interactive_test.go` — 102 lines
 - `internal/cli/config_testhelpers_test.go` — 23 lines, contains `slowReader`/`slowStdin` helper that prevents bufio over-consumption when multiple sequential prompt functions each create their own `bufio.NewReader`; rewritten tests must use this
 
@@ -120,7 +122,7 @@ Types, loaders, and writers are all in the noun-group files being deleted:
 - `writeAgentsFile`, `writeRolesFile`, `writeContextsFile`, `writeTasksFile` — defined in the noun-group files
 - `loadConfigForScope`, `getDefaultAgentFromConfig` — defined in `config_agent.go`, called by `runConfigList` in `config.go`
 
-All of the above must migrate to `config_types.go` (new file) as a prerequisite to deleting the noun-group files. `runConfigList` and `config_order.go` depend on these.
+All of the above are migrated to `config_types.go` by p-036 before p-032 begins. By the time p-032 starts, the noun-group files no longer contain these definitions and can be deleted directly.
 
 `config_interactive.go` currently routes interactive add/edit/remove to noun-group subcommands via `cmd.Root().Find([]string{"config", singular, "add"})`. This routing pattern is entirely replaced by the new verb files (`config_add.go`, `config_edit.go`, `config_remove.go`). After the refactor, `config_interactive.go` retains only `allConfigCategories` and `loadNamesForCategory`.
 
@@ -155,11 +157,12 @@ p-033 is complete. `start show` noun subcommands (`show agent`, `show role`, `sh
 ## Goals
 
 1. Remove all noun-group subcommands from `start config`
-2. Implement verb-first commands: `add`, `edit`, `remove`, `list`, `info`, `order`
+2. Implement new verb-first commands: `add`, `edit`, `remove`, `list`, `info`
 3. Implement search-by-name with interactive menus for `edit`, `remove`, `info`
 4. Remove `start config agent default` (duplicate of `config settings default_agent`)
 5. Update all tests to reflect new command paths
 6. Update README.md and docs
+7. All new output in new files uses `internal/tui` colour helpers per dr-042
 
 ## Scope
 
@@ -185,10 +188,10 @@ Out of Scope:
 ```
 start config                          # list effective config (unchanged behaviour)
 start config list [category]          # list items; all categories if omitted
-start config info [query]             # search by name, show raw config fields; list all if no query
+start config info [query]             # search by name, show raw config fields; prompt interactively if no query
 start config add [category]           # add item; prompt for category if omitted
 start config edit [query]             # search by name, edit matched item; prompt interactively if no query
-start config remove <query>           # search by name, confirm, delete; usage message if no query
+start config remove [query]           # search by name, confirm, delete; prompt interactively if no query
 start config open [category]          # open .cue file in $EDITOR; prompt if no category (p-035)
 start config order [category]         # reorder items; prompt if no category
 start config search [query]           # unchanged
@@ -203,10 +206,10 @@ start config settings [key] [value]   # unchanged
 | --- | --- |
 | `start config` | list all (unchanged) |
 | `start config list` | list all items grouped by category |
-| `start config info` | list all (same output as `start config`) |
+| `start config info` | prompt category → item → display raw fields |
 | `start config add` | prompt for category (agent/role/context/task) |
 | `start config edit` | interactive: prompt to pick from all items |
-| `start config remove` | usage message — query required |
+| `start config remove` | prompt category → item picker → confirmation → delete |
 | `start config open` | prompt for which file — delivered by p-035 |
 | `start config order` | prompt for category (context/role only) |
 
@@ -225,7 +228,7 @@ Output matches the current per-category list commands.
 ### start config info
 
 ```
-start config info                        # list all (same as start config list)
+start config info                        # prompt: category → item → display raw fields
 start config info claude                 # search by name, menu if multiple matches
 start config info claude/interactive     # exact match, show raw config fields
 ```
@@ -263,29 +266,19 @@ Always interactive — no field flags. Users who want scripted or non-interactiv
 ### start config remove
 
 ```
-start config remove                       # usage message — do not prompt
+start config remove                       # prompt: category → item picker → confirmation → delete
 start config remove claude/interactive    # exact match, confirmation dialog, delete
 start config remove claude                # search, menu if multiple, confirmation, delete
 start config remove claude/interactive -y # skip confirmation dialog
 ```
 
-Query is required. No-arg usage message is intentional — remove is destructive, the user must supply a target. Confirmation dialog always shown unless `--yes` / `-y` flag is provided. The `-y` flag is the only non-global flag on this command.
+Query is optional. With no argument, prompts for category then item(s) interactively, then confirms before deleting. Confirmation dialog always shown unless `--yes` / `-y` flag is provided. The `-y` flag is the only non-global flag on this command.
 
 ### start config order
 
-No change to behaviour — already implemented correctly. The top-level `start config order` command prompts for context or role and reorders interactively. The noun-group versions (`config role order`, `config context order`) are removed but the top-level command is unchanged.
+The optional category argument (`order context`, `order role`, `order agent`, `order task`) is delivered by p-037 before p-032 begins. By the time p-032 starts, direct category routing already works.
 
-Direct category argument support is added for consistency:
-
-```
-start config order             # prompt: context or role?
-start config order context     # go straight to context reorder
-start config order role        # go straight to role reorder
-start config order agent       # agent doesn't support ordering — show the prompt menu
-start config order task        # task doesn't support ordering — show the prompt menu
-```
-
-If a non-orderable category (`agent`, `task`) is supplied, ignore it and fall back to the standard prompt. Do not show an error — just present the menu.
+The remaining change in p-032 is removing dead code: `addConfigContextOrderCommand` and `addConfigRoleOrderCommand` are registered by the noun-group files and become unreachable after those files are deleted.
 
 ## Removed Commands
 
@@ -332,7 +325,6 @@ start config task remove
 
 ### Create
 
-- `internal/cli/config_types.go` — struct types, loaders, and writers migrated from the deleted noun-group files
 - `internal/cli/config_add.go` — `config add [category]` command
 - `internal/cli/config_edit.go` — `config edit [query]` command
 - `internal/cli/config_remove.go` — `config remove <query>` command
@@ -344,18 +336,18 @@ start config task remove
 - `internal/cli/config.go` — register new verb commands, remove noun-group registrations
 - `internal/cli/config_helpers.go` — review and retain shared helpers; remove any helpers only used by deleted noun groups
 - `internal/cli/config_interactive.go` — update shared interactive flows for new verb structure
-- `internal/cli/config_order.go` — add optional category argument (`order context`, `order role`)
+- `internal/cli/config_order.go` — remove dead code (`addConfigContextOrderCommand`, `addConfigRoleOrderCommand`)
 
 ### Unchanged
 
 - `internal/cli/config_settings.go`
 - `internal/cli/config_search.go`
+- `internal/cli/config_open.go` (delivered by p-035)
 
 ### Tests — Rewrite
 
 - `internal/cli/config_test.go` — rewrite for new verb commands
 - `internal/cli/config_integration_test.go` — rewrite full workflow tests
-- `internal/cli/config_order_test.go` — update for category arg addition
 - `internal/cli/config_helpers_test.go` — review, remove tests for deleted helpers
 - `internal/cli/config_interactive_test.go` — update for new flows
 
@@ -373,7 +365,7 @@ start config task remove
 - [ ] `start config list role` lists only roles
 - [ ] `start config list context` lists only contexts
 - [ ] `start config list task` lists only tasks
-- [ ] `start config info` lists all items (same as `start config list`)
+- [ ] `start config info` prompts for category then item, displays raw fields
 - [ ] `start config info claude` searches and shows config fields for claude
 - [ ] `start config info claude/interactive` shows config for exact name match
 - [ ] `start config info golang` shows menu when multiple items match
@@ -386,7 +378,7 @@ start config task remove
 - [ ] `start config edit` prompts interactively to pick an item
 - [ ] `start config edit claude` finds and edits claude agent interactively
 - [ ] `start config edit golang/assistant` exact match, edits interactively
-- [ ] `start config remove` prints usage message, exits non-zero
+- [ ] `start config remove` prompts for category, item picker, confirmation, deletes
 - [ ] `start config remove claude/interactive` prompts confirmation then deletes
 - [ ] `start config remove claude` shows menu if multiple matches, then confirms
 - [ ] `start config remove claude/interactive -y` skips confirmation and deletes
@@ -466,7 +458,7 @@ The logical order within Phase 2:
 3. Implement `config add` — carries over from noun-group add commands
 4. Implement `config edit` — carries over from noun-group edit commands
 5. Implement `config remove` — carries over from noun-group remove commands
-6. Update `config order` — add category arg
+6. Update `config_order.go` — remove dead code (`addConfigContextOrderCommand`, `addConfigRoleOrderCommand`)
 7. Update helpers and interactive flows
 8. Rewrite tests
 
@@ -482,7 +474,6 @@ Checkpoint: `scripts/invoke-tests` passes before moving to Phase 3.
 
 Implementation files (new):
 
-- `internal/cli/config_types.go`
 - `internal/cli/config_add.go`
 - `internal/cli/config_edit.go`
 - `internal/cli/config_remove.go`
@@ -494,7 +485,7 @@ Implementation files (modified):
 - `internal/cli/config.go`
 - `internal/cli/config_helpers.go`
 - `internal/cli/config_interactive.go`
-- `internal/cli/config_order.go`
+- `internal/cli/config_order.go` (remove dead code only — category arg delivered by p-037)
 
 Implementation files (deleted):
 
@@ -532,3 +523,5 @@ Requires all config-touching projects complete:
 - p-033 CLI Show Noun Subcommand Removal (complete)
 - p-034 CLI Config Add/Edit Flags Removal
 - p-035 CLI Config Open Command
+- p-036 CLI Config Types Migration
+- p-037 CLI Config Order Category Argument
