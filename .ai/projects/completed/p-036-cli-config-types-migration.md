@@ -1,8 +1,8 @@
 # P-036: CLI Config Types Migration
 
-- Status: Pending
-- Started:
-- Completed:
+- Status: Complete
+- Started: 2026-02-24
+- Completed: 2026-02-24
 
 ## Overview
 
@@ -81,10 +81,10 @@ Out of Scope:
 
 ## Success Criteria
 
-- [ ] `internal/cli/config_types.go` exists and contains all four struct types, loaders, writers, `loadConfigForScope`, and `getDefaultAgentFromConfig`
-- [ ] The moved definitions are removed from `config_agent.go`, `config_role.go`, `config_context.go`, `config_task.go`
-- [ ] `go test ./internal/cli/...` passes
-- [ ] No function signatures changed
+- [x] `internal/cli/config_types.go` exists and contains all four struct types, loaders, writers, `loadConfigForScope`, and `getDefaultAgentFromConfig`
+- [x] The moved definitions are removed from `config_agent.go`, `config_role.go`, `config_context.go`, `config_task.go`
+- [x] `go test ./internal/cli/...` passes
+- [x] No function signatures changed
 
 ## Deliverables
 
