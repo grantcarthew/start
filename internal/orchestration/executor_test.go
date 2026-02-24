@@ -553,27 +553,27 @@ func TestBuildCommand_WithEnvVarPrefix(t *testing.T) {
 			name: "command with env var prefix",
 			config: ExecuteConfig{
 				Agent: Agent{
-					Bin:     "gemini",
-					Command: "GEMINI_SYSTEM_MD={{.role_file}} {{.bin}} --model {{.model}}",
-					Models:  map[string]string{"pro": "gemini-2.5-pro"},
+					Bin:     "echo",
+					Command: "SOME_VAR={{.role_file}} {{.bin}} --model {{.model}}",
+					Models:  map[string]string{"pro": "model-id"},
 				},
 				RoleFile: "/tmp/role.md",
 				Model:    "pro",
 			},
-			wantContain: "'gemini'",
+			wantContain: "'echo'",
 		},
 		{
 			name: "command with empty env var value",
 			config: ExecuteConfig{
 				Agent: Agent{
-					Bin:     "gemini",
-					Command: "GEMINI_SYSTEM_MD={{.role_file}} {{.bin}} --model {{.model}}",
-					Models:  map[string]string{"pro": "gemini-2.5-pro"},
+					Bin:     "echo",
+					Command: "SOME_VAR={{.role_file}} {{.bin}} --model {{.model}}",
+					Models:  map[string]string{"pro": "model-id"},
 				},
 				RoleFile: "", // empty role file
 				Model:    "pro",
 			},
-			wantContain: "'gemini'",
+			wantContain: "'echo'",
 		},
 		{
 			name: "command with multiple env vars",

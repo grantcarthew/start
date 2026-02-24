@@ -16,9 +16,11 @@ Update this document as work proceeds:
 
 ## Overview
 
-`start config` uses noun-first commands — category subcommands group verbs underneath them (`config agent edit`, `config role add`). `start assets` uses verb-first — verbs are top-level and targets are arguments (`assets add`, `assets list`). `start show` has the same noun-first smell with redundant category subcommands (`show agent`, `show role`).
+`start config` uses noun-first commands — category subcommands group verbs underneath them (`config agent edit`, `config role add`). `start assets` uses verb-first — verbs are top-level and targets are arguments (`assets add`, `assets list`).
 
-This project restructures both `start config` and `start show` to verb-first, removes all noun-group subcommands, and introduces search-by-name with interactive menus for commands that target existing items. The result is a consistent pattern across the entire CLI.
+This project restructures `start config` to verb-first, removes all noun-group subcommands, and introduces search-by-name with interactive menus for commands that target existing items. The result is a consistent pattern across the CLI.
+
+The equivalent change to `start show` is covered by p-033, which is a prerequisite to this project.
 
 This is a breaking change to the command interface. It is intentional and timed for early in the project lifecycle before a wide user base forms.
 
@@ -99,7 +101,6 @@ Implementation:
 - `internal/cli/config_order.go` — 288 lines, top-level order command
 - `internal/cli/config_settings.go` — 468 lines, settings command (unchanged)
 - `internal/cli/config_search.go` — 138 lines, search command (unchanged)
-- `internal/cli/show.go` — 755 lines, show command with noun subcommands
 
 Tests:
 
@@ -108,7 +109,6 @@ Tests:
 - `internal/cli/config_order_test.go` — 774 lines
 - `internal/cli/config_helpers_test.go` — 461 lines
 - `internal/cli/config_interactive_test.go` — 101 lines
-- `internal/cli/show_test.go` — 1140 lines
 
 ### Codebase observations
 
@@ -141,30 +141,28 @@ Write function signatures differ between orderable and non-orderable types:
 - `writeRolesFile(path, roles, order)` — takes explicit order slice
 - `writeContextsFile(path, contexts, order)` — takes explicit order slice
 
-Two staged changes exist on the working tree unrelated to p-032: a bug fix in `promptModels` (clear option now calls `promptModelsEdit` instead of returning nil) and a corresponding test in `config_test.go`. These do not affect the refactor scope.
+The `promptModels` bug fix (clear option calls `promptModelsEdit` instead of returning nil) and its corresponding test in `config_test.go` were committed prior to p-032 start. These do not affect the refactor scope.
 
 `internal/orchestration` has a pre-existing test failure unrelated to p-032 (`TestBuildCommand_WithEnvVarPrefix` fails because the test environment has no `gemini` binary). This failure predates p-032. The success criterion "All tests pass via `scripts/invoke-tests`" should be read as "all CLI tests pass and no new failures are introduced". Verify with `go test ./internal/cli/...` to confirm CLI-scope test health independently.
 
-`go test ./internal/cli/...` passes as of p-032 start — confirmed green baseline.
+`go test ./internal/cli/...` passes — confirmed green baseline. Working tree is clean.
 
-The README has partially staged changes on the working tree (173 additions, 68 deletions covering agent/role/task name updates and an added Inspection section). The config and show command examples in these staged changes still use the old noun-first paths and will be updated in Phase 4 of this project.
+The README was updated prior to p-032 start (agent/role/task name updates and added Inspection section). The config and show command examples in the README still use the old noun-first paths and will be updated in Phase 4 of this project.
 
 ## Goals
 
 1. Remove all noun-group subcommands from `start config`
 2. Implement verb-first commands: `add`, `edit`, `remove`, `list`, `info`, `open`, `order`
 3. Implement search-by-name with interactive menus for `edit`, `remove`, `info`
-4. Remove noun subcommands from `start show`
-5. Remove `start config agent default` (duplicate of `config settings default_agent`)
-6. Update all tests to reflect new command paths
-7. Update README.md and docs
+4. Remove `start config agent default` (duplicate of `config settings default_agent`)
+5. Update all tests to reflect new command paths
+6. Update README.md and docs
 
 ## Scope
 
 In Scope:
 
 - All `internal/cli/config*.go` files (except config_settings.go and config_search.go)
-- `internal/cli/show.go`
 - All associated test files
 - `README.md` configuration and usage sections
 
@@ -193,12 +191,6 @@ start config search [query]           # unchanged
 start config settings [key] [value]   # unchanged
 ```
 
-### start show
-
-```
-start show [query]    # list all if no query; search by name, show resolved content if query
-```
-
 ## Command Behaviour Detail
 
 ### No-argument behaviour
@@ -213,7 +205,6 @@ start show [query]    # list all if no query; search by name, show resolved cont
 | `start config remove` | usage message — query required |
 | `start config open` | prompt for which file (agent/role/context/task/setting) |
 | `start config order` | prompt for category (context/role only) |
-| `start show` | list all (unchanged) |
 
 ### start config list
 
@@ -305,16 +296,6 @@ start config order task        # task doesn't support ordering — show the prom
 
 If a non-orderable category (`agent`, `task`) is supplied, ignore it and fall back to the standard prompt. Do not show an error — just present the menu.
 
-### start show
-
-```
-start show                     # list all configured items (unchanged)
-start show claude              # search by name, menu if multiple
-start show claude/interactive  # exact match, show resolved content
-```
-
-`--global` and `--local` flags unchanged. Noun subcommands (`show agent`, `show role`, `show context`, `show task`) removed.
-
 ## Removed Commands
 
 Every path listed below must return a "command not found" or usage error after this refactor:
@@ -347,10 +328,6 @@ start config task edit
 start config task info
 start config task list
 start config task remove
-start show agent
-start show role
-start show context
-start show task
 ```
 
 ## File Changes
@@ -378,7 +355,6 @@ start show task
 - `internal/cli/config_helpers.go` — review and retain shared helpers; remove any helpers only used by deleted noun groups
 - `internal/cli/config_interactive.go` — update shared interactive flows for new verb structure
 - `internal/cli/config_order.go` — add optional category argument (`order context`, `order role`)
-- `internal/cli/show.go` — remove `show agent`, `show role`, `show context`, `show task` subcommand registrations and handlers
 
 ### Unchanged
 
@@ -392,7 +368,6 @@ start show task
 - `internal/cli/config_order_test.go` — update for category arg addition
 - `internal/cli/config_helpers_test.go` — review, remove tests for deleted helpers
 - `internal/cli/config_interactive_test.go` — update for new flows
-- `internal/cli/show_test.go` — remove noun subcommand tests, verify search-by-name
 
 ### Docs
 
@@ -456,18 +431,6 @@ start show task
 - [ ] `start config task remove review` returns error
 - [ ] `start config agent default claude` returns error
 
-### start show — changes
-
-- [ ] `start show` lists all items (unchanged)
-- [ ] `start show claude` searches and shows resolved content
-- [ ] `start show golang/assistant` shows resolved role content
-- [ ] `start show agent` no longer works as a subcommand (treated as name search)
-- [ ] `start show role` no longer works as a subcommand (treated as name search)
-- [ ] `start show context` no longer works as a subcommand
-- [ ] `start show task` no longer works as a subcommand
-- [ ] `start show --local` works (unchanged)
-- [ ] `start show --global` works (unchanged)
-
 ### Tests
 
 - [ ] All tests pass via `scripts/invoke-tests`
@@ -503,13 +466,7 @@ scripts/invoke-tests
 
 dr-044 written and accepted. dr-017 and dr-029 marked superseded.
 
-### Phase 2 — start show
-
-Smallest change, good warm-up. Remove noun subcommands from `show.go`. Verify `start show <name>` search-by-name still works. Update `show_test.go`. Run tests.
-
-Checkpoint: `scripts/invoke-tests` passes before moving to Phase 3.
-
-### Phase 3 — start config
+### Phase 2 — start config
 
 Main body of work:
 
@@ -518,7 +475,7 @@ Main body of work:
 - Update `config.go`, `config_helpers.go`, `config_interactive.go`, `config_order.go`
 - Rewrite test files
 
-The logical order within Phase 3:
+The logical order within Phase 2:
 
 1. Update `config.go` — register new verbs, remove noun registrations
 2. Implement `config list` and `config info` — read-only, lower risk
@@ -530,9 +487,9 @@ The logical order within Phase 3:
 8. Update helpers and interactive flows
 9. Rewrite tests
 
-Checkpoint: `scripts/invoke-tests` passes before moving to Phase 4.
+Checkpoint: `scripts/invoke-tests` passes before moving to Phase 3.
 
-### Phase 4 — Docs and cleanup
+### Phase 3 — Docs and cleanup
 
 - Update README.md
 - Verify shell completion works (Cobra regenerates automatically)
@@ -556,7 +513,6 @@ Implementation files (modified):
 - `internal/cli/config_helpers.go`
 - `internal/cli/config_interactive.go`
 - `internal/cli/config_order.go`
-- `internal/cli/show.go`
 
 Implementation files (deleted):
 
@@ -572,7 +528,6 @@ Test files (rewritten/updated):
 - `internal/cli/config_order_test.go`
 - `internal/cli/config_helpers_test.go`
 - `internal/cli/config_interactive_test.go`
-- `internal/cli/show_test.go`
 
 Documentation:
 
@@ -592,3 +547,4 @@ Requires all config-touching projects complete:
 - p-018 CLI Interactive Edit Completeness
 - p-023 CLI Config Reorder
 - p-027 CLI Content Source Menu Extraction
+- p-033 CLI Show Noun Subcommand Removal

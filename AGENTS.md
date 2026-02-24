@@ -14,8 +14,7 @@ Projects are stored in `.ai/projects/`. Continue by reading the active project.
 
 Active Project: .ai/projects/p-032-cli-config-verb-first-refactor.md
 
-Other Projects (paused):
-- None
+Other Projects (pending):
 
 Project Workflow:
 - Active projects are in `.ai/projects/`
@@ -188,5 +187,6 @@ start-assets/
 - p-030: Assets Index Setting (assets_index setting, EffectiveIndexPath helper, all consumers updated)
 
 - p-031: CLI workingDir Threading (cancelled — --directory flag removed; remaining chdir calls blocked by t.Setenv regardless)
+- p-033: CLI Show Noun Subcommand Removal (removed show agent/role/context/task subcommands; show [name] is now always a cross-category search)
 
 The prototype validated that this tool solves a real problem. This version will implement it properly.

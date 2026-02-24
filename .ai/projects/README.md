@@ -12,6 +12,7 @@ See [p-writing-guide.md](./p-writing-guide.md) for guidelines on creating and ma
 
 | Project | Title |
 |---------|-------|
+| [p-033](./p-033-cli-show-noun-subcommand-removal.md) | CLI Show Noun Subcommand Removal |
 | [p-032](./p-032-cli-config-verb-first-refactor.md) | CLI Config Verb-First Refactor |
 
 
@@ -56,11 +57,17 @@ See [p-writing-guide.md](./p-writing-guide.md) for guidelines on creating and ma
 
 ### Active
 
+#### p-033: CLI Show Noun Subcommand Removal
+
+Remove `show agent`, `show role`, `show context`, `show task` noun subcommands from `start show`. After removal `show <name>` treats all arguments as cross-category name searches. Prerequisite to p-032.
+
+Dependencies: p-029
+
 #### p-032: CLI Config Verb-First Refactor
 
-Restructure `start config` and `start show` from noun-first to verb-first to match `start assets`. Removes all noun-group subcommands, introduces search-by-name with menus, adds new verb commands: `list`, `info`, `open`. Breaking change to command interface.
+Restructure `start config` from noun-first to verb-first to match `start assets`. Removes all noun-group subcommands, introduces search-by-name with menus, adds new verb commands: `list`, `info`, `open`. Breaking change to command interface.
 
-Dependencies: p-008, p-013, p-017, p-018, p-023, p-027
+Dependencies: p-008, p-013, p-017, p-018, p-023, p-027, p-033
 
 ### Completed
 
