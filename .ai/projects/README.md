@@ -12,6 +12,8 @@ See [p-writing-guide.md](./p-writing-guide.md) for guidelines on creating and ma
 
 | Project | Title |
 |---------|-------|
+| [p-036](./p-036-cli-config-types-migration.md) | CLI Config Types Migration |
+| [p-037](./p-037-cli-config-order-category-arg.md) | CLI Config Order Category Argument |
 | [p-032](./p-032-cli-config-verb-first-refactor.md) | CLI Config Verb-First Refactor |
 
 
@@ -58,11 +60,23 @@ See [p-writing-guide.md](./p-writing-guide.md) for guidelines on creating and ma
 
 ### Active
 
+#### p-036: CLI Config Types Migration
+
+Pure refactor — moves `AgentConfig`, `RoleConfig`, `ContextConfig`, `TaskConfig` struct types plus all loaders and writers out of the four noun-group files into a new `config_types.go`. No behaviour change. Prerequisite for p-032.
+
+Dependencies: None
+
+#### p-037: CLI Config Order Category Argument
+
+Adds an optional `[category]` argument to `start config order` so users can skip the interactive menu and navigate directly to context or role reordering. Non-orderable categories (agent, task) fall back silently to the menu.
+
+Dependencies: None
+
 #### p-032: CLI Config Verb-First Refactor
 
 Restructure `start config` from noun-first to verb-first to match `start assets`. Removes all noun-group subcommands, introduces search-by-name with menus, adds new verb commands: `list`, `info`. Breaking change to command interface.
 
-Dependencies: p-008, p-013, p-017, p-018, p-023, p-027, p-033, p-034, p-035
+Dependencies: p-008, p-013, p-017, p-018, p-023, p-027, p-033, p-034, p-035, p-036, p-037
 
 ### Completed
 
