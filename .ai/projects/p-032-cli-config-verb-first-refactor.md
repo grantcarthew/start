@@ -91,15 +91,16 @@ start show task [name]        # restrict to tasks
 
 Implementation:
 
-- `internal/cli/config.go` — 177 lines, root config command and noun-group registration
-- `internal/cli/config_agent.go` — 814 lines, agent noun group (add/edit/remove/list/info/default/order)
-- `internal/cli/config_role.go` — 634 lines, role noun group (add/edit/remove/list/info/order)
-- `internal/cli/config_context.go` — 697 lines, context noun group (add/edit/remove/list/info/order)
-- `internal/cli/config_task.go` — 646 lines, task noun group (add/edit/remove/list/info)
+- `internal/cli/config.go` — 178 lines, root config command and noun-group registration
+- `internal/cli/config_types.go` — 583 lines, all config types, loaders, and writers (created by p-036)
+- `internal/cli/config_agent.go` — 623 lines, agent noun group (add/edit/remove/list/info/default); types/loaders/writers removed by p-036
+- `internal/cli/config_role.go` — 509 lines, role noun group (add/edit/remove/list/info/order); types/loaders/writers removed by p-036
+- `internal/cli/config_context.go` — 567 lines, context noun group (add/edit/remove/list/info/order); types/loaders/writers removed by p-036
+- `internal/cli/config_task.go` — 515 lines, task noun group (add/edit/remove/list/info); types/loaders/writers removed by p-036
 - `internal/cli/config_helpers.go` — 837 lines, shared CUE read/write helpers, field prompt helpers
-- `internal/cli/config_interactive.go` — 200 lines, shared interactive picker flows
+- `internal/cli/config_interactive.go` — 200 lines, shared interactive picker flows (routes to noun-group subcommands via cmd.Root().Find — replaced entirely by new verb files)
 - `internal/cli/config_open.go` — 93 lines, open command (unchanged, delivered by p-035)
-- `internal/cli/config_order.go` — 288 lines, top-level order command
+- `internal/cli/config_order.go` — 318 lines, top-level order command; contains dead code `addConfigContextOrderCommand`/`addConfigRoleOrderCommand` (called from noun-group files, dead after deletion)
 - `internal/cli/config_settings.go` — 468 lines, settings command (unchanged)
 - `internal/cli/config_search.go` — 138 lines, search command (unchanged)
 
@@ -107,7 +108,7 @@ Tests:
 
 - `internal/cli/config_test.go` — 1915 lines
 - `internal/cli/config_integration_test.go` — 952 lines (reduced from 1103 by p-034 interactive conversion)
-- `internal/cli/config_order_test.go` — 754 lines
+- `internal/cli/config_order_test.go` — 818 lines (grew from 754 during p-037)
 - `internal/cli/config_helpers_test.go` — 461 lines
 - `internal/cli/config_open_test.go` — 210 lines (unchanged, p-035)
 - `internal/cli/config_interactive_test.go` — 102 lines
@@ -115,14 +116,14 @@ Tests:
 
 ### Codebase observations
 
-Types, loaders, and writers are all in the noun-group files being deleted:
+p-036 migrated all types, loaders, and writers to `config_types.go`. The noun-group files no longer define any of the following; they only use them:
 
-- `AgentConfig`, `RoleConfig`, `ContextConfig`, `TaskConfig` struct types — defined in the noun-group files
-- `loadAgentsForScope/FromDir`, `loadRolesForScope/FromDir`, `loadContextsForScope/FromDir`, `loadTasksForScope/FromDir` — defined in the noun-group files
-- `writeAgentsFile`, `writeRolesFile`, `writeContextsFile`, `writeTasksFile` — defined in the noun-group files
-- `loadConfigForScope`, `getDefaultAgentFromConfig` — defined in `config_agent.go`, called by `runConfigList` in `config.go`
+- `AgentConfig`, `RoleConfig`, `ContextConfig`, `TaskConfig` struct types
+- `loadAgentsForScope/FromDir`, `loadRolesForScope/FromDir`, `loadContextsForScope/FromDir`, `loadTasksForScope/FromDir`
+- `writeAgentsFile`, `writeRolesFile`, `writeContextsFile`, `writeTasksFile`
+- `loadConfigForScope`, `getDefaultAgentFromConfig`
 
-All of the above are migrated to `config_types.go` by p-036 before p-032 begins. By the time p-032 starts, the noun-group files no longer contain these definitions and can be deleted directly.
+The noun-group files can be deleted directly without losing any shared code.
 
 `config_interactive.go` currently routes interactive add/edit/remove to noun-group subcommands via `cmd.Root().Find([]string{"config", singular, "add"})`. This routing pattern is entirely replaced by the new verb files (`config_add.go`, `config_edit.go`, `config_remove.go`). After the refactor, `config_interactive.go` retains only `allConfigCategories` and `loadNamesForCategory`.
 
@@ -148,11 +149,19 @@ The `promptModels` bug fix (clear option calls `promptModelsEdit` instead of ret
 
 `internal/orchestration` has a pre-existing test failure unrelated to p-032 (`TestBuildCommand_WithEnvVarPrefix` fails because the test environment has no `gemini` binary). This failure predates p-032. The success criterion "All tests pass via `scripts/invoke-tests`" should be read as "all CLI tests pass and no new failures are introduced". Verify with `go test ./internal/cli/...` to confirm CLI-scope test health independently.
 
-`go test ./internal/cli/...` passes — confirmed green baseline. p-034 is complete; all add/edit commands are already always interactive with no field flags.
+`go test ./internal/cli/...` passes — confirmed green baseline (re-verified post p-037 commits). p-034 is complete; all add/edit commands are already always interactive with no field flags.
+
+Cross-category search for `edit [query]`, `remove [query]`, and `info [query]` requires aggregating results across all four category maps. The existing helpers (`resolveAllMatchingNames`, `resolveRemoveNames`) operate on a single typed map. The new verb commands need an internal helper that loads all four maps, searches each, and returns results tagged with their category — so the menu can display `claude (agent)` vs `golang (role)`, and removal/edit can write back to the correct category file. This is implementation detail with no design decision required.
+
+For `config edit` with no args, the intent matches the current `runConfigInteractiveEdit` flow: prompt for category → show items in that category → edit. The phrasing "prompt to pick from all items" in the no-arg table means any category is reachable, not a flat cross-category list. This is consistent with how `config info` and `config remove` no-arg are described.
 
 The README was updated prior to p-032 start (agent/role/task name updates and added Inspection section). The config and show command examples in the README still use the old noun-first paths and will be updated in Phase 3 of this project.
 
 p-033 is complete. `start show` noun subcommands (`show agent`, `show role`, `show context`, `show task`) have been removed. The prerequisite for p-032 is met.
+
+p-035 is complete. `config open [category]` is implemented in `config_open.go` and registered in `config.go`. Unchanged by p-032.
+
+p-036 is complete. All config types (`AgentConfig`, `RoleConfig`, `ContextConfig`, `TaskConfig`), loaders (`loadAgentsForScope/FromDir`, etc.), and writers (`writeAgentsFile`, etc.) have been migrated to `config_types.go`. The noun-group files now use these definitions but no longer own them, and can be deleted directly without losing any shared code.
 
 ## Goals
 
@@ -429,6 +438,74 @@ Follow dr-024:
 - Test no-argument behaviour explicitly for each verb command
 - Test plural aliases for `add`, `list`, `order`
 - Test that all removed command paths return errors
+
+### Required test cases
+
+#### config list
+
+- `config list` with no config — each category section prints a zero-count or "none" message
+- `config list` with items in all four categories — output contains all item names grouped by category, each category heading present
+- `config list agent` — only agents section present in output
+- `config list role` — only roles section present
+- `config list context` — only contexts section present
+- `config list task` — only tasks section present
+- `config list agents` — plural alias accepted, same output as `config list agent`
+- `config list unknowncategory` — returns error
+
+#### config info — per-category field display
+
+Each type has distinct fields that must appear in output:
+
+- Agent: `config info <name>` output contains `bin`, `command`, and `models` block when present; `default_model` when set; `description` when set
+- Role: `config info <name>` output contains `prompt` content; `optional` marker when set
+- Context: `config info <name>` output contains `required` and `default` markers when set; `tags` when present
+- Task: `config info <name>` output contains `description` when set; `prompt` content; `role` when set
+
+#### config info — search and no-arg
+
+- `config info <exact-name>` — shows fields with no menu
+- `config info <substring>` matching one item — resolves directly, shows fields
+- `config info <substring>` matching zero items — informs user, exits non-zero
+- `config info` with no args — returns terminal-required error in non-interactive mode
+
+#### cross-category search (config edit, config remove, config info)
+
+These cases require seeding items with the same name in different categories (e.g., an agent named `shared` and a role named `shared`):
+
+- Query that matches one item in one category — goes directly to the action (no menu)
+- Query that matches items in multiple categories — presents a menu showing each match with its category label (e.g., `shared (agent)`, `shared (role)`)
+- After menu selection, action targets the correct category — verify the right CUE file is written
+- `config remove shared --yes` with matches in two categories — removes all matches, both CUE files updated
+
+#### config remove — confirmation and --yes flag
+
+- `config remove <name>` in non-interactive mode without `--yes` — returns error requiring `--yes`
+- `config remove <name> --yes` — skips confirmation prompt, removes item
+- `config remove <name> -y` — short flag accepted, same behaviour as `--yes`
+- `config remove <name>` interactively with `y` response — removes item
+- `config remove <name>` interactively with `n` response — cancels, item still present
+- `config remove <no-match> --yes` — informs user, exits non-zero, no file modified
+
+#### zero-match behaviour
+
+Table-driven, one case per command:
+
+- `config edit name-that-doesnt-exist` — error message contains "not found", exits non-zero
+- `config remove name-that-doesnt-exist --yes` — error message contains "not found", exits non-zero
+- `config info name-that-doesnt-exist` — error message contains "not found", exits non-zero
+
+#### removed command paths
+
+Table-driven, covers representative paths from all four deleted noun groups:
+
+- `config agent` — error
+- `config agent add` — error
+- `config agent default claude` — error
+- `config agent edit claude` — error
+- `config role add` — error
+- `config role list` — error
+- `config context order` — error
+- `config task remove review` — error
 
 Run tests:
 
