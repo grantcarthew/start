@@ -88,37 +88,6 @@ func runConfigOrder(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-// addConfigContextOrderCommand adds the order subcommand to the context command.
-func addConfigContextOrderCommand(parent *cobra.Command) {
-	orderCmd := &cobra.Command{
-		Use:     "order",
-		Aliases: []string{"reorder"},
-		Short:   "Reorder contexts",
-		Long: `Reorder context configuration items interactively.
-
-Displays a numbered list of contexts. Enter a number to move that
-item up one position. Repeat to achieve the desired order.
-
-Press Enter to save the new order, or q to cancel.`,
-		Args: noArgsOrHelp,
-		RunE: runConfigContextOrder,
-	}
-
-	parent.AddCommand(orderCmd)
-}
-
-// runConfigContextOrder runs the interactive reorder flow for contexts.
-func runConfigContextOrder(cmd *cobra.Command, args []string) error {
-	if shown, err := checkHelpArg(cmd, args); shown || err != nil {
-		return err
-	}
-	stdin := cmd.InOrStdin()
-	if !isTerminal(stdin) {
-		return fmt.Errorf("interactive reordering requires a terminal")
-	}
-	return reorderContexts(cmd.OutOrStdout(), stdin, getFlags(cmd).Local)
-}
-
 // reorderContexts performs the interactive context reorder.
 func reorderContexts(stdout io.Writer, stdin io.Reader, local bool) error {
 	paths, err := config.ResolvePaths("")
@@ -169,37 +138,6 @@ func reorderContexts(stdout io.Writer, stdin io.Reader, local bool) error {
 
 	_, _ = fmt.Fprintln(stdout, "Order saved.")
 	return nil
-}
-
-// addConfigRoleOrderCommand adds the order subcommand to the role command.
-func addConfigRoleOrderCommand(parent *cobra.Command) {
-	orderCmd := &cobra.Command{
-		Use:     "order",
-		Aliases: []string{"reorder"},
-		Short:   "Reorder roles",
-		Long: `Reorder role configuration items interactively.
-
-Displays a numbered list of roles. Enter a number to move that
-item up one position. Repeat to achieve the desired order.
-
-Press Enter to save the new order, or q to cancel.`,
-		Args: noArgsOrHelp,
-		RunE: runConfigRoleOrder,
-	}
-
-	parent.AddCommand(orderCmd)
-}
-
-// runConfigRoleOrder runs the interactive reorder flow for roles.
-func runConfigRoleOrder(cmd *cobra.Command, args []string) error {
-	if shown, err := checkHelpArg(cmd, args); shown || err != nil {
-		return err
-	}
-	stdin := cmd.InOrStdin()
-	if !isTerminal(stdin) {
-		return fmt.Errorf("interactive reordering requires a terminal")
-	}
-	return reorderRoles(cmd.OutOrStdout(), stdin, getFlags(cmd).Local)
 }
 
 // reorderRoles performs the interactive role reorder.

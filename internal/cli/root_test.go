@@ -108,58 +108,37 @@ func TestHelpArgLeafCommands(t *testing.T) {
 			args: []string{"completion", "fish", "help"},
 			want: "fish",
 		},
-		// config interactive commands
+		// config verb commands
 		{
 			name: "config add help",
 			args: []string{"config", "add", "help"},
-			want: "Interactively",
+			want: "interactively",
 		},
 		{
 			name: "config edit help",
 			args: []string{"config", "edit", "help"},
-			want: "select and edit",
+			want: "Search by name",
 		},
 		{
 			name: "config remove help",
 			args: []string{"config", "remove", "help"},
-			want: "select and remove",
+			want: "Remove an agent",
+		},
+		{
+			name: "config list help",
+			args: []string{"config", "list", "help"},
+			want: "category",
+		},
+		{
+			name: "config info help",
+			args: []string{"config", "info", "help"},
+			want: "raw stored",
 		},
 		// config order commands
 		{
 			name: "config order help",
 			args: []string{"config", "order", "help"},
 			want: "Reorder",
-		},
-		{
-			name: "config context order help",
-			args: []string{"config", "context", "order", "help"},
-			want: "Reorder context",
-		},
-		{
-			name: "config role order help",
-			args: []string{"config", "role", "order", "help"},
-			want: "Reorder role",
-		},
-		// config category add commands
-		{
-			name: "config agent add help",
-			args: []string{"config", "agent", "add", "help"},
-			want: "new agent",
-		},
-		{
-			name: "config context add help",
-			args: []string{"config", "context", "add", "help"},
-			want: "new context",
-		},
-		{
-			name: "config role add help",
-			args: []string{"config", "role", "add", "help"},
-			want: "new role",
-		},
-		{
-			name: "config task add help",
-			args: []string{"config", "task", "add", "help"},
-			want: "new task",
 		},
 	}
 

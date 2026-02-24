@@ -11,7 +11,7 @@ import (
 // Note: Tests below use os.Chdir (process-global state). Do not add t.Parallel()
 // to any test that calls os.Chdir — it will cause data races on the working directory.
 
-func TestConfigAgentList_NoConfig(t *testing.T) {
+func TestConfigListAgent_NoConfig(t *testing.T) {
 	// Set up temp directory with no config
 	tmpDir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", tmpDir)
@@ -22,7 +22,7 @@ func TestConfigAgentList_NoConfig(t *testing.T) {
 	stdout := &bytes.Buffer{}
 	cmd.SetOut(stdout)
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"config", "agent", "list", "--local"})
+	cmd.SetArgs([]string{"config", "list", "agent", "--local"})
 
 	err := cmd.Execute()
 	if err != nil {
@@ -30,12 +30,12 @@ func TestConfigAgentList_NoConfig(t *testing.T) {
 	}
 
 	output := stdout.String()
-	if !strings.Contains(output, "No agents configured") {
-		t.Errorf("expected 'No agents configured', got: %s", output)
+	if !strings.Contains(output, "agents") {
+		t.Errorf("expected 'agents' section header, got: %s", output)
 	}
 }
 
-func TestConfigAgentList_WithAgents(t *testing.T) {
+func TestConfigListAgent_WithAgents(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", tmpDir)
 
@@ -63,7 +63,7 @@ func TestConfigAgentList_WithAgents(t *testing.T) {
 	stdout := &bytes.Buffer{}
 	cmd.SetOut(stdout)
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"config", "agent", "list"})
+	cmd.SetArgs([]string{"config", "list", "agent"})
 
 	err := cmd.Execute()
 	if err != nil {
@@ -79,7 +79,7 @@ func TestConfigAgentList_WithAgents(t *testing.T) {
 	}
 }
 
-func TestConfigAgentInfo(t *testing.T) {
+func TestConfigInfo_Agent(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", tmpDir)
 
@@ -111,7 +111,7 @@ func TestConfigAgentInfo(t *testing.T) {
 	stdout := &bytes.Buffer{}
 	cmd.SetOut(stdout)
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"config", "agent", "info", "claude"})
+	cmd.SetArgs([]string{"config", "info", "claude"})
 
 	err := cmd.Execute()
 	if err != nil {
@@ -133,7 +133,7 @@ func TestConfigAgentInfo(t *testing.T) {
 	}
 }
 
-func TestConfigAgentInfo_NotFound(t *testing.T) {
+func TestConfigInfo_NotFound(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", tmpDir)
 
@@ -151,22 +151,22 @@ func TestConfigAgentInfo_NotFound(t *testing.T) {
 	cmd := NewRootCmd()
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"config", "agent", "info", "nonexistent"})
+	cmd.SetArgs([]string{"config", "info", "nonexistent"})
 
 	err := cmd.Execute()
 	if err == nil {
-		t.Fatal("expected error for nonexistent agent")
+		t.Fatal("expected error for nonexistent item")
 	}
 	if !strings.Contains(err.Error(), "not found") {
 		t.Errorf("expected 'not found' error, got: %v", err)
 	}
 }
 
-func TestConfigAgentRemove(t *testing.T) {
+func TestConfigRemove_Agent(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", tmpDir)
 
-	// Create global config with an agent
+	// Create global config with agents
 	globalDir := filepath.Join(tmpDir, "start")
 	if err := os.MkdirAll(globalDir, 0755); err != nil {
 		t.Fatal(err)
@@ -192,7 +192,7 @@ func TestConfigAgentRemove(t *testing.T) {
 	stdout := &bytes.Buffer{}
 	cmd.SetOut(stdout)
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"config", "agent", "remove", "gemini", "--yes"})
+	cmd.SetArgs([]string{"config", "remove", "gemini", "--yes"})
 
 	err := cmd.Execute()
 	if err != nil {
@@ -213,7 +213,7 @@ func TestConfigAgentRemove(t *testing.T) {
 	}
 }
 
-func TestConfigAgentDefault_Show(t *testing.T) {
+func TestConfigSettings_DefaultAgentShow(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", tmpDir)
 
@@ -232,11 +232,12 @@ func TestConfigAgentDefault_Show(t *testing.T) {
 
 	chdir(t, tmpDir)
 
+	// Use config settings to show the default_agent setting
 	cmd := NewRootCmd()
 	stdout := &bytes.Buffer{}
 	cmd.SetOut(stdout)
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"config", "agent", "default"})
+	cmd.SetArgs([]string{"config", "settings", "default_agent"})
 
 	err := cmd.Execute()
 	if err != nil {
@@ -244,12 +245,12 @@ func TestConfigAgentDefault_Show(t *testing.T) {
 	}
 
 	output := stdout.String()
-	if !strings.Contains(output, "Default agent: claude") {
-		t.Errorf("expected 'Default agent: claude', got: %s", output)
+	if !strings.Contains(output, "claude") {
+		t.Errorf("expected 'claude' in output, got: %s", output)
 	}
 }
 
-func TestConfigRoleList_NoConfig(t *testing.T) {
+func TestConfigListRole_NoConfig(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", tmpDir)
 
@@ -259,7 +260,7 @@ func TestConfigRoleList_NoConfig(t *testing.T) {
 	stdout := &bytes.Buffer{}
 	cmd.SetOut(stdout)
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"config", "role", "list", "--local"})
+	cmd.SetArgs([]string{"config", "list", "role", "--local"})
 
 	err := cmd.Execute()
 	if err != nil {
@@ -267,12 +268,12 @@ func TestConfigRoleList_NoConfig(t *testing.T) {
 	}
 
 	output := stdout.String()
-	if !strings.Contains(output, "No roles configured") {
-		t.Errorf("expected 'No roles configured', got: %s", output)
+	if !strings.Contains(output, "roles") {
+		t.Errorf("expected 'roles' section header, got: %s", output)
 	}
 }
 
-func TestConfigContextList_WithContexts(t *testing.T) {
+func TestConfigListContext_WithContexts(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", tmpDir)
 
@@ -299,7 +300,7 @@ func TestConfigContextList_WithContexts(t *testing.T) {
 	stdout := &bytes.Buffer{}
 	cmd.SetOut(stdout)
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"config", "context", "list"})
+	cmd.SetArgs([]string{"config", "list", "context"})
 
 	err := cmd.Execute()
 	if err != nil {
@@ -315,7 +316,7 @@ func TestConfigContextList_WithContexts(t *testing.T) {
 	}
 }
 
-func TestConfigContextList_PreservesDefinitionOrder(t *testing.T) {
+func TestConfigListContext_PreservesDefinitionOrder(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", tmpDir)
 
@@ -351,7 +352,7 @@ func TestConfigContextList_PreservesDefinitionOrder(t *testing.T) {
 	stdout := &bytes.Buffer{}
 	cmd.SetOut(stdout)
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"config", "context", "list"})
+	cmd.SetArgs([]string{"config", "list", "context"})
 
 	err := cmd.Execute()
 	if err != nil {
@@ -376,7 +377,7 @@ func TestConfigContextList_PreservesDefinitionOrder(t *testing.T) {
 	}
 }
 
-func TestConfigTaskList_WithTasks(t *testing.T) {
+func TestConfigListTask_WithTasks(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", tmpDir)
 
@@ -402,7 +403,7 @@ func TestConfigTaskList_WithTasks(t *testing.T) {
 	stdout := &bytes.Buffer{}
 	cmd.SetOut(stdout)
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"config", "task", "list"})
+	cmd.SetArgs([]string{"config", "list", "task"})
 
 	err := cmd.Execute()
 	if err != nil {
@@ -1911,5 +1912,32 @@ func TestConfigSearch_TagFilter(t *testing.T) {
 	}
 	if strings.Contains(output, "deploy") {
 		t.Errorf("expected 'deploy' task to be excluded by tag filter, got: %s", output)
+	}
+}
+
+func TestConfigRemovedCommandPaths(t *testing.T) {
+	cases := []struct {
+		name string
+		args []string
+	}{
+		{"config agent", []string{"config", "agent"}},
+		{"config agent add", []string{"config", "agent", "add"}},
+		{"config agent default", []string{"config", "agent", "default", "claude"}},
+		{"config agent edit", []string{"config", "agent", "edit", "claude"}},
+		{"config role add", []string{"config", "role", "add"}},
+		{"config role list", []string{"config", "role", "list"}},
+		{"config context order", []string{"config", "context", "order"}},
+		{"config task remove review", []string{"config", "task", "remove", "review"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cmd := NewRootCmd()
+			cmd.SetOut(&bytes.Buffer{})
+			cmd.SetErr(&bytes.Buffer{})
+			cmd.SetArgs(tc.args)
+			if err := cmd.Execute(); err == nil {
+				t.Errorf("expected error for removed command %v, got nil", tc.args)
+			}
+		})
 	}
 }

@@ -763,42 +763,175 @@ func promptSelectFromList(w io.Writer, r io.Reader, entityType, query string, na
 	return selected, nil
 }
 
-// resolveRemoveNames resolves CLI args to a deduplicated list of names to remove.
-// With a single ambiguous arg and an interactive terminal, it shows a picker.
-// With multiple args, any ambiguous arg without --yes returns an error.
-// Returns (nil, nil) when the user cancels the interactive picker (caller should
-// return nil). Returns (nil, err) on any other failure.
-func resolveRemoveNames[T any](items map[string]T, typeName string, args []string, skipConfirm bool, stdout io.Writer, stdin io.Reader) ([]string, error) {
-	seen := make(map[string]bool)
-	var resolvedNames []string
-	for _, arg := range args {
-		candidates, err := resolveAllMatchingNames(items, typeName, arg)
-		if err != nil {
-			return nil, err
-		}
-		if len(candidates) > 1 && !skipConfirm {
-			if len(args) > 1 {
-				return nil, fmt.Errorf("%q matches multiple %ss — use an exact name or pass --yes to remove all matches", arg, typeName)
-			}
-			if !isTerminal(stdin) {
-				return nil, fmt.Errorf("--yes flag required in non-interactive mode for ambiguous %s %q", typeName, arg)
-			}
-			candidates, err = promptSelectFromList(stdout, stdin, typeName, arg, candidates)
-			if err != nil {
-				return nil, err
-			}
-			if len(candidates) == 0 {
-				return nil, nil // user cancelled
-			}
-		}
-		for _, name := range candidates {
-			if !seen[name] {
-				seen[name] = true
-				resolvedNames = append(resolvedNames, name)
-			}
+// normalizeCategoryArg converts a category argument (singular or plural) to a
+// canonical singular category name ("agent", "role", "context", "task").
+// Returns "" for unknown inputs.
+func normalizeCategoryArg(arg string) string {
+	singular := strings.TrimSuffix(strings.ToLower(arg), "s")
+	switch singular {
+	case "agent", "role", "context", "task":
+		return singular
+	}
+	return ""
+}
+
+// configMatch represents a single cross-category search result.
+type configMatch struct {
+	Name     string
+	Category string // "agent", "role", "context", or "task"
+}
+
+// searchAllConfigCategories searches all four config categories for a query string.
+// Returns all matches across categories tagged with their category name.
+// Zero matches in a category is not an error; the returned slice may be empty.
+func searchAllConfigCategories(query string, local bool) ([]configMatch, error) {
+	var results []configMatch
+
+	agents, _, err := loadAgentsForScope(local)
+	if err != nil {
+		return nil, fmt.Errorf("loading agents: %w", err)
+	}
+	if names, _ := resolveAllMatchingNames(agents, "agent", query); len(names) > 0 {
+		for _, name := range names {
+			results = append(results, configMatch{Name: name, Category: "agent"})
 		}
 	}
-	return resolvedNames, nil
+
+	roles, _, err := loadRolesForScope(local)
+	if err != nil {
+		return nil, fmt.Errorf("loading roles: %w", err)
+	}
+	if names, _ := resolveAllMatchingNames(roles, "role", query); len(names) > 0 {
+		for _, name := range names {
+			results = append(results, configMatch{Name: name, Category: "role"})
+		}
+	}
+
+	contexts, _, err := loadContextsForScope(local)
+	if err != nil {
+		return nil, fmt.Errorf("loading contexts: %w", err)
+	}
+	if names, _ := resolveAllMatchingNames(contexts, "context", query); len(names) > 0 {
+		for _, name := range names {
+			results = append(results, configMatch{Name: name, Category: "context"})
+		}
+	}
+
+	tasks, _, err := loadTasksForScope(local)
+	if err != nil {
+		return nil, fmt.Errorf("loading tasks: %w", err)
+	}
+	if names, _ := resolveAllMatchingNames(tasks, "task", query); len(names) > 0 {
+		for _, name := range names {
+			results = append(results, configMatch{Name: name, Category: "task"})
+		}
+	}
+
+	return results, nil
+}
+
+// promptSelectConfigMatch shows a numbered list of cross-category matches and
+// lets the user pick one. Items are displayed as "name (category)".
+// Returns a zero-value configMatch{} and nil if the user cancels.
+func promptSelectConfigMatch(w io.Writer, r io.Reader, query string, matches []configMatch) (configMatch, error) {
+	if query != "" {
+		_, _ = fmt.Fprintf(w, "Found %d items matching %q:\n\n", len(matches), query)
+	} else {
+		_, _ = fmt.Fprintf(w, "%d items:\n\n", len(matches))
+	}
+	for i, m := range matches {
+		_, _ = fmt.Fprintf(w, "  %2d. %s %s\n", i+1, m.Name, tui.Annotate("%s", m.Category))
+	}
+	_, _ = fmt.Fprintln(w)
+	_, _ = fmt.Fprintf(w, "Select %s: ", tui.Annotate("1-%d", len(matches)))
+
+	reader := bufio.NewReader(r)
+	input, err := reader.ReadString('\n')
+	if err != nil {
+		return configMatch{}, fmt.Errorf("reading input: %w", err)
+	}
+	input = strings.TrimSpace(input)
+	if input == "" {
+		_, _ = fmt.Fprintln(w, "Cancelled.")
+		return configMatch{}, nil
+	}
+	n, err := strconv.Atoi(input)
+	if err != nil || n < 1 || n > len(matches) {
+		return configMatch{}, fmt.Errorf("invalid selection %q: enter a number between 1 and %d", input, len(matches))
+	}
+	return matches[n-1], nil
+}
+
+// promptSelectConfigMatchesFromList shows a numbered multi-select list of cross-category
+// matches and returns the user's selection. Items are displayed as "name (category)".
+// Returns nil and nil if the user cancels.
+func promptSelectConfigMatchesFromList(w io.Writer, r io.Reader, query string, matches []configMatch) ([]configMatch, error) {
+	if len(matches) == 0 {
+		return nil, nil
+	}
+	if query != "" {
+		_, _ = fmt.Fprintf(w, "Found %d items matching %q:\n\n", len(matches), query)
+	} else {
+		_, _ = fmt.Fprintf(w, "%d items:\n\n", len(matches))
+	}
+	for i, m := range matches {
+		_, _ = fmt.Fprintf(w, "  %2d. %s %s\n", i+1, m.Name, tui.Annotate("%s", m.Category))
+	}
+	_, _ = fmt.Fprintln(w)
+	_, _ = fmt.Fprintf(w, "Select %s, range, or all: ", tui.Annotate("1-%d", len(matches)))
+
+	reader := bufio.NewReader(r)
+	input, err := reader.ReadString('\n')
+	if err != nil {
+		return nil, fmt.Errorf("reading input: %w", err)
+	}
+	input = strings.TrimSpace(strings.ToLower(input))
+
+	if input == "" {
+		_, _ = fmt.Fprintln(w, "Cancelled.")
+		return nil, nil
+	}
+	if input == "all" {
+		return matches, nil
+	}
+
+	seen := make(map[int]bool)
+	var selected []configMatch
+	for _, part := range strings.Split(input, ",") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		if strings.Contains(part, "-") {
+			bounds := strings.SplitN(part, "-", 2)
+			lo, loErr := strconv.Atoi(strings.TrimSpace(bounds[0]))
+			hi, hiErr := strconv.Atoi(strings.TrimSpace(bounds[1]))
+			if loErr != nil || hiErr != nil || lo < 1 || hi > len(matches) || lo > hi {
+				return nil, fmt.Errorf("invalid range %q: use format lo-hi within 1-%d", part, len(matches))
+			}
+			for n := lo; n <= hi; n++ {
+				if !seen[n] {
+					seen[n] = true
+					selected = append(selected, matches[n-1])
+				}
+			}
+			continue
+		}
+		n, err := strconv.Atoi(part)
+		if err != nil || n < 1 || n > len(matches) {
+			return nil, fmt.Errorf("invalid selection %q: enter a number between 1 and %d", part, len(matches))
+		}
+		if !seen[n] {
+			seen[n] = true
+			selected = append(selected, matches[n-1])
+		}
+	}
+
+	if len(selected) == 0 {
+		_, _ = fmt.Fprintln(w, "Cancelled.")
+		return nil, nil
+	}
+	return selected, nil
 }
 
 // resolveInstalledName resolves a name from a map using exact match first,

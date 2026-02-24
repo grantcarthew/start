@@ -795,7 +795,7 @@ func TestConfigRoleList_PreservesDefinitionOrder(t *testing.T) {
 	stdout := &bytes.Buffer{}
 	cmd.SetOut(stdout)
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"config", "role", "list"})
+	cmd.SetArgs([]string{"config", "list", "role"})
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
