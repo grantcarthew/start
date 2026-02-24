@@ -77,62 +77,8 @@ exclusive; omitting both shows the effective merged configuration.`,
 		RunE: runShow,
 	}
 
-	showRoleCmd := &cobra.Command{
-		Use:     "role [name]",
-		Aliases: []string{"roles"},
-		Short:   "Display resolved role content",
-		Long: `Display role content resolved from its configured source (file, command, or prompt).
-
-Without a name, shows the first configured role.
-With a name, searches roles by name and displays the full configuration and content.`,
-		Args: cobra.MaximumNArgs(1),
-		RunE: runShowItem(internalcue.KeyRoles, "Role"),
-	}
-
-	showContextCmd := &cobra.Command{
-		Use:     "context [name]",
-		Aliases: []string{"contexts"},
-		Short:   "Display resolved context content",
-		Long: `Display context content resolved from its configured source (file, command, or prompt).
-
-Without a name, shows the first configured context.
-With a name, searches contexts by name and displays the full configuration and content.`,
-		Args: cobra.MaximumNArgs(1),
-		RunE: runShowItem(internalcue.KeyContexts, "Context"),
-	}
-
-	showAgentCmd := &cobra.Command{
-		Use:     "agent [name]",
-		Aliases: []string{"agents"},
-		Short:   "Display agent configuration",
-		Long: `Display effective agent configuration after merging global and local config.
-
-Without a name, shows the first configured agent.
-With a name, searches agents by name and displays the full configuration.`,
-		Args: cobra.MaximumNArgs(1),
-		RunE: runShowItem(internalcue.KeyAgents, "Agent"),
-	}
-
-	showTaskCmd := &cobra.Command{
-		Use:     "task [name]",
-		Aliases: []string{"tasks"},
-		Short:   "Display resolved task content",
-		Long: `Display task content resolved from its configured source (file, command, or prompt).
-
-Without a name, shows the first configured task.
-With a name, searches tasks by name and displays the full configuration and content.`,
-		Args: cobra.MaximumNArgs(1),
-		RunE: runShowItem(internalcue.KeyTasks, "Task"),
-	}
-
 	// Add --global flag to show command (show-specific scope restriction)
 	showCmd.PersistentFlags().Bool("global", false, "Show from global scope only")
-
-	// Add subcommands
-	showCmd.AddCommand(showRoleCmd)
-	showCmd.AddCommand(showContextCmd)
-	showCmd.AddCommand(showAgentCmd)
-	showCmd.AddCommand(showTaskCmd)
 
 	// Add show to parent
 	parent.AddCommand(showCmd)
@@ -438,28 +384,6 @@ func showVerboseItem(w io.Writer, name string, scope config.Scope, cueKey, itemT
 	return nil
 }
 
-// runShowItem returns a cobra RunE handler that displays a specific item type.
-func runShowItem(cueKey, itemType string) func(*cobra.Command, []string) error {
-	return func(cmd *cobra.Command, args []string) error {
-		name := ""
-		if len(args) > 0 {
-			name = args[0]
-		}
-
-		scope, err := showScopeFromCmd(cmd)
-		if err != nil {
-			return err
-		}
-		result, err := prepareShow(name, scope, cueKey, itemType)
-		if err != nil {
-			return err
-		}
-
-		printVerboseDump(cmd.OutOrStdout(), result)
-		return nil
-	}
-}
-
 // prepareShow prepares show output for an item type.
 // cueKey is the top-level CUE key (e.g., internalcue.KeyRoles).
 // itemType is the display name (e.g., "Role").
@@ -638,8 +562,12 @@ func printVerboseDump(w io.Writer, r ShowResult) {
 
 	// Command
 	if fields.Command != "" {
+		cmd := fields.Command
+		if r.ItemType == "Agent" {
+			cmd = partialFillAgentCommand(cmd, r.Value)
+		}
 		_, _ = fmt.Fprintln(w)
-		_, _ = fmt.Fprintf(w, "%s %s\n", label("Command:"), fields.Command)
+		_, _ = fmt.Fprintf(w, "%s %s\n", label("Command:"), cmd)
 	}
 
 	printSeparator(w)
@@ -733,6 +661,47 @@ func resolveShowFile(filePath, origin string) (resolvedPath, content string, err
 		return expanded, "", readErr
 	}
 	return expanded, string(data), nil
+}
+
+// partialFillAgentCommand substitutes the static {{.bin}} and {{.model}}
+// placeholders in an agent command template with their resolved values.
+// Runtime placeholders ({{.prompt}}, {{.role}}, {{.role_file}}, {{.date}})
+// are left as-is since they are only known at execution time.
+func partialFillAgentCommand(command string, v cue.Value) string {
+	bin := ""
+	if f := v.LookupPath(cue.ParsePath("bin")); f.Exists() {
+		bin, _ = f.String()
+	}
+
+	model := ""
+	if dm := v.LookupPath(cue.ParsePath("default_model")); dm.Exists() {
+		model, _ = dm.String()
+	}
+	if model != "" {
+		if models := v.LookupPath(cue.ParsePath("models")); models.Exists() {
+			entry := models.LookupPath(cue.MakePath(cue.Str(model)))
+			if entry.Exists() {
+				// Simple string format: models: { sonnet: "model-id" }
+				if s, err := entry.String(); err == nil {
+					model = s
+				} else if idVal := entry.LookupPath(cue.ParsePath("id")); idVal.Exists() {
+					// Object format: models: { sonnet: { id: "model-id" } }
+					if s, err := idVal.String(); err == nil {
+						model = s
+					}
+				}
+			}
+		}
+	}
+
+	result := command
+	if bin != "" {
+		result = strings.ReplaceAll(result, "{{.bin}}", bin)
+	}
+	if model != "" {
+		result = strings.ReplaceAll(result, "{{.model}}", model)
+	}
+	return result
 }
 
 // deriveCacheDir constructs the CUE cache directory for an origin.

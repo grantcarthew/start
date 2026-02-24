@@ -19,6 +19,17 @@ func setupTestConfig(t *testing.T) string {
 	t.Helper()
 
 	dir := t.TempDir()
+
+	// CUE extracts registry modules with read-only permissions; chmod before TempDir cleanup.
+	t.Cleanup(func() {
+		_ = filepath.Walk(filepath.Join(dir, ".cache"), func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return nil
+			}
+			return os.Chmod(path, 0755)
+		})
+	})
+
 	startDir := filepath.Join(dir, ".start")
 	if err := os.MkdirAll(startDir, 0755); err != nil {
 		t.Fatalf("creating .start dir: %v", err)
@@ -588,7 +599,7 @@ agents: {
 		}
 	})
 
-	t.Run("show agent subcommand with --global", func(t *testing.T) {
+	t.Run("show agent name search with --global matches global-agent", func(t *testing.T) {
 		buf := new(bytes.Buffer)
 		cmd := NewRootCmd()
 		cmd.SetOut(buf)
@@ -636,6 +647,31 @@ func TestVerboseDumpCUEDefinition(t *testing.T) {
 		if !strings.Contains(output, want) {
 			t.Errorf("output missing CUE definition element %q\ngot:\n%s", want, output)
 		}
+	}
+}
+
+// TestVerboseDumpAgentCommand verifies that agent command templates have
+// {{.bin}} and {{.model}} filled with resolved values in the verbose dump.
+func TestVerboseDumpAgentCommand(t *testing.T) {
+	setupTestConfig(t)
+
+	result, err := prepareShow("claude", config.ScopeMerged, internalcue.KeyAgents, "Agent")
+	if err != nil {
+		t.Fatalf("prepareShow: %v", err)
+	}
+
+	var buf bytes.Buffer
+	printVerboseDump(&buf, result)
+	output := buf.String()
+
+	// bin and resolved model should appear in the Command line
+	if !strings.Contains(output, "Command: claude --model claude-sonnet-4-20250514") {
+		t.Errorf("Command line missing resolved bin and model\ngot:\n%s", output)
+	}
+
+	// Runtime placeholder should remain unfilled
+	if !strings.Contains(output, "{{.prompt}}") {
+		t.Errorf("Command line should retain {{.prompt}} placeholder\ngot:\n%s", output)
 	}
 }
 
@@ -952,45 +988,40 @@ func TestShowCommandIntegration(t *testing.T) {
 	setupTestConfig(t)
 
 	tests := []struct {
-		name       string
-		args       []string
-		wantOutput []string
-		wantErr    bool
+		name            string
+		args            []string
+		wantOutput      []string
+		wantErr         bool
+		wantErrContain  string
 	}{
 		{
-			name:       "show agent no name shows first agent",
-			args:       []string{"show", "agent"},
-			wantOutput: []string{"Agent:", "claude", "first in config"},
+			name:           "show agent is a name search returning not-found",
+			args:           []string{"show", "agent"},
+			wantErr:        true,
+			wantErrContain: "agent",
 		},
 		{
-			name:       "show agent with name shows verbose dump",
-			args:       []string{"show", "agent", "claude"},
-			wantOutput: []string{"Agent: claude", "bin:"},
+			name:           "show role is a name search returning not-found",
+			args:           []string{"show", "role"},
+			wantErr:        true,
+			wantErrContain: "role",
 		},
 		{
-			name:       "show role no name shows first role",
-			args:       []string{"show", "role"},
-			wantOutput: []string{"Role:", "assistant", "first in config"},
+			name:           "show context is a name search returning not-found",
+			args:           []string{"show", "context"},
+			wantErr:        true,
+			wantErrContain: "context",
 		},
 		{
-			name:       "show context no name shows first context",
-			args:       []string{"show", "context"},
-			wantOutput: []string{"Context:", "environment", "first in config"},
+			name:           "show task is a name search returning not-found",
+			args:           []string{"show", "task"},
+			wantErr:        true,
+			wantErrContain: "task",
 		},
 		{
-			name:       "show context with name shows verbose dump",
-			args:       []string{"show", "context", "environment"},
-			wantOutput: []string{"Context: environment"},
-		},
-		{
-			name:       "show task with name shows verbose dump",
-			args:       []string{"show", "task", "review"},
-			wantOutput: []string{"Task: review", "git diff --staged"},
-		},
-		{
-			name:       "show task no name shows first task",
-			args:       []string{"show", "task"},
-			wantOutput: []string{"Task:", "review", "first in config"},
+			name:    "show with two args is rejected",
+			args:    []string{"show", "claude", "extra"},
+			wantErr: true,
 		},
 		{
 			name:       "show no args lists all items",
@@ -1032,6 +1063,10 @@ func TestShowCommandIntegration(t *testing.T) {
 			if tt.wantErr {
 				if err == nil {
 					t.Error("expected error, got nil")
+					return
+				}
+				if tt.wantErrContain != "" && !strings.Contains(err.Error(), tt.wantErrContain) {
+					t.Errorf("error = %q, want containing %q", err.Error(), tt.wantErrContain)
 				}
 				return
 			}
