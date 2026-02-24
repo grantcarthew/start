@@ -35,6 +35,7 @@ Use --local to target project-specific configuration.`,
 	addConfigInteractiveAddCommand(configCmd)
 	addConfigInteractiveEditCommand(configCmd)
 	addConfigInteractiveRemoveCommand(configCmd)
+	addConfigOpenCommand(configCmd)
 
 	parent.AddCommand(configCmd)
 }

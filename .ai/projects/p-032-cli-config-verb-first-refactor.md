@@ -105,10 +105,11 @@ Implementation:
 Tests:
 
 - `internal/cli/config_test.go` — 1915 lines
-- `internal/cli/config_integration_test.go` — 1103 lines
-- `internal/cli/config_order_test.go` — 768 lines
+- `internal/cli/config_integration_test.go` — 952 lines (reduced from 1103 by p-034 interactive conversion)
+- `internal/cli/config_order_test.go` — 754 lines
 - `internal/cli/config_helpers_test.go` — 461 lines
-- `internal/cli/config_interactive_test.go` — 116 lines
+- `internal/cli/config_interactive_test.go` — 102 lines
+- `internal/cli/config_testhelpers_test.go` — 23 lines, contains `slowReader`/`slowStdin` helper that prevents bufio over-consumption when multiple sequential prompt functions each create their own `bufio.NewReader`; rewritten tests must use this
 
 ### Codebase observations
 
@@ -154,7 +155,7 @@ p-033 is complete. `start show` noun subcommands (`show agent`, `show role`, `sh
 ## Goals
 
 1. Remove all noun-group subcommands from `start config`
-2. Implement verb-first commands: `add`, `edit`, `remove`, `list`, `info`, `open`, `order`
+2. Implement verb-first commands: `add`, `edit`, `remove`, `list`, `info`, `order`
 3. Implement search-by-name with interactive menus for `edit`, `remove`, `info`
 4. Remove `start config agent default` (duplicate of `config settings default_agent`)
 5. Update all tests to reflect new command paths
@@ -173,6 +174,7 @@ Out of Scope:
 - `start assets` (already correct)
 - `start config settings` internals (unchanged)
 - `start config search` internals (unchanged)
+- `start config open` — delivered by p-035 (complete before p-032 begins)
 - CUE schemas, config file formats, or registry interaction
 - Adding new features beyond the restructure
 
@@ -187,7 +189,7 @@ start config info [query]             # search by name, show raw config fields; 
 start config add [category]           # add item; prompt for category if omitted
 start config edit [query]             # search by name, edit matched item; prompt interactively if no query
 start config remove <query>           # search by name, confirm, delete; usage message if no query
-start config open [category]          # open .cue file in $EDITOR; prompt if no category
+start config open [category]          # open .cue file in $EDITOR; prompt if no category (p-035)
 start config order [category]         # reorder items; prompt if no category
 start config search [query]           # unchanged
 start config settings [key] [value]   # unchanged
@@ -205,7 +207,7 @@ start config settings [key] [value]   # unchanged
 | `start config add` | prompt for category (agent/role/context/task) |
 | `start config edit` | interactive: prompt to pick from all items |
 | `start config remove` | usage message — query required |
-| `start config open` | prompt for which file (agent/role/context/task/setting) |
+| `start config open` | prompt for which file — delivered by p-035 |
 | `start config order` | prompt for category (context/role only) |
 
 ### start config list
@@ -268,19 +270,6 @@ start config remove claude/interactive -y # skip confirmation dialog
 ```
 
 Query is required. No-arg usage message is intentional — remove is destructive, the user must supply a target. Confirmation dialog always shown unless `--yes` / `-y` flag is provided. The `-y` flag is the only non-global flag on this command.
-
-### start config open
-
-```
-start config open              # prompt: agent/role/context/task/setting?
-start config open agent        # open agents.cue in $EDITOR
-start config open role         # open roles.cue in $EDITOR
-start config open context      # open contexts.cue in $EDITOR
-start config open task         # open tasks.cue in $EDITOR
-start config open setting      # open settings.cue in $EDITOR
-```
-
-Plural aliases accepted. This replaces the `config <type> edit` (no name) behaviour from the noun groups.
 
 ### start config order
 
@@ -349,7 +338,6 @@ start config task remove
 - `internal/cli/config_remove.go` — `config remove <query>` command
 - `internal/cli/config_list.go` — `config list [category]` command
 - `internal/cli/config_info.go` — `config info [query]` command
-- `internal/cli/config_open.go` — `config open [category]` command
 
 ### Modify
 
@@ -403,13 +391,7 @@ start config task remove
 - [ ] `start config remove claude` shows menu if multiple matches, then confirms
 - [ ] `start config remove claude/interactive -y` skips confirmation and deletes
 - [ ] `start config remove claude/interactive --yes` skips confirmation and deletes
-- [ ] `start config open` prompts for which file
-- [ ] `start config open agent` opens agents.cue in $EDITOR
-- [ ] `start config open agents` works (plural alias)
-- [ ] `start config open role` opens roles.cue in $EDITOR
-- [ ] `start config open context` opens contexts.cue in $EDITOR
-- [ ] `start config open task` opens tasks.cue in $EDITOR
-- [ ] `start config open setting` opens settings.cue in $EDITOR
+- [ ] `start config open` prompts for which file (delivered by p-035)
 - [ ] `start config order` prompts for context or role (unchanged)
 - [ ] `start config order context` goes straight to context reorder
 - [ ] `start config order role` goes straight to role reorder
@@ -453,7 +435,7 @@ Follow dr-024:
 - Table-driven tests for command routing and argument handling
 - Integration tests cover full workflows: add an item, list it, edit it, remove it
 - Test no-argument behaviour explicitly for each verb command
-- Test plural aliases for `add`, `list`, `open`, `order`
+- Test plural aliases for `add`, `list`, `order`
 - Test that all removed command paths return errors
 
 Run tests:
@@ -484,10 +466,9 @@ The logical order within Phase 2:
 3. Implement `config add` — carries over from noun-group add commands
 4. Implement `config edit` — carries over from noun-group edit commands
 5. Implement `config remove` — carries over from noun-group remove commands
-6. Implement `config open` — consolidates the "no name = open file" behaviour
-7. Update `config order` — add category arg
-8. Update helpers and interactive flows
-9. Rewrite tests
+6. Update `config order` — add category arg
+7. Update helpers and interactive flows
+8. Rewrite tests
 
 Checkpoint: `scripts/invoke-tests` passes before moving to Phase 3.
 
@@ -507,7 +488,6 @@ Implementation files (new):
 - `internal/cli/config_remove.go`
 - `internal/cli/config_list.go`
 - `internal/cli/config_info.go`
-- `internal/cli/config_open.go`
 
 Implementation files (modified):
 
@@ -551,3 +531,4 @@ Requires all config-touching projects complete:
 - p-027 CLI Content Source Menu Extraction
 - p-033 CLI Show Noun Subcommand Removal (complete)
 - p-034 CLI Config Add/Edit Flags Removal
+- p-035 CLI Config Open Command

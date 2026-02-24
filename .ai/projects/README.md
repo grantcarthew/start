@@ -50,6 +50,7 @@ See [p-writing-guide.md](./p-writing-guide.md) for guidelines on creating and ma
 | [p-022](./completed/p-022-assets-ast-refactor.md) | Assets AST Refactor | 2026-02-20 |
 | [p-030](./completed/p-030-assets-index-setting.md) | Assets Index Setting | 2026-02-20 |
 | [p-034](./completed/p-034-cli-config-add-edit-flags-removal.md) | CLI Config Add/Edit Flags Removal | 2026-02-24 |
+| [p-035](./completed/p-035-cli-config-open-command.md) | CLI Config Open Command | 2026-02-24 |
 
 ---
 
@@ -59,11 +60,17 @@ See [p-writing-guide.md](./p-writing-guide.md) for guidelines on creating and ma
 
 #### p-032: CLI Config Verb-First Refactor
 
-Restructure `start config` from noun-first to verb-first to match `start assets`. Removes all noun-group subcommands, introduces search-by-name with menus, adds new verb commands: `list`, `info`, `open`. Breaking change to command interface.
+Restructure `start config` from noun-first to verb-first to match `start assets`. Removes all noun-group subcommands, introduces search-by-name with menus, adds new verb commands: `list`, `info`. Breaking change to command interface.
 
-Dependencies: p-008, p-013, p-017, p-018, p-023, p-027, p-033, p-034
+Dependencies: p-008, p-013, p-017, p-018, p-023, p-027, p-033, p-034, p-035
 
 ### Completed
+
+#### p-035: CLI Config Open Command
+
+Adds `start config open [category]` as a new verb command that opens the appropriate `.cue` configuration file in `$EDITOR`. Extracted from p-032 to ship independently before the noun-group refactor begins.
+
+Dependencies: None
 
 #### p-030: Assets Index Setting
 
