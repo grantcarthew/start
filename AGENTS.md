@@ -12,7 +12,7 @@ Avoid references to the prototype in new documentation. This is a new design.
 
 Projects are stored in `.ai/projects/`. Continue by reading the active project.
 
-Active Project: .ai/projects/p-036-cli-config-types-migration.md
+Active Project: .ai/projects/p-037-cli-config-order-category-arg.md
 
 Project Workflow:
 - Active projects are in `.ai/projects/`
