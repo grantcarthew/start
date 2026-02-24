@@ -10,9 +10,7 @@ See [p-writing-guide.md](./p-writing-guide.md) for guidelines on creating and ma
 
 ### Active Projects
 
-| Project | Title |
-|---------|-------|
-| [p-032](./p-032-cli-config-verb-first-refactor.md) | CLI Config Verb-First Refactor |
+None.
 
 
 ### Completed Projects
@@ -53,20 +51,21 @@ See [p-writing-guide.md](./p-writing-guide.md) for guidelines on creating and ma
 | [p-035](./completed/p-035-cli-config-open-command.md) | CLI Config Open Command | 2026-02-24 |
 | [p-036](./completed/p-036-cli-config-types-migration.md) | CLI Config Types Migration | 2026-02-24 |
 | [p-037](./completed/p-037-cli-config-order-category-arg.md) | CLI Config Order Category Argument | 2026-02-24 |
+| [p-032](./completed/p-032-cli-config-verb-first-refactor.md) | CLI Config Verb-First Refactor | 2026-02-24 |
 
 ---
 
 ## Project Overview
 
-### Active
+### Completed
 
 #### p-032: CLI Config Verb-First Refactor
 
-Restructure `start config` from noun-first to verb-first to match `start assets`. Removes all noun-group subcommands, introduces search-by-name with menus, adds new verb commands: `list`, `info`. Breaking change to command interface.
+Restructured `start config` from noun-first to verb-first to match `start assets`. Removed all noun-group subcommands (`config agent`, `config role`, `config context`, `config task`). Added new verb commands: `list`, `info`, `add`, `edit`, `remove`. Cross-category search with interactive menus. Breaking change to command interface.
+
+**Key Deliverables:** `config_list.go`, `config_info.go`, `config_add.go`, `config_edit.go`, `config_remove.go`, deleted 4 noun-group files, updated tests and README.
 
 Dependencies: p-008, p-013, p-017, p-018, p-023, p-027, p-033, p-034, p-035, p-036, p-037
-
-### Completed
 
 #### p-037: CLI Config Order Category Argument
 

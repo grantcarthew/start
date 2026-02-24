@@ -22,20 +22,16 @@ Use --local to target project-specific configuration.`,
 		RunE: runConfigList,
 	}
 
-	// Add entity subcommand groups
-	addConfigAgentCommand(configCmd)
-	addConfigRoleCommand(configCmd)
-	addConfigContextCommand(configCmd)
-	addConfigTaskCommand(configCmd)
-	addConfigSettingsCommand(configCmd)
+	// Verb-first subcommands
+	addConfigListCommand(configCmd)
+	addConfigInfoCommand(configCmd)
+	addConfigAddCommand(configCmd)
+	addConfigEditCommand(configCmd)
+	addConfigRemoveCommand(configCmd)
+	addConfigOpenCommand(configCmd)
 	addConfigOrderCommand(configCmd)
 	addConfigSearchCommand(configCmd)
-
-	// Add top-level interactive commands
-	addConfigInteractiveAddCommand(configCmd)
-	addConfigInteractiveEditCommand(configCmd)
-	addConfigInteractiveRemoveCommand(configCmd)
-	addConfigOpenCommand(configCmd)
+	addConfigSettingsCommand(configCmd)
 
 	parent.AddCommand(configCmd)
 }

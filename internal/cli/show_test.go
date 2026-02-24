@@ -988,11 +988,11 @@ func TestShowCommandIntegration(t *testing.T) {
 	setupTestConfig(t)
 
 	tests := []struct {
-		name            string
-		args            []string
-		wantOutput      []string
-		wantErr         bool
-		wantErrContain  string
+		name           string
+		args           []string
+		wantOutput     []string
+		wantErr        bool
+		wantErrContain string
 	}{
 		{
 			name:           "show agent is a name search returning not-found",

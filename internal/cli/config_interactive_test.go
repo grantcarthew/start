@@ -16,10 +16,12 @@ func TestConfigInteractive_RequiresTerminal(t *testing.T) {
 		{[]string{"config", "add"}, "interactive add requires a terminal"},
 		{[]string{"config", "edit"}, "interactive edit requires a terminal"},
 		{[]string{"config", "remove"}, "interactive remove requires a terminal"},
-		{[]string{"config", "agent", "add"}, "interactive add requires a terminal"},
-		{[]string{"config", "role", "add"}, "interactive add requires a terminal"},
-		{[]string{"config", "context", "add"}, "interactive add requires a terminal"},
-		{[]string{"config", "task", "add"}, "interactive add requires a terminal"},
+		{[]string{"config", "info"}, "interactive info requires a terminal"},
+		// Explicit category arg still requires terminal for interactive prompts
+		{[]string{"config", "add", "agent"}, "interactive add requires a terminal"},
+		{[]string{"config", "add", "role"}, "interactive add requires a terminal"},
+		{[]string{"config", "add", "context"}, "interactive add requires a terminal"},
+		{[]string{"config", "add", "task"}, "interactive add requires a terminal"},
 	} {
 		t.Run(strings.Join(tc.args, " "), func(t *testing.T) {
 			cmd := NewRootCmd()

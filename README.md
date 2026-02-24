@@ -175,10 +175,25 @@ Configuration is stored in CUE format at `~/.config/start/config.cue` (global) a
 # View effective configuration
 start config
 
-# Edit agent settings interactively
-start config agent edit
+# List all configured items
+start config list
 
-# Edit with flags (non-interactive)
+# Add a new item interactively
+start config add
+
+# Edit an item by name
+start config edit claude
+
+# Remove an item
+start config remove claude --yes
+
+# Show raw config fields for an item
+start config info claude
+
+# Open a config file directly in $EDITOR
+start config open
+
+# Set a setting
 start config settings default_agent claude
 
 # Use project-local config
@@ -195,12 +210,6 @@ start show
 
 # Search across all categories and dump full detail
 start show golang/assistant
-
-# Inspect specific resource types
-start show role golang/assistant
-start show context environment
-start show task git-diff
-start show agent claude
 ```
 
 The `--global` and `--local` flags restrict output to a single config scope; omitting both shows the effective merged configuration.
@@ -247,12 +256,6 @@ start show
 
 # Inspect a specific resource by name (searches all categories)
 start show <name>
-
-# Inspect by category
-start show role <name>
-start show context <name>
-start show task <name>
-start show agent <name>
 ```
 
 ### Assets Management
@@ -281,15 +284,45 @@ start assets update
 # Display current configuration
 start config
 
-# Edit specific sections interactively
-start config agent edit
-start config role edit
-start config context edit
-start config task edit
-start config settings edit
+# List all configured items
+start config list
 
-# Interactive edit
-start config agent edit gemini/interactive
+# List by category
+start config list agent
+start config list role
+start config list context
+start config list task
+
+# Add a new item (prompts for category if omitted)
+start config add
+start config add agent
+
+# Edit an item by name (search across all categories)
+start config edit
+start config edit claude
+start config edit gemini/interactive
+
+# Show raw config fields for an item
+start config info
+start config info claude
+
+# Remove an item
+start config remove claude
+start config remove claude --yes
+
+# Reorder contexts or roles
+start config order
+start config order context
+start config order role
+
+# Open a config file directly in $EDITOR
+start config open
+
+# Search config by keyword
+start config search <query>
+
+# Manage settings
+start config settings default_agent claude
 ```
 
 ### Search and Discovery
