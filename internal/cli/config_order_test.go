@@ -628,18 +628,8 @@ func TestConfigContextAdd_PreservesOrder(t *testing.T) {
 	chdir(t, tmpDir)
 
 	// Add a new context "beta" - should appear at end
-	cmd := NewRootCmd()
-	stdout := &bytes.Buffer{}
-	cmd.SetOut(stdout)
-	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetIn(strings.NewReader(""))
-	cmd.SetArgs([]string{
-		"config", "context", "add",
-		"--name", "beta",
-		"--file", "beta.md",
-	})
-
-	if err := cmd.Execute(); err != nil {
+	// Prompts: name, description (empty), content choice (Enter=default file), file path, required (N), default (N)
+	if err := configContextAdd(slowStdin("beta\n\n\nbeta.md\n\n\n"), &bytes.Buffer{}, false); err != nil {
 		t.Fatalf("add failed: %v", err)
 	}
 
@@ -685,18 +675,8 @@ func TestConfigRoleAdd_PreservesOrder(t *testing.T) {
 	chdir(t, tmpDir)
 
 	// Add a new role "beta"
-	cmd := NewRootCmd()
-	stdout := &bytes.Buffer{}
-	cmd.SetOut(stdout)
-	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetIn(strings.NewReader(""))
-	cmd.SetArgs([]string{
-		"config", "role", "add",
-		"--name", "beta",
-		"--prompt", "Beta role",
-	})
-
-	if err := cmd.Execute(); err != nil {
+	// Prompts: name, description (empty), content choice "3" (inline prompt), prompt text, blank line to finish
+	if err := configRoleAdd(slowStdin("beta\n\n3\nBeta role\n\n"), &bytes.Buffer{}, false); err != nil {
 		t.Fatalf("add failed: %v", err)
 	}
 

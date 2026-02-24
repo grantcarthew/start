@@ -25,23 +25,10 @@ func TestConfigAgent_FullWorkflow(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	t.Run("add agent via flags", func(t *testing.T) {
-
-		cmd := NewRootCmd()
+	t.Run("add agent interactively", func(t *testing.T) {
+		// Prompts: name, bin, command template, default model, description
 		stdout := &bytes.Buffer{}
-		cmd.SetOut(stdout)
-		cmd.SetErr(&bytes.Buffer{})
-		cmd.SetIn(strings.NewReader(""))
-		cmd.SetArgs([]string{
-			"config", "agent", "add",
-			"--name", "claude",
-			"--bin", "claude",
-			"--command", `claude --model {{.model}} "{{.prompt}}"`,
-			"--default-model", "sonnet",
-			"--description", "Anthropic Claude",
-		})
-
-		if err := cmd.Execute(); err != nil {
+		if err := configAgentAdd(slowStdin("claude\nclaude\n"+`claude --model {{.model}} "{{.prompt}}"`+"\nsonnet\nAnthropic Claude\n"), stdout, false); err != nil {
 			t.Fatalf("add failed: %v", err)
 		}
 
@@ -98,19 +85,8 @@ func TestConfigAgent_FullWorkflow(t *testing.T) {
 	})
 
 	t.Run("add second agent", func(t *testing.T) {
-		cmd := NewRootCmd()
-		stdout := &bytes.Buffer{}
-		cmd.SetOut(stdout)
-		cmd.SetErr(&bytes.Buffer{})
-		cmd.SetIn(strings.NewReader(""))
-		cmd.SetArgs([]string{
-			"config", "agent", "add",
-			"--name", "gemini",
-			"--bin", "gemini",
-			"--command", `gemini "{{.prompt}}"`,
-		})
-
-		if err := cmd.Execute(); err != nil {
+		// Prompts: name, bin, command template, default model (empty), description (empty)
+		if err := configAgentAdd(slowStdin("gemini\ngemini\n"+`gemini "{{.prompt}}"`+"\n\n\n"), &bytes.Buffer{}, false); err != nil {
 			t.Fatalf("add gemini failed: %v", err)
 		}
 	})
@@ -250,18 +226,8 @@ func TestConfigAgent_FullWorkflow(t *testing.T) {
 	})
 
 	t.Run("add duplicate fails", func(t *testing.T) {
-		cmd := NewRootCmd()
-		cmd.SetOut(&bytes.Buffer{})
-		cmd.SetErr(&bytes.Buffer{})
-		cmd.SetIn(strings.NewReader(""))
-		cmd.SetArgs([]string{
-			"config", "agent", "add",
-			"--name", "claude",
-			"--bin", "claude",
-			"--command", `claude "{{.prompt}}"`,
-		})
-
-		err := cmd.Execute()
+		// Provide full add responses; duplicate check fires after all prompts
+		err := configAgentAdd(slowStdin("claude\nclaude\n"+`claude "{{.prompt}}"`+"\n\n\n"), &bytes.Buffer{}, false)
 		if err == nil {
 			t.Fatal("expected error for duplicate agent")
 		}
@@ -283,19 +249,9 @@ func TestConfigRole_FullWorkflow(t *testing.T) {
 	}
 
 	t.Run("add role with file", func(t *testing.T) {
-		cmd := NewRootCmd()
+		// Prompts: name, description, content choice (Enter→"1"→file), file path
 		stdout := &bytes.Buffer{}
-		cmd.SetOut(stdout)
-		cmd.SetErr(&bytes.Buffer{})
-		cmd.SetIn(strings.NewReader(""))
-		cmd.SetArgs([]string{
-			"config", "role", "add",
-			"--name", "go-expert",
-			"--file", "~/.config/start/roles/go-expert.md",
-			"--description", "Go programming expert",
-		})
-
-		if err := cmd.Execute(); err != nil {
+		if err := configRoleAdd(slowStdin("go-expert\nGo programming expert\n\n~/.config/start/roles/go-expert.md\n"), stdout, false); err != nil {
 			t.Fatalf("add failed: %v", err)
 		}
 
@@ -306,19 +262,8 @@ func TestConfigRole_FullWorkflow(t *testing.T) {
 	})
 
 	t.Run("add role with prompt", func(t *testing.T) {
-		cmd := NewRootCmd()
-		stdout := &bytes.Buffer{}
-		cmd.SetOut(stdout)
-		cmd.SetErr(&bytes.Buffer{})
-		cmd.SetIn(strings.NewReader(""))
-		cmd.SetArgs([]string{
-			"config", "role", "add",
-			"--name", "reviewer",
-			"--prompt", "You are a code reviewer. Review code for bugs and style issues.",
-			"--description", "Code review expert",
-		})
-
-		if err := cmd.Execute(); err != nil {
+		// Prompts: name, description, content choice "3"→inline, prompt text, blank line to finish
+		if err := configRoleAdd(slowStdin("reviewer\nCode review expert\n3\nYou are a code reviewer. Review code for bugs and style issues.\n\n"), &bytes.Buffer{}, false); err != nil {
 			t.Fatalf("add failed: %v", err)
 		}
 	})
@@ -362,7 +307,6 @@ func TestConfigRole_FullWorkflow(t *testing.T) {
 			t.Errorf("info missing prompt: %s", output)
 		}
 	})
-
 }
 
 func TestConfigContext_FullWorkflow(t *testing.T) {
@@ -377,20 +321,9 @@ func TestConfigContext_FullWorkflow(t *testing.T) {
 	}
 
 	t.Run("add required context", func(t *testing.T) {
-		cmd := NewRootCmd()
+		// Prompts: name, description, content choice (Enter→file), file path, required "y"
 		stdout := &bytes.Buffer{}
-		cmd.SetOut(stdout)
-		cmd.SetErr(&bytes.Buffer{})
-		cmd.SetIn(strings.NewReader(""))
-		cmd.SetArgs([]string{
-			"config", "context", "add",
-			"--name", "project",
-			"--file", "PROJECT.md",
-			"--description", "Project documentation",
-			"--required",
-		})
-
-		if err := cmd.Execute(); err != nil {
+		if err := configContextAdd(slowStdin("project\nProject documentation\n\nPROJECT.md\ny\n"), stdout, false); err != nil {
 			t.Fatalf("add failed: %v", err)
 		}
 
@@ -404,19 +337,9 @@ func TestConfigContext_FullWorkflow(t *testing.T) {
 	})
 
 	t.Run("add default context", func(t *testing.T) {
-		cmd := NewRootCmd()
-		stdout := &bytes.Buffer{}
-		cmd.SetOut(stdout)
-		cmd.SetErr(&bytes.Buffer{})
-		cmd.SetIn(strings.NewReader(""))
-		cmd.SetArgs([]string{
-			"config", "context", "add",
-			"--name", "readme",
-			"--file", "README.md",
-			"--default",
-		})
-
-		if err := cmd.Execute(); err != nil {
+		// Prompts: name, description (empty), content choice (Enter→file), file path,
+		//          required "n", default "y"
+		if err := configContextAdd(slowStdin("readme\n\n\nREADME.md\nn\ny\n"), &bytes.Buffer{}, false); err != nil {
 			t.Fatalf("add failed: %v", err)
 		}
 	})
@@ -454,20 +377,10 @@ func TestConfigTask_FullWorkflow(t *testing.T) {
 	}
 
 	t.Run("add task with prompt and role", func(t *testing.T) {
-		cmd := NewRootCmd()
+		// Prompts: name, description, content choice (Enter→"3"→inline), prompt text,
+		//          blank line to finish, role
 		stdout := &bytes.Buffer{}
-		cmd.SetOut(stdout)
-		cmd.SetErr(&bytes.Buffer{})
-		cmd.SetIn(strings.NewReader(""))
-		cmd.SetArgs([]string{
-			"config", "task", "add",
-			"--name", "review",
-			"--prompt", "Review this code for bugs and improvements",
-			"--role", "code-reviewer",
-			"--description", "Code review task",
-		})
-
-		if err := cmd.Execute(); err != nil {
+		if err := configTaskAdd(slowStdin("review\nCode review task\n\nReview this code for bugs and improvements\n\ncode-reviewer\n"), stdout, false); err != nil {
 			t.Fatalf("add failed: %v", err)
 		}
 
@@ -545,36 +458,13 @@ func TestConfigLocal_Isolation(t *testing.T) {
 	}
 
 	t.Run("add global agent", func(t *testing.T) {
-		cmd := NewRootCmd()
-		cmd.SetOut(&bytes.Buffer{})
-		cmd.SetErr(&bytes.Buffer{})
-		cmd.SetIn(strings.NewReader(""))
-		cmd.SetArgs([]string{
-			"config", "agent", "add",
-			"--name", "global-agent",
-			"--bin", "global",
-			"--command", `global "{{.prompt}}"`,
-		})
-
-		if err := cmd.Execute(); err != nil {
+		if err := configAgentAdd(slowStdin("global-agent\nglobal\n"+`global "{{.prompt}}"`+"\n\n\n"), &bytes.Buffer{}, false); err != nil {
 			t.Fatalf("add global failed: %v", err)
 		}
 	})
 
 	t.Run("add local agent", func(t *testing.T) {
-		cmd := NewRootCmd()
-		cmd.SetOut(&bytes.Buffer{})
-		cmd.SetErr(&bytes.Buffer{})
-		cmd.SetIn(strings.NewReader(""))
-		cmd.SetArgs([]string{
-			"config", "agent", "add",
-			"--local",
-			"--name", "local-agent",
-			"--bin", "local",
-			"--command", `local "{{.prompt}}"`,
-		})
-
-		if err := cmd.Execute(); err != nil {
+		if err := configAgentAdd(slowStdin("local-agent\nlocal\n"+`local "{{.prompt}}"`+"\n\n\n"), &bytes.Buffer{}, true); err != nil {
 			t.Fatalf("add local failed: %v", err)
 		}
 
@@ -639,19 +529,16 @@ func TestConfigTask_SubstringResolution(t *testing.T) {
 	}
 
 	// Add tasks with namespace-style names
-	for _, args := range [][]string{
-		{"config", "task", "add", "--name", "cwd/dotai/create-role", "--prompt", "Create a role"},
-		{"config", "task", "add", "--name", "confluence/read-doc", "--prompt", "Read a doc"},
-		{"config", "task", "add", "--name", "golang/review/architecture", "--prompt", "Review arch"},
-		{"config", "task", "add", "--name", "golang/review/code", "--prompt", "Review code"},
+	// Prompts: name, description (empty), content choice (Enter→"3"→inline), prompt text,
+	//          blank line to finish, role (empty)
+	for _, tc := range []struct{ name, prompt string }{
+		{"cwd/dotai/create-role", "Create a role"},
+		{"confluence/read-doc", "Read a doc"},
+		{"golang/review/architecture", "Review arch"},
+		{"golang/review/code", "Review code"},
 	} {
-		cmd := NewRootCmd()
-		cmd.SetOut(&bytes.Buffer{})
-		cmd.SetErr(&bytes.Buffer{})
-		cmd.SetIn(strings.NewReader(""))
-		cmd.SetArgs(args)
-		if err := cmd.Execute(); err != nil {
-			t.Fatalf("add task %v failed: %v", args, err)
+		if err := configTaskAdd(slowStdin(tc.name+"\n\n\n"+tc.prompt+"\n\n\n"), &bytes.Buffer{}, false); err != nil {
+			t.Fatalf("add task %s failed: %v", tc.name, err)
 		}
 	}
 
@@ -719,14 +606,11 @@ func TestConfigTask_SubstringResolution(t *testing.T) {
 		}
 	})
 
-	t.Run("edit with substring via flags", func(t *testing.T) {
-		cmd := NewRootCmd()
+	t.Run("edit with substring interactively", func(t *testing.T) {
+		// Interactive edit of "confluence/read-doc":
+		// Prompts: description, keep current content? (Enter=Y), role (Enter=keep ""), tags (Enter=keep nil)
 		stdout := &bytes.Buffer{}
-		cmd.SetOut(stdout)
-		cmd.SetErr(&bytes.Buffer{})
-		cmd.SetArgs([]string{"config", "task", "edit", "read-doc", "--description", "Updated description"})
-
-		if err := cmd.Execute(); err != nil {
+		if err := configTaskEdit(slowStdin("Updated description\n\n\n\n"), stdout, false, "read-doc"); err != nil {
 			t.Fatalf("edit with substring failed: %v", err)
 		}
 
@@ -762,7 +646,6 @@ func TestConfigTask_SubstringResolution(t *testing.T) {
 			t.Errorf("create-role should be removed: %s", content)
 		}
 	})
-
 }
 
 func TestConfigRemove_MultipleArgs(t *testing.T) {
@@ -776,19 +659,14 @@ func TestConfigRemove_MultipleArgs(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		for _, args := range [][]string{
-			{"config", "task", "add", "--name", "golang/review/architecture", "--prompt", "Arch"},
-			{"config", "task", "add", "--name", "golang/review/code", "--prompt", "Code"},
-			{"config", "task", "add", "--name", "golang/review/security", "--prompt", "Security"},
-			{"config", "task", "add", "--name", "confluence/read-doc", "--prompt", "Read"},
+		for _, tc := range []struct{ name, prompt string }{
+			{"golang/review/architecture", "Arch"},
+			{"golang/review/code", "Code"},
+			{"golang/review/security", "Security"},
+			{"confluence/read-doc", "Read"},
 		} {
-			cmd := NewRootCmd()
-			cmd.SetOut(&bytes.Buffer{})
-			cmd.SetErr(&bytes.Buffer{})
-			cmd.SetIn(strings.NewReader(""))
-			cmd.SetArgs(args)
-			if err := cmd.Execute(); err != nil {
-				t.Fatalf("add %v failed: %v", args, err)
+			if err := configTaskAdd(slowStdin(tc.name+"\n\n\n"+tc.prompt+"\n\n\n"), &bytes.Buffer{}, false); err != nil {
+				t.Fatalf("add %s failed: %v", tc.name, err)
 			}
 		}
 
@@ -829,18 +707,13 @@ func TestConfigRemove_MultipleArgs(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		for _, args := range [][]string{
-			{"config", "agent", "add", "--name", "alpha", "--bin", "alpha", "--command", `alpha "{{.prompt}}"`},
-			{"config", "agent", "add", "--name", "beta", "--bin", "beta", "--command", `beta "{{.prompt}}"`},
-			{"config", "agent", "add", "--name", "gamma", "--bin", "gamma", "--command", `gamma "{{.prompt}}"`},
+		for _, tc := range []struct{ name string }{
+			{"alpha"},
+			{"beta"},
+			{"gamma"},
 		} {
-			cmd := NewRootCmd()
-			cmd.SetOut(&bytes.Buffer{})
-			cmd.SetErr(&bytes.Buffer{})
-			cmd.SetIn(strings.NewReader(""))
-			cmd.SetArgs(args)
-			if err := cmd.Execute(); err != nil {
-				t.Fatalf("add %v failed: %v", args, err)
+			if err := configAgentAdd(slowStdin(tc.name+"\n"+tc.name+"\n"+tc.name+` "{{.prompt}}"`+"\n\n\n"), &bytes.Buffer{}, false); err != nil {
+				t.Fatalf("add %s failed: %v", tc.name, err)
 			}
 		}
 
@@ -885,18 +758,15 @@ func TestConfigRemove_MultipleArgs(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		for _, args := range [][]string{
-			{"config", "context", "add", "--name", "project/alpha", "--prompt", "Alpha"},
-			{"config", "context", "add", "--name", "project/beta", "--prompt", "Beta"},
-			{"config", "context", "add", "--name", "project/gamma", "--prompt", "Gamma"},
+		// Prompts: name, description (empty), content choice "3"→inline, prompt text,
+		//          blank line to finish, required "n", default "n"
+		for _, tc := range []struct{ name, prompt string }{
+			{"project/alpha", "Alpha"},
+			{"project/beta", "Beta"},
+			{"project/gamma", "Gamma"},
 		} {
-			cmd := NewRootCmd()
-			cmd.SetOut(&bytes.Buffer{})
-			cmd.SetErr(&bytes.Buffer{})
-			cmd.SetIn(strings.NewReader(""))
-			cmd.SetArgs(args)
-			if err := cmd.Execute(); err != nil {
-				t.Fatalf("add %v failed: %v", args, err)
+			if err := configContextAdd(slowStdin(tc.name+"\n\n3\n"+tc.prompt+"\n\n\n\n"), &bytes.Buffer{}, false); err != nil {
+				t.Fatalf("add %s failed: %v", tc.name, err)
 			}
 		}
 
@@ -941,18 +811,15 @@ func TestConfigRemove_MultipleArgs(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		for _, args := range [][]string{
-			{"config", "role", "add", "--name", "project/alpha", "--prompt", "Alpha"},
-			{"config", "role", "add", "--name", "project/beta", "--prompt", "Beta"},
-			{"config", "role", "add", "--name", "project/gamma", "--prompt", "Gamma"},
+		// Prompts: name, description (empty), content choice "3"→inline, prompt text,
+		//          blank line to finish
+		for _, tc := range []struct{ name, prompt string }{
+			{"project/alpha", "Alpha"},
+			{"project/beta", "Beta"},
+			{"project/gamma", "Gamma"},
 		} {
-			cmd := NewRootCmd()
-			cmd.SetOut(&bytes.Buffer{})
-			cmd.SetErr(&bytes.Buffer{})
-			cmd.SetIn(strings.NewReader(""))
-			cmd.SetArgs(args)
-			if err := cmd.Execute(); err != nil {
-				t.Fatalf("add %v failed: %v", args, err)
+			if err := configRoleAdd(slowStdin(tc.name+"\n\n3\n"+tc.prompt+"\n\n"), &bytes.Buffer{}, false); err != nil {
+				t.Fatalf("add %s failed: %v", tc.name, err)
 			}
 		}
 
@@ -997,18 +864,13 @@ func TestConfigRemove_MultipleArgs(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		for _, args := range [][]string{
-			{"config", "task", "add", "--name", "confluence/read-doc", "--prompt", "Read a doc"},
-			{"config", "task", "add", "--name", "golang/review/architecture", "--prompt", "Review arch"},
-			{"config", "task", "add", "--name", "golang/review/code", "--prompt", "Review code"},
+		for _, tc := range []struct{ name, prompt string }{
+			{"confluence/read-doc", "Read a doc"},
+			{"golang/review/architecture", "Review arch"},
+			{"golang/review/code", "Review code"},
 		} {
-			cmd := NewRootCmd()
-			cmd.SetOut(&bytes.Buffer{})
-			cmd.SetErr(&bytes.Buffer{})
-			cmd.SetIn(strings.NewReader(""))
-			cmd.SetArgs(args)
-			if err := cmd.Execute(); err != nil {
-				t.Fatalf("add %v failed: %v", args, err)
+			if err := configTaskAdd(slowStdin(tc.name+"\n\n\n"+tc.prompt+"\n\n\n"), &bytes.Buffer{}, false); err != nil {
+				t.Fatalf("add %s failed: %v", tc.name, err)
 			}
 		}
 
@@ -1053,18 +915,13 @@ func TestConfigRemove_MultipleArgs(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		for _, args := range [][]string{
-			{"config", "task", "add", "--name", "golang/review/architecture", "--prompt", "Arch"},
-			{"config", "task", "add", "--name", "golang/review/code", "--prompt", "Code"},
-			{"config", "task", "add", "--name", "confluence/read-doc", "--prompt", "Read"},
+		for _, tc := range []struct{ name, prompt string }{
+			{"golang/review/architecture", "Arch"},
+			{"golang/review/code", "Code"},
+			{"confluence/read-doc", "Read"},
 		} {
-			cmd := NewRootCmd()
-			cmd.SetOut(&bytes.Buffer{})
-			cmd.SetErr(&bytes.Buffer{})
-			cmd.SetIn(strings.NewReader(""))
-			cmd.SetArgs(args)
-			if err := cmd.Execute(); err != nil {
-				t.Fatalf("add %v failed: %v", args, err)
+			if err := configTaskAdd(slowStdin(tc.name+"\n\n\n"+tc.prompt+"\n\n\n"), &bytes.Buffer{}, false); err != nil {
+				t.Fatalf("add %s failed: %v", tc.name, err)
 			}
 		}
 

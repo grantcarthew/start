@@ -16,6 +16,10 @@ func TestConfigInteractive_RequiresTerminal(t *testing.T) {
 		{[]string{"config", "add"}, "interactive add requires a terminal"},
 		{[]string{"config", "edit"}, "interactive edit requires a terminal"},
 		{[]string{"config", "remove"}, "interactive remove requires a terminal"},
+		{[]string{"config", "agent", "add"}, "interactive add requires a terminal"},
+		{[]string{"config", "role", "add"}, "interactive add requires a terminal"},
+		{[]string{"config", "context", "add"}, "interactive add requires a terminal"},
+		{[]string{"config", "task", "add"}, "interactive add requires a terminal"},
 	} {
 		t.Run(strings.Join(tc.args, " "), func(t *testing.T) {
 			cmd := NewRootCmd()
@@ -45,21 +49,18 @@ func TestLoadNamesForCategory(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Seed one item in each category.
-	for _, args := range [][]string{
-		{"config", "agent", "add", "--name", "my-agent", "--bin", "agent", "--command", `agent "{{.prompt}}"`},
-		{"config", "role", "add", "--name", "my-role", "--prompt", "You are a role."},
-		{"config", "context", "add", "--name", "my-context", "--prompt", "Context info."},
-		{"config", "task", "add", "--name", "my-task", "--prompt", "Do a task."},
-	} {
-		cmd := NewRootCmd()
-		cmd.SetOut(&bytes.Buffer{})
-		cmd.SetErr(&bytes.Buffer{})
-		cmd.SetIn(strings.NewReader(""))
-		cmd.SetArgs(args)
-		if err := cmd.Execute(); err != nil {
-			t.Fatalf("setup %v failed: %v", args, err)
-		}
+	// Seed one item in each category using stdin-driven interactive input.
+	if err := configAgentAdd(slowStdin("my-agent\nagent\n"+`agent "{{.prompt}}"`+"\n\n\n"), &bytes.Buffer{}, false); err != nil {
+		t.Fatalf("setup agent add failed: %v", err)
+	}
+	if err := configRoleAdd(slowStdin("my-role\n\n3\nYou are a role.\n\n"), &bytes.Buffer{}, false); err != nil {
+		t.Fatalf("setup role add failed: %v", err)
+	}
+	if err := configContextAdd(slowStdin("my-context\n\n3\nContext info.\n\n\n\n"), &bytes.Buffer{}, false); err != nil {
+		t.Fatalf("setup context add failed: %v", err)
+	}
+	if err := configTaskAdd(slowStdin("my-task\n\n\nDo a task.\n\n\n"), &bytes.Buffer{}, false); err != nil {
+		t.Fatalf("setup task add failed: %v", err)
 	}
 
 	for _, tc := range []struct {
