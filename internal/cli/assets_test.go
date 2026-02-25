@@ -2,6 +2,8 @@ package cli
 
 import (
 	"bytes"
+	"encoding/json"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -301,7 +303,7 @@ func TestPrintIndex(t *testing.T) {
 
 	t.Run("default output", func(t *testing.T) {
 		var buf bytes.Buffer
-		printIndex(&buf, index, "v0.2.3", false, nil)
+		printIndex(&buf, index, "v0.2.3", false, nil, "")
 		output := buf.String()
 
 		if !strings.Contains(output, "Index: v0.2.3 (3 assets)") {
@@ -332,7 +334,7 @@ func TestPrintIndex(t *testing.T) {
 
 	t.Run("verbose output", func(t *testing.T) {
 		var buf bytes.Buffer
-		printIndex(&buf, index, "v0.2.3", true, nil)
+		printIndex(&buf, index, "v0.2.3", true, nil, "")
 		output := buf.String()
 
 		if !strings.Contains(output, "Module:") {
@@ -348,7 +350,7 @@ func TestPrintIndex(t *testing.T) {
 		installed := map[string]bool{
 			"agents/ai/claude": true,
 		}
-		printIndex(&buf, index, "v0.2.3", false, installed)
+		printIndex(&buf, index, "v0.2.3", false, installed, "")
 		output := buf.String()
 
 		if !strings.Contains(output, "★") {
@@ -358,7 +360,7 @@ func TestPrintIndex(t *testing.T) {
 
 	t.Run("category count", func(t *testing.T) {
 		var buf bytes.Buffer
-		printIndex(&buf, index, "v0.2.3", false, nil)
+		printIndex(&buf, index, "v0.2.3", false, nil, "")
 		output := buf.String()
 
 		if !strings.Contains(output, "(2)") {
@@ -366,6 +368,33 @@ func TestPrintIndex(t *testing.T) {
 		}
 		if !strings.Contains(output, "(1)") {
 			t.Errorf("output missing roles count (1), got: %s", output)
+		}
+	})
+
+	t.Run("category filter agents only", func(t *testing.T) {
+		var buf bytes.Buffer
+		printIndex(&buf, index, "v0.2.3", false, nil, "agents")
+		output := buf.String()
+
+		if !strings.Contains(output, "agents/") {
+			t.Errorf("output missing agents category, got: %s", output)
+		}
+		if strings.Contains(output, "roles/") {
+			t.Errorf("output should not contain roles when filtered to agents, got: %s", output)
+		}
+		if !strings.Contains(output, "ai/claude") {
+			t.Errorf("output missing ai/claude, got: %s", output)
+		}
+	})
+
+	t.Run("category filter preserves full total in header", func(t *testing.T) {
+		var buf bytes.Buffer
+		printIndex(&buf, index, "v0.2.3", false, nil, "agents")
+		output := buf.String()
+
+		// Header should show all 3 assets, not just agents
+		if !strings.Contains(output, "(3 assets)") {
+			t.Errorf("header should show full total even when filtered, got: %s", output)
 		}
 	})
 }
@@ -390,7 +419,7 @@ func TestAssetsIndexCommandExists(t *testing.T) {
 	// Find index subcommand
 	var indexCmd *cobra.Command
 	for _, c := range assetsCmd.Commands() {
-		if c.Use == "index" {
+		if strings.HasPrefix(c.Use, "index") {
 			indexCmd = c
 			break
 		}
@@ -674,6 +703,179 @@ func TestUpdateAssetInConfig(t *testing.T) {
 				if !strings.Contains(string(result), want) {
 					t.Errorf("result missing %q\ngot:\n%s", want, result)
 				}
+			}
+		})
+	}
+}
+
+// TestAssetsListCategoryValidation tests that invalid category args are rejected early.
+func TestAssetsListCategoryValidation(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name    string
+		args    []string
+		wantErr string
+	}{
+		{
+			name:    "invalid category",
+			args:    []string{"assets", "list", "invalid"},
+			wantErr: `unknown category "invalid"`,
+		},
+		{
+			name:    "valid category agents - no error from validation",
+			args:    []string{"assets", "list", "agents"},
+			wantErr: "", // fails later on config, not on category validation
+		},
+		{
+			name:    "valid category plural",
+			args:    []string{"assets", "list", "tasks"},
+			wantErr: "",
+		},
+		{
+			name:    "valid category singular",
+			args:    []string{"assets", "list", "task"},
+			wantErr: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd := NewRootCmd()
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
+			cmd.SetArgs(tt.args)
+			err := cmd.Execute()
+
+			if tt.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+					t.Errorf("expected error containing %q, got %v", tt.wantErr, err)
+				}
+			} else {
+				// Valid categories must not fail category validation regardless of
+				// what happens downstream (e.g. missing config is acceptable here).
+				if err != nil && strings.Contains(err.Error(), "unknown category") {
+					t.Errorf("valid category should not fail validation, got: %v", err)
+				}
+			}
+		})
+	}
+}
+
+// TestAssetsIndexCategoryValidation tests that invalid category args are rejected before network I/O,
+// and that --raw rejects a category arg since the index is a single file.
+func TestAssetsIndexCategoryValidation(t *testing.T) {
+	t.Parallel()
+
+	t.Run("invalid category", func(t *testing.T) {
+		cmd := NewRootCmd()
+		cmd.SetOut(io.Discard)
+		cmd.SetErr(io.Discard)
+		cmd.SetArgs([]string{"assets", "index", "invalid"})
+		err := cmd.Execute()
+
+		if err == nil || !strings.Contains(err.Error(), `unknown category "invalid"`) {
+			t.Errorf("expected unknown category error, got %v", err)
+		}
+	})
+
+	t.Run("category with --raw", func(t *testing.T) {
+		cmd := NewRootCmd()
+		cmd.SetOut(io.Discard)
+		cmd.SetErr(io.Discard)
+		cmd.SetArgs([]string{"assets", "index", "agents", "--raw"})
+		err := cmd.Execute()
+
+		if err == nil || !strings.Contains(err.Error(), "cannot be used with --raw") {
+			t.Errorf("expected --raw conflict error, got %v", err)
+		}
+	})
+}
+
+// TestPrintInstalledAssetsJSON tests that installed assets marshal to valid JSON.
+func TestPrintInstalledAssetsJSON(t *testing.T) {
+	t.Parallel()
+	installed := []InstalledAsset{
+		{
+			Category:     "agents",
+			Name:         "ai/claude",
+			InstalledVer: "v0.2.0",
+			Scope:        "global",
+			Origin:       "github.com/test/agents/ai/claude@v0.2.0",
+			ConfigFile:   "/home/user/.start/agents.cue",
+		},
+		{
+			Category:     "roles",
+			Name:         "golang/assistant",
+			InstalledVer: "v0.1.0",
+			Scope:        "local",
+			Origin:       "github.com/test/roles/golang/assistant@v0.1.0",
+			ConfigFile:   "/project/.start/roles.cue",
+		},
+	}
+
+	data, err := json.MarshalIndent(installed, "", "  ")
+	if err != nil {
+		t.Fatalf("MarshalIndent failed: %v", err)
+	}
+	output := string(data)
+
+	if !strings.Contains(output, `"category": "agents"`) {
+		t.Errorf("output missing category field, got: %s", output)
+	}
+	if !strings.Contains(output, `"name": "ai/claude"`) {
+		t.Errorf("output missing name field, got: %s", output)
+	}
+	if !strings.Contains(output, `"version": "v0.2.0"`) {
+		t.Errorf("output missing version field, got: %s", output)
+	}
+	if !strings.Contains(output, `"scope": "global"`) {
+		t.Errorf("output missing scope field, got: %s", output)
+	}
+	if strings.Contains(output, `"updateAvailable"`) {
+		t.Errorf("omitempty should suppress false updateAvailable, got: %s", output)
+	}
+}
+
+// TestFilterIndexByCategory tests that filterIndexByCategory isolates a single category.
+func TestFilterIndexByCategory(t *testing.T) {
+	t.Parallel()
+	index := &registry.Index{
+		Agents: map[string]registry.IndexEntry{
+			"ai/claude": {Description: "Claude"},
+		},
+		Roles: map[string]registry.IndexEntry{
+			"golang/assistant": {Description: "Go expert"},
+		},
+		Tasks:    map[string]registry.IndexEntry{},
+		Contexts: map[string]registry.IndexEntry{},
+	}
+
+	tests := []struct {
+		category    string
+		wantAgents  bool
+		wantRoles   bool
+	}{
+		{"agents", true, false},
+		{"roles", false, true},
+		{"tasks", false, false},
+		{"contexts", false, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.category, func(t *testing.T) {
+			got := filterIndexByCategory(index, tt.category)
+
+			if tt.wantAgents && len(got.Agents) == 0 {
+				t.Errorf("expected agents in filtered index, got none")
+			}
+			if !tt.wantAgents && len(got.Agents) > 0 {
+				t.Errorf("expected no agents in filtered index, got %d", len(got.Agents))
+			}
+			if tt.wantRoles && len(got.Roles) == 0 {
+				t.Errorf("expected roles in filtered index, got none")
+			}
+			if !tt.wantRoles && len(got.Roles) > 0 {
+				t.Errorf("expected no roles in filtered index, got %d", len(got.Roles))
 			}
 		})
 	}
