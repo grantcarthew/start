@@ -24,6 +24,8 @@ Use these commands to discover, install, and update assets.`,
 		RunE: runAssets,
 	}
 
+	assetsCmd.Flags().Bool("json", false, "Output as JSON")
+
 	// Add subcommands
 	addAssetsBrowseCommand(assetsCmd)
 	addAssetsIndexCommand(assetsCmd)

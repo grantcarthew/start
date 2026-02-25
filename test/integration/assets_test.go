@@ -4,6 +4,7 @@ package integration
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -100,6 +101,210 @@ tasks: {
 	if !strings.Contains(output, "v0.1.0") {
 		t.Errorf("output should show assistant version, got: %s", output)
 	}
+}
+
+// TestIntegration_AssetsListJSON tests --json output for installed assets.
+func TestIntegration_AssetsListJSON(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	configDir := filepath.Join(tmpDir, ".start")
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		t.Fatalf("creating config dir: %v", err)
+	}
+
+	config := `
+agents: {
+	claude: {
+		bin: "claude"
+		command: "{{.bin}}"
+		origin: "github.com/grantcarthew/start-assets/agents/ai/claude@v0.2.0"
+	}
+}
+roles: {
+	assistant: {
+		prompt: "You are a helpful assistant."
+		origin: "github.com/grantcarthew/start-assets/roles/assistant@v0.1.0"
+	}
+}
+`
+	if err := os.WriteFile(filepath.Join(configDir, "settings.cue"), []byte(config), 0644); err != nil {
+		t.Fatalf("writing config: %v", err)
+	}
+
+	chdir(t, tmpDir)
+
+	oldHome := os.Getenv("HOME")
+	os.Setenv("HOME", tmpDir)
+	defer os.Setenv("HOME", oldHome)
+
+	t.Run("assets list --json", func(t *testing.T) {
+		buf := new(bytes.Buffer)
+		cmd := cli.NewRootCmd()
+		cmd.SetOut(buf)
+		cmd.SetErr(buf)
+		cmd.SetArgs([]string{"assets", "list", "--json"})
+
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("assets list --json failed: %v", err)
+		}
+
+		var result []map[string]interface{}
+		if err := json.Unmarshal(buf.Bytes(), &result); err != nil {
+			t.Fatalf("output is not valid JSON: %v\ngot: %s", err, buf.String())
+		}
+		if len(result) == 0 {
+			t.Errorf("expected non-empty JSON array, got: %s", buf.String())
+		}
+
+		// Verify expected fields are present
+		first := result[0]
+		for _, field := range []string{"category", "name", "scope", "origin"} {
+			if _, ok := first[field]; !ok {
+				t.Errorf("JSON entry missing field %q, got: %v", field, first)
+			}
+		}
+	})
+
+	t.Run("start assets --json (parent command)", func(t *testing.T) {
+		buf := new(bytes.Buffer)
+		cmd := cli.NewRootCmd()
+		cmd.SetOut(buf)
+		cmd.SetErr(buf)
+		cmd.SetArgs([]string{"assets", "--json"})
+
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("start assets --json failed: %v", err)
+		}
+
+		var result []map[string]interface{}
+		if err := json.Unmarshal(buf.Bytes(), &result); err != nil {
+			t.Fatalf("output is not valid JSON: %v\ngot: %s", err, buf.String())
+		}
+		if len(result) == 0 {
+			t.Errorf("expected non-empty JSON array, got: %s", buf.String())
+		}
+	})
+
+	t.Run("assets list roles --json", func(t *testing.T) {
+		buf := new(bytes.Buffer)
+		cmd := cli.NewRootCmd()
+		cmd.SetOut(buf)
+		cmd.SetErr(buf)
+		cmd.SetArgs([]string{"assets", "list", "roles", "--json"})
+
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("assets list roles --json failed: %v", err)
+		}
+
+		var result []map[string]interface{}
+		if err := json.Unmarshal(buf.Bytes(), &result); err != nil {
+			t.Fatalf("output is not valid JSON: %v\ngot: %s", err, buf.String())
+		}
+		for _, entry := range result {
+			if entry["category"] != "roles" {
+				t.Errorf("expected only roles, got category %q", entry["category"])
+			}
+		}
+	})
+}
+
+// TestIntegration_AssetsListCategory tests filtering installed assets by category.
+func TestIntegration_AssetsListCategory(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	configDir := filepath.Join(tmpDir, ".start")
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		t.Fatalf("creating config dir: %v", err)
+	}
+
+	config := `
+agents: {
+	claude: {
+		bin: "claude"
+		command: "{{.bin}}"
+		origin: "github.com/grantcarthew/start-assets/agents/ai/claude@v0.2.0"
+	}
+}
+
+roles: {
+	assistant: {
+		prompt: "You are a helpful assistant."
+		origin: "github.com/grantcarthew/start-assets/roles/assistant@v0.1.0"
+	}
+}
+`
+	if err := os.WriteFile(filepath.Join(configDir, "settings.cue"), []byte(config), 0644); err != nil {
+		t.Fatalf("writing config: %v", err)
+	}
+
+	chdir(t, tmpDir)
+
+	oldHome := os.Getenv("HOME")
+	os.Setenv("HOME", tmpDir)
+	defer os.Setenv("HOME", oldHome)
+
+	t.Run("filter to agents only", func(t *testing.T) {
+		buf := new(bytes.Buffer)
+		cmd := cli.NewRootCmd()
+		cmd.SetOut(buf)
+		cmd.SetErr(buf)
+		cmd.SetArgs([]string{"assets", "list", "agents"})
+
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("assets list agents failed: %v", err)
+		}
+
+		output := buf.String()
+		if !strings.Contains(output, "agents/") {
+			t.Errorf("output should show agents category, got: %s", output)
+		}
+		if !strings.Contains(output, "claude") {
+			t.Errorf("output should show claude, got: %s", output)
+		}
+		if strings.Contains(output, "roles/") {
+			t.Errorf("output should not show roles when filtered to agents, got: %s", output)
+		}
+	})
+
+	t.Run("filter to roles only", func(t *testing.T) {
+		buf := new(bytes.Buffer)
+		cmd := cli.NewRootCmd()
+		cmd.SetOut(buf)
+		cmd.SetErr(buf)
+		cmd.SetArgs([]string{"assets", "list", "roles"})
+
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("assets list roles failed: %v", err)
+		}
+
+		output := buf.String()
+		if !strings.Contains(output, "roles/") {
+			t.Errorf("output should show roles category, got: %s", output)
+		}
+		if !strings.Contains(output, "assistant") {
+			t.Errorf("output should show assistant, got: %s", output)
+		}
+		if strings.Contains(output, "agents/") {
+			t.Errorf("output should not show agents when filtered to roles, got: %s", output)
+		}
+	})
+
+	t.Run("filter to tasks - none installed", func(t *testing.T) {
+		buf := new(bytes.Buffer)
+		cmd := cli.NewRootCmd()
+		cmd.SetOut(buf)
+		cmd.SetErr(buf)
+		cmd.SetArgs([]string{"assets", "list", "tasks"})
+
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("assets list tasks failed: %v", err)
+		}
+
+		output := buf.String()
+		if !strings.Contains(output, "No tasks installed") {
+			t.Errorf("should report no tasks installed, got: %s", output)
+		}
+	})
 }
 
 // TestIntegration_AssetsListNoConfig tests listing when no config exists.

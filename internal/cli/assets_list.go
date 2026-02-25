@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -24,31 +25,35 @@ import (
 
 // InstalledAsset represents an installed asset with version info.
 type InstalledAsset struct {
-	Category     string // "agents", "roles", "tasks", "contexts"
-	Name         string
-	InstalledVer string // Current installed version
-	LatestVer    string // Latest available version
-	UpdateAvail  bool   // True if update is available
-	Scope        string // "global" or "local"
-	Origin       string // Registry module path (for updates)
-	ConfigFile   string // Path to config file containing this asset
+	Category     string `json:"category"`
+	Name         string `json:"name"`
+	InstalledVer string `json:"version,omitempty"`
+	LatestVer    string `json:"latestVersion,omitempty"`
+	UpdateAvail  bool   `json:"updateAvailable,omitempty"`
+	Scope        string `json:"scope"`
+	Origin       string `json:"origin"`
+	ConfigFile   string `json:"configFile"`
 }
 
 // addAssetsListCommand adds the list subcommand to the assets command.
 func addAssetsListCommand(parent *cobra.Command) {
 	listCmd := &cobra.Command{
-		Use:     "list",
+		Use:     "list [category]",
 		Aliases: []string{"ls"},
 		Short:   "List installed assets",
 		Long: `List installed registry assets with update status.
 
 Shows all assets installed via the registry with their current version
-and whether updates are available.`,
-		Args: noArgsOrHelp,
+and whether updates are available.
+
+Optionally filter by category: agents, roles, tasks, or contexts.
+
+Use --json to output machine-readable JSON.`,
+		Args: cobra.MaximumNArgs(1),
 		RunE: runAssetsList,
 	}
 
-	listCmd.Flags().String("type", "", "Filter by type (agents, roles, tasks, contexts)")
+	listCmd.Flags().Bool("json", false, "Output as JSON")
 
 	parent.AddCommand(listCmd)
 }
@@ -58,6 +63,18 @@ func runAssetsList(cmd *cobra.Command, args []string) error {
 	if shown, err := checkHelpArg(cmd, args); shown || err != nil {
 		return err
 	}
+
+	// Validate category arg before any I/O
+	var category string
+	if len(args) > 0 {
+		singular := normalizeCategoryArg(args[0])
+		if singular == "" {
+			return fmt.Errorf("unknown category %q: expected agents, roles, tasks, or contexts", args[0])
+		}
+		category = singular + "s"
+	}
+
+	jsonFlag, _ := cmd.Flags().GetBool("json")
 	ctx := context.Background()
 
 	// Load configuration
@@ -67,6 +84,10 @@ func runAssetsList(cmd *cobra.Command, args []string) error {
 	}
 
 	if !paths.AnyExists() {
+		if jsonFlag {
+			_, _ = fmt.Fprintln(cmd.OutOrStdout(), "[]")
+			return nil
+		}
 		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "No configuration found. Run 'start' to set up.")
 		return nil
 	}
@@ -91,23 +112,30 @@ func runAssetsList(cmd *cobra.Command, args []string) error {
 	installed := collectInstalledAssets(cfg.Value, paths, localCfg)
 
 	if len(installed) == 0 {
+		if jsonFlag {
+			_, _ = fmt.Fprintln(cmd.OutOrStdout(), "[]")
+			return nil
+		}
 		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "No assets installed from registry.")
 		return nil
 	}
 
-	// Filter by type if specified
-	assetType, _ := cmd.Flags().GetString("type")
-	if assetType != "" {
+	// Filter by category if specified
+	if category != "" {
 		var filtered []InstalledAsset
 		for _, a := range installed {
-			if a.Category == assetType {
+			if a.Category == category {
 				filtered = append(filtered, a)
 			}
 		}
 		installed = filtered
 
 		if len(installed) == 0 {
-			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "No %s installed from registry.\n", assetType)
+			if jsonFlag {
+				_, _ = fmt.Fprintln(cmd.OutOrStdout(), "[]")
+				return nil
+			}
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "No %s installed from registry.\n", category)
 			return nil
 		}
 	}
@@ -121,7 +149,15 @@ func runAssetsList(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Print results
+	if jsonFlag {
+		data, err := json.MarshalIndent(installed, "", "  ")
+		if err != nil {
+			return fmt.Errorf("marshalling assets: %w", err)
+		}
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), string(data))
+		return nil
+	}
+
 	printInstalledAssets(cmd.OutOrStdout(), installed, flags.Verbose)
 
 	return nil

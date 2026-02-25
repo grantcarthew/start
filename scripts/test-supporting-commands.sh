@@ -178,11 +178,11 @@ run_test_show "1.7 assets add (Direct Path)" \
 run_test_show "1.8 assets list" \
     "./start assets list"
 
-run_test_show "1.9 assets list --type roles" \
-    "./start assets list --type roles"
+run_test_show "1.9 assets list roles" \
+    "./start assets list roles"
 
-run_test_show "1.9b assets list --type tasks" \
-    "./start assets list --type tasks"
+run_test_show "1.9b assets list tasks" \
+    "./start assets list tasks"
 
 run_test_show "1.10 assets info" \
     "./start assets info golang/code-review"
