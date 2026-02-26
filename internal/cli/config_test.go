@@ -627,8 +627,63 @@ func TestConfigSettingsList_NoConfig(t *testing.T) {
 	}
 
 	output := stdout.String()
-	if !strings.Contains(output, "No settings configured") {
-		t.Errorf("expected 'No settings configured', got: %s", output)
+	// Should show config paths
+	if !strings.Contains(output, "Configuration Paths:") {
+		t.Errorf("expected config paths header, got: %s", output)
+	}
+	// Should show all settings with defaults or not set
+	if !strings.Contains(output, "assets_index:") {
+		t.Errorf("expected assets_index in output, got: %s", output)
+	}
+	if !strings.Contains(output, "default_agent:") {
+		t.Errorf("expected default_agent in output, got: %s", output)
+	}
+	if !strings.Contains(output, "timeout:") {
+		t.Errorf("expected timeout in output, got: %s", output)
+	}
+	// default_agent has no default
+	if !strings.Contains(output, "(not set)") {
+		t.Errorf("expected '(not set)' for default_agent, got: %s", output)
+	}
+	// timeout has a default
+	if !strings.Contains(output, "(default)") {
+		t.Errorf("expected '(default)' annotation, got: %s", output)
+	}
+}
+
+func TestConfigSettingsList_NoCUEFiles(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	// Create global config dir with no CUE files
+	globalDir := filepath.Join(tmpDir, "start")
+	if err := os.MkdirAll(globalDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	// Write a non-CUE file so the dir exists but has no CUE
+	if err := os.WriteFile(filepath.Join(globalDir, "README.md"), []byte("# test"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	chdir(t, tmpDir)
+
+	cmd := NewRootCmd()
+	stdout := &bytes.Buffer{}
+	cmd.SetOut(stdout)
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"config", "settings"})
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := stdout.String()
+	if !strings.Contains(output, "assets_index:") {
+		t.Errorf("expected settings list even with no CUE files, got: %s", output)
+	}
+	if !strings.Contains(output, "(default)") {
+		t.Errorf("expected default annotations, got: %s", output)
 	}
 }
 
@@ -663,11 +718,55 @@ func TestConfigSettingsList_WithSettings(t *testing.T) {
 	}
 
 	output := stdout.String()
-	if !strings.Contains(output, "default_agent: claude") {
-		t.Errorf("expected 'default_agent: claude', got: %s", output)
+	// Configured settings show with global source
+	if !strings.Contains(output, "default_agent: claude (global)") {
+		t.Errorf("expected 'default_agent: claude (global)', got: %s", output)
 	}
-	if !strings.Contains(output, "timeout: 120") {
-		t.Errorf("expected 'timeout: 120', got: %s", output)
+	if !strings.Contains(output, "timeout: 120 (global)") {
+		t.Errorf("expected 'timeout: 120 (global)', got: %s", output)
+	}
+	// Unconfigured settings show defaults
+	if !strings.Contains(output, "assets_index:") {
+		t.Errorf("expected assets_index in output, got: %s", output)
+	}
+}
+
+func TestConfigSettingsList_UnknownKey(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	globalDir := filepath.Join(tmpDir, "start")
+	if err := os.MkdirAll(globalDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	settingsContent := `settings: {
+	default_agent: "claude"
+	custom_thing: "hello"
+}`
+	if err := os.WriteFile(filepath.Join(globalDir, "settings.cue"), []byte(settingsContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	chdir(t, tmpDir)
+
+	cmd := NewRootCmd()
+	stdout := &bytes.Buffer{}
+	cmd.SetOut(stdout)
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"config", "settings"})
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := stdout.String()
+	if !strings.Contains(output, "custom_thing: hello (global, unknown key)") {
+		t.Errorf("expected unknown key annotation, got: %s", output)
+	}
+	if !strings.Contains(output, "default_agent: claude (global)") {
+		t.Errorf("expected known key without unknown annotation, got: %s", output)
 	}
 }
 
@@ -701,8 +800,8 @@ func TestConfigSettingsShow_SingleKey(t *testing.T) {
 	}
 
 	output := stdout.String()
-	if !strings.Contains(output, "default_agent: gemini") {
-		t.Errorf("expected 'default_agent: gemini', got: %s", output)
+	if !strings.Contains(output, "default_agent: gemini (global)") {
+		t.Errorf("expected 'default_agent: gemini (global)', got: %s", output)
 	}
 }
 
@@ -710,25 +809,13 @@ func TestConfigSettingsShow_NotSet(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", tmpDir)
 
-	globalDir := filepath.Join(tmpDir, "start")
-	if err := os.MkdirAll(globalDir, 0755); err != nil {
-		t.Fatal(err)
-	}
-
-	settingsContent := `settings: {
-	default_agent: "claude"
-}`
-	if err := os.WriteFile(filepath.Join(globalDir, "settings.cue"), []byte(settingsContent), 0644); err != nil {
-		t.Fatal(err)
-	}
-
 	chdir(t, tmpDir)
 
 	cmd := NewRootCmd()
 	stdout := &bytes.Buffer{}
 	cmd.SetOut(stdout)
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"config", "settings", "shell"})
+	cmd.SetArgs([]string{"config", "settings", "default_agent"})
 
 	err := cmd.Execute()
 	if err != nil {
@@ -736,8 +823,31 @@ func TestConfigSettingsShow_NotSet(t *testing.T) {
 	}
 
 	output := stdout.String()
-	if !strings.Contains(output, "shell: (not set)") {
-		t.Errorf("expected 'shell: (not set)', got: %s", output)
+	if !strings.Contains(output, "default_agent: (not set)") {
+		t.Errorf("expected 'default_agent: (not set)', got: %s", output)
+	}
+}
+
+func TestConfigSettingsShow_Default(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	chdir(t, tmpDir)
+
+	cmd := NewRootCmd()
+	stdout := &bytes.Buffer{}
+	cmd.SetOut(stdout)
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"config", "settings", "timeout"})
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := stdout.String()
+	if !strings.Contains(output, "timeout: 30 (default)") {
+		t.Errorf("expected 'timeout: 30 (default)', got: %s", output)
 	}
 }
 
@@ -771,7 +881,7 @@ func TestValidSettingsKeysString(t *testing.T) {
 	result := validSettingsKeysString()
 
 	// Must contain all known keys
-	for key := range validSettingsKeys {
+	for key := range settingsRegistry {
 		if !strings.Contains(result, key) {
 			t.Errorf("validSettingsKeysString() missing key %q, got: %s", key, result)
 		}
@@ -779,8 +889,8 @@ func TestValidSettingsKeysString(t *testing.T) {
 
 	// Must be sorted (first key alphabetically should appear before last)
 	keys := strings.Split(result, ", ")
-	if len(keys) != len(validSettingsKeys) {
-		t.Errorf("validSettingsKeysString() returned %d keys, want %d", len(keys), len(validSettingsKeys))
+	if len(keys) != len(settingsRegistry) {
+		t.Errorf("validSettingsKeysString() returned %d keys, want %d", len(keys), len(settingsRegistry))
 	}
 	for i := 1; i < len(keys); i++ {
 		if keys[i] < keys[i-1] {

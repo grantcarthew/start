@@ -14,29 +14,104 @@ import (
 	"cuelang.org/go/cue/cuecontext"
 	"github.com/grantcarthew/start/internal/config"
 	internalcue "github.com/grantcarthew/start/internal/cue"
+	"github.com/grantcarthew/start/internal/registry"
+	"github.com/grantcarthew/start/internal/shell"
 	"github.com/grantcarthew/start/internal/tui"
 	"github.com/spf13/cobra"
 )
 
-// errNoConfig is returned by loadSettingsForScope when no configuration exists.
-var errNoConfig = errors.New("no config found")
+// settingInfo describes a valid settings key with its type.
+type settingInfo struct {
+	Type string // "string" or "int"
+}
 
-// Valid settings keys
-var validSettingsKeys = map[string]string{
-	"assets_index":  "string",
-	"default_agent": "string",
-	"shell":         "string",
-	"timeout":       "int",
+// settingEntry holds a resolved setting value and its source.
+type settingEntry struct {
+	Value  string
+	Source string // "default", "global", "local", or "not set"
+}
+
+// settingsRegistry defines all valid settings keys and their types.
+var settingsRegistry = map[string]settingInfo{
+	"assets_index":  {Type: "string"},
+	"default_agent": {Type: "string"},
+	"shell":         {Type: "string"},
+	"timeout":       {Type: "int"},
 }
 
 // validSettingsKeysString returns a sorted, comma-separated list of valid setting keys.
 func validSettingsKeysString() string {
-	keys := make([]string, 0, len(validSettingsKeys))
-	for k := range validSettingsKeys {
+	keys := make([]string, 0, len(settingsRegistry))
+	for k := range settingsRegistry {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
 	return strings.Join(keys, ", ")
+}
+
+// settingDefault returns the default value for a setting key.
+// Returns empty string if the key has no default.
+func settingDefault(key string) string {
+	switch key {
+	case "assets_index":
+		return registry.IndexModulePath
+	case "shell":
+		if detected, err := shell.DetectShell(); err == nil {
+			return strings.TrimSuffix(detected, " -c")
+		}
+		return ""
+	case "timeout":
+		return strconv.Itoa(shell.DefaultTimeout)
+	default:
+		return ""
+	}
+}
+
+// resolveAllSettings resolves all valid settings with their values and sources.
+func resolveAllSettings(paths config.Paths, localOnly bool) (map[string]settingEntry, error) {
+	entries := make(map[string]settingEntry, len(settingsRegistry))
+
+	// Start with defaults
+	for key := range settingsRegistry {
+		if def := settingDefault(key); def != "" {
+			entries[key] = settingEntry{Value: def, Source: "default"}
+		} else {
+			entries[key] = settingEntry{Source: "not set"}
+		}
+	}
+
+	if localOnly {
+		if paths.LocalExists {
+			localSettings, err := loadSettingsFromDir(paths.Local)
+			if err != nil {
+				return nil, err
+			}
+			for k, v := range localSettings {
+				entries[k] = settingEntry{Value: v, Source: "local"}
+			}
+		}
+	} else {
+		if paths.GlobalExists {
+			globalSettings, err := loadSettingsFromDir(paths.Global)
+			if err != nil {
+				return nil, err
+			}
+			for k, v := range globalSettings {
+				entries[k] = settingEntry{Value: v, Source: "global"}
+			}
+		}
+		if paths.LocalExists {
+			localSettings, err := loadSettingsFromDir(paths.Local)
+			if err != nil {
+				return nil, err
+			}
+			for k, v := range localSettings {
+				entries[k] = settingEntry{Value: v, Source: "local"}
+			}
+		}
+	}
+
+	return entries, nil
 }
 
 // addConfigSettingsCommand adds the settings subcommand to config.
@@ -115,61 +190,94 @@ func executeConfigSettings(cmd *cobra.Command, args []string) error {
 	}
 }
 
-// listSettings displays all settings.
+// listSettings displays all settings with their values and sources.
 func listSettings(w io.Writer, localOnly bool) error {
-	settings, err := loadSettingsForScope(localOnly)
+	paths, err := config.ResolvePaths("")
 	if err != nil {
-		// No settings is fine, just show empty
-		if errors.Is(err, errNoConfig) {
-			_, _ = fmt.Fprintln(w, "No settings configured")
-			return nil
-		}
+		return fmt.Errorf("resolving config paths: %w", err)
+	}
+
+	// Show config paths
+	printConfigPaths(w, paths)
+	_, _ = fmt.Fprintln(w)
+
+	entries, err := resolveAllSettings(paths, localOnly)
+	if err != nil {
 		return err
 	}
 
-	if len(settings) == 0 {
-		_, _ = fmt.Fprintln(w, "No settings configured")
-		return nil
-	}
-
 	// Sort keys for consistent output
-	var keys []string
-	for k := range settings {
+	keys := make([]string, 0, len(entries))
+	for k := range entries {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
 
+	// Find max key length for right-alignment
+	maxLen := 0
 	for _, k := range keys {
-		_, _ = tui.ColorDim.Fprintf(w, "%s: ", k)
-		_, _ = fmt.Fprintln(w, settings[k])
+		if len(k) > maxLen {
+			maxLen = len(k)
+		}
+	}
+
+	for _, k := range keys {
+		entry := entries[k]
+		_, _ = tui.ColorDim.Fprintf(w, "%*s: ", maxLen, k)
+		if entry.Source == "not set" {
+			_, _ = fmt.Fprintln(w, tui.Annotate("not set"))
+		} else {
+			source := entry.Source
+			if _, known := settingsRegistry[k]; !known {
+				source += ", unknown key"
+			}
+			_, _ = fmt.Fprintf(w, "%s %s\n", entry.Value, tui.Annotate("%s", source))
+		}
 	}
 
 	return nil
 }
 
-// showSetting displays a single setting value.
+// printConfigPaths displays the configuration directory paths.
+func printConfigPaths(w io.Writer, paths config.Paths) {
+	_, _ = tui.ColorHeader.Fprintln(w, "Configuration Paths:")
+	_, _ = fmt.Fprintln(w)
+	globalStatus := "not found"
+	if paths.GlobalExists {
+		globalStatus = "exists"
+	}
+	localStatus := "not found"
+	if paths.LocalExists {
+		localStatus = "exists"
+	}
+	_, _ = fmt.Fprintf(w, "  Global: %s ", paths.Global)
+	_, _ = fmt.Fprintln(w, tui.Annotate("%s", globalStatus))
+	_, _ = fmt.Fprintf(w, "  Local:  %s ", paths.Local)
+	_, _ = fmt.Fprintln(w, tui.Annotate("%s", localStatus))
+}
+
+// showSetting displays a single setting value with its source.
 func showSetting(w io.Writer, key string, localOnly bool) error {
-	// Validate key
-	if _, valid := validSettingsKeys[key]; !valid {
+	if _, valid := settingsRegistry[key]; !valid {
 		return fmt.Errorf("unknown setting %q\n\nValid settings: %s", key, validSettingsKeysString())
 	}
 
-	settings, err := loadSettingsForScope(localOnly)
+	paths, err := config.ResolvePaths("")
 	if err != nil {
-		if errors.Is(err, errNoConfig) {
-			_, _ = tui.ColorDim.Fprintf(w, "%s: ", key)
-			_, _ = fmt.Fprintln(w, tui.Annotate("not set"))
-			return nil
-		}
+		return fmt.Errorf("resolving config paths: %w", err)
+	}
+
+	entries, err := resolveAllSettings(paths, localOnly)
+	if err != nil {
 		return err
 	}
 
-	if val, exists := settings[key]; exists {
-		_, _ = tui.ColorDim.Fprintf(w, "%s: ", key)
-		_, _ = fmt.Fprintln(w, val)
-	} else {
-		_, _ = tui.ColorDim.Fprintf(w, "%s: ", key)
+	entry := entries[key]
+	_, _ = tui.ColorDim.Fprintf(w, "%s: ", key)
+	if entry.Source == "not set" {
 		_, _ = fmt.Fprintln(w, tui.Annotate("not set"))
+	} else {
+		_, _ = fmt.Fprintf(w, "%s %s\n", entry.Value, tui.Annotate("%s", entry.Source))
 	}
 
 	return nil
@@ -177,14 +285,12 @@ func showSetting(w io.Writer, key string, localOnly bool) error {
 
 // setSetting sets a setting value.
 func setSetting(w io.Writer, flags *Flags, key, value string, localOnly bool) error {
-	// Validate key
-	keyType, valid := validSettingsKeys[key]
+	info, valid := settingsRegistry[key]
 	if !valid {
 		return fmt.Errorf("unknown setting %q\n\nValid settings: %s", key, validSettingsKeysString())
 	}
 
-	// Validate value type
-	if keyType == "int" {
+	if info.Type == "int" {
 		if _, err := strconv.Atoi(value); err != nil {
 			return fmt.Errorf("setting %q requires an integer value", key)
 		}
@@ -252,6 +358,7 @@ func editSettings(localOnly bool) error {
 }
 
 // loadSettingsForScope loads settings from the appropriate scope.
+// Returns an empty map if no settings are configured.
 func loadSettingsForScope(localOnly bool) (map[string]string, error) {
 	paths, err := config.ResolvePaths("")
 	if err != nil {
@@ -261,10 +368,9 @@ func loadSettingsForScope(localOnly bool) (map[string]string, error) {
 	settings := make(map[string]string)
 
 	if localOnly {
-		// Local only
 		if paths.LocalExists {
 			localSettings, err := loadSettingsFromDir(paths.Local)
-			if err != nil && !os.IsNotExist(err) {
+			if err != nil {
 				return nil, err
 			}
 			for k, v := range localSettings {
@@ -272,10 +378,9 @@ func loadSettingsForScope(localOnly bool) (map[string]string, error) {
 			}
 		}
 	} else {
-		// Merged: global first, then local overrides
 		if paths.GlobalExists {
 			globalSettings, err := loadSettingsFromDir(paths.Global)
-			if err != nil && !os.IsNotExist(err) {
+			if err != nil {
 				return nil, err
 			}
 			for k, v := range globalSettings {
@@ -284,17 +389,13 @@ func loadSettingsForScope(localOnly bool) (map[string]string, error) {
 		}
 		if paths.LocalExists {
 			localSettings, err := loadSettingsFromDir(paths.Local)
-			if err != nil && !os.IsNotExist(err) {
+			if err != nil {
 				return nil, err
 			}
 			for k, v := range localSettings {
 				settings[k] = v
 			}
 		}
-	}
-
-	if len(settings) == 0 && !paths.GlobalExists && !paths.LocalExists {
-		return nil, errNoConfig
 	}
 
 	return settings, nil
@@ -307,6 +408,9 @@ func loadSettingsFromDir(dir string) (map[string]string, error) {
 	loader := internalcue.NewLoader()
 	result, err := loader.Load([]string{dir})
 	if err != nil {
+		if errors.Is(err, internalcue.ErrNoCUEFiles) {
+			return settings, nil
+		}
 		return nil, err
 	}
 
@@ -388,7 +492,7 @@ func writeSettingsFile(path string, settings map[string]string) error {
 		for _, k := range keys {
 			v := settings[k]
 			// Check if this is an int setting
-			if keyType, exists := validSettingsKeys[k]; exists && keyType == "int" {
+			if info, exists := settingsRegistry[k]; exists && info.Type == "int" {
 				// Write as integer (no quotes)
 				sb.WriteString(fmt.Sprintf("\t%s: %s\n", k, v))
 			} else {
@@ -405,7 +509,7 @@ func writeSettingsFile(path string, settings map[string]string) error {
 
 // unsetSetting removes a setting key from the settings file.
 func unsetSetting(w io.Writer, flags *Flags, key string, localOnly bool) error {
-	if _, valid := validSettingsKeys[key]; !valid {
+	if _, valid := settingsRegistry[key]; !valid {
 		return fmt.Errorf("unknown setting %q\n\nValid settings: %s", key, validSettingsKeysString())
 	}
 
