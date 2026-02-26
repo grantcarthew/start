@@ -13,7 +13,7 @@ import (
 	"cuelang.org/go/cue/load"
 )
 
-// ErrNoCUEFiles is returned by LoadSingle when the directory contains no CUE files.
+// ErrNoCUEFiles is returned when no CUE files are found in the provided directories.
 var ErrNoCUEFiles = errors.New("no CUE files found")
 
 // Loader loads and merges CUE configurations from directories.
@@ -101,7 +101,7 @@ func (l *Loader) Load(dirs []string) (LoadResult, error) {
 	}
 
 	if len(values) == 0 {
-		return result, fmt.Errorf("no valid CUE configuration found")
+		return result, fmt.Errorf("%w", ErrNoCUEFiles)
 	}
 
 	// Merge values with replacement semantics:
