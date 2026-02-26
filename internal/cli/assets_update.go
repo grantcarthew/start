@@ -123,14 +123,15 @@ func runAssetsUpdate(cmd *cobra.Command, args []string) error {
 
 	// Fetch index for version comparison
 	flags := getFlags(cmd)
-	if !flags.Quiet {
-		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "Checking for updates...")
-	}
+	prog := tui.NewProgress(cmd.ErrOrStderr(), flags.Quiet)
+	defer prog.Done()
 
+	prog.Update("Checking for updates...")
 	index, err := client.FetchIndex(ctx, resolveAssetsIndexPath())
 	if err != nil {
 		return fmt.Errorf("fetching index: %w", err)
 	}
+	prog.Done()
 
 	// Check each asset for updates
 	dryRun := getFlags(cmd).DryRun

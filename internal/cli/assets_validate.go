@@ -81,7 +81,7 @@ func runAssetsValidate(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
 	flags := getFlags(cmd)
 	w := cmd.OutOrStdout()
-	prog := tui.NewProgress(cmd.ErrOrStderr())
+	prog := tui.NewProgress(cmd.ErrOrStderr(), flags.Quiet)
 	defer prog.Done() // safety net: clears any active progress line on early return
 
 	// Gate: --yes is required to prevent casual traffic against public infrastructure.

@@ -2,6 +2,8 @@ package tui
 
 import (
 	"bytes"
+	"io"
+	"os"
 	"strings"
 	"testing"
 )
@@ -102,7 +104,7 @@ func TestProgress_NonTTY(t *testing.T) {
 	// bytes.Buffer is not *os.File, so NewProgress treats it as non-TTY.
 	// Update and Done must be no-ops.
 	buf := &bytes.Buffer{}
-	p := NewProgress(buf)
+	p := NewProgress(buf, false)
 
 	p.Update("loading %d%%", 50)
 	p.Update("loading %d%%", 100)
@@ -113,11 +115,31 @@ func TestProgress_NonTTY(t *testing.T) {
 	}
 }
 
+func TestProgress_Quiet(t *testing.T) {
+	t.Parallel()
+	// Use a real *os.File so the writer would pass the type assertion;
+	// quiet=true must still suppress all output.
+	f, err := os.CreateTemp(t.TempDir(), "prog")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+
+	p := NewProgress(f, true)
+	p.Update("loading %d%%", 50)
+	p.Done()
+
+	n, _ := f.Seek(0, io.SeekEnd)
+	if n != 0 {
+		t.Errorf("Progress should be no-op when quiet, but %d bytes were written", n)
+	}
+}
+
 func TestProgress_NonTTY_DoneOnEmpty(t *testing.T) {
 	t.Parallel()
 	// Calling Done without any Update should not write anything.
 	buf := &bytes.Buffer{}
-	p := NewProgress(buf)
+	p := NewProgress(buf, false)
 	p.Done()
 
 	if buf.Len() != 0 {
