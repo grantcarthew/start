@@ -72,11 +72,13 @@ type Progress struct {
 }
 
 // NewProgress creates a progress writer.
-// Carriage-return progress output is suppressed when w is not a terminal.
-func NewProgress(w io.Writer) *Progress {
+// Carriage-return progress output is suppressed when w is not a terminal or quiet is true.
+func NewProgress(w io.Writer, quiet bool) *Progress {
 	tty := false
-	if f, ok := w.(*os.File); ok {
-		tty = term.IsTerminal(int(f.Fd()))
+	if !quiet {
+		if f, ok := w.(*os.File); ok {
+			tty = term.IsTerminal(int(f.Fd()))
+		}
 	}
 	return &Progress{w: w, tty: tty}
 }

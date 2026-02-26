@@ -52,6 +52,8 @@ func runAssetsAdd(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
 	flags := getFlags(cmd)
 	w := cmd.OutOrStdout()
+	prog := tui.NewProgress(cmd.ErrOrStderr(), flags.Quiet)
+	defer prog.Done()
 
 	// Create registry client
 	client, err := registry.NewClient()
@@ -60,13 +62,12 @@ func runAssetsAdd(cmd *cobra.Command, args []string) error {
 	}
 
 	// Fetch index
-	if !flags.Quiet {
-		_, _ = fmt.Fprintln(w, "Fetching index...")
-	}
+	prog.Update("Fetching index...")
 	index, err := client.FetchIndex(ctx, resolveAssetsIndexPath())
 	if err != nil {
 		return fmt.Errorf("fetching index: %w", err)
 	}
+	prog.Done()
 
 	// Determine config path
 	paths, err := config.ResolvePaths("")
@@ -92,7 +93,7 @@ func runAssetsAdd(cmd *cobra.Command, args []string) error {
 	// Install each queried asset
 	var errs []error
 	for _, query := range args {
-		if err := installAsset(ctx, cmd, client, index, query, configDir, scopeName, flags, cfg); err != nil {
+		if err := installAsset(ctx, cmd, prog, client, index, query, configDir, scopeName, flags, cfg); err != nil {
 			errs = append(errs, fmt.Errorf("%s: %w", query, err))
 			_, _ = fmt.Fprintf(w, "Error installing %q: %v\n", query, err)
 		}
@@ -102,7 +103,7 @@ func runAssetsAdd(cmd *cobra.Command, args []string) error {
 }
 
 // installAsset searches for, selects, and installs a single asset.
-func installAsset(ctx context.Context, cmd *cobra.Command, client *registry.Client, index *registry.Index, query, configDir, scopeName string, flags *Flags, cfg cue.Value) error {
+func installAsset(ctx context.Context, cmd *cobra.Command, prog *tui.Progress, client *registry.Client, index *registry.Index, query, configDir, scopeName string, flags *Flags, cfg cue.Value) error {
 	w := cmd.OutOrStdout()
 
 	// Search for matching assets
@@ -172,13 +173,11 @@ func installAsset(ctx context.Context, cmd *cobra.Command, client *registry.Clie
 	}
 
 	// Install the asset
-	if !flags.Quiet {
-		_, _ = fmt.Fprintln(w, "Fetching asset...")
-	}
-
+	prog.Update("Fetching asset...")
 	if err := assets.InstallAsset(ctx, client, index, selected, configDir); err != nil {
 		return err
 	}
+	prog.Done()
 
 	if !flags.Quiet {
 		configFile := map[string]string{

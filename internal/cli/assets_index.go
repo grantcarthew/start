@@ -75,7 +75,11 @@ func runAssetsIndex(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("creating registry client: %w", err)
 	}
 
+	prog := tui.NewProgress(cmd.ErrOrStderr(), flags.Quiet)
+	defer prog.Done()
+
 	// Resolve latest version
+	prog.Update("Fetching index...")
 	indexPath := registry.EffectiveIndexPath(resolveAssetsIndexPath())
 	resolvedPath, err := client.ResolveLatestVersion(ctx, indexPath)
 	if err != nil {
@@ -93,6 +97,7 @@ func runAssetsIndex(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("fetching index module: %w", err)
 	}
+	prog.Done()
 
 	w := cmd.OutOrStdout()
 

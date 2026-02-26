@@ -45,13 +45,15 @@ func runAssetsInfo(cmd *cobra.Command, args []string) error {
 	}
 
 	// Fetch index
-	if !flags.Quiet {
-		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "Fetching index...")
-	}
+	prog := tui.NewProgress(cmd.ErrOrStderr(), flags.Quiet)
+	defer prog.Done()
+
+	prog.Update("Fetching index...")
 	index, err := client.FetchIndex(ctx, resolveAssetsIndexPath())
 	if err != nil {
 		return fmt.Errorf("fetching index: %w", err)
 	}
+	prog.Done()
 
 	// Search for matching assets
 	results, err := assets.SearchIndex(index, query, nil)

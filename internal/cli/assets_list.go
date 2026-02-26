@@ -145,7 +145,10 @@ func runAssetsList(cmd *cobra.Command, args []string) error {
 	if flags.Verbose {
 		client, err := registry.NewClient()
 		if err == nil {
+			prog := tui.NewProgress(cmd.ErrOrStderr(), flags.Quiet)
+			prog.Update("Checking for updates...")
 			checkForUpdates(ctx, client, installed, resolveAssetsIndexPath())
+			prog.Done()
 		}
 	}
 

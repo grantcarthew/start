@@ -58,6 +58,7 @@ func runAssetsSearch(cmd *cobra.Command, args []string) error {
 	}
 
 	ctx := context.Background()
+	flags := getFlags(cmd)
 
 	// Fetch index from registry
 	client, err := registry.NewClient()
@@ -65,10 +66,15 @@ func runAssetsSearch(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("creating registry client: %w", err)
 	}
 
+	prog := tui.NewProgress(cmd.ErrOrStderr(), flags.Quiet)
+	defer prog.Done()
+
+	prog.Update("Fetching index...")
 	index, err := client.FetchIndex(ctx, resolveAssetsIndexPath())
 	if err != nil {
 		return fmt.Errorf("fetching index: %w", err)
 	}
+	prog.Done()
 
 	// Search index
 	results, err := assets.SearchIndex(index, query, tags)
@@ -90,7 +96,6 @@ func runAssetsSearch(cmd *cobra.Command, args []string) error {
 	installed := collectInstalledNames()
 
 	// Print results
-	flags := getFlags(cmd)
 	printSearchResults(cmd.OutOrStdout(), results, flags.Verbose, installed)
 
 	return nil
