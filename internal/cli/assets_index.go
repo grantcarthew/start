@@ -192,8 +192,8 @@ func printIndex(w io.Writer, index *registry.Index, version string, verbose bool
 	}{
 		{"agents", index.Agents},
 		{"roles", index.Roles},
-		{"tasks", index.Tasks},
 		{"contexts", index.Contexts},
+		{"tasks", index.Tasks},
 	}
 
 	for _, cat := range categories {

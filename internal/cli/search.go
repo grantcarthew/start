@@ -208,7 +208,7 @@ func printSearchSections(w io.Writer, sections []searchSection, verbose bool, in
 		}
 
 		// Print in category order
-		categories := []string{"agents", "roles", "tasks", "contexts"}
+		categories := []string{"agents", "roles", "contexts", "tasks"}
 		for _, cat := range categories {
 			catResults := grouped[cat]
 			if len(catResults) == 0 {

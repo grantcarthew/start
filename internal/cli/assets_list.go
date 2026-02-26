@@ -170,7 +170,7 @@ func runAssetsList(cmd *cobra.Command, args []string) error {
 func collectInstalledAssets(v cue.Value, paths config.Paths, localCfg cue.Value) []InstalledAsset {
 	var installed []InstalledAsset
 
-	categories := []string{"agents", "roles", "tasks", "contexts"}
+	categories := []string{"agents", "roles", "contexts", "tasks"}
 	for _, cat := range categories {
 		catVal := v.LookupPath(cue.ParsePath(cat))
 		if !catVal.Exists() {
@@ -287,7 +287,7 @@ func printInstalledAssets(w io.Writer, installed []InstalledAsset, verbose bool)
 		grouped[a.Category] = append(grouped[a.Category], a)
 	}
 
-	categories := []string{"agents", "roles", "tasks", "contexts"}
+	categories := []string{"agents", "roles", "contexts", "tasks"}
 	for _, cat := range categories {
 		assets := grouped[cat]
 		if len(assets) == 0 {

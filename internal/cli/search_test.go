@@ -173,7 +173,7 @@ func TestPrintSearchSections(t *testing.T) {
 		}
 	})
 
-	t.Run("category order is agents roles tasks contexts", func(t *testing.T) {
+	t.Run("category order is agents roles contexts tasks", func(t *testing.T) {
 		t.Parallel()
 		allCatResults := []assets.SearchResult{
 			{Category: "contexts", Name: "env", Entry: registry.IndexEntry{Description: "Environment"}, MatchScore: 3},
@@ -193,9 +193,9 @@ func TestPrintSearchSections(t *testing.T) {
 		tasksIdx := strings.Index(out, "tasks/")
 		contextsIdx := strings.Index(out, "contexts/")
 
-		if agentsIdx > rolesIdx || rolesIdx > tasksIdx || tasksIdx > contextsIdx {
-			t.Errorf("categories in wrong order: agents=%d roles=%d tasks=%d contexts=%d",
-				agentsIdx, rolesIdx, tasksIdx, contextsIdx)
+		if agentsIdx > rolesIdx || rolesIdx > contextsIdx || contextsIdx > tasksIdx {
+			t.Errorf("categories in wrong order: agents=%d roles=%d contexts=%d tasks=%d",
+				agentsIdx, rolesIdx, contextsIdx, tasksIdx)
 		}
 	})
 
