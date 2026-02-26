@@ -184,6 +184,129 @@ func TestResolveAllMatchingNames(t *testing.T) {
 	})
 }
 
+func TestParseSelectionInput(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		count   int
+		want    []int
+		wantErr string
+	}{
+		{
+			name:  "single number",
+			input: "2",
+			count: 5,
+			want:  []int{1},
+		},
+		{
+			name:  "csv numbers",
+			input: "1,3,5",
+			count: 5,
+			want:  []int{0, 2, 4},
+		},
+		{
+			name:  "range",
+			input: "2-4",
+			count: 5,
+			want:  []int{1, 2, 3},
+		},
+		{
+			name:  "mixed csv and range",
+			input: "1,3-5",
+			count: 5,
+			want:  []int{0, 2, 3, 4},
+		},
+		{
+			name:  "deduplicates",
+			input: "1,2,1,2-3",
+			count: 5,
+			want:  []int{0, 1, 2},
+		},
+		{
+			name:  "whitespace in parts",
+			input: " 1 , 3 , 2 - 4 ",
+			count: 5,
+			want:  []int{0, 2, 1, 3},
+		},
+		{
+			name:  "empty parts skipped",
+			input: "1,,3,",
+			count: 5,
+			want:  []int{0, 2},
+		},
+		{
+			name:  "empty input returns nil",
+			input: "",
+			count: 5,
+			want:  nil,
+		},
+		{
+			name:    "number exceeds count",
+			input:   "6",
+			count:   5,
+			wantErr: "invalid selection",
+		},
+		{
+			name:    "zero is out of range",
+			input:   "0",
+			count:   5,
+			wantErr: "invalid selection",
+		},
+		{
+			name:    "non-numeric input",
+			input:   "abc",
+			count:   5,
+			wantErr: "invalid selection",
+		},
+		{
+			name:    "reversed range",
+			input:   "3-1",
+			count:   5,
+			wantErr: "invalid range",
+		},
+		{
+			name:    "range exceeds count",
+			input:   "3-6",
+			count:   5,
+			wantErr: "invalid range",
+		},
+		{
+			name:    "range starts at zero",
+			input:   "0-2",
+			count:   5,
+			wantErr: "invalid range",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parseSelectionInput(tt.input, tt.count)
+
+			if tt.wantErr != "" {
+				if err == nil {
+					t.Fatalf("expected error containing %q, got nil", tt.wantErr)
+				}
+				if !strings.Contains(err.Error(), tt.wantErr) {
+					t.Fatalf("expected error containing %q, got: %v", tt.wantErr, err)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if len(got) != len(tt.want) {
+				t.Fatalf("got %v, want %v", got, tt.want)
+			}
+			for i := range got {
+				if got[i] != tt.want[i] {
+					t.Errorf("index %d: got %d, want %d", i, got[i], tt.want[i])
+				}
+			}
+		})
+	}
+}
+
 func TestPromptSelectFromList(t *testing.T) {
 	names := []string{"golang/review/architecture", "golang/review/code", "golang/review/security"}
 

@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"cuelang.org/go/cue"
@@ -115,18 +114,35 @@ func installAsset(ctx context.Context, cmd *cobra.Command, prog *tui.Progress, c
 		return fmt.Errorf("no assets found matching %q", query)
 	}
 
-	// Select asset
-	var selected assets.SearchResult
+	// Select asset(s)
+	var selections []assets.SearchResult
 	if len(results) == 1 {
-		selected = results[0]
+		selections = results
 	} else {
 		var err error
-		selected, err = promptAssetSelection(w, cmd.InOrStdin(), results, cfg)
+		selections, err = promptAssetSelection(w, cmd.InOrStdin(), results, cfg)
 		if err != nil {
 			return err
 		}
+		if len(selections) == 0 {
+			return nil
+		}
 	}
 
+	// Install each selected asset
+	var errs []error
+	for _, selected := range selections {
+		if err := installSingleAsset(ctx, w, prog, client, index, selected, configDir, scopeName, flags, cfg); err != nil {
+			errs = append(errs, fmt.Errorf("%s/%s: %w", selected.Category, selected.Name, err))
+			_, _ = fmt.Fprintf(w, "Error installing %s/%s: %v\n", selected.Category, selected.Name, err)
+		}
+	}
+
+	return errors.Join(errs...)
+}
+
+// installSingleAsset checks and installs a single selected asset.
+func installSingleAsset(ctx context.Context, w io.Writer, prog *tui.Progress, client *registry.Client, index *registry.Index, selected assets.SearchResult, configDir, scopeName string, flags *Flags, cfg cue.Value) error {
 	// Check if already installed
 	if assets.AssetExists(cfg, selected.Category, selected.Name) {
 		origin := assets.GetInstalledOrigin(cfg, selected.Category, selected.Name)
@@ -196,8 +212,10 @@ func installAsset(ctx context.Context, cmd *cobra.Command, prog *tui.Progress, c
 	return nil
 }
 
-// promptAssetSelection prompts the user to select an asset from multiple matches.
-func promptAssetSelection(w io.Writer, r io.Reader, results []assets.SearchResult, cfg cue.Value) (assets.SearchResult, error) {
+// promptAssetSelection prompts the user to select one or more assets from multiple matches.
+// Supports single numbers, CSV (1,3,5), ranges (1-3), "all", or name matching.
+// Returns nil and nil if the user cancels (empty input).
+func promptAssetSelection(w io.Writer, r io.Reader, results []assets.SearchResult, cfg cue.Value) ([]assets.SearchResult, error) {
 	// Check if stdin is a TTY
 	isTTY := isTerminal(r)
 
@@ -206,7 +224,7 @@ func promptAssetSelection(w io.Writer, r io.Reader, results []assets.SearchResul
 		for _, res := range results {
 			names = append(names, fmt.Sprintf("%s/%s", res.Category, res.Name))
 		}
-		return assets.SearchResult{}, fmt.Errorf(
+		return nil, fmt.Errorf(
 			"multiple assets found: %s\nSpecify exact path or run interactively",
 			strings.Join(names, ", "),
 		)
@@ -227,32 +245,47 @@ func promptAssetSelection(w io.Writer, r io.Reader, results []assets.SearchResul
 	}
 
 	_, _ = fmt.Fprintln(w)
-	_, _ = fmt.Fprintf(w, "Select asset %s: ", tui.Annotate("number or name"))
+	_, _ = fmt.Fprintf(w, "CSV %s, range %s, or \"all\" supported\n",
+		tui.Annotate("1,2,3"), tui.Annotate("1-3"))
+	_, _ = fmt.Fprintf(w, "Select %s: ", tui.Annotate("1-%d", len(results)))
 
 	reader := bufio.NewReader(r)
 	input, err := reader.ReadString('\n')
 	if err != nil {
-		return assets.SearchResult{}, fmt.Errorf("reading input: %w", err)
+		return nil, fmt.Errorf("reading input: %w", err)
 	}
 
 	input = strings.TrimSpace(input)
 
-	// Try parsing as number
-	if choice, err := strconv.Atoi(input); err == nil {
-		if choice >= 1 && choice <= len(results) {
-			return results[choice-1], nil
-		}
-		return assets.SearchResult{}, fmt.Errorf("invalid selection: %s (choose 1-%d)", input, len(results))
+	if input == "" {
+		_, _ = fmt.Fprintln(w, "Cancelled.")
+		return nil, nil
+	}
+	if strings.ToLower(input) == "all" {
+		return results, nil
 	}
 
-	// Try matching by name
+	// Try matching by name (single result)
 	inputLower := strings.ToLower(input)
 	for _, res := range results {
 		fullPath := fmt.Sprintf("%s/%s", res.Category, res.Name)
 		if strings.ToLower(res.Name) == inputLower || strings.ToLower(fullPath) == inputLower {
-			return res, nil
+			return []assets.SearchResult{res}, nil
 		}
 	}
 
-	return assets.SearchResult{}, fmt.Errorf("invalid selection: %s", input)
+	// Parse as numbers, CSV, and/or ranges
+	indices, err := parseSelectionInput(input, len(results))
+	if err != nil {
+		return nil, err
+	}
+	if len(indices) == 0 {
+		_, _ = fmt.Fprintln(w, "Cancelled.")
+		return nil, nil
+	}
+	selected := make([]assets.SearchResult, len(indices))
+	for i, idx := range indices {
+		selected[i] = results[idx]
+	}
+	return selected, nil
 }

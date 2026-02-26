@@ -627,6 +627,46 @@ func resolveAllMatchingNames[T any](items map[string]T, typeName, query string) 
 	return names, nil
 }
 
+// parseSelectionInput parses a user selection string containing comma-separated
+// numbers and/or ranges (e.g. "1,3,5" or "1-3" or "1,3-5") and returns
+// deduplicated 0-based indices in input order. count is the total number of
+// selectable items (used for bounds validation).
+func parseSelectionInput(input string, count int) ([]int, error) {
+	seen := make(map[int]bool)
+	var indices []int
+
+	for _, part := range strings.Split(input, ",") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		if dashIdx := strings.Index(part, "-"); dashIdx > 0 {
+			start, err1 := strconv.Atoi(strings.TrimSpace(part[:dashIdx]))
+			end, err2 := strconv.Atoi(strings.TrimSpace(part[dashIdx+1:]))
+			if err1 != nil || err2 != nil || start < 1 || end > count || start > end {
+				return nil, fmt.Errorf("invalid range %q: enter numbers between 1 and %d", part, count)
+			}
+			for i := start; i <= end; i++ {
+				if !seen[i] {
+					seen[i] = true
+					indices = append(indices, i-1)
+				}
+			}
+		} else {
+			n, err := strconv.Atoi(part)
+			if err != nil || n < 1 || n > count {
+				return nil, fmt.Errorf("invalid selection %q: enter a number between 1 and %d", part, count)
+			}
+			if !seen[n] {
+				seen[n] = true
+				indices = append(indices, n-1)
+			}
+		}
+	}
+
+	return indices, nil
+}
+
 // promptSelectCategory displays a colour-coded numbered list of config categories
 // and returns the chosen category name. Returns "" and nil if the user cancels
 // (empty input).
@@ -707,7 +747,9 @@ func promptSelectFromList(w io.Writer, r io.Reader, entityType, query string, na
 	}
 
 	_, _ = fmt.Fprintln(w)
-	_, _ = fmt.Fprintf(w, "Select %s or all: ", tui.Annotate("1-%d", len(names)))
+	_, _ = fmt.Fprintf(w, "CSV %s, range %s, or \"all\" supported\n",
+		tui.Annotate("1,2,3"), tui.Annotate("1-3"))
+	_, _ = fmt.Fprintf(w, "Select %s: ", tui.Annotate("1-%d", len(names)))
 
 	reader := bufio.NewReader(r)
 	input, err := reader.ReadString('\n')
@@ -724,41 +766,17 @@ func promptSelectFromList(w io.Writer, r io.Reader, entityType, query string, na
 		return names, nil
 	}
 
-	seen := make(map[int]bool)
-	var selected []string
-
-	for _, part := range strings.Split(input, ",") {
-		part = strings.TrimSpace(part)
-		if part == "" {
-			continue
-		}
-		if dashIdx := strings.Index(part, "-"); dashIdx > 0 {
-			start, err1 := strconv.Atoi(strings.TrimSpace(part[:dashIdx]))
-			end, err2 := strconv.Atoi(strings.TrimSpace(part[dashIdx+1:]))
-			if err1 != nil || err2 != nil || start < 1 || end > len(names) || start > end {
-				return nil, fmt.Errorf("invalid range %q: enter numbers between 1 and %d", part, len(names))
-			}
-			for i := start; i <= end; i++ {
-				if !seen[i] {
-					seen[i] = true
-					selected = append(selected, names[i-1])
-				}
-			}
-		} else {
-			n, err := strconv.Atoi(part)
-			if err != nil || n < 1 || n > len(names) {
-				return nil, fmt.Errorf("invalid selection %q: enter a number between 1 and %d", part, len(names))
-			}
-			if !seen[n] {
-				seen[n] = true
-				selected = append(selected, names[n-1])
-			}
-		}
+	indices, err := parseSelectionInput(input, len(names))
+	if err != nil {
+		return nil, err
 	}
-
-	if len(selected) == 0 {
+	if len(indices) == 0 {
 		_, _ = fmt.Fprintln(w, "Cancelled.")
 		return nil, nil
+	}
+	selected := make([]string, len(indices))
+	for i, idx := range indices {
+		selected[i] = names[idx]
 	}
 	return selected, nil
 }
@@ -878,7 +896,9 @@ func promptSelectConfigMatchesFromList(w io.Writer, r io.Reader, query string, m
 		_, _ = fmt.Fprintf(w, "  %2d. %s %s\n", i+1, m.Name, tui.Annotate("%s", m.Category))
 	}
 	_, _ = fmt.Fprintln(w)
-	_, _ = fmt.Fprintf(w, "Select %s, range, or all: ", tui.Annotate("1-%d", len(matches)))
+	_, _ = fmt.Fprintf(w, "CSV %s, range %s, or \"all\" supported\n",
+		tui.Annotate("1,2,3"), tui.Annotate("1-3"))
+	_, _ = fmt.Fprintf(w, "Select %s: ", tui.Annotate("1-%d", len(matches)))
 
 	reader := bufio.NewReader(r)
 	input, err := reader.ReadString('\n')
@@ -895,41 +915,17 @@ func promptSelectConfigMatchesFromList(w io.Writer, r io.Reader, query string, m
 		return matches, nil
 	}
 
-	seen := make(map[int]bool)
-	var selected []configMatch
-	for _, part := range strings.Split(input, ",") {
-		part = strings.TrimSpace(part)
-		if part == "" {
-			continue
-		}
-		if strings.Contains(part, "-") {
-			bounds := strings.SplitN(part, "-", 2)
-			lo, loErr := strconv.Atoi(strings.TrimSpace(bounds[0]))
-			hi, hiErr := strconv.Atoi(strings.TrimSpace(bounds[1]))
-			if loErr != nil || hiErr != nil || lo < 1 || hi > len(matches) || lo > hi {
-				return nil, fmt.Errorf("invalid range %q: use format lo-hi within 1-%d", part, len(matches))
-			}
-			for n := lo; n <= hi; n++ {
-				if !seen[n] {
-					seen[n] = true
-					selected = append(selected, matches[n-1])
-				}
-			}
-			continue
-		}
-		n, err := strconv.Atoi(part)
-		if err != nil || n < 1 || n > len(matches) {
-			return nil, fmt.Errorf("invalid selection %q: enter a number between 1 and %d", part, len(matches))
-		}
-		if !seen[n] {
-			seen[n] = true
-			selected = append(selected, matches[n-1])
-		}
+	indices, err := parseSelectionInput(input, len(matches))
+	if err != nil {
+		return nil, err
 	}
-
-	if len(selected) == 0 {
+	if len(indices) == 0 {
 		_, _ = fmt.Fprintln(w, "Cancelled.")
 		return nil, nil
+	}
+	selected := make([]configMatch, len(indices))
+	for i, idx := range indices {
+		selected[i] = matches[idx]
 	}
 	return selected, nil
 }
