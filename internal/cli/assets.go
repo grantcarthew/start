@@ -17,7 +17,7 @@ func addAssetsCommand(parent *cobra.Command) {
 		Aliases: []string{"asset"},
 		GroupID: "commands",
 		Short:   "Manage assets from the CUE registry",
-		Long: `Manage assets (roles, tasks, contexts, agents) from the CUE Central Registry.
+		Long: `Manage assets (agents, roles, contexts, tasks) from the CUE Central Registry.
 
 Assets are CUE modules that define reusable AI agent configurations.
 Use these commands to discover, install, and update assets.`,

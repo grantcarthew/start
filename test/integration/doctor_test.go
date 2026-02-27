@@ -604,24 +604,24 @@ func runDoctorChecks(t *testing.T, paths config.Paths) doctor.Report {
 		})
 	}
 
-	// Context checks
-	if cfgLoaded {
-		report.Sections = append(report.Sections, doctor.CheckContexts(cfgResult.Value))
-	} else {
-		report.Sections = append(report.Sections, doctor.SectionResult{
-			Name: "Contexts",
-			Results: []doctor.CheckResult{
-				{Status: doctor.StatusInfo, Label: "Skipped", Message: "no valid config"},
-			},
-		})
-	}
-
 	// Role checks
 	if cfgLoaded {
 		report.Sections = append(report.Sections, doctor.CheckRoles(cfgResult.Value))
 	} else {
 		report.Sections = append(report.Sections, doctor.SectionResult{
 			Name: "Roles",
+			Results: []doctor.CheckResult{
+				{Status: doctor.StatusInfo, Label: "Skipped", Message: "no valid config"},
+			},
+		})
+	}
+
+	// Context checks
+	if cfgLoaded {
+		report.Sections = append(report.Sections, doctor.CheckContexts(cfgResult.Value))
+	} else {
+		report.Sections = append(report.Sections, doctor.SectionResult{
+			Name: "Contexts",
 			Results: []doctor.CheckResult{
 				{Status: doctor.StatusInfo, Label: "Skipped", Message: "no valid config"},
 			},

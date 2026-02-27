@@ -512,7 +512,7 @@ func indexVersionFromPath(resolvedPath string) string {
 
 // indexEntryCount returns the total number of entries across all index categories.
 func indexEntryCount(idx *registry.Index) int {
-	return len(idx.Agents) + len(idx.Roles) + len(idx.Tasks) + len(idx.Contexts)
+	return len(idx.Agents) + len(idx.Roles) + len(idx.Contexts) + len(idx.Tasks)
 }
 
 // validateModules runs the five mismatch checks for every module in the index
@@ -524,8 +524,8 @@ func validateModules(ctx context.Context, client *registry.Client, idx *registry
 	}{
 		{"agents", idx.Agents},
 		{"roles", idx.Roles},
-		{"tasks", idx.Tasks},
 		{"contexts", idx.Contexts},
+		{"tasks", idx.Tasks},
 	}
 
 	var results []validateCatResult

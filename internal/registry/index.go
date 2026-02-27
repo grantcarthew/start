@@ -26,9 +26,9 @@ type IndexEntry struct {
 // Index represents the full asset discovery index.
 type Index struct {
 	Agents   map[string]IndexEntry `json:"agents,omitempty"`
-	Tasks    map[string]IndexEntry `json:"tasks,omitempty"`
 	Roles    map[string]IndexEntry `json:"roles,omitempty"`
 	Contexts map[string]IndexEntry `json:"contexts,omitempty"`
+	Tasks    map[string]IndexEntry `json:"tasks,omitempty"`
 }
 
 // EffectiveIndexPath returns configured if non-empty, otherwise IndexModulePath.
@@ -88,22 +88,22 @@ func LoadIndex(dir string, reg modconfig.Registry) (*Index, error) {
 func decodeIndex(v cue.Value) (*Index, error) {
 	idx := &Index{
 		Agents:   make(map[string]IndexEntry),
-		Tasks:    make(map[string]IndexEntry),
 		Roles:    make(map[string]IndexEntry),
 		Contexts: make(map[string]IndexEntry),
+		Tasks:    make(map[string]IndexEntry),
 	}
 
 	// Decode each category
 	if err := decodeCategory(v, "agents", idx.Agents); err != nil {
 		return nil, err
 	}
-	if err := decodeCategory(v, "tasks", idx.Tasks); err != nil {
-		return nil, err
-	}
 	if err := decodeCategory(v, "roles", idx.Roles); err != nil {
 		return nil, err
 	}
 	if err := decodeCategory(v, "contexts", idx.Contexts); err != nil {
+		return nil, err
+	}
+	if err := decodeCategory(v, "tasks", idx.Tasks); err != nil {
 		return nil, err
 	}
 

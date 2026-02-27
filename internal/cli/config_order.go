@@ -19,9 +19,9 @@ func addConfigOrderCommand(parent *cobra.Command) {
 		Use:     "order [category]",
 		Aliases: []string{"reorder"},
 		Short:   "Reorder configuration items",
-		Long: `Reorder contexts or roles interactively.
+		Long: `Reorder roles or contexts interactively.
 
-Provide a category (context, role) or omit it to be prompted
+Provide a category (role, context) or omit it to be prompted
 interactively. Non-orderable categories (agent, task) fall back
 to the interactive menu.`,
 		Args: cobra.MaximumNArgs(1),
@@ -32,22 +32,22 @@ to the interactive menu.`,
 }
 
 // resolveOrderCategory maps a category argument to the canonical reorder target.
-// Returns ("contexts"/"roles", true) for orderable categories, ("", true) for known
+// Returns ("roles"/"contexts", true) for orderable categories, ("", true) for known
 // non-orderable categories (agent, task), and ("", false) for unknown categories.
 func resolveOrderCategory(arg string) (string, bool) {
 	singular := strings.TrimSuffix(strings.ToLower(arg), "s")
 	switch singular {
-	case "context":
-		return "contexts", true
 	case "role":
 		return "roles", true
+	case "context":
+		return "contexts", true
 	case "agent", "task":
 		return "", true
 	}
 	return "", false
 }
 
-// runConfigOrder prompts the user to select contexts or roles, then runs reorder.
+// runConfigOrder prompts the user to select roles or contexts, then runs reorder.
 func runConfigOrder(cmd *cobra.Command, args []string) error {
 	if shown, err := checkHelpArg(cmd, args); shown || err != nil {
 		return err
@@ -73,17 +73,17 @@ func runConfigOrder(cmd *cobra.Command, args []string) error {
 	if category == "" {
 		_, _ = fmt.Fprintln(stdout, "Reorder:")
 		var err error
-		category, err = promptSelectCategory(stdout, stdin, []string{"contexts", "roles"})
+		category, err = promptSelectCategory(stdout, stdin, []string{"roles", "contexts"})
 		if err != nil || category == "" {
 			return err
 		}
 	}
 
 	switch category {
-	case "contexts":
-		return reorderContexts(stdout, stdin, local)
 	case "roles":
 		return reorderRoles(stdout, stdin, local)
+	case "contexts":
+		return reorderContexts(stdout, stdin, local)
 	}
 	return nil
 }

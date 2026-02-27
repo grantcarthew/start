@@ -18,7 +18,7 @@ Every time you open an AI coding session you provide the same background: what t
 - **Automatic context injection** - Project files, environment info, and documentation included without manual setup
 - **Multi-agent support** - Works with Claude, Gemini, aichat, aider, opencode, or any AI CLI tool
 - **CUE-powered configuration** - Type-safe, validated, order-preserving config with built-in schema enforcement
-- **Registry packages** - Install curated roles, tasks, and contexts from the CUE Central Registry
+- **Registry packages** - Install curated roles, contexts, and tasks from the CUE Central Registry
 
 **Perfect for:**
 
@@ -76,7 +76,7 @@ go build ./cmd/start
 
 ## How It Works
 
-start is built around four concepts: **agents**, **roles**, **tasks**, and **contexts**. These are all defined in CUE and distributed as packages through the CUE Central Registry.
+start is built around four concepts: **agents**, **roles**, **contexts**, and **tasks**. These are all defined in CUE and distributed as packages through the CUE Central Registry.
 
 ### Agents
 
@@ -123,28 +123,6 @@ Roles come in three modes:
 - assistant mode: interactive sessions
 - teacher mode: to learn as you build
 
-### Tasks
-
-A task is a reusable, parameterisable prompt for a specific workflow. Run a task instead of typing the same instructions repeatedly.
-
-```bash
-# Run a configured task
-start task review/git-diff
-
-# Pass instructions to a parameterised task
-start task github/issue/triage "Implement the feature in issue #87"
-
-# Run a task from a local file (must start with ./ or /)
-start task ./tasks/my-review.md
-```
-
-Tasks only include required contexts by default, keeping prompts focused. Tasks are also available from the registry:
-
-```bash
-start assets add review/git-diff
-start assets add jira/item/research
-```
-
 ### Contexts
 
 Contexts are document fragments injected into the prompt such as project overviews, environment details, coding standards, or anything else the agent needs to know. Contexts are tagged and selectively included.
@@ -165,6 +143,28 @@ start assets add contexts cwd/agents-md
 
 # Use the ./AGENTS.md context (it is a required context)
 start
+```
+
+### Tasks
+
+A task is a reusable, parameterisable prompt for a specific workflow. Run a task instead of typing the same instructions repeatedly.
+
+```bash
+# Run a configured task
+start task review/git-diff
+
+# Pass instructions to a parameterised task
+start task github/issue/triage "Implement the feature in issue #87"
+
+# Run a task from a local file (must start with ./ or /)
+start task ./tasks/my-review.md
+```
+
+Tasks only include required contexts by default, keeping prompts focused. Tasks are also available from the registry:
+
+```bash
+start assets add review/git-diff
+start assets add jira/item/research
 ```
 
 ### Configuration
@@ -202,7 +202,7 @@ start --local
 
 ### Inspection
 
-Use `start show` to inspect resolved configuration — what roles, contexts, tasks, and agents are actually configured and what their content looks like after merging global and local config:
+Use `start show` to inspect resolved configuration — what agents, roles, contexts, and tasks are actually configured and what their content looks like after merging global and local config:
 
 ```bash
 # List all configured items with descriptions

@@ -58,14 +58,6 @@ agents: {
 	}
 }
 
-tasks: {
-	"golang/review": {
-		module:      "github.com/test/review@v0"
-		description: "Code review"
-		tags:        ["golang", "review"]
-	}
-}
-
 roles: {
 	"dev/expert": {
 		module: "github.com/test/expert@v0"
@@ -75,6 +67,14 @@ roles: {
 contexts: {
 	"env/local": {
 		module: "github.com/test/local@v0"
+	}
+}
+
+tasks: {
+	"golang/review": {
+		module:      "github.com/test/review@v0"
+		description: "Code review"
+		tags:        ["golang", "review"]
 	}
 }
 `
@@ -104,6 +104,16 @@ contexts: {
 		}
 	}
 
+	// Verify roles
+	if len(index.Roles) != 1 {
+		t.Errorf("expected 1 role, got %d", len(index.Roles))
+	}
+
+	// Verify contexts
+	if len(index.Contexts) != 1 {
+		t.Errorf("expected 1 context, got %d", len(index.Contexts))
+	}
+
 	// Verify tasks
 	if len(index.Tasks) != 1 {
 		t.Errorf("expected 1 task, got %d", len(index.Tasks))
@@ -116,16 +126,6 @@ contexts: {
 		if len(review.Tags) != 2 {
 			t.Errorf("expected 2 tags, got %d", len(review.Tags))
 		}
-	}
-
-	// Verify roles
-	if len(index.Roles) != 1 {
-		t.Errorf("expected 1 role, got %d", len(index.Roles))
-	}
-
-	// Verify contexts
-	if len(index.Contexts) != 1 {
-		t.Errorf("expected 1 context, got %d", len(index.Contexts))
 	}
 }
 
@@ -226,14 +226,6 @@ agents: {
 	}
 }
 
-tasks: {
-	"golang/review": {
-		module:      "github.com/test/review@v0"
-		description: "Code review task"
-		tags:        ["golang", "review"]
-	}
-}
-
 roles: {
 	"dev/expert": {
 		module:      "github.com/test/expert@v0"
@@ -245,6 +237,14 @@ contexts: {
 	"env/local": {
 		module:      "github.com/test/local@v0"
 		description: "Local environment context"
+	}
+}
+
+tasks: {
+	"golang/review": {
+		module:      "github.com/test/review@v0"
+		description: "Code review task"
+		tags:        ["golang", "review"]
 	}
 }
 `
@@ -261,14 +261,14 @@ contexts: {
 	if len(index.Agents) != 1 {
 		t.Errorf("expected 1 agent, got %d", len(index.Agents))
 	}
-	if len(index.Tasks) != 1 {
-		t.Errorf("expected 1 task, got %d", len(index.Tasks))
-	}
 	if len(index.Roles) != 1 {
 		t.Errorf("expected 1 role, got %d", len(index.Roles))
 	}
 	if len(index.Contexts) != 1 {
 		t.Errorf("expected 1 context, got %d", len(index.Contexts))
+	}
+	if len(index.Tasks) != 1 {
+		t.Errorf("expected 1 task, got %d", len(index.Tasks))
 	}
 
 	// Verify agent fields are decoded correctly

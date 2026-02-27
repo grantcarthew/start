@@ -4,8 +4,8 @@ package cue
 // Centralised here to prevent typos and ease refactoring.
 const (
 	KeyAgents   = "agents"
-	KeyContexts = "contexts"
 	KeyRoles    = "roles"
+	KeyContexts = "contexts"
 	KeyTasks    = "tasks"
 	KeySettings = "settings"
 )

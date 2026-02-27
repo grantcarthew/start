@@ -12,7 +12,7 @@ import (
 
 // SearchResult holds a matched index entry with its category and name.
 type SearchResult struct {
-	Category   string // "agents", "roles", "tasks", "contexts"
+	Category   string // "agents", "roles", "contexts", "tasks"
 	Name       string
 	Entry      registry.IndexEntry
 	MatchScore int // Higher = better match
@@ -121,8 +121,8 @@ func SearchIndex(index *registry.Index, query string, tags []string) ([]SearchRe
 	// Search each category
 	results = append(results, searchCategory("agents", index.Agents, patterns, tags)...)
 	results = append(results, searchCategory("roles", index.Roles, patterns, tags)...)
-	results = append(results, searchCategory("tasks", index.Tasks, patterns, tags)...)
 	results = append(results, searchCategory("contexts", index.Contexts, patterns, tags)...)
+	results = append(results, searchCategory("tasks", index.Tasks, patterns, tags)...)
 
 	// Sort by match score (descending), then by category, then by name
 	sort.Slice(results, func(i, j int) bool {
@@ -130,7 +130,7 @@ func SearchIndex(index *registry.Index, query string, tags []string) ([]SearchRe
 			return results[i].MatchScore > results[j].MatchScore
 		}
 		if results[i].Category != results[j].Category {
-			return categoryOrder(results[i].Category) < categoryOrder(results[j].Category)
+			return CategoryOrder(results[i].Category) < CategoryOrder(results[j].Category)
 		}
 		return results[i].Name < results[j].Name
 	})
@@ -346,16 +346,16 @@ func extractIndexEntryFromCUE(v cue.Value) registry.IndexEntry {
 	return entry
 }
 
-// categoryOrder returns the display order for a category.
-func categoryOrder(category string) int {
+// CategoryOrder returns the display order for a category.
+func CategoryOrder(category string) int {
 	switch category {
 	case "agents":
 		return 0
 	case "roles":
 		return 1
-	case "tasks":
-		return 2
 	case "contexts":
+		return 2
+	case "tasks":
 		return 3
 	default:
 		return 4

@@ -214,7 +214,7 @@ func TestIndexVersionFromPath(t *testing.T) {
 // TestIndexEntryCount verifies entry counting across categories.
 func TestIndexEntryCount(t *testing.T) {
 	t.Parallel()
-	idx := makeTestRegistryIndex(3, 2, 1, 4)
+	idx := makeTestRegistryIndex(3, 2, 4, 1)
 	got := indexEntryCount(idx)
 	want := 10
 	if got != want {
@@ -449,12 +449,12 @@ func TestValidateError(t *testing.T) {
 // --- helpers ---
 
 // makeTestRegistryIndex creates a *registry.Index with n stub entries per category.
-func makeTestRegistryIndex(agents, roles, tasks, contexts int) *registry.Index {
+func makeTestRegistryIndex(agents, roles, contexts, tasks int) *registry.Index {
 	idx := &registry.Index{
 		Agents:   make(map[string]registry.IndexEntry, agents),
 		Roles:    make(map[string]registry.IndexEntry, roles),
-		Tasks:    make(map[string]registry.IndexEntry, tasks),
 		Contexts: make(map[string]registry.IndexEntry, contexts),
+		Tasks:    make(map[string]registry.IndexEntry, tasks),
 	}
 	for i := 0; i < agents; i++ {
 		idx.Agents[fmt.Sprintf("agent%d", i)] = registry.IndexEntry{Version: "v0.1.0"}
@@ -462,11 +462,11 @@ func makeTestRegistryIndex(agents, roles, tasks, contexts int) *registry.Index {
 	for i := 0; i < roles; i++ {
 		idx.Roles[fmt.Sprintf("role%d", i)] = registry.IndexEntry{Version: "v0.1.0"}
 	}
-	for i := 0; i < tasks; i++ {
-		idx.Tasks[fmt.Sprintf("task%d", i)] = registry.IndexEntry{Version: "v0.1.0"}
-	}
 	for i := 0; i < contexts; i++ {
 		idx.Contexts[fmt.Sprintf("ctx%d", i)] = registry.IndexEntry{Version: "v0.1.0"}
+	}
+	for i := 0; i < tasks; i++ {
+		idx.Tasks[fmt.Sprintf("task%d", i)] = registry.IndexEntry{Version: "v0.1.0"}
 	}
 	return idx
 }

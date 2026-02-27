@@ -30,10 +30,10 @@ func addAssetsIndexCommand(parent *cobra.Command) {
 		Short:   "Show registry asset catalog",
 		Long: `Display the full asset catalog from the CUE Central Registry.
 
-Shows all available assets grouped by type (agents, roles, tasks, contexts).
+Shows all available assets grouped by type (agents, roles, contexts, tasks).
 Installed assets are marked with ★.
 
-Optionally filter by category: agents, roles, tasks, or contexts.
+Optionally filter by category: agents, roles, contexts, or tasks.
 Category filtering is supported with --json but not with --raw.
 
 Use --json to output machine-readable JSON, or --raw to display the
@@ -59,7 +59,7 @@ func runAssetsIndex(cmd *cobra.Command, args []string) error {
 	if len(args) > 0 {
 		singular := normalizeCategoryArg(args[0])
 		if singular == "" {
-			return fmt.Errorf("unknown category %q: expected agents, roles, tasks, or contexts", args[0])
+			return fmt.Errorf("unknown category %q: expected agents, roles, contexts, or tasks", args[0])
 		}
 		category = singular + "s"
 	}
@@ -170,10 +170,10 @@ func filterIndexByCategory(index *registry.Index, category string) *registry.Ind
 		return &registry.Index{Agents: index.Agents}
 	case "roles":
 		return &registry.Index{Roles: index.Roles}
-	case "tasks":
-		return &registry.Index{Tasks: index.Tasks}
 	case "contexts":
 		return &registry.Index{Contexts: index.Contexts}
+	case "tasks":
+		return &registry.Index{Tasks: index.Tasks}
 	default:
 		return index
 	}
@@ -183,7 +183,7 @@ func filterIndexByCategory(index *registry.Index, category string) *registry.Ind
 // If category is non-empty, only that category is shown; the total count in the
 // header always reflects the full index.
 func printIndex(w io.Writer, index *registry.Index, version string, verbose bool, installed map[string]bool, category string) {
-	total := len(index.Agents) + len(index.Roles) + len(index.Tasks) + len(index.Contexts)
+	total := len(index.Agents) + len(index.Roles) + len(index.Contexts) + len(index.Tasks)
 	_, _ = fmt.Fprintf(w, "Index: %s (%d assets)\n\n", version, total)
 
 	categories := []struct {

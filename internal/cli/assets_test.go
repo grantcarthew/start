@@ -122,30 +122,6 @@ func TestSearchIndex(t *testing.T) {
 	}
 }
 
-// TestCategoryOrder tests the categoryOrder function.
-func TestCategoryOrder(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		category string
-		want     int
-	}{
-		{"agents", 0},
-		{"roles", 1},
-		{"tasks", 2},
-		{"contexts", 3},
-		{"unknown", 4},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.category, func(t *testing.T) {
-			got := categoryOrder(tt.category)
-			if got != tt.want {
-				t.Errorf("categoryOrder(%q) = %d, want %d", tt.category, got, tt.want)
-			}
-		})
-	}
-}
-
 // TestPrintSearchResults tests the printSearchResults function.
 func TestPrintSearchResults(t *testing.T) {
 	t.Parallel()
