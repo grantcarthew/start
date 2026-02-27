@@ -121,14 +121,14 @@ func (l *Loader) Load(dirs []string) (LoadResult, error) {
 // values replacing earlier values for the same item name.
 var collectionKeys = map[string]bool{
 	KeyAgents:   true,
-	KeyContexts: true,
 	KeyRoles:    true,
+	KeyContexts: true,
 	KeyTasks:    true,
 }
 
 // mergeWithReplacement merges multiple CUE values with two-level merge semantics:
 //
-// For collection keys (agents, contexts, roles, tasks):
+// For collection keys (agents, roles, contexts, tasks):
 //   - Items are merged additively by name (global.claude + local.gemini = both exist)
 //   - Same-named items: later completely replaces earlier (no field-level merge)
 //

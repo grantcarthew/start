@@ -165,18 +165,18 @@ func TestSearchIndex(t *testing.T) {
 				Tags:        []string{"golang", "review"},
 			},
 		},
-		Tasks: map[string]registry.IndexEntry{
-			"start/commit": {
-				Module:      "github.com/test/tasks/start/commit@v0",
-				Description: "Create git commit",
-				Tags:        []string{"git", "commit"},
-			},
-		},
 		Contexts: map[string]registry.IndexEntry{
 			"cwd/agents-md": {
 				Module:      "github.com/test/contexts/cwd/agents-md@v0",
 				Description: "Read AGENTS.md file",
 				Tags:        []string{"repository", "guidelines"},
+			},
+		},
+		Tasks: map[string]registry.IndexEntry{
+			"start/commit": {
+				Module:      "github.com/test/tasks/start/commit@v0",
+				Description: "Create git commit",
+				Tags:        []string{"git", "commit"},
 			},
 		},
 	}
@@ -347,13 +347,6 @@ func TestSearchIndex_Regex(t *testing.T) {
 				Tags:        []string{"python", "programming"},
 			},
 		},
-		Tasks: map[string]registry.IndexEntry{
-			"start/commit": {
-				Module:      "github.com/test/tasks/start/commit@v0",
-				Description: "Create git commit",
-				Tags:        []string{"git", "commit"},
-			},
-		},
 		Contexts: map[string]registry.IndexEntry{
 			"cwd/agents-md": {
 				Module:      "github.com/test/contexts/cwd/agents-md@v0",
@@ -364,6 +357,13 @@ func TestSearchIndex_Regex(t *testing.T) {
 				Module:      "github.com/test/contexts/home/environment@v0",
 				Description: "Home environment context",
 				Tags:        []string{"home", "environment"},
+			},
+		},
+		Tasks: map[string]registry.IndexEntry{
+			"start/commit": {
+				Module:      "github.com/test/tasks/start/commit@v0",
+				Description: "Create git commit",
+				Tags:        []string{"git", "commit"},
 			},
 		},
 	}
@@ -460,16 +460,16 @@ func TestCategoryOrder(t *testing.T) {
 	}{
 		{"agents", 0},
 		{"roles", 1},
-		{"tasks", 2},
-		{"contexts", 3},
+		{"contexts", 2},
+		{"tasks", 3},
 		{"unknown", 4},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.category, func(t *testing.T) {
-			got := categoryOrder(tt.category)
+			got := CategoryOrder(tt.category)
 			if got != tt.want {
-				t.Errorf("categoryOrder(%q) = %d, want %d", tt.category, got, tt.want)
+				t.Errorf("CategoryOrder(%q) = %d, want %d", tt.category, got, tt.want)
 			}
 		})
 	}
@@ -581,8 +581,8 @@ func TestSearchIndex_NilMaps(t *testing.T) {
 	index := &registry.Index{
 		Agents:   nil,
 		Roles:    nil,
-		Tasks:    nil,
 		Contexts: nil,
+		Tasks:    nil,
 	}
 	results, err := SearchIndex(index, "test", nil)
 	if err != nil {

@@ -1,7 +1,7 @@
 package schemas
 
 // #UTD defines the Unified Template Design pattern.
-// Used by tasks, roles, and contexts to build prompt text from
+// Used by roles, contexts, and tasks to build prompt text from
 // static files, dynamic command output, and template text.
 //
 // At least one of file, command, or prompt must be present.

@@ -239,6 +239,49 @@ func CheckAgents(cfgValue cue.Value) SectionResult {
 	return section
 }
 
+// CheckRoles validates configured role files exist.
+func CheckRoles(cfgValue cue.Value) SectionResult {
+	section := SectionResult{Name: "Roles"}
+
+	roles := cfgValue.LookupPath(cue.ParsePath(internalcue.KeyRoles))
+	if !roles.Exists() {
+		section.Results = append(section.Results, CheckResult{
+			Status:  StatusInfo,
+			Label:   "None configured",
+			Message: "",
+		})
+		return section
+	}
+
+	iter, err := roles.Fields()
+	if err != nil {
+		section.Results = append(section.Results, CheckResult{
+			Status:  StatusFail,
+			Label:   "Error",
+			Message: fmt.Sprintf("Cannot read roles: %v", err),
+		})
+		return section
+	}
+
+	count := 0
+	for iter.Next() {
+		count++
+		name := iter.Selector().Unquoted()
+		role := iter.Value()
+
+		result := checkFileField(role, name)
+		if result != nil {
+			section.Results = append(section.Results, *result)
+		}
+	}
+
+	if count > 0 {
+		section.Summary = fmt.Sprintf("%d configured", count)
+	}
+
+	return section
+}
+
 // CheckContexts validates configured context files exist.
 func CheckContexts(cfgValue cue.Value) SectionResult {
 	section := SectionResult{Name: "Contexts"}
@@ -282,49 +325,6 @@ func CheckContexts(cfgValue cue.Value) SectionResult {
 				result.Status = StatusWarn
 			}
 
-			section.Results = append(section.Results, *result)
-		}
-	}
-
-	if count > 0 {
-		section.Summary = fmt.Sprintf("%d configured", count)
-	}
-
-	return section
-}
-
-// CheckRoles validates configured role files exist.
-func CheckRoles(cfgValue cue.Value) SectionResult {
-	section := SectionResult{Name: "Roles"}
-
-	roles := cfgValue.LookupPath(cue.ParsePath(internalcue.KeyRoles))
-	if !roles.Exists() {
-		section.Results = append(section.Results, CheckResult{
-			Status:  StatusInfo,
-			Label:   "None configured",
-			Message: "",
-		})
-		return section
-	}
-
-	iter, err := roles.Fields()
-	if err != nil {
-		section.Results = append(section.Results, CheckResult{
-			Status:  StatusFail,
-			Label:   "Error",
-			Message: fmt.Sprintf("Cannot read roles: %v", err),
-		})
-		return section
-	}
-
-	count := 0
-	for iter.Next() {
-		count++
-		name := iter.Selector().Unquoted()
-		role := iter.Value()
-
-		result := checkFileField(role, name)
-		if result != nil {
 			section.Results = append(section.Results, *result)
 		}
 	}

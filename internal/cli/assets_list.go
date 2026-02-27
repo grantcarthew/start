@@ -46,7 +46,7 @@ func addAssetsListCommand(parent *cobra.Command) {
 Shows all assets installed via the registry with their current version
 and whether updates are available.
 
-Optionally filter by category: agents, roles, tasks, or contexts.
+Optionally filter by category: agents, roles, contexts, or tasks.
 
 Use --json to output machine-readable JSON.`,
 		Args: cobra.MaximumNArgs(1),
@@ -69,7 +69,7 @@ func runAssetsList(cmd *cobra.Command, args []string) error {
 	if len(args) > 0 {
 		singular := normalizeCategoryArg(args[0])
 		if singular == "" {
-			return fmt.Errorf("unknown category %q: expected agents, roles, tasks, or contexts", args[0])
+			return fmt.Errorf("unknown category %q: expected agents, roles, contexts, or tasks", args[0])
 		}
 		category = singular + "s"
 	}
@@ -215,7 +215,7 @@ func collectInstalledAssets(v cue.Value, paths config.Paths, localCfg cue.Value)
 	// Sort by category then name
 	sort.Slice(installed, func(i, j int) bool {
 		if installed[i].Category != installed[j].Category {
-			return categoryOrder(installed[i].Category) < categoryOrder(installed[j].Category)
+			return assets.CategoryOrder(installed[i].Category) < assets.CategoryOrder(installed[j].Category)
 		}
 		return installed[i].Name < installed[j].Name
 	})
@@ -264,10 +264,10 @@ func findInIndex(index *registry.Index, category, name string) *registry.IndexEn
 		entries = index.Agents
 	case "roles":
 		entries = index.Roles
-	case "tasks":
-		entries = index.Tasks
 	case "contexts":
 		entries = index.Contexts
+	case "tasks":
+		entries = index.Tasks
 	}
 
 	if entry, ok := entries[name]; ok {
@@ -321,23 +321,6 @@ func printInstalledAssets(w io.Writer, installed []InstalledAsset, verbose bool)
 	}
 }
 
-// Helper functions
-
-// categoryOrder returns the display order for a category.
-func categoryOrder(category string) int {
-	switch category {
-	case "agents":
-		return 0
-	case "roles":
-		return 1
-	case "tasks":
-		return 2
-	case "contexts":
-		return 3
-	default:
-		return 4
-	}
-}
 
 // assetTypeToConfigFile returns the config file name for an asset type.
 func assetTypeToConfigFile(category string) string {

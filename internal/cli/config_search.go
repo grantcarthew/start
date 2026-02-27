@@ -68,8 +68,8 @@ func runConfigSearch(cmd *cobra.Command, args []string) error {
 	}{
 		{internalcue.KeyAgents, "agents"},
 		{internalcue.KeyRoles, "roles"},
-		{internalcue.KeyTasks, "tasks"},
 		{internalcue.KeyContexts, "contexts"},
+		{internalcue.KeyTasks, "tasks"},
 	}
 
 	var sections []searchSection

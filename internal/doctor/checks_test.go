@@ -419,6 +419,98 @@ func TestCheckAgents_NoBinField(t *testing.T) {
 	}
 }
 
+// --- CheckRoles tests ---
+
+func TestCheckRoles_NoneConfigured(t *testing.T) {
+	t.Parallel()
+	cctx := cuecontext.New()
+	v := cctx.CompileString("{}")
+
+	section := CheckRoles(v)
+
+	if section.Name != "Roles" {
+		t.Errorf("Name = %q, want %q", section.Name, "Roles")
+	}
+	if len(section.Results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(section.Results))
+	}
+	if section.Results[0].Label != "None configured" {
+		t.Errorf("label = %q, want %q", section.Results[0].Label, "None configured")
+	}
+}
+
+func TestCheckRoles_FileExists(t *testing.T) {
+	t.Parallel()
+	tmpFile := filepath.Join(t.TempDir(), "role.md")
+	if err := os.WriteFile(tmpFile, []byte("role content"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cctx := cuecontext.New()
+	v := cctx.CompileString(`roles: { myrole: { file: "` + tmpFile + `" } }`)
+
+	section := CheckRoles(v)
+
+	if len(section.Results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(section.Results))
+	}
+	if section.Results[0].Status != StatusPass {
+		t.Errorf("status = %v, want StatusPass", section.Results[0].Status)
+	}
+}
+
+func TestCheckRoles_FileMissing(t *testing.T) {
+	t.Parallel()
+	cctx := cuecontext.New()
+	v := cctx.CompileString(`roles: { badrole: { file: "/nonexistent/path/role.md" } }`)
+
+	section := CheckRoles(v)
+
+	if len(section.Results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(section.Results))
+	}
+	// Roles do NOT downgrade to warn - missing file stays as StatusFail
+	if section.Results[0].Status != StatusFail {
+		t.Errorf("status = %v, want StatusFail (roles don't downgrade)", section.Results[0].Status)
+	}
+}
+
+func TestCheckRoles_PromptFallback(t *testing.T) {
+	t.Parallel()
+	cctx := cuecontext.New()
+	v := cctx.CompileString(`roles: { prole: { prompt: "You are a code reviewer" } }`)
+
+	section := CheckRoles(v)
+
+	if len(section.Results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(section.Results))
+	}
+	if section.Results[0].Status != StatusPass {
+		t.Errorf("status = %v, want StatusPass", section.Results[0].Status)
+	}
+	if section.Results[0].Message != "(inline prompt)" {
+		t.Errorf("message = %q, want %q", section.Results[0].Message, "(inline prompt)")
+	}
+}
+
+func TestCheckRoles_NoFileOrPrompt(t *testing.T) {
+	t.Parallel()
+	cctx := cuecontext.New()
+	v := cctx.CompileString(`roles: { emptyrole: { description: "nothing useful" } }`)
+
+	section := CheckRoles(v)
+
+	if len(section.Results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(section.Results))
+	}
+	if section.Results[0].Status != StatusWarn {
+		t.Errorf("status = %v, want StatusWarn", section.Results[0].Status)
+	}
+	if section.Results[0].Message != "No file, prompt, or command" {
+		t.Errorf("message = %q, want %q", section.Results[0].Message, "No file, prompt, or command")
+	}
+}
+
 // --- CheckContexts tests ---
 
 func TestCheckContexts_NoneConfigured(t *testing.T) {
@@ -522,98 +614,6 @@ func TestCheckContexts_Command(t *testing.T) {
 	}
 	if section.Results[0].Message != "(command)" {
 		t.Errorf("message = %q, want %q", section.Results[0].Message, "(command)")
-	}
-}
-
-// --- CheckRoles tests ---
-
-func TestCheckRoles_NoneConfigured(t *testing.T) {
-	t.Parallel()
-	cctx := cuecontext.New()
-	v := cctx.CompileString("{}")
-
-	section := CheckRoles(v)
-
-	if section.Name != "Roles" {
-		t.Errorf("Name = %q, want %q", section.Name, "Roles")
-	}
-	if len(section.Results) != 1 {
-		t.Fatalf("expected 1 result, got %d", len(section.Results))
-	}
-	if section.Results[0].Label != "None configured" {
-		t.Errorf("label = %q, want %q", section.Results[0].Label, "None configured")
-	}
-}
-
-func TestCheckRoles_FileExists(t *testing.T) {
-	t.Parallel()
-	tmpFile := filepath.Join(t.TempDir(), "role.md")
-	if err := os.WriteFile(tmpFile, []byte("role content"), 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	cctx := cuecontext.New()
-	v := cctx.CompileString(`roles: { myrole: { file: "` + tmpFile + `" } }`)
-
-	section := CheckRoles(v)
-
-	if len(section.Results) != 1 {
-		t.Fatalf("expected 1 result, got %d", len(section.Results))
-	}
-	if section.Results[0].Status != StatusPass {
-		t.Errorf("status = %v, want StatusPass", section.Results[0].Status)
-	}
-}
-
-func TestCheckRoles_FileMissing(t *testing.T) {
-	t.Parallel()
-	cctx := cuecontext.New()
-	v := cctx.CompileString(`roles: { badrole: { file: "/nonexistent/path/role.md" } }`)
-
-	section := CheckRoles(v)
-
-	if len(section.Results) != 1 {
-		t.Fatalf("expected 1 result, got %d", len(section.Results))
-	}
-	// Roles do NOT downgrade to warn - missing file stays as StatusFail
-	if section.Results[0].Status != StatusFail {
-		t.Errorf("status = %v, want StatusFail (roles don't downgrade)", section.Results[0].Status)
-	}
-}
-
-func TestCheckRoles_PromptFallback(t *testing.T) {
-	t.Parallel()
-	cctx := cuecontext.New()
-	v := cctx.CompileString(`roles: { prole: { prompt: "You are a code reviewer" } }`)
-
-	section := CheckRoles(v)
-
-	if len(section.Results) != 1 {
-		t.Fatalf("expected 1 result, got %d", len(section.Results))
-	}
-	if section.Results[0].Status != StatusPass {
-		t.Errorf("status = %v, want StatusPass", section.Results[0].Status)
-	}
-	if section.Results[0].Message != "(inline prompt)" {
-		t.Errorf("message = %q, want %q", section.Results[0].Message, "(inline prompt)")
-	}
-}
-
-func TestCheckRoles_NoFileOrPrompt(t *testing.T) {
-	t.Parallel()
-	cctx := cuecontext.New()
-	v := cctx.CompileString(`roles: { emptyrole: { description: "nothing useful" } }`)
-
-	section := CheckRoles(v)
-
-	if len(section.Results) != 1 {
-		t.Fatalf("expected 1 result, got %d", len(section.Results))
-	}
-	if section.Results[0].Status != StatusWarn {
-		t.Errorf("status = %v, want StatusWarn", section.Results[0].Status)
-	}
-	if section.Results[0].Message != "No file, prompt, or command" {
-		t.Errorf("message = %q, want %q", section.Results[0].Message, "No file, prompt, or command")
 	}
 }
 
