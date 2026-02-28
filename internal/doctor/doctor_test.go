@@ -16,6 +16,7 @@ func TestStatus_String(t *testing.T) {
 		{StatusWarn, "warn"},
 		{StatusFail, "fail"},
 		{StatusInfo, "info"},
+		{StatusNotFound, "notfound"},
 		{Status(99), "unknown"},
 	}
 
@@ -38,6 +39,7 @@ func TestStatus_Symbol(t *testing.T) {
 		{StatusWarn, "⚠"},
 		{StatusFail, "✗"},
 		{StatusInfo, "-"},
+		{StatusNotFound, "○"},
 		{Status(99), "?"},
 	}
 
@@ -301,5 +303,42 @@ func TestReporter_Print_NoIcons(t *testing.T) {
 	}
 	if !strings.Contains(output, "Commit:") {
 		t.Error("NoIcons section should show label with colon for key-value")
+	}
+}
+
+func TestReporter_Print_IndentAndNoIcon(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	reporter := NewReporter(&buf, false, false)
+
+	report := Report{
+		Sections: []SectionResult{
+			{
+				Name: "Configuration",
+				Results: []CheckResult{
+					{Status: StatusInfo, Label: "Global (~/.config/start)", NoIcon: true},
+					{Status: StatusPass, Label: "agents.cue", Indent: 1},
+					{Status: StatusPass, Label: "settings.cue", Indent: 1},
+				},
+			},
+		},
+	}
+
+	reporter.Print(report)
+
+	output := buf.String()
+	// Header should appear without a status symbol
+	if strings.Contains(output, "- Global") || strings.Contains(output, "✓ Global") {
+		t.Error("NoIcon result should not show status symbol before label")
+	}
+	if !strings.Contains(output, "  Global (~/.config/start)") {
+		t.Errorf("NoIcon result should show label at base indent, got:\n%s", output)
+	}
+	// Indented results should have extra indentation (4 spaces + symbol)
+	if !strings.Contains(output, "    ✓ agents.cue") {
+		t.Errorf("Indent=1 result should have 4-space indent, got:\n%s", output)
+	}
+	if !strings.Contains(output, "    ✓ settings.cue") {
+		t.Errorf("Indent=1 result should have 4-space indent, got:\n%s", output)
 	}
 }

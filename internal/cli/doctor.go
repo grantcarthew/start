@@ -114,6 +114,18 @@ func prepareDoctor() (doctor.Report, error) {
 		}
 	}
 
+	// Settings checks
+	if cfgLoaded {
+		report.Sections = append(report.Sections, doctor.CheckSettings(cfgResult.Value))
+	} else {
+		report.Sections = append(report.Sections, doctor.SectionResult{
+			Name: "Settings",
+			Results: []doctor.CheckResult{
+				{Status: doctor.StatusInfo, Label: "Skipped", Message: "no valid config"},
+			},
+		})
+	}
+
 	// Agent checks
 	if cfgLoaded {
 		report.Sections = append(report.Sections, doctor.CheckAgents(cfgResult.Value))

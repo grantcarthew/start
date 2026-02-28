@@ -100,11 +100,19 @@ func checkConfigDir(dir, scope string, exists bool) []CheckResult {
 	// Build display path like "~/.config/start" for check output
 	shortDir := shortenPath(dir)
 
+	// Directory header (always present, no icon)
+	header := CheckResult{
+		Status: StatusInfo,
+		Label:  fmt.Sprintf("%s (%s)", scope, shortDir),
+		NoIcon: true,
+	}
+
 	if !exists {
+		results = append(results, header)
 		results = append(results, CheckResult{
-			Status:  StatusInfo,
-			Label:   scope,
-			Message: fmt.Sprintf("(%s) - Not found", shortDir),
+			Status: StatusInfo,
+			Label:  "Not found",
+			Indent: 1,
 		})
 		return results
 	}
@@ -112,10 +120,13 @@ func checkConfigDir(dir, scope string, exists bool) []CheckResult {
 	// List CUE files in directory
 	entries, err := os.ReadDir(dir)
 	if err != nil {
+		results = append(results, header)
 		results = append(results, CheckResult{
 			Status:  StatusFail,
-			Label:   scope,
-			Message: fmt.Sprintf("(%s) - Cannot read: %v", shortDir, err),
+			Label:   "Cannot read",
+			Message: fmt.Sprintf("%v", err),
+			Indent:  1,
+			Fix:     "Check directory permissions",
 		})
 		return results
 	}
@@ -128,10 +139,11 @@ func checkConfigDir(dir, scope string, exists bool) []CheckResult {
 	}
 
 	if len(cueFiles) == 0 {
+		results = append(results, header)
 		results = append(results, CheckResult{
-			Status:  StatusInfo,
-			Label:   scope,
-			Message: fmt.Sprintf("(%s) - No CUE files", shortDir),
+			Status: StatusInfo,
+			Label:  "No CUE files",
+			Indent: 1,
 		})
 		return results
 	}
@@ -140,24 +152,21 @@ func checkConfigDir(dir, scope string, exists bool) []CheckResult {
 	loader := internalcue.NewLoader()
 	_, err = loader.LoadSingle(dir)
 	if err != nil {
-		// Report the directory as having errors
+		results = append(results, header)
 		results = append(results, CheckResult{
 			Status:  StatusFail,
-			Label:   scope,
-			Message: fmt.Sprintf("(%s) - Invalid: %v", shortDir, err),
+			Label:   "Invalid",
+			Message: fmt.Sprintf("%v", err),
+			Indent:  1,
 			Fix:     "Fix CUE syntax errors in this directory",
 		})
 	} else {
-		// Add header first, then list each file as valid
-		results = append(results, CheckResult{
-			Status:  StatusInfo,
-			Label:   scope,
-			Message: fmt.Sprintf("(%s):", shortDir),
-		})
+		results = append(results, header)
 		for _, f := range cueFiles {
 			results = append(results, CheckResult{
 				Status: StatusPass,
-				Label:  "  " + f,
+				Label:  f,
+				Indent: 1,
 			})
 		}
 	}
@@ -314,15 +323,16 @@ func CheckContexts(cfgValue cue.Value) SectionResult {
 
 		result := checkFileField(ctx, name)
 		if result != nil {
-			// Check if this is a required context
-			required := false
-			if req := ctx.LookupPath(cue.ParsePath("required")); req.Exists() {
-				required, _ = req.Bool()
-			}
-
-			// Downgrade to warning for optional contexts
-			if result.Status == StatusFail && !required {
-				result.Status = StatusWarn
+			// Required contexts with missing files stay as errors
+			if result.Status == StatusNotFound {
+				required := false
+				if req := ctx.LookupPath(cue.ParsePath("required")); req.Exists() {
+					required, _ = req.Bool()
+				}
+				if required {
+					result.Status = StatusFail
+					result.Fix = "Create file or update path"
+				}
 			}
 
 			section.Results = append(section.Results, *result)
@@ -370,6 +380,10 @@ func CheckTasks(cfgValue cue.Value) SectionResult {
 		if result != nil {
 			section.Results = append(section.Results, *result)
 		}
+
+		if roleResult := checkTaskRole(task, name, cfgValue); roleResult != nil {
+			section.Results = append(section.Results, *roleResult)
+		}
 	}
 
 	if count > 0 {
@@ -377,6 +391,36 @@ func CheckTasks(cfgValue cue.Value) SectionResult {
 	}
 
 	return section
+}
+
+// checkTaskRole checks if a task's role field references an existing role.
+func checkTaskRole(taskVal cue.Value, taskName string, cfgValue cue.Value) *CheckResult {
+	roleVal := taskVal.LookupPath(cue.ParsePath("role"))
+	if !roleVal.Exists() {
+		return nil
+	}
+
+	roleName, err := roleVal.String()
+	if err != nil {
+		// Role is a struct (inline definition), skip validation
+		return nil
+	}
+
+	roles := cfgValue.LookupPath(cue.ParsePath(internalcue.KeyRoles))
+	if roles.Exists() {
+		role := roles.LookupPath(cue.MakePath(cue.Str(roleName)))
+		if role.Exists() {
+			return nil
+		}
+	}
+
+	return &CheckResult{
+		Status:  StatusWarn,
+		Label:   fmt.Sprintf("role %q", roleName),
+		Message: "not found in roles config",
+		Fix:     fmt.Sprintf("Add %q to roles or fix the reference in task %q", roleName, taskName),
+		Indent:  1,
+	}
 }
 
 // checkFileField checks if a config item has a valid file field.
@@ -428,10 +472,9 @@ func checkFileField(v cue.Value, name string) *CheckResult {
 
 	if _, err := os.Stat(expandedPath); os.IsNotExist(err) {
 		return &CheckResult{
-			Status:  StatusFail,
+			Status:  StatusNotFound,
 			Label:   name,
-			Message: fmt.Sprintf("%s (not found)", shortenPath(filePath)),
-			Fix:     "Create file or update path",
+			Message: shortenPath(filePath),
 		}
 	} else if err != nil {
 		return &CheckResult{
@@ -446,6 +489,76 @@ func checkFileField(v cue.Value, name string) *CheckResult {
 		Label:   name,
 		Message: shortenPath(filePath),
 	}
+}
+
+// CheckSettings validates settings references.
+func CheckSettings(cfgValue cue.Value) SectionResult {
+	section := SectionResult{Name: "Settings"}
+
+	settings := cfgValue.LookupPath(cue.ParsePath(internalcue.KeySettings))
+	if !settings.Exists() {
+		section.Results = append(section.Results, CheckResult{
+			Status: StatusInfo,
+			Label:  "None configured",
+		})
+		return section
+	}
+
+	// Check default_agent
+	if daVal := settings.LookupPath(cue.ParsePath("default_agent")); daVal.Exists() {
+		agentName, err := daVal.String()
+		if err == nil {
+			agents := cfgValue.LookupPath(cue.ParsePath(internalcue.KeyAgents))
+			if !agents.Exists() {
+				section.Results = append(section.Results, CheckResult{
+					Status:  StatusWarn,
+					Label:   "default_agent",
+					Message: agentName,
+					Fix:     "No agents configured; add an agents section or remove default_agent",
+				})
+			} else {
+				agent := agents.LookupPath(cue.MakePath(cue.Str(agentName)))
+				if agent.Exists() {
+					section.Results = append(section.Results, CheckResult{
+						Status:  StatusPass,
+						Label:   "default_agent",
+						Message: agentName,
+					})
+				} else {
+					section.Results = append(section.Results, CheckResult{
+						Status:  StatusWarn,
+						Label:   "default_agent",
+						Message: agentName,
+						Fix:     fmt.Sprintf("Agent %q not found in config; check spelling or add it to agents", agentName),
+					})
+				}
+			}
+		}
+	}
+
+	// Check shell
+	if shellVal := settings.LookupPath(cue.ParsePath("shell")); shellVal.Exists() {
+		shell, err := shellVal.String()
+		if err == nil {
+			path, lookErr := exec.LookPath(shell)
+			if lookErr != nil {
+				section.Results = append(section.Results, CheckResult{
+					Status:  StatusWarn,
+					Label:   "shell",
+					Message: shell,
+					Fix:     fmt.Sprintf("Install %s or update settings.shell", shell),
+				})
+			} else {
+				section.Results = append(section.Results, CheckResult{
+					Status:  StatusPass,
+					Label:   "shell",
+					Message: path,
+				})
+			}
+		}
+	}
+
+	return section
 }
 
 // CheckEnvironment validates runtime environment.

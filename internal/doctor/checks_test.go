@@ -166,18 +166,36 @@ func TestCheckConfiguration_NoConfig(t *testing.T) {
 		t.Errorf("CheckConfiguration().Name = %q, want %q", section.Name, "Configuration")
 	}
 
-	// Should have 2 results (global not found, local not found)
-	if len(section.Results) != 2 {
-		t.Fatalf("CheckConfiguration() should have 2 results, got %d", len(section.Results))
+	// Should have 4 results (global header, global "Not found", local header, local "Not found")
+	if len(section.Results) != 4 {
+		t.Fatalf("CheckConfiguration() should have 4 results, got %d", len(section.Results))
 	}
 
-	// Both should be info status with message containing "Not found"
-	for _, r := range section.Results {
+	// Headers should be NoIcon with scope in label
+	if !section.Results[0].NoIcon {
+		t.Error("Global header should have NoIcon=true")
+	}
+	if !strings.Contains(section.Results[0].Label, "Global") {
+		t.Errorf("Global header label should contain 'Global', got %q", section.Results[0].Label)
+	}
+	if !section.Results[2].NoIcon {
+		t.Error("Local header should have NoIcon=true")
+	}
+	if !strings.Contains(section.Results[2].Label, "Local") {
+		t.Errorf("Local header label should contain 'Local', got %q", section.Results[2].Label)
+	}
+
+	// Children should be indented info results with "Not found" label
+	for _, i := range []int{1, 3} {
+		r := section.Results[i]
 		if r.Status != StatusInfo {
-			t.Errorf("Result status should be StatusInfo, got %v", r.Status)
+			t.Errorf("Result[%d] status should be StatusInfo, got %v", i, r.Status)
 		}
-		if !strings.Contains(r.Message, "Not found") {
-			t.Errorf("Result message should contain 'Not found', got %q", r.Message)
+		if r.Label != "Not found" {
+			t.Errorf("Result[%d] label should be 'Not found', got %q", i, r.Label)
+		}
+		if r.Indent != 1 {
+			t.Errorf("Result[%d] indent should be 1, got %d", i, r.Indent)
 		}
 	}
 }
@@ -469,9 +487,8 @@ func TestCheckRoles_FileMissing(t *testing.T) {
 	if len(section.Results) != 1 {
 		t.Fatalf("expected 1 result, got %d", len(section.Results))
 	}
-	// Roles do NOT downgrade to warn - missing file stays as StatusFail
-	if section.Results[0].Status != StatusFail {
-		t.Errorf("status = %v, want StatusFail (roles don't downgrade)", section.Results[0].Status)
+	if section.Results[0].Status != StatusNotFound {
+		t.Errorf("status = %v, want StatusNotFound", section.Results[0].Status)
 	}
 }
 
@@ -576,8 +593,8 @@ func TestCheckContexts_FileMissingOptional(t *testing.T) {
 	if len(section.Results) != 1 {
 		t.Fatalf("expected 1 result, got %d", len(section.Results))
 	}
-	if section.Results[0].Status != StatusWarn {
-		t.Errorf("status = %v, want StatusWarn for optional missing file", section.Results[0].Status)
+	if section.Results[0].Status != StatusNotFound {
+		t.Errorf("status = %v, want StatusNotFound for optional missing file", section.Results[0].Status)
 	}
 }
 
@@ -696,6 +713,66 @@ func TestCheckTasks_ModulePath(t *testing.T) {
 	}
 }
 
+func TestCheckTasks_RoleExists(t *testing.T) {
+	t.Parallel()
+	cctx := cuecontext.New()
+	v := cctx.CompileString(`
+		roles: { dev: { prompt: "Developer role" } }
+		tasks: { mytask: { prompt: "Do something", role: "dev" } }
+	`)
+
+	section := CheckTasks(v)
+
+	// Should have 1 result for the task itself, no extra warning
+	if len(section.Results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(section.Results))
+	}
+	if section.Results[0].Status != StatusPass {
+		t.Errorf("status = %v, want StatusPass", section.Results[0].Status)
+	}
+}
+
+func TestCheckTasks_RoleMissing(t *testing.T) {
+	t.Parallel()
+	cctx := cuecontext.New()
+	v := cctx.CompileString(`
+		roles: { dev: { prompt: "Developer role" } }
+		tasks: { mytask: { prompt: "Do something", role: "missing" } }
+	`)
+
+	section := CheckTasks(v)
+
+	// Should have 2 results: task pass + role warning
+	if len(section.Results) != 2 {
+		t.Fatalf("expected 2 results, got %d", len(section.Results))
+	}
+	if section.Results[1].Status != StatusWarn {
+		t.Errorf("status = %v, want StatusWarn", section.Results[1].Status)
+	}
+	if section.Results[1].Indent != 1 {
+		t.Errorf("indent = %d, want 1", section.Results[1].Indent)
+	}
+	if !strings.Contains(section.Results[1].Label, "missing") {
+		t.Errorf("label = %q, should contain role name", section.Results[1].Label)
+	}
+}
+
+func TestCheckTasks_NoRoleField(t *testing.T) {
+	t.Parallel()
+	cctx := cuecontext.New()
+	v := cctx.CompileString(`tasks: { mytask: { prompt: "Do something" } }`)
+
+	section := CheckTasks(v)
+
+	// Should have 1 result only (no role warning)
+	if len(section.Results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(section.Results))
+	}
+	if section.Results[0].Status != StatusPass {
+		t.Errorf("status = %v, want StatusPass", section.Results[0].Status)
+	}
+}
+
 func TestCheckTasks_FileMissing(t *testing.T) {
 	t.Parallel()
 	cctx := cuecontext.New()
@@ -706,7 +783,153 @@ func TestCheckTasks_FileMissing(t *testing.T) {
 	if len(section.Results) != 1 {
 		t.Fatalf("expected 1 result, got %d", len(section.Results))
 	}
-	if section.Results[0].Status != StatusFail {
-		t.Errorf("status = %v, want StatusFail", section.Results[0].Status)
+	if section.Results[0].Status != StatusNotFound {
+		t.Errorf("status = %v, want StatusNotFound", section.Results[0].Status)
+	}
+}
+
+// --- CheckSettings tests ---
+
+func TestCheckSettings_NoneConfigured(t *testing.T) {
+	t.Parallel()
+	cctx := cuecontext.New()
+	v := cctx.CompileString("{}")
+
+	section := CheckSettings(v)
+
+	if section.Name != "Settings" {
+		t.Errorf("Name = %q, want %q", section.Name, "Settings")
+	}
+	if len(section.Results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(section.Results))
+	}
+	if section.Results[0].Status != StatusInfo {
+		t.Errorf("status = %v, want StatusInfo", section.Results[0].Status)
+	}
+	if section.Results[0].Label != "None configured" {
+		t.Errorf("label = %q, want %q", section.Results[0].Label, "None configured")
+	}
+}
+
+func TestCheckSettings_DefaultAgentExists(t *testing.T) {
+	t.Parallel()
+	cctx := cuecontext.New()
+	v := cctx.CompileString(`
+		agents: { claude: { bin: "echo" } }
+		settings: { default_agent: "claude" }
+	`)
+
+	section := CheckSettings(v)
+
+	found := false
+	for _, r := range section.Results {
+		if r.Label == "default_agent" {
+			found = true
+			if r.Status != StatusPass {
+				t.Errorf("status = %v, want StatusPass", r.Status)
+			}
+			if r.Message != "claude" {
+				t.Errorf("message = %q, want %q", r.Message, "claude")
+			}
+		}
+	}
+	if !found {
+		t.Error("missing default_agent result")
+	}
+}
+
+func TestCheckSettings_DefaultAgentMissing(t *testing.T) {
+	t.Parallel()
+	cctx := cuecontext.New()
+	v := cctx.CompileString(`
+		agents: { claude: { bin: "echo" } }
+		settings: { default_agent: "nonexistent" }
+	`)
+
+	section := CheckSettings(v)
+
+	found := false
+	for _, r := range section.Results {
+		if r.Label == "default_agent" {
+			found = true
+			if r.Status != StatusWarn {
+				t.Errorf("status = %v, want StatusWarn", r.Status)
+			}
+			if r.Fix == "" {
+				t.Error("expected a fix suggestion")
+			}
+		}
+	}
+	if !found {
+		t.Error("missing default_agent result")
+	}
+}
+
+func TestCheckSettings_DefaultAgentNoAgents(t *testing.T) {
+	t.Parallel()
+	cctx := cuecontext.New()
+	v := cctx.CompileString(`settings: { default_agent: "claude" }`)
+
+	section := CheckSettings(v)
+
+	found := false
+	for _, r := range section.Results {
+		if r.Label == "default_agent" {
+			found = true
+			if r.Status != StatusWarn {
+				t.Errorf("status = %v, want StatusWarn", r.Status)
+			}
+			if !strings.Contains(r.Fix, "No agents configured") {
+				t.Errorf("fix = %q, should mention no agents configured", r.Fix)
+			}
+		}
+	}
+	if !found {
+		t.Error("missing default_agent result")
+	}
+}
+
+func TestCheckSettings_ShellExists(t *testing.T) {
+	t.Parallel()
+	cctx := cuecontext.New()
+	v := cctx.CompileString(`settings: { shell: "sh" }`)
+
+	section := CheckSettings(v)
+
+	found := false
+	for _, r := range section.Results {
+		if r.Label == "shell" {
+			found = true
+			if r.Status != StatusPass {
+				t.Errorf("status = %v, want StatusPass", r.Status)
+			}
+		}
+	}
+	if !found {
+		t.Error("missing shell result")
+	}
+}
+
+func TestCheckSettings_ShellMissing(t *testing.T) {
+	t.Parallel()
+	cctx := cuecontext.New()
+	v := cctx.CompileString(`settings: { shell: "nonexistent-shell-xyz-123" }`)
+
+	section := CheckSettings(v)
+
+	found := false
+	for _, r := range section.Results {
+		if r.Label == "shell" {
+			found = true
+			if r.Status != StatusWarn {
+				t.Errorf("status = %v, want StatusWarn", r.Status)
+			}
+			if r.Fix == "" {
+				t.Error("expected a fix suggestion")
+			}
+		}
+	}
+	if !found {
+		t.Error("missing shell result")
 	}
 }

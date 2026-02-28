@@ -134,6 +134,7 @@ settings: {
 	expectedSections := []string{
 		"Version",
 		"Configuration",
+		"Settings",
 		"Agents",
 	}
 
@@ -193,7 +194,7 @@ func TestPrepareDoctor(t *testing.T) {
 		sectionNames[s.Name] = true
 	}
 
-	expectedSections := []string{"Repository", "Version", "Configuration", "Environment"}
+	expectedSections := []string{"Repository", "Version", "Configuration", "Settings", "Environment"}
 	for _, name := range expectedSections {
 		if !sectionNames[name] {
 			t.Errorf("missing section %q", name)

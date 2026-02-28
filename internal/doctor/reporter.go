@@ -104,15 +104,19 @@ func statusColor(s Status) *color.Color {
 	}
 }
 
+
 // printResult prints a single check result.
 func (r *Reporter) printResult(result CheckResult, noIcons bool) {
+	indent := strings.Repeat("  ", result.Indent+1)
+
 	// Format based on content and icon mode
-	if noIcons {
+	if noIcons || result.NoIcon {
 		// No icons - used for info-only sections like Version, Repository
+		// and per-result headers like config directory names
 		if result.Message == "" {
-			_, _ = fmt.Fprintf(r.w, "  %s\n", result.Label)
+			_, _ = fmt.Fprintf(r.w, "%s%s\n", indent, result.Label)
 		} else {
-			_, _ = fmt.Fprintf(r.w, "  %-10s ", result.Label+":")
+			_, _ = fmt.Fprintf(r.w, "%s%-10s ", indent, result.Label+":")
 			fprintDim(r.w, result.Message)
 			_, _ = fmt.Fprintln(r.w)
 		}
@@ -123,7 +127,7 @@ func (r *Reporter) printResult(result CheckResult, noIcons bool) {
 	symbol := result.Status.Symbol()
 
 	// Format based on content
-	_, _ = fmt.Fprint(r.w, "  ")
+	_, _ = fmt.Fprint(r.w, indent)
 	_, _ = sc.Fprintf(r.w, "%s", symbol)
 	if result.Message == "" {
 		_, _ = fmt.Fprintf(r.w, " %s\n", result.Label)
@@ -135,15 +139,17 @@ func (r *Reporter) printResult(result CheckResult, noIcons bool) {
 
 	// Print fix suggestion if present and there's an issue
 	if result.Fix != "" && (result.Status == StatusFail || result.Status == StatusWarn) {
-		_, _ = fmt.Fprint(r.w, "    ")
+		fixIndent := strings.Repeat("  ", result.Indent+2)
+		_, _ = fmt.Fprint(r.w, fixIndent)
 		fprintDim(r.w, "Fix: "+result.Fix)
 		_, _ = fmt.Fprintln(r.w)
 	}
 
 	// Print details in verbose mode
 	if r.verbose && len(result.Details) > 0 {
+		detailIndent := strings.Repeat("  ", result.Indent+2)
 		for _, detail := range result.Details {
-			_, _ = tui.ColorDim.Fprintf(r.w, "    %s\n", detail)
+			_, _ = tui.ColorDim.Fprintf(r.w, "%s%s\n", detailIndent, detail)
 		}
 	}
 }
