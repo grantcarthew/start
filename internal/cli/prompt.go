@@ -39,6 +39,18 @@ func runPrompt(cmd *cobra.Command, args []string) error {
 		} else {
 			customText = arg
 		}
+	} else {
+		stdin := cmd.InOrStdin()
+		if isTerminal(stdin) {
+			text, err := promptText(cmd.OutOrStdout(), stdin, "Prompt text", "")
+			if err != nil {
+				return err
+			}
+			if text == "" {
+				return nil
+			}
+			customText = text
+		}
 	}
 
 	flags := getFlags(cmd)

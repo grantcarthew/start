@@ -930,6 +930,33 @@ func promptSelectConfigMatchesFromList(w io.Writer, r io.Reader, query string, m
 	return selected, nil
 }
 
+// promptSearchQuery checks if stdin is a TTY and prompts the user for a search query.
+// Loops until a valid query (at least 3 characters) is entered.
+// Returns the entered query string, or an error in non-interactive mode.
+// Returns empty string and nil if the user presses Enter without input.
+func promptSearchQuery(w io.Writer, r io.Reader) (string, error) {
+	if !isTerminal(r) {
+		return "", fmt.Errorf("query required in non-interactive mode")
+	}
+	reader := bufio.NewReader(r)
+	for {
+		_, _ = fmt.Fprint(w, "Enter a search query: ")
+		input, err := reader.ReadString('\n')
+		if err != nil {
+			return "", fmt.Errorf("reading input: %w", err)
+		}
+		input = strings.TrimSpace(input)
+		if input == "" {
+			return "", nil
+		}
+		if len(input) < 3 {
+			_, _ = fmt.Fprintln(w, "Query must be at least 3 characters")
+			continue
+		}
+		return input, nil
+	}
+}
+
 // resolveInstalledName resolves a name from a map using exact match first,
 // then regex-based search. Returns the resolved key and value.
 // On zero matches, returns a "not found" error.

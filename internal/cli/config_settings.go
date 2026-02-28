@@ -206,14 +206,36 @@ func listSettings(w io.Writer, localOnly bool) error {
 		return err
 	}
 
-	// Sort keys for consistent output
+	printSettingsEntries(w, entries)
+	return nil
+}
+
+// printConfigPaths displays the configuration directory paths.
+func printConfigPaths(w io.Writer, paths config.Paths) {
+	_, _ = tui.ColorHeader.Fprintln(w, "Configuration Paths:")
+	_, _ = fmt.Fprintln(w)
+	globalStatus := "not found"
+	if paths.GlobalExists {
+		globalStatus = "exists"
+	}
+	localStatus := "not found"
+	if paths.LocalExists {
+		localStatus = "exists"
+	}
+	_, _ = fmt.Fprintf(w, "  Global: %s ", paths.Global)
+	_, _ = fmt.Fprintln(w, tui.Annotate("%s", globalStatus))
+	_, _ = fmt.Fprintf(w, "  Local:  %s ", paths.Local)
+	_, _ = fmt.Fprintln(w, tui.Annotate("%s", localStatus))
+}
+
+// printSettingsEntries displays resolved setting entries in a formatted table.
+func printSettingsEntries(w io.Writer, entries map[string]settingEntry) {
 	keys := make([]string, 0, len(entries))
 	for k := range entries {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
 
-	// Find max key length for right-alignment
 	maxLen := 0
 	for _, k := range keys {
 		if len(k) > maxLen {
@@ -234,26 +256,6 @@ func listSettings(w io.Writer, localOnly bool) error {
 			_, _ = fmt.Fprintf(w, "%s %s\n", entry.Value, tui.Annotate("%s", source))
 		}
 	}
-
-	return nil
-}
-
-// printConfigPaths displays the configuration directory paths.
-func printConfigPaths(w io.Writer, paths config.Paths) {
-	_, _ = tui.ColorHeader.Fprintln(w, "Configuration Paths:")
-	_, _ = fmt.Fprintln(w)
-	globalStatus := "not found"
-	if paths.GlobalExists {
-		globalStatus = "exists"
-	}
-	localStatus := "not found"
-	if paths.LocalExists {
-		localStatus = "exists"
-	}
-	_, _ = fmt.Fprintf(w, "  Global: %s ", paths.Global)
-	_, _ = fmt.Fprintln(w, tui.Annotate("%s", globalStatus))
-	_, _ = fmt.Fprintf(w, "  Local:  %s ", paths.Local)
-	_, _ = fmt.Fprintln(w, tui.Annotate("%s", localStatus))
 }
 
 // showSetting displays a single setting value with its source.

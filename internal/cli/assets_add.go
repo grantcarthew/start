@@ -19,6 +19,9 @@ import (
 	"golang.org/x/mod/semver"
 )
 
+// errNoAssets is returned by installAsset when no matching assets are found.
+var errNoAssets = errors.New("no assets found")
+
 // NOTE(design): This file shares registry client creation, index fetching, and config
 // loading patterns with assets_list.go, assets_search.go, assets_update.go, and
 // assets_index.go. This duplication is accepted - each command uses the results
@@ -27,7 +30,7 @@ import (
 // addAssetsAddCommand adds the add subcommand to the assets command.
 func addAssetsAddCommand(parent *cobra.Command) {
 	addCmd := &cobra.Command{
-		Use:     "add <query>...",
+		Use:     "add [query]...",
 		Aliases: []string{"install"},
 		Short:   "Install assets from registry",
 		Long: `Install one or more assets from the CUE registry to your configuration.
@@ -39,7 +42,7 @@ Multiple queries can be provided to install several assets at once.
 
 By default, installs to global config (~/.config/start/).
 Use --local to install to project config (./.start/).`,
-		Args: cobra.MinimumNArgs(1),
+		Args: cobra.MinimumNArgs(0),
 		RunE: runAssetsAdd,
 	}
 
@@ -48,9 +51,48 @@ Use --local to install to project config (./.start/).`,
 
 // runAssetsAdd searches for and installs one or more assets.
 func runAssetsAdd(cmd *cobra.Command, args []string) error {
+	prompted := false
+	if len(args) == 0 {
+		query, err := promptSearchQuery(cmd.OutOrStdout(), cmd.InOrStdin())
+		if err != nil {
+			return err
+		}
+		if query == "" {
+			return nil
+		}
+		args = []string{query}
+		prompted = true
+	}
+
+	// Validate all queries are at least 3 characters
+	w := cmd.OutOrStdout()
+	stdin := cmd.InOrStdin()
+	var validated []string
+	for _, q := range args {
+		if len(q) < 3 {
+			if !isTerminal(stdin) {
+				return fmt.Errorf("query %q must be at least 3 characters", q)
+			}
+			_, _ = fmt.Fprintf(w, "Query %q must be at least 3 characters\n", q)
+			input, err := promptSearchQuery(w, stdin)
+			if err != nil {
+				return err
+			}
+			if input == "" {
+				continue
+			}
+			q = input
+			prompted = true
+		}
+		validated = append(validated, q)
+	}
+	if len(validated) == 0 {
+		return nil
+	}
+	args = validated
+
 	ctx := context.Background()
 	flags := getFlags(cmd)
-	w := cmd.OutOrStdout()
 	prog := tui.NewProgress(cmd.ErrOrStderr(), flags.Quiet)
 	defer prog.Done()
 
@@ -93,8 +135,14 @@ func runAssetsAdd(cmd *cobra.Command, args []string) error {
 	var errs []error
 	for _, query := range args {
 		if err := installAsset(ctx, cmd, prog, client, index, query, configDir, scopeName, flags, cfg); err != nil {
+			if prompted && len(args) == 1 && errors.Is(err, errNoAssets) {
+				_, _ = fmt.Fprintf(w, "No assets found matching %q\n", query)
+				return nil
+			}
 			errs = append(errs, fmt.Errorf("%s: %w", query, err))
-			_, _ = fmt.Fprintf(w, "Error installing %q: %v\n", query, err)
+			if len(args) > 1 {
+				_, _ = fmt.Fprintf(w, "Error installing %q: %v\n", query, err)
+			}
 		}
 	}
 
@@ -111,7 +159,7 @@ func installAsset(ctx context.Context, cmd *cobra.Command, prog *tui.Progress, c
 		return err
 	}
 	if len(results) == 0 {
-		return fmt.Errorf("no assets found matching %q", query)
+		return fmt.Errorf("%w matching %q", errNoAssets, query)
 	}
 
 	// Select asset(s)
