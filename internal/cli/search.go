@@ -57,7 +57,23 @@ func runSearch(cmd *cobra.Command, args []string) error {
 
 	terms := assets.ParseSearchPatterns(query)
 	if err := assets.ValidateSearchQuery(terms, tags); err != nil {
-		return err
+		w := cmd.OutOrStdout()
+		stdin := cmd.InOrStdin()
+		if !isTerminal(stdin) {
+			return err
+		}
+		if query != "" {
+			_, _ = fmt.Fprintln(w, "Query must be at least 3 characters")
+		}
+		input, promptErr := promptSearchQuery(w, stdin)
+		if promptErr != nil {
+			return promptErr
+		}
+		if input == "" {
+			return nil
+		}
+		query = input
+		terms = assets.ParseSearchPatterns(query)
 	}
 
 	// Validate regex patterns before searching

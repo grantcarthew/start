@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"cuelang.org/go/cue"
 	cueformat "cuelang.org/go/cue/format"
@@ -94,17 +96,63 @@ func runShow(cmd *cobra.Command, args []string) error {
 		return runShowListing(cmd)
 	}
 
-	return runShowSearch(cmd, args[0])
+	query := args[0]
+	prompted := false
+	if len(query) < 3 {
+		w := cmd.OutOrStdout()
+		stdin := cmd.InOrStdin()
+		if !isTerminal(stdin) {
+			return fmt.Errorf("query must be at least 3 characters")
+		}
+		_, _ = fmt.Fprintln(w, "Query must be at least 3 characters")
+		input, err := promptSearchQuery(w, stdin)
+		if err != nil {
+			return err
+		}
+		if input == "" {
+			return nil
+		}
+		query = input
+		prompted = true
+	}
+
+	if err := runShowSearch(cmd, query); err != nil {
+		if prompted {
+			_, _ = fmt.Fprintln(cmd.OutOrStdout(), capitalise(err.Error()))
+			return nil
+		}
+		return err
+	}
+	return nil
 }
 
 // runShowListing displays all items grouped by category with descriptions.
 func runShowListing(cmd *cobra.Command) error {
 	w := cmd.OutOrStdout()
+	stdin := cmd.InOrStdin()
 
 	scope, err := showScopeFromCmd(cmd)
 	if err != nil {
 		return err
 	}
+
+	// Show config paths and settings
+	paths, err := config.ResolvePaths("")
+	if err != nil {
+		return fmt.Errorf("resolving config paths: %w", err)
+	}
+	printConfigPaths(w, paths)
+	_, _ = fmt.Fprintln(w)
+
+	flags := getFlags(cmd)
+	entries, err := resolveAllSettings(paths, flags.Local)
+	if err != nil {
+		return err
+	}
+	printSettingsEntries(w, entries)
+	_, _ = fmt.Fprintln(w)
+
+	// Show categories
 	cfg, err := loadConfig(scope)
 	if err != nil {
 		return err
@@ -121,7 +169,7 @@ func runShowListing(cmd *cobra.Command) error {
 			desc string
 		}
 
-		var entries []entry
+		var catEntries []entry
 		maxNameLen := 0
 
 		iter, err := items.Fields()
@@ -134,20 +182,20 @@ func runShowListing(cmd *cobra.Command) error {
 			if d := iter.Value().LookupPath(cue.ParsePath("description")); d.Exists() {
 				desc, _ = d.String()
 			}
-			entries = append(entries, entry{name, desc})
+			catEntries = append(catEntries, entry{name, desc})
 			if len(name) > maxNameLen {
 				maxNameLen = len(name)
 			}
 		}
 
-		if len(entries) == 0 {
+		if len(catEntries) == 0 {
 			continue
 		}
 
 		_, _ = tui.CategoryColor(cat.category).Fprint(w, cat.category)
 		_, _ = fmt.Fprintln(w, "/")
 
-		for _, e := range entries {
+		for _, e := range catEntries {
 			if e.desc != "" {
 				padding := strings.Repeat(" ", maxNameLen-len(e.name)+2)
 				_, _ = fmt.Fprintf(w, "  %s%s", e.name, padding)
@@ -158,6 +206,22 @@ func runShowListing(cmd *cobra.Command) error {
 		}
 
 		_, _ = fmt.Fprintln(w)
+	}
+
+	// In TTY mode, prompt for a search query
+	if isTerminal(stdin) {
+		query, err := promptSearchQuery(w, stdin)
+		if err != nil {
+			return err
+		}
+		if query == "" {
+			return nil
+		}
+		if err := runShowSearch(cmd, query); err != nil {
+			_, _ = fmt.Fprintln(w, capitalise(err.Error()))
+			return nil
+		}
+		return nil
 	}
 
 	return nil
@@ -281,7 +345,7 @@ func runShowSearch(cmd *cobra.Command, name string) error {
 
 	switch len(allMatches) {
 	case 0:
-		return fmt.Errorf("%q not found", name)
+		return fmt.Errorf("no matches found for %q", name)
 	case 1:
 		return displayShowMatch(w, scope, allMatches[0], r)
 	default:
@@ -721,4 +785,13 @@ func deriveCacheDir(origin string) string {
 	return filepath.Join(cacheDir, "mod", "extract",
 		filepath.Dir(modulePath),
 		filepath.Base(modulePath)+version)
+}
+
+// capitalise returns s with the first rune converted to upper case.
+func capitalise(s string) string {
+	if s == "" {
+		return s
+	}
+	r, size := utf8.DecodeRuneInString(s)
+	return string(unicode.ToUpper(r)) + s[size:]
 }
