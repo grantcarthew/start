@@ -28,7 +28,8 @@ var (
 	ColorRoles     = color.New(color.FgGreen)
 	ColorContexts  = color.New(color.FgCyan)
 	ColorTasks     = color.New(color.FgHiYellow)
-	ColorPrompts   = color.New(color.FgMagenta)
+	ColorSettings  = color.New(color.FgMagenta)
+	ColorPrompts   = color.New(color.Faint)
 	ColorInstalled = color.New(color.FgHiGreen)
 	ColorRegistry  = color.New(color.FgYellow)
 )
@@ -45,6 +46,8 @@ func CategoryColor(category string) *color.Color {
 		return ColorContexts
 	case "tasks":
 		return ColorTasks
+	case "settings":
+		return ColorSettings
 	default:
 		return ColorDim
 	}

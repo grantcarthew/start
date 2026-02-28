@@ -22,6 +22,8 @@ func TestCategoryColor(t *testing.T) {
 		{"CONTEXTS", ColorContexts},
 		{"tasks", ColorTasks},
 		{"Tasks", ColorTasks},
+		{"settings", ColorSettings},
+		{"Settings", ColorSettings},
 		{"unknown", ColorDim},
 		{"", ColorDim},
 		{"prompts", ColorDim}, // not in switch, falls to default
