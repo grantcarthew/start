@@ -14,6 +14,7 @@ const (
 	StatusWarn
 	StatusFail
 	StatusInfo
+	StatusNotFound
 )
 
 // String returns the string representation of a Status.
@@ -27,6 +28,8 @@ func (s Status) String() string {
 		return "fail"
 	case StatusInfo:
 		return "info"
+	case StatusNotFound:
+		return "notfound"
 	default:
 		return "unknown"
 	}
@@ -43,6 +46,8 @@ func (s Status) Symbol() string {
 		return "✗"
 	case StatusInfo:
 		return "-"
+	case StatusNotFound:
+		return "○"
 	default:
 		return "?"
 	}
@@ -55,6 +60,8 @@ type CheckResult struct {
 	Message string   // Detail message (e.g., "/usr/local/bin/claude", "NOT FOUND")
 	Fix     string   // Suggested fix action
 	Details []string // Additional details for verbose mode
+	Indent  int      // Additional indentation level (0 = normal, 1+ = nested)
+	NoIcon  bool     // Suppress status icon for this result
 }
 
 // SectionResult holds the results for a check section.
