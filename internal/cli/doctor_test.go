@@ -2,11 +2,26 @@ package cli
 
 import (
 	"bytes"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 )
+
+// cleanupCUECache makes CUE module cache files writable before t.TempDir() cleanup.
+// CUE extracts registry modules with read-only permissions which prevents automatic cleanup.
+func cleanupCUECache(t *testing.T, dir string) {
+	t.Helper()
+	t.Cleanup(func() {
+		_ = filepath.WalkDir(filepath.Join(dir, ".cache"), func(path string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return nil
+			}
+			return os.Chmod(path, 0755)
+		})
+	})
+}
 
 func TestDoctorCommand_Exists(t *testing.T) {
 	cmd := NewRootCmd()
@@ -59,6 +74,7 @@ func TestDoctorCommand_NoConfig(t *testing.T) {
 
 func TestDoctorCommand_WithConfig(t *testing.T) {
 	tmpDir := t.TempDir()
+	cleanupCUECache(t, tmpDir)
 
 	// Isolate from global config
 	t.Setenv("HOME", tmpDir)
@@ -187,6 +203,7 @@ func TestPrepareDoctor(t *testing.T) {
 
 func TestPrepareDoctor_WithValidConfig(t *testing.T) {
 	tmpDir := t.TempDir()
+	cleanupCUECache(t, tmpDir)
 
 	// Isolate from global config
 	t.Setenv("HOME", tmpDir)
@@ -237,6 +254,9 @@ contexts: {
 	}
 
 	// These sections should be present when config loads successfully
+	if !sectionNames["Schema Validation"] {
+		t.Error("missing Schema Validation section")
+	}
 	if !sectionNames["Agents"] {
 		t.Error("missing Agents section")
 	}

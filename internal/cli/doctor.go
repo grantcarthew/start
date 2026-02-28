@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/grantcarthew/start/internal/assets"
@@ -24,6 +25,7 @@ Reports warnings and suggestions for any problems found.
 Checks performed:
   - Version and build information
   - Configuration file validation (CUE syntax)
+  - Schema validation (fetched from registry)
   - Agent binary availability
   - Context and role file existence
   - Environment (directory permissions)
@@ -94,6 +96,9 @@ func prepareDoctor() (doctor.Report, error) {
 	}
 	report.Sections = append(report.Sections, doctor.CheckConfiguration(paths))
 
+	// Schema validation section
+	report.Sections = append(report.Sections, fetchAndValidateSchemas(paths))
+
 	// Load config for remaining checks (if possible)
 	var cfgLoaded bool
 	var cfgResult internalcue.LoadResult
@@ -161,6 +166,63 @@ func prepareDoctor() (doctor.Report, error) {
 	report.Sections = append(report.Sections, doctor.CheckEnvironment(paths))
 
 	return report, nil
+}
+
+// fetchAndValidateSchemas fetches schemas from the registry and validates config files.
+func fetchAndValidateSchemas(paths config.Paths) doctor.SectionResult {
+	if !paths.AnyExists() {
+		return doctor.SectionResult{
+			Name: "Schema Validation",
+			Results: []doctor.CheckResult{
+				{Status: doctor.StatusInfo, Label: "Skipped", Message: "no config directories"},
+			},
+		}
+	}
+
+	client, err := registry.NewClient()
+	if err != nil {
+		return doctor.SectionResult{
+			Name: "Schema Validation",
+			Results: []doctor.CheckResult{
+				{Status: doctor.StatusInfo, Label: "Skipped", Message: "registry unavailable"},
+			},
+		}
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	resolvedPath, err := client.ResolveLatestVersion(ctx, registry.SchemaModulePath)
+	if err != nil {
+		return doctor.SectionResult{
+			Name: "Schema Validation",
+			Results: []doctor.CheckResult{
+				{Status: doctor.StatusInfo, Label: "Skipped", Message: "cannot resolve schema version"},
+			},
+		}
+	}
+
+	result, err := client.Fetch(ctx, resolvedPath)
+	if err != nil {
+		return doctor.SectionResult{
+			Name: "Schema Validation",
+			Results: []doctor.CheckResult{
+				{Status: doctor.StatusInfo, Label: "Skipped", Message: "cannot fetch schemas"},
+			},
+		}
+	}
+
+	schemas, err := doctor.LoadSchemas(result.SourceDir, client.Registry())
+	if err != nil {
+		return doctor.SectionResult{
+			Name: "Schema Validation",
+			Results: []doctor.CheckResult{
+				{Status: doctor.StatusInfo, Label: "Skipped", Message: fmt.Sprintf("cannot load schemas: %v", err)},
+			},
+		}
+	}
+
+	return doctor.CheckSchemaValidation(paths, schemas)
 }
 
 // resolveIndexVersion queries the registry for the latest index version.

@@ -78,6 +78,19 @@ func runConfigList(cmd *cobra.Command, args []string) error {
 
 	stderr := cmd.ErrOrStderr()
 
+	// Settings
+	entries, err := resolveAllSettings(paths, local)
+	if err != nil {
+		printWarning(stderr, "failed to load settings: %s", err)
+	}
+	_, _ = fmt.Fprintln(w)
+	_, _ = tui.ColorSettings.Fprint(w, "settings")
+	_, _ = fmt.Fprint(w, "/ ")
+	_, _ = fmt.Fprintln(w, tui.Annotate("%s", scopeLabel))
+	if len(entries) > 0 {
+		printSettingsEntries(w, entries)
+	}
+
 	// Agents
 	agents, agentOrder, err := loadAgentsForScope(local)
 	if err != nil {

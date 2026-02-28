@@ -419,6 +419,80 @@ func TestConfigListTask_WithTasks(t *testing.T) {
 	}
 }
 
+func TestConfigList_IncludesSettings(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	// Create global config with a setting
+	globalDir := filepath.Join(tmpDir, "start")
+	if err := os.MkdirAll(globalDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	settingsContent := `settings: {
+	default_agent: "claude"
+}`
+	if err := os.WriteFile(filepath.Join(globalDir, "settings.cue"), []byte(settingsContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	chdir(t, tmpDir)
+
+	cmd := NewRootCmd()
+	stdout := &bytes.Buffer{}
+	cmd.SetOut(stdout)
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"config"})
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := stdout.String()
+	if !strings.Contains(output, "settings") {
+		t.Errorf("expected 'settings' section header, got: %s", output)
+	}
+	if !strings.Contains(output, "default_agent") {
+		t.Errorf("expected 'default_agent' in settings output, got: %s", output)
+	}
+	if !strings.Contains(output, "claude") {
+		t.Errorf("expected 'claude' value in settings output, got: %s", output)
+	}
+	if !strings.Contains(output, "global") {
+		t.Errorf("expected 'global' source annotation in settings output, got: %s", output)
+	}
+}
+
+func TestConfigList_SettingsDefaults(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	chdir(t, tmpDir)
+
+	cmd := NewRootCmd()
+	stdout := &bytes.Buffer{}
+	cmd.SetOut(stdout)
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"config"})
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := stdout.String()
+	if !strings.Contains(output, "settings") {
+		t.Errorf("expected 'settings' section header, got: %s", output)
+	}
+	if !strings.Contains(output, "timeout") {
+		t.Errorf("expected 'timeout' in settings output, got: %s", output)
+	}
+	if !strings.Contains(output, "default") {
+		t.Errorf("expected 'default' source annotation in settings output, got: %s", output)
+	}
+}
+
 func TestWriteAgentsFile(t *testing.T) {
 	tmpDir := t.TempDir()
 	path := filepath.Join(tmpDir, "agents.cue")
