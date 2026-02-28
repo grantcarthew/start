@@ -136,11 +136,14 @@ func runAssetsUpdate(cmd *cobra.Command, args []string) error {
 	// Check each asset for updates
 	dryRun := getFlags(cmd).DryRun
 	force, _ := cmd.Flags().GetBool("force")
+	total := len(installed)
 	var results []UpdateResult
-	for _, asset := range installed {
+	for i, asset := range installed {
+		prog.Update("Updating %d/%d %s/%s...", i+1, total, asset.Category, asset.Name)
 		result := checkAndUpdate(ctx, client, paths, index, asset, dryRun, force)
 		results = append(results, result)
 	}
+	prog.Done()
 
 	// Print results
 	printUpdateResults(cmd.OutOrStdout(), results, dryRun)
