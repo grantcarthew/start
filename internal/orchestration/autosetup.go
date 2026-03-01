@@ -17,6 +17,7 @@ import (
 	"cuelang.org/go/mod/modconfig"
 
 	"github.com/grantcarthew/start/internal/assets"
+	"github.com/grantcarthew/start/internal/cache"
 	"github.com/grantcarthew/start/internal/config"
 	internalcue "github.com/grantcarthew/start/internal/cue"
 	"github.com/grantcarthew/start/internal/detection"
@@ -63,10 +64,11 @@ func (a *AutoSetup) Run(ctx context.Context) (*AutoSetupResult, error) {
 
 	// Fetch index
 	_, _ = fmt.Fprintln(a.stdout, "Fetching agent index...")
-	index, err := client.FetchIndex(ctx, "") // use built-in default; auto-setup runs before user settings exist
+	index, indexVersion, err := client.FetchIndex(ctx, "") // use built-in default; auto-setup runs before user settings exist
 	if err != nil {
 		return nil, fmt.Errorf("fetching index: %w", err)
 	}
+	_ = cache.WriteIndex(indexVersion)
 
 	// Detect installed agents
 	detected := detection.DetectAgents(index)

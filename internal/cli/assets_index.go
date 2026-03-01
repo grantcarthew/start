@@ -12,6 +12,7 @@ import (
 
 	"cuelang.org/go/mod/modconfig"
 	"github.com/grantcarthew/start/internal/assets"
+	"github.com/grantcarthew/start/internal/cache"
 	"github.com/grantcarthew/start/internal/registry"
 	"github.com/grantcarthew/start/internal/tui"
 	"github.com/spf13/cobra"
@@ -97,6 +98,7 @@ func runAssetsIndex(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("fetching index module: %w", err)
 	}
+	_ = cache.WriteIndex(resolvedPath)
 	prog.Done()
 
 	w := cmd.OutOrStdout()

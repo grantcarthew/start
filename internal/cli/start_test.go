@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	internalcue "github.com/grantcarthew/start/internal/cue"
 	"github.com/grantcarthew/start/internal/orchestration"
@@ -37,6 +38,19 @@ func setupStartTestConfig(t *testing.T) string {
 	// Isolate from global config
 	t.Setenv("HOME", tmpDir)
 	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	// CUE module cache writes read-only files; make them writable before cleanup.
+	t.Cleanup(func() {
+		_ = filepath.Walk(tmpDir, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return nil
+			}
+			if info.IsDir() {
+				return os.Chmod(path, 0o755)
+			}
+			return os.Chmod(path, 0o644)
+		})
+	})
 
 	configDir := filepath.Join(tmpDir, ".start")
 	if err := os.MkdirAll(configDir, 0755); err != nil {
@@ -1389,6 +1403,209 @@ func TestMergeTaskMatches_Empty(t *testing.T) {
 	}
 }
 
+// TestRegistryAwareGuard_MergedMatchesTriggerFallthrough verifies that the
+// multi-match guard in task.go correctly combines installed and registry matches.
+// When an exact installed match exists AND registry tasks also match the search
+// term, the merged count > 1 should trigger a fallthrough to the selection list.
+func TestRegistryAwareGuard_MergedMatchesTriggerFallthrough(t *testing.T) {
+	t.Parallel()
+
+	// Simulate the guard logic from task.go lines 209-224.
+	// Scenario: "start" is an exact installed match with 1 installed substring match.
+	// The registry also contains "start/assets/agent/create" matching "start".
+	installedMatches := []TaskMatch{
+		{Name: "start", Source: TaskSourceInstalled},
+	}
+
+	index := &registry.Index{
+		Tasks: map[string]registry.IndexEntry{
+			"start/assets/agent/create": {
+				Module:      "github.com/example/start-assets-agent-create@v0",
+				Description: "Create an agent asset",
+			},
+		},
+	}
+
+	registryMatches, err := findRegistryTasks(index, "start", nil)
+	if err != nil {
+		t.Fatalf("findRegistryTasks() error: %v", err)
+	}
+
+	merged := mergeTaskMatches(installedMatches, registryMatches)
+
+	// Guard should trigger: merged > 1.
+	if len(merged) <= 1 {
+		t.Fatalf("expected merged > 1 to trigger guard, got %d", len(merged))
+	}
+
+	// Verify both sources are present.
+	sources := make(map[TaskSource]bool)
+	for _, m := range merged {
+		sources[m.Source] = true
+	}
+	if !sources[TaskSourceInstalled] {
+		t.Error("merged matches should include installed tasks")
+	}
+	if !sources[TaskSourceRegistry] {
+		t.Error("merged matches should include registry tasks")
+	}
+}
+
+// TestRegistryAwareGuard_DeduplicationPreservesInstalled verifies that when an
+// installed task has the same name as a registry task, the installed version
+// takes precedence and the total count is not inflated.
+func TestRegistryAwareGuard_DeduplicationPreservesInstalled(t *testing.T) {
+	t.Parallel()
+
+	installedMatches := []TaskMatch{
+		{Name: "golang/review", Source: TaskSourceInstalled},
+	}
+
+	index := &registry.Index{
+		Tasks: map[string]registry.IndexEntry{
+			"golang/review": {
+				Module:      "github.com/example/golang-review@v0",
+				Description: "Review Go code",
+			},
+		},
+	}
+
+	registryMatches, err := findRegistryTasks(index, "golang", nil)
+	if err != nil {
+		t.Fatalf("findRegistryTasks() error: %v", err)
+	}
+
+	merged := mergeTaskMatches(installedMatches, registryMatches)
+
+	// Same name: deduplication should keep count at 1.
+	if len(merged) != 1 {
+		t.Fatalf("expected 1 merged match (deduplicated), got %d", len(merged))
+	}
+	if merged[0].Source != TaskSourceInstalled {
+		t.Errorf("deduplicated match should be installed, got %q", merged[0].Source)
+	}
+}
+
+// TestRegistryAwareGuard_NilIndexNoEffect verifies that when the registry
+// index is unavailable (nil), the guard is a no-op and does not affect
+// the installed-only match.
+func TestRegistryAwareGuard_NilIndexNoEffect(t *testing.T) {
+	t.Parallel()
+
+	installedMatches := []TaskMatch{
+		{Name: "start", Source: TaskSourceInstalled},
+	}
+
+	// No registry index available — simulate ensureIndex returning nil.
+	var guardIndex *registry.Index
+
+	// Guard logic: if guardIndex == nil, skip registry check.
+	var registryGuardMatches []TaskMatch
+	if guardIndex != nil {
+		registryGuardMatches, _ = findRegistryTasks(guardIndex, "start", nil)
+	}
+
+	merged := mergeTaskMatches(installedMatches, registryGuardMatches)
+
+	// Should only have the installed match — guard does not trigger.
+	if len(merged) != 1 {
+		t.Fatalf("expected 1 match with nil index, got %d", len(merged))
+	}
+	if merged[0].Name != "start" {
+		t.Errorf("expected 'start', got %q", merged[0].Name)
+	}
+}
+
+// TestTaskResolution_RegistryGuardAmbiguous tests the full executeTask flow
+// where a single installed exact match exists but registry tasks also match,
+// producing an ambiguous error in non-TTY mode. This requires a working
+// registry index (via cache or network).
+func TestTaskResolution_RegistryGuardAmbiguous(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	t.Setenv("HOME", tmpDir)
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	// CUE module cache cleanup.
+	t.Cleanup(func() {
+		_ = filepath.WalkDir(tmpDir, func(path string, d os.DirEntry, err error) error {
+			if err != nil {
+				return nil
+			}
+			_ = os.Chmod(path, 0755)
+			return nil
+		})
+	})
+
+	configDir := filepath.Join(tmpDir, ".start")
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		t.Fatalf("creating config dir: %v", err)
+	}
+
+	// Config with a single task "start" — exact match for search term "start".
+	config := `
+agents: {
+	echo: {
+		bin: "echo"
+		command: "{{.bin}} test"
+	}
+}
+
+tasks: {
+	"start": {
+		prompt: "Start task"
+	}
+	"start/review": {
+		prompt: "Start review"
+	}
+}
+
+settings: {
+	default_agent: "echo"
+}
+`
+	configFile := filepath.Join(configDir, "settings.cue")
+	if err := os.WriteFile(configFile, []byte(config), 0644); err != nil {
+		t.Fatalf("writing config: %v", err)
+	}
+
+	chdir(t, tmpDir)
+
+	// Precondition: exact match exists.
+	cfg, err := loadMergedConfigFromDir("")
+	if err != nil {
+		t.Fatalf("loading config: %v", err)
+	}
+	exact, err := findExactInstalledName(cfg.Value, internalcue.KeyTasks, "start")
+	if err != nil {
+		t.Fatalf("findExactInstalledName error: %v", err)
+	}
+	if exact != "start" {
+		t.Fatalf("expected exact match 'start', got %q", exact)
+	}
+
+	// Precondition: substring search finds 2 installed matches.
+	matches, err := findInstalledTasks(cfg, "start", nil)
+	if err != nil {
+		t.Fatalf("findInstalledTasks error: %v", err)
+	}
+	if len(matches) < 2 {
+		t.Fatalf("expected >= 2 installed matches, got %d", len(matches))
+	}
+
+	// executeTask should fall through to selection list (ambiguous in non-TTY).
+	stdout := new(bytes.Buffer)
+	stderr := new(bytes.Buffer)
+	flags := &Flags{Quiet: true}
+	err = executeTask(stdout, stderr, strings.NewReader(""), flags, "start", "", nil)
+	if err == nil {
+		t.Fatal("expected ambiguous task error, got nil")
+	}
+	if !strings.Contains(err.Error(), "ambiguous") {
+		t.Errorf("expected error containing 'ambiguous', got: %v", err)
+	}
+}
+
 func TestPromptTaskSelection_ByNumber(t *testing.T) {
 	t.Parallel()
 	var buf bytes.Buffer
@@ -1884,5 +2101,206 @@ func TestBuildExecutionEnv_MultipleAgents_NonTTY(t *testing.T) {
 	}
 	if !strings.Contains(buf.String(), "Using agent") {
 		t.Errorf("expected non-TTY fallback message, got: %q", buf.String())
+	}
+}
+
+// ensureIndex cache behaviour tests
+
+func TestEnsureIndex_FreshCacheSkipsFetchMessage(t *testing.T) {
+	tmpDir := setupStartTestConfig(t)
+	chdir(t, tmpDir)
+
+	// Seed a fresh cache with a canonical version matching the default index module.
+	t.Setenv("XDG_CACHE_HOME", tmpDir)
+	cacheDir := filepath.Join(tmpDir, "start")
+	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	cacheContent := fmt.Sprintf(
+		"index_updated: %q\nindex_version: %q\n",
+		time.Now().Format(time.RFC3339),
+		"github.com/grantcarthew/start-assets/index@v0.3.46",
+	)
+	if err := os.WriteFile(filepath.Join(cacheDir, "cache.cue"), []byte(cacheContent), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := loadMergedConfigFromDir("")
+	if err != nil {
+		t.Fatalf("loading config: %v", err)
+	}
+
+	stdout := new(bytes.Buffer)
+	flags := &Flags{}
+	r := newResolver(cfg, flags, stdout, io.Discard, strings.NewReader(""))
+
+	// Call ensureIndex — with a fresh cache it should NOT print "Fetching registry index..."
+	r.ensureIndex()
+
+	if strings.Contains(stdout.String(), "Fetching registry index") {
+		t.Errorf("fresh cache should skip 'Fetching registry index...' message, got:\n%s", stdout.String())
+	}
+}
+
+func TestEnsureIndex_StaleCacheShowsFetchMessage(t *testing.T) {
+	tmpDir := setupStartTestConfig(t)
+	chdir(t, tmpDir)
+
+	// Seed a stale cache (48 hours old).
+	t.Setenv("XDG_CACHE_HOME", tmpDir)
+	cacheDir := filepath.Join(tmpDir, "start")
+	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	staleTime := time.Now().Add(-48 * time.Hour).Format(time.RFC3339)
+	cacheContent := fmt.Sprintf(
+		"index_updated: %q\nindex_version: %q\n",
+		staleTime,
+		"github.com/grantcarthew/start-assets/index@v0.3.46",
+	)
+	if err := os.WriteFile(filepath.Join(cacheDir, "cache.cue"), []byte(cacheContent), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := loadMergedConfigFromDir("")
+	if err != nil {
+		t.Fatalf("loading config: %v", err)
+	}
+
+	stdout := new(bytes.Buffer)
+	flags := &Flags{}
+	r := newResolver(cfg, flags, stdout, io.Discard, strings.NewReader(""))
+
+	// Call ensureIndex — stale cache should print "Fetching registry index..."
+	r.ensureIndex()
+
+	if !strings.Contains(stdout.String(), "Fetching registry index") {
+		t.Errorf("stale cache should show 'Fetching registry index...' message, got:\n%s", stdout.String())
+	}
+}
+
+func TestEnsureIndex_MissingCacheShowsFetchMessage(t *testing.T) {
+	tmpDir := setupStartTestConfig(t)
+	chdir(t, tmpDir)
+
+	// No cache file exists — XDG_CACHE_HOME points to empty temp dir.
+	t.Setenv("XDG_CACHE_HOME", tmpDir)
+
+	cfg, err := loadMergedConfigFromDir("")
+	if err != nil {
+		t.Fatalf("loading config: %v", err)
+	}
+
+	stdout := new(bytes.Buffer)
+	flags := &Flags{}
+	r := newResolver(cfg, flags, stdout, io.Discard, strings.NewReader(""))
+
+	// Call ensureIndex — missing cache should print "Fetching registry index..."
+	r.ensureIndex()
+
+	if !strings.Contains(stdout.String(), "Fetching registry index") {
+		t.Errorf("missing cache should show 'Fetching registry index...' message, got:\n%s", stdout.String())
+	}
+}
+
+func TestEnsureIndex_QuietSuppressesFetchMessage(t *testing.T) {
+	tmpDir := setupStartTestConfig(t)
+	chdir(t, tmpDir)
+
+	// No cache — but Quiet flag suppresses the message.
+	t.Setenv("XDG_CACHE_HOME", tmpDir)
+
+	cfg, err := loadMergedConfigFromDir("")
+	if err != nil {
+		t.Fatalf("loading config: %v", err)
+	}
+
+	stdout := new(bytes.Buffer)
+	flags := &Flags{Quiet: true}
+	r := newResolver(cfg, flags, stdout, io.Discard, strings.NewReader(""))
+
+	r.ensureIndex()
+
+	if strings.Contains(stdout.String(), "Fetching registry index") {
+		t.Errorf("Quiet mode should suppress 'Fetching registry index...' message, got:\n%s", stdout.String())
+	}
+}
+
+func TestEnsureIndex_MismatchedModuleShowsFetchMessage(t *testing.T) {
+	tmpDir := setupStartTestConfig(t)
+	chdir(t, tmpDir)
+
+	// Seed a fresh cache but with a different module path than the default.
+	t.Setenv("XDG_CACHE_HOME", tmpDir)
+	cacheDir := filepath.Join(tmpDir, "start")
+	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	cacheContent := fmt.Sprintf(
+		"index_updated: %q\nindex_version: %q\n",
+		time.Now().Format(time.RFC3339),
+		"github.com/other/module/index@v0.1.0",
+	)
+	if err := os.WriteFile(filepath.Join(cacheDir, "cache.cue"), []byte(cacheContent), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := loadMergedConfigFromDir("")
+	if err != nil {
+		t.Fatalf("loading config: %v", err)
+	}
+
+	stdout := new(bytes.Buffer)
+	flags := &Flags{}
+	r := newResolver(cfg, flags, stdout, io.Discard, strings.NewReader(""))
+
+	// Call ensureIndex — module mismatch should trigger a fresh fetch.
+	r.ensureIndex()
+
+	if !strings.Contains(stdout.String(), "Fetching registry index") {
+		t.Errorf("mismatched module cache should show 'Fetching registry index...' message, got:\n%s", stdout.String())
+	}
+}
+
+func TestEnsureIndex_FreshCacheNotRewritten(t *testing.T) {
+	tmpDir := setupStartTestConfig(t)
+	chdir(t, tmpDir)
+
+	// Seed a fresh cache with a known timestamp.
+	t.Setenv("XDG_CACHE_HOME", tmpDir)
+	cacheDir := filepath.Join(tmpDir, "start")
+	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	seedTime := time.Now().Add(-2 * time.Hour)
+	cacheContent := fmt.Sprintf(
+		"index_updated: %q\nindex_version: %q\n",
+		seedTime.Format(time.RFC3339),
+		"github.com/grantcarthew/start-assets/index@v0.3.46",
+	)
+	cachePath := filepath.Join(cacheDir, "cache.cue")
+	if err := os.WriteFile(cachePath, []byte(cacheContent), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := loadMergedConfigFromDir("")
+	if err != nil {
+		t.Fatalf("loading config: %v", err)
+	}
+
+	stdout := new(bytes.Buffer)
+	flags := &Flags{}
+	r := newResolver(cfg, flags, stdout, io.Discard, strings.NewReader(""))
+
+	r.ensureIndex()
+
+	// Read the cache file back — the timestamp should not have been updated.
+	data, err := os.ReadFile(cachePath)
+	if err != nil {
+		t.Fatalf("reading cache file: %v", err)
+	}
+	content := string(data)
+	if !strings.Contains(content, seedTime.Format(time.RFC3339)) {
+		t.Errorf("fresh cache was rewritten (timestamp changed):\n%s", content)
 	}
 }

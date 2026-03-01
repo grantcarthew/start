@@ -8,6 +8,7 @@ import (
 
 	"cuelang.org/go/cue"
 	"github.com/grantcarthew/start/internal/assets"
+	"github.com/grantcarthew/start/internal/cache"
 	"github.com/grantcarthew/start/internal/config"
 	internalcue "github.com/grantcarthew/start/internal/cue"
 	"github.com/grantcarthew/start/internal/registry"
@@ -86,10 +87,11 @@ func runAssetsSearch(cmd *cobra.Command, args []string) error {
 	defer prog.Done()
 
 	prog.Update("Fetching index...")
-	index, err := client.FetchIndex(ctx, resolveAssetsIndexPath())
+	index, indexVersion, err := client.FetchIndex(ctx, resolveAssetsIndexPath())
 	if err != nil {
 		return fmt.Errorf("fetching index: %w", err)
 	}
+	_ = cache.WriteIndex(indexVersion)
 	prog.Done()
 
 	// Search index

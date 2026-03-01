@@ -1341,3 +1341,26 @@ func TestVersionFromOrigin(t *testing.T) {
 		})
 	}
 }
+
+func TestModuleFromOrigin(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		origin string
+		want   string
+	}{
+		{"github.com/test/asset@v0.1.1", "github.com/test/asset"},
+		{"github.com/test/asset@v0", "github.com/test/asset"},
+		{"no-version", "no-version"},
+		{"", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.origin, func(t *testing.T) {
+			got := ModuleFromOrigin(tt.origin)
+			if got != tt.want {
+				t.Errorf("ModuleFromOrigin(%q) = %q, want %q", tt.origin, got, tt.want)
+			}
+		})
+	}
+}

@@ -5,8 +5,10 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"cuelang.org/go/cue/cuecontext"
+	"github.com/grantcarthew/start/internal/cache"
 	"github.com/grantcarthew/start/internal/config"
 )
 
@@ -931,5 +933,108 @@ func TestCheckSettings_ShellMissing(t *testing.T) {
 	}
 	if !found {
 		t.Error("missing shell result")
+	}
+}
+
+func TestCheckCache_missing(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("XDG_CACHE_HOME", tmp)
+
+	section := CheckCache()
+
+	if section.Name != "Cache" {
+		t.Errorf("Name = %q, want %q", section.Name, "Cache")
+	}
+	if len(section.Results) != 1 {
+		t.Fatalf("Results count = %d, want 1", len(section.Results))
+	}
+	if section.Results[0].Status != StatusNotFound {
+		t.Errorf("Status = %v, want StatusNotFound", section.Results[0].Status)
+	}
+	if section.Results[0].Fix == "" {
+		t.Error("expected fix suggestion for missing cache")
+	}
+}
+
+func TestCheckCache_fresh(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("XDG_CACHE_HOME", tmp)
+
+	if err := cache.WriteIndex("test@v1.0.0"); err != nil {
+		t.Fatalf("WriteIndex() error: %v", err)
+	}
+
+	section := CheckCache()
+
+	if len(section.Results) != 1 {
+		t.Fatalf("Results count = %d, want 1", len(section.Results))
+	}
+	if section.Results[0].Status != StatusPass {
+		t.Errorf("Status = %v, want StatusPass", section.Results[0].Status)
+	}
+	if !strings.Contains(section.Results[0].Message, "fresh") {
+		t.Errorf("Message = %q, should contain 'fresh'", section.Results[0].Message)
+	}
+}
+
+func TestCheckCache_stale(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("XDG_CACHE_HOME", tmp)
+
+	// Write a cache file with a timestamp older than 24 hours.
+	cacheDir := filepath.Join(tmp, "start")
+	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	staleTime := time.Now().Add(-48 * time.Hour).Format(time.RFC3339)
+	content := `index_updated: "` + staleTime + `"` + "\n" + `index_version: "test@v1.0.0"` + "\n"
+	if err := os.WriteFile(filepath.Join(cacheDir, "cache.cue"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	section := CheckCache()
+
+	if len(section.Results) != 1 {
+		t.Fatalf("Results count = %d, want 1", len(section.Results))
+	}
+	if section.Results[0].Status != StatusWarn {
+		t.Errorf("Status = %v, want StatusWarn", section.Results[0].Status)
+	}
+	if !strings.Contains(section.Results[0].Message, "stale") {
+		t.Errorf("Message = %q, should contain 'stale'", section.Results[0].Message)
+	}
+	if section.Results[0].Fix == "" {
+		t.Error("expected fix suggestion for stale cache")
+	}
+}
+
+func TestFormatDuration(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		d    time.Duration
+		want string
+	}{
+		{"zero", 0, "just now"},
+		{"sub-second", 500 * time.Millisecond, "just now"},
+		{"one second", 1 * time.Second, "1 second"},
+		{"seconds", 30 * time.Second, "30 seconds"},
+		{"one minute", 1 * time.Minute, "1 minute"},
+		{"minutes", 5 * time.Minute, "5 minutes"},
+		{"one hour", 1 * time.Hour, "1 hour"},
+		{"hours", 3 * time.Hour, "3 hours"},
+		{"one day", 24 * time.Hour, "1 day"},
+		{"days", 72 * time.Hour, "3 days"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := formatDuration(tt.d)
+			if got != tt.want {
+				t.Errorf("formatDuration(%v) = %q, want %q", tt.d, got, tt.want)
+			}
+		})
 	}
 }

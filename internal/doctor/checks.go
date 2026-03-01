@@ -2,12 +2,15 @@ package doctor
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"cuelang.org/go/cue"
+	"github.com/grantcarthew/start/internal/cache"
 	"github.com/grantcarthew/start/internal/config"
 	internalcue "github.com/grantcarthew/start/internal/cue"
 )
@@ -600,6 +603,75 @@ func CheckEnvironment(paths config.Paths) SectionResult {
 	}
 
 	return section
+}
+
+// CheckCache checks the registry index cache status.
+func CheckCache() SectionResult {
+	section := SectionResult{Name: "Cache"}
+
+	cached, err := cache.ReadIndex()
+	if err != nil {
+		section.Results = append(section.Results, CheckResult{
+			Status:  StatusNotFound,
+			Label:   "Index cache",
+			Message: "not found",
+			Fix:     "Run any registry command (e.g., start assets list) to create the cache",
+		})
+		return section
+	}
+
+	age := time.Since(cached.Updated)
+	ageStr := formatDuration(age)
+
+	if cached.IsFresh(cache.DefaultMaxAge) {
+		section.Results = append(section.Results, CheckResult{
+			Status:  StatusPass,
+			Label:   "Index cache",
+			Message: fmt.Sprintf("fresh (%s ago)", ageStr),
+		})
+	} else {
+		section.Results = append(section.Results, CheckResult{
+			Status:  StatusWarn,
+			Label:   "Index cache",
+			Message: fmt.Sprintf("stale (%s ago)", ageStr),
+			Fix:     "Run any registry command to refresh the cache",
+		})
+	}
+
+	return section
+}
+
+// formatDuration returns a human-readable duration string.
+func formatDuration(d time.Duration) string {
+	if d < time.Second {
+		return "just now"
+	}
+	if d < time.Minute {
+		s := int(d.Seconds())
+		if s == 1 {
+			return "1 second"
+		}
+		return fmt.Sprintf("%d seconds", s)
+	}
+	if d < time.Hour {
+		m := int(d.Minutes())
+		if m == 1 {
+			return "1 minute"
+		}
+		return fmt.Sprintf("%d minutes", m)
+	}
+	if d < 24*time.Hour {
+		h := int(d.Hours())
+		if h == 1 {
+			return "1 hour"
+		}
+		return fmt.Sprintf("%d hours", h)
+	}
+	days := int(math.Round(d.Hours() / 24))
+	if days == 1 {
+		return "1 day"
+	}
+	return fmt.Sprintf("%d days", days)
 }
 
 // expandPath expands ~ to the user's home directory.
