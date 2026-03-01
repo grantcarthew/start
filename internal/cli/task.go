@@ -178,6 +178,8 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 		// the search term (e.g., "review" matches both "start/review" and
 		// "review/git-diff"), fall through to the full search to show a
 		// selection list rather than silently running the short-name match.
+		// This includes registry tasks via the cached index (no network call
+		// when the cache is fresh).
 		hasInstalledMatches := false
 		var installedMatches []TaskMatch
 		if resolved != "" {
@@ -199,6 +201,28 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 			}
 		}
 
+		// Registry-aware guard: when installed search found <= 1 match,
+		// also check registry tasks via the cached index. If combined
+		// matches > 1, fall through to the selection list.
+		registryGuardTriggered := false
+		var registryGuardMatches []TaskMatch
+		if resolved != "" {
+			guardIndex, _, _ := r.ensureIndex()
+			if guardIndex != nil {
+				var guardErr error
+				registryGuardMatches, guardErr = findRegistryTasks(guardIndex, taskName, tags)
+				if guardErr == nil {
+					merged := mergeTaskMatches(installedMatches, registryGuardMatches)
+					if len(merged) > 1 {
+						debugf(stderr, flags, dbgTask, "Exact match %q found but %d unique matches (installed+registry), falling through to search", resolved, len(merged))
+						resolved = ""
+						hasInstalledMatches = len(installedMatches) > 0
+						registryGuardTriggered = true
+					}
+				}
+			}
+		}
+
 		if resolved != "" {
 			debugf(stderr, flags, dbgTask, "Installed match found: %s", resolved)
 			resolvedName = resolved
@@ -216,8 +240,10 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 				}
 			}
 
-			// Single installed substring match - use directly without registry
-			if hasInstalledMatches && len(installedMatches) == 1 {
+			// Single installed substring match - use directly without registry.
+			// Skip when the registry guard triggered: there are registry matches
+			// too, so we must fall through to the combined selection list.
+			if hasInstalledMatches && len(installedMatches) == 1 && !registryGuardTriggered {
 				debugf(stderr, flags, dbgTask, "Single installed substring match: %s", installedMatches[0].Name)
 				resolvedName = installedMatches[0].Name
 			}
@@ -266,9 +292,11 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 
 			if resolvedName == "" {
 				// Step 3: Combined match across installed + registry.
-				// Reuse installed matches from step 1b.
+				// Reuse guard results when available, otherwise search registry.
 				var registryMatches []TaskMatch
-				if index != nil {
+				if registryGuardTriggered {
+					registryMatches = registryGuardMatches
+				} else if index != nil {
 					registryMatches, err = findRegistryTasks(index, taskName, tags)
 					if err != nil {
 						return err

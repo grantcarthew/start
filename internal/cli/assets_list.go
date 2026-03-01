@@ -10,6 +10,7 @@ import (
 
 	"cuelang.org/go/cue"
 	"github.com/grantcarthew/start/internal/assets"
+	"github.com/grantcarthew/start/internal/cache"
 	"github.com/grantcarthew/start/internal/config"
 	internalcue "github.com/grantcarthew/start/internal/cue"
 	"github.com/grantcarthew/start/internal/registry"
@@ -241,10 +242,11 @@ func determineScopeAndFile(localCfg cue.Value, paths config.Paths, category, nam
 // checkForUpdates checks registry for available updates.
 func checkForUpdates(ctx context.Context, client *registry.Client, installed []InstalledAsset, indexPath string) {
 	// Fetch index for version info
-	index, err := client.FetchIndex(ctx, indexPath)
+	index, indexVersion, err := client.FetchIndex(ctx, indexPath)
 	if err != nil {
 		return
 	}
+	_ = cache.WriteIndex(indexVersion)
 
 	for i := range installed {
 		entry := findInIndex(index, installed[i].Category, installed[i].Name)

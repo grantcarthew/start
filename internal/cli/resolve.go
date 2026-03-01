@@ -12,6 +12,7 @@ import (
 
 	"cuelang.org/go/cue"
 	"github.com/grantcarthew/start/internal/assets"
+	"github.com/grantcarthew/start/internal/cache"
 	"github.com/grantcarthew/start/internal/config"
 	internalcue "github.com/grantcarthew/start/internal/cue"
 	"github.com/grantcarthew/start/internal/orchestration"
@@ -643,6 +644,11 @@ func (r *resolver) autoInstall(client *registry.Client, result assets.SearchResu
 
 // ensureIndex lazily fetches the registry index. Returns nil index with nil error
 // if the registry is unavailable (graceful fallback).
+//
+// When a fresh cache exists (< 24h), the cached canonical version is passed to
+// FetchIndex which short-circuits version resolution and serves from CUE's module
+// cache — no network call. When the cache is stale or missing, a full fetch is
+// performed and the cache is updated.
 func (r *resolver) ensureIndex() (*registry.Index, *registry.Client, error) {
 	if r.skipRegistry {
 		return nil, nil, nil
@@ -653,8 +659,21 @@ func (r *resolver) ensureIndex() (*registry.Index, *registry.Client, error) {
 	}
 	r.didFetch = true
 
-	if !r.flags.Quiet {
-		_, _ = fmt.Fprintf(r.stdout, "Fetching registry index...\n")
+	// Check cache for a fresh canonical version to avoid network calls.
+	// Only use the cache when it belongs to the same module as the configured index.
+	indexPath := resolveAssetsIndexPath()
+	effectivePath := registry.EffectiveIndexPath(indexPath)
+	usedCache := false
+	cached, cacheErr := cache.ReadIndex()
+	if cacheErr == nil && cached.IsFresh(cache.DefaultMaxAge) &&
+		assets.ModuleFromOrigin(cached.Version) == assets.ModuleFromOrigin(effectivePath) {
+		debugf(r.stderr, r.flags, dbgResolve, "Using cached index version: %s", cached.Version)
+		indexPath = cached.Version
+		usedCache = true
+	} else {
+		if !r.flags.Quiet {
+			_, _ = fmt.Fprintf(r.stdout, "Fetching registry index...\n")
+		}
 	}
 
 	client, err := registry.NewClient()
@@ -683,11 +702,14 @@ func (r *resolver) ensureIndex() (*registry.Index, *registry.Client, error) {
 		}()
 	}
 
-	index, err := client.FetchIndex(ctx, resolveAssetsIndexPath())
+	index, indexVersion, err := client.FetchIndex(ctx, indexPath)
 	if err != nil {
 		debugf(r.stderr, r.flags, dbgResolve, "Index fetch failed: %v", err)
 		r.indexErr = err
 		return nil, client, nil // Graceful fallback
+	}
+	if !usedCache {
+		_ = cache.WriteIndex(indexVersion)
 	}
 
 	r.index = index

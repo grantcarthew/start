@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/grantcarthew/start/internal/assets"
+	"github.com/grantcarthew/start/internal/cache"
 	"github.com/grantcarthew/start/internal/config"
 	internalcue "github.com/grantcarthew/start/internal/cue"
 	"github.com/grantcarthew/start/internal/doctor"
@@ -88,6 +89,9 @@ func prepareDoctor() (doctor.Report, error) {
 		IndexPath:    indexPath,
 	}
 	report.Sections = append(report.Sections, doctor.CheckVersion(buildInfo))
+
+	// Cache section
+	report.Sections = append(report.Sections, doctor.CheckCache())
 
 	// Configuration section
 	paths, err := config.ResolvePaths("")
@@ -237,9 +241,16 @@ func fetchAndValidateSchemas(paths config.Paths) doctor.SectionResult {
 	return doctor.CheckSchemaValidation(paths, schemas)
 }
 
-// resolveIndexVersion queries the registry for the latest index version.
-// Returns the version string (e.g., "v0.3.2") or empty string on failure.
+// resolveIndexVersion returns the latest index version string (e.g., "v0.3.2").
+// Reads from cache first; falls back to a registry network call if cache is missing.
 func resolveIndexVersion(indexPath string) string {
+	// Try cache first to avoid a network call.
+	cached, err := cache.ReadIndex()
+	if err == nil && cached.Version != "" {
+		return assets.VersionFromOrigin(cached.Version)
+	}
+
+	// Fall back to registry query.
 	client, err := registry.NewClient()
 	if err != nil {
 		return ""

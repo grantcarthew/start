@@ -13,6 +13,10 @@ See [p-writing-guide.md](./p-writing-guide.md) for guidelines on creating and ma
 None.
 
 
+### Development Status
+
+Index caching and multi-match guard for task resolution complete. No active project.
+
 ### Completed Projects
 
 | Project | Title | Completed |
@@ -52,6 +56,7 @@ None.
 | [p-036](./completed/p-036-cli-config-types-migration.md) | CLI Config Types Migration | 2026-02-24 |
 | [p-037](./completed/p-037-cli-config-order-category-arg.md) | CLI Config Order Category Argument | 2026-02-24 |
 | [p-032](./completed/p-032-cli-config-verb-first-refactor.md) | CLI Config Verb-First Refactor | 2026-02-24 |
+| [p-038](./completed/p-038-cli-index-cache.md) | CLI Index Cache | 2026-03-02 |
 
 ---
 
@@ -59,11 +64,19 @@ None.
 
 ### Completed
 
+#### p-038: CLI Index Cache
+
+Added index caching so `start task` checks both installed and registry tasks without a network call on every invocation. Cache stores version and timestamp in `~/.cache/start/cache.cue` (XDG-aware). Fresh cache (< 24h) short-circuits version resolution and serves from CUE's module cache. Extended the multi-match guard to include registry tasks via cached index. Added cache staleness check to `start doctor`. Fixed bug where cache was rewritten on every invocation.
+
+Key Deliverables: `internal/cache/` package, cache-aware `ensureIndex()`, registry-aware multi-match guard in `task.go`, `FetchIndex()` signature change to `(*Index, string, error)`, 9 call sites updated, `CheckCache()` in doctor, 16 new tests
+
+Dependencies: p-024
+
 #### p-032: CLI Config Verb-First Refactor
 
 Restructured `start config` from noun-first to verb-first to match `start assets`. Removed all noun-group subcommands (`config agent`, `config role`, `config context`, `config task`). Added new verb commands: `list`, `info`, `add`, `edit`, `remove`. Cross-category search with interactive menus. Breaking change to command interface.
 
-**Key Deliverables:** `config_list.go`, `config_info.go`, `config_add.go`, `config_edit.go`, `config_remove.go`, deleted 4 noun-group files, updated tests and README.
+Key Deliverables: `config_list.go`, `config_info.go`, `config_add.go`, `config_edit.go`, `config_remove.go`, deleted 4 noun-group files, updated tests and README.
 
 Dependencies: p-008, p-013, p-017, p-018, p-023, p-027, p-033, p-034, p-035, p-036, p-037
 

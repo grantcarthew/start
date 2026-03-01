@@ -373,6 +373,16 @@ func VersionFromOrigin(origin string) string {
 	return ""
 }
 
+// ModuleFromOrigin extracts the module path from an origin path.
+// For example, "github.com/test/asset@v0.1.1" returns "github.com/test/asset".
+// Returns the input unchanged if no version separator is found.
+func ModuleFromOrigin(origin string) string {
+	if idx := strings.LastIndex(origin, "@"); idx != -1 {
+		return origin[:idx]
+	}
+	return origin
+}
+
 // writeAssetToConfig writes the asset content to the config file.
 // If the asset already exists, it is updated in place (upsert).
 func writeAssetToConfig(configPath string, asset SearchResult, content ast.Expr, modulePath string) error {

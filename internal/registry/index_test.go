@@ -1,9 +1,14 @@
 package registry
 
 import (
+	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
+
+	"cuelang.org/go/mod/module"
 )
 
 func TestEffectiveIndexPath(t *testing.T) {
@@ -422,5 +427,257 @@ tasks: {
 	}
 	if len(index.Tasks) != 1 {
 		t.Errorf("expected 1 task, got %d", len(index.Tasks))
+	}
+}
+
+// writeTestIndex creates a valid index CUE file in dir for FetchIndex tests.
+func writeTestIndex(t *testing.T, dir string) {
+	t.Helper()
+	indexCUE := `
+package index
+
+agents: {
+	"ai/claude": {
+		module: "github.com/test/claude@v0"
+		bin:    "claude"
+	}
+}
+
+tasks: {
+	"golang/review": {
+		module:      "github.com/test/review@v0"
+		description: "Code review"
+		tags:        ["golang"]
+	}
+}
+`
+	if err := os.WriteFile(filepath.Join(dir, "index.cue"), []byte(indexCUE), 0644); err != nil {
+		t.Fatalf("writing test index: %v", err)
+	}
+}
+
+func TestFetchIndex_ReturnsIndexAndVersion(t *testing.T) {
+	t.Parallel()
+	tmpDir := t.TempDir()
+	writeTestIndex(t, tmpDir)
+
+	mock := &mockRegistry{
+		versionsFunc: func(ctx context.Context, path string) ([]string, error) {
+			return []string{"v0.0.1", "v0.3.46"}, nil
+		},
+		fetchFunc: func(ctx context.Context, mv module.Version) (module.SourceLoc, error) {
+			return module.SourceLoc{
+				FS: &mockOSRootFS{root: tmpDir},
+			}, nil
+		},
+	}
+
+	client := &Client{
+		registry: mock,
+		retries:  1,
+		baseWait: time.Millisecond,
+	}
+
+	ctx := context.Background()
+	idx, version, err := client.FetchIndex(ctx, "github.com/test/index@v0")
+	if err != nil {
+		t.Fatalf("FetchIndex() error: %v", err)
+	}
+
+	// Verify index is populated.
+	if idx == nil {
+		t.Fatal("FetchIndex() returned nil index")
+	}
+	if len(idx.Agents) != 1 {
+		t.Errorf("expected 1 agent, got %d", len(idx.Agents))
+	}
+	if len(idx.Tasks) != 1 {
+		t.Errorf("expected 1 task, got %d", len(idx.Tasks))
+	}
+
+	// Verify resolved canonical version is returned.
+	want := "github.com/test/index@v0.3.46"
+	if version != want {
+		t.Errorf("FetchIndex() version = %q, want %q", version, want)
+	}
+}
+
+func TestFetchIndex_CanonicalVersionSkipsResolution(t *testing.T) {
+	t.Parallel()
+	tmpDir := t.TempDir()
+	writeTestIndex(t, tmpDir)
+
+	versionsCalled := false
+	mock := &mockRegistry{
+		versionsFunc: func(ctx context.Context, path string) ([]string, error) {
+			versionsCalled = true
+			return nil, nil
+		},
+		fetchFunc: func(ctx context.Context, mv module.Version) (module.SourceLoc, error) {
+			return module.SourceLoc{
+				FS: &mockOSRootFS{root: tmpDir},
+			}, nil
+		},
+	}
+
+	client := &Client{
+		registry: mock,
+		retries:  1,
+		baseWait: time.Millisecond,
+	}
+
+	ctx := context.Background()
+	// Pass a canonical version — should not call ModuleVersions.
+	idx, version, err := client.FetchIndex(ctx, "github.com/test/index@v0.3.46")
+	if err != nil {
+		t.Fatalf("FetchIndex() error: %v", err)
+	}
+	if idx == nil {
+		t.Fatal("FetchIndex() returned nil index")
+	}
+	if version != "github.com/test/index@v0.3.46" {
+		t.Errorf("version = %q, want canonical passthrough", version)
+	}
+	if versionsCalled {
+		t.Error("ModuleVersions should not be called for canonical versions")
+	}
+}
+
+func TestFetchIndex_VersionResolutionError(t *testing.T) {
+	t.Parallel()
+
+	mock := &mockRegistry{
+		versionsFunc: func(ctx context.Context, path string) ([]string, error) {
+			return nil, context.DeadlineExceeded
+		},
+	}
+
+	client := &Client{
+		registry: mock,
+		retries:  1,
+		baseWait: time.Millisecond,
+	}
+
+	ctx := context.Background()
+	idx, version, err := client.FetchIndex(ctx, "github.com/test/index@v0")
+	if err == nil {
+		t.Fatal("FetchIndex() expected error for version resolution failure")
+	}
+	if !strings.Contains(err.Error(), "resolving index version") {
+		t.Errorf("error = %v, want 'resolving index version' prefix", err)
+	}
+	if idx != nil {
+		t.Error("expected nil index on error")
+	}
+	if version != "" {
+		t.Errorf("expected empty version on error, got %q", version)
+	}
+}
+
+func TestFetchIndex_FetchError(t *testing.T) {
+	t.Parallel()
+
+	mock := &mockRegistry{
+		versionsFunc: func(ctx context.Context, path string) ([]string, error) {
+			return []string{"v0.1.0"}, nil
+		},
+		fetchFunc: func(ctx context.Context, mv module.Version) (module.SourceLoc, error) {
+			return module.SourceLoc{}, context.DeadlineExceeded
+		},
+	}
+
+	client := &Client{
+		registry: mock,
+		retries:  1,
+		baseWait: time.Millisecond,
+	}
+
+	ctx := context.Background()
+	idx, version, err := client.FetchIndex(ctx, "github.com/test/index@v0")
+	if err == nil {
+		t.Fatal("FetchIndex() expected error for fetch failure")
+	}
+	if !strings.Contains(err.Error(), "fetching index module") {
+		t.Errorf("error = %v, want 'fetching index module' prefix", err)
+	}
+	if idx != nil {
+		t.Error("expected nil index on error")
+	}
+	if version != "" {
+		t.Errorf("expected empty version on error, got %q", version)
+	}
+}
+
+func TestFetchIndex_LoadIndexError(t *testing.T) {
+	t.Parallel()
+	tmpDir := t.TempDir()
+
+	// Write invalid CUE so LoadIndex fails.
+	if err := os.WriteFile(filepath.Join(tmpDir, "index.cue"), []byte("not valid {{{"), 0644); err != nil {
+		t.Fatalf("writing bad index: %v", err)
+	}
+
+	mock := &mockRegistry{
+		versionsFunc: func(ctx context.Context, path string) ([]string, error) {
+			return []string{"v0.1.0"}, nil
+		},
+		fetchFunc: func(ctx context.Context, mv module.Version) (module.SourceLoc, error) {
+			return module.SourceLoc{
+				FS: &mockOSRootFS{root: tmpDir},
+			}, nil
+		},
+	}
+
+	client := &Client{
+		registry: mock,
+		retries:  1,
+		baseWait: time.Millisecond,
+	}
+
+	ctx := context.Background()
+	idx, version, err := client.FetchIndex(ctx, "github.com/test/index@v0")
+	if err == nil {
+		t.Fatal("FetchIndex() expected error for invalid index CUE")
+	}
+	if idx != nil {
+		t.Error("expected nil index on error")
+	}
+	if version != "" {
+		t.Errorf("expected empty version on error, got %q", version)
+	}
+}
+
+func TestFetchIndex_DefaultIndexPath(t *testing.T) {
+	t.Parallel()
+	tmpDir := t.TempDir()
+	writeTestIndex(t, tmpDir)
+
+	var resolvedPath string
+	mock := &mockRegistry{
+		versionsFunc: func(ctx context.Context, path string) ([]string, error) {
+			resolvedPath = path
+			return []string{"v0.1.0"}, nil
+		},
+		fetchFunc: func(ctx context.Context, mv module.Version) (module.SourceLoc, error) {
+			return module.SourceLoc{
+				FS: &mockOSRootFS{root: tmpDir},
+			}, nil
+		},
+	}
+
+	client := &Client{
+		registry: mock,
+		retries:  1,
+		baseWait: time.Millisecond,
+	}
+
+	ctx := context.Background()
+	// Pass empty string — should use IndexModulePath default.
+	_, _, err := client.FetchIndex(ctx, "")
+	if err != nil {
+		t.Fatalf("FetchIndex() error: %v", err)
+	}
+	if resolvedPath != IndexModulePath {
+		t.Errorf("resolved path = %q, want default %q", resolvedPath, IndexModulePath)
 	}
 }

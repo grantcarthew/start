@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/grantcarthew/start/internal/assets"
+	"github.com/grantcarthew/start/internal/cache"
 	"github.com/grantcarthew/start/internal/config"
 	internalcue "github.com/grantcarthew/start/internal/cue"
 	"github.com/grantcarthew/start/internal/registry"
@@ -158,10 +159,11 @@ func runSearch(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		registryErr = err
 	} else {
-		index, err := client.FetchIndex(ctx, resolveAssetsIndexPath())
+		index, indexVersion, err := client.FetchIndex(ctx, resolveAssetsIndexPath())
 		if err != nil {
 			registryErr = err
 		} else {
+			_ = cache.WriteIndex(indexVersion)
 			results, err := assets.SearchIndex(index, query, tags)
 			if err != nil {
 				return err
