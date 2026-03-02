@@ -145,7 +145,7 @@ func runShowListing(cmd *cobra.Command) error {
 	_, _ = fmt.Fprintln(w)
 
 	flags := getFlags(cmd)
-	entries, err := resolveAllSettings(paths, flags.Local)
+	entries, err := config.ResolveAllSettings(paths, flags.Local)
 	if err != nil {
 		return err
 	}

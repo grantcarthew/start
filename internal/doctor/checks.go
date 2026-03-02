@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -494,74 +495,132 @@ func checkFileField(v cue.Value, name string) *CheckResult {
 	}
 }
 
-// CheckSettings validates settings references.
-func CheckSettings(cfgValue cue.Value) SectionResult {
+// CheckSettings resolves and displays all settings with their sources,
+// and validates specific settings (default_agent, shell).
+func CheckSettings(paths config.Paths, cfgValue cue.Value) SectionResult {
 	section := SectionResult{Name: "Settings"}
 
-	settings := cfgValue.LookupPath(cue.ParsePath(internalcue.KeySettings))
-	if !settings.Exists() {
+	entries, err := config.ResolveAllSettings(paths, false)
+	if err != nil {
 		section.Results = append(section.Results, CheckResult{
-			Status: StatusInfo,
-			Label:  "None configured",
+			Status:  StatusWarn,
+			Label:   "Error",
+			Message: fmt.Sprintf("cannot resolve settings: %v", err),
 		})
 		return section
 	}
 
-	// Check default_agent
-	if daVal := settings.LookupPath(cue.ParsePath("default_agent")); daVal.Exists() {
-		agentName, err := daVal.String()
-		if err == nil {
-			agents := cfgValue.LookupPath(cue.ParsePath(internalcue.KeyAgents))
-			if !agents.Exists() {
-				section.Results = append(section.Results, CheckResult{
-					Status:  StatusWarn,
-					Label:   "default_agent",
-					Message: agentName,
-					Fix:     "No agents configured; add an agents section or remove default_agent",
-				})
-			} else {
-				agent := agents.LookupPath(cue.MakePath(cue.Str(agentName)))
-				if agent.Exists() {
-					section.Results = append(section.Results, CheckResult{
-						Status:  StatusPass,
-						Label:   "default_agent",
-						Message: agentName,
-					})
-				} else {
-					section.Results = append(section.Results, CheckResult{
-						Status:  StatusWarn,
-						Label:   "default_agent",
-						Message: agentName,
-						Fix:     fmt.Sprintf("Agent %q not found in config; check spelling or add it to agents", agentName),
-					})
-				}
-			}
-		}
-	}
+	keys := sortedKeys(entries)
 
-	// Check shell
-	if shellVal := settings.LookupPath(cue.ParsePath("shell")); shellVal.Exists() {
-		shell, err := shellVal.String()
-		if err == nil {
-			path, lookErr := exec.LookPath(shell)
-			if lookErr != nil {
-				section.Results = append(section.Results, CheckResult{
-					Status:  StatusWarn,
-					Label:   "shell",
-					Message: shell,
-					Fix:     fmt.Sprintf("Install %s or update settings.shell", shell),
-				})
-			} else {
-				section.Results = append(section.Results, CheckResult{
-					Status:  StatusPass,
-					Label:   "shell",
-					Message: path,
-				})
-			}
+	for _, key := range keys {
+		entry := entries[key]
+
+		switch key {
+		case "default_agent":
+			section.Results = append(section.Results, checkDefaultAgent(entry, cfgValue))
+		case "shell":
+			section.Results = append(section.Results, checkShell(entry))
+		default:
+			section.Results = append(section.Results, settingResult(key, entry))
 		}
 	}
 
 	return section
+}
+
+// settingResult creates a CheckResult for a setting with its value and source.
+func settingResult(key string, entry config.SettingEntry) CheckResult {
+	if entry.Source == "not set" {
+		return CheckResult{
+			Status:  StatusInfo,
+			Label:   key,
+			Message: "(not set)",
+		}
+	}
+	return CheckResult{
+		Status:  StatusPass,
+		Label:   key,
+		Message: fmt.Sprintf("%s (%s)", entry.Value, entry.Source),
+	}
+}
+
+// checkDefaultAgent validates the default_agent setting.
+func checkDefaultAgent(entry config.SettingEntry, cfgValue cue.Value) CheckResult {
+	if entry.Source == "not set" {
+		return settingResult("default_agent", entry)
+	}
+
+	message := fmt.Sprintf("%s (%s)", entry.Value, entry.Source)
+
+	// Config not loaded (zero cue.Value) — show the value but skip agent verification.
+	if !cfgValue.Exists() {
+		return CheckResult{
+			Status:  StatusInfo,
+			Label:   "default_agent",
+			Message: message + " (cannot verify: config not loaded)",
+		}
+	}
+
+	agents := cfgValue.LookupPath(cue.ParsePath(internalcue.KeyAgents))
+	if !agents.Exists() {
+		return CheckResult{
+			Status:  StatusWarn,
+			Label:   "default_agent",
+			Message: message,
+			Fix:     "No agents configured; add an agents section or remove default_agent",
+		}
+	}
+
+	agent := agents.LookupPath(cue.MakePath(cue.Str(entry.Value)))
+	if agent.Exists() {
+		return CheckResult{
+			Status:  StatusPass,
+			Label:   "default_agent",
+			Message: message,
+		}
+	}
+
+	return CheckResult{
+		Status:  StatusWarn,
+		Label:   "default_agent",
+		Message: message,
+		Fix:     fmt.Sprintf("Agent %q not found in config; check spelling or add it to agents", entry.Value),
+	}
+}
+
+// checkShell validates the shell setting.
+func checkShell(entry config.SettingEntry) CheckResult {
+	if entry.Source == "not set" {
+		return settingResult("shell", entry)
+	}
+
+	message := fmt.Sprintf("%s (%s)", entry.Value, entry.Source)
+
+	_, lookErr := exec.LookPath(entry.Value)
+	if lookErr != nil {
+		return CheckResult{
+			Status:  StatusWarn,
+			Label:   "shell",
+			Message: message,
+			Fix:     fmt.Sprintf("Install %s or update settings.shell", entry.Value),
+		}
+	}
+
+	return CheckResult{
+		Status:  StatusPass,
+		Label:   "shell",
+		Message: message,
+	}
+}
+
+// sortedKeys returns the keys of a map in sorted order.
+func sortedKeys[V any](m map[string]V) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 // CheckEnvironment validates runtime environment.
