@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/grantcarthew/start/internal/config"
 )
 
 // Note: Tests below use os.Chdir (process-global state). Do not add t.Parallel()
@@ -952,23 +954,23 @@ func TestConfigSettingsShow_InvalidKey(t *testing.T) {
 }
 
 func TestValidSettingsKeysString(t *testing.T) {
-	result := validSettingsKeysString()
+	result := config.ValidSettingsKeysString()
 
 	// Must contain all known keys
-	for key := range settingsRegistry {
+	for key := range config.SettingsRegistry {
 		if !strings.Contains(result, key) {
-			t.Errorf("validSettingsKeysString() missing key %q, got: %s", key, result)
+			t.Errorf("ValidSettingsKeysString() missing key %q, got: %s", key, result)
 		}
 	}
 
 	// Must be sorted (first key alphabetically should appear before last)
 	keys := strings.Split(result, ", ")
-	if len(keys) != len(settingsRegistry) {
-		t.Errorf("validSettingsKeysString() returned %d keys, want %d", len(keys), len(settingsRegistry))
+	if len(keys) != len(config.SettingsRegistry) {
+		t.Errorf("ValidSettingsKeysString() returned %d keys, want %d", len(keys), len(config.SettingsRegistry))
 	}
 	for i := 1; i < len(keys); i++ {
 		if keys[i] < keys[i-1] {
-			t.Errorf("validSettingsKeysString() not sorted: %q before %q", keys[i-1], keys[i])
+			t.Errorf("ValidSettingsKeysString() not sorted: %q before %q", keys[i-1], keys[i])
 		}
 	}
 }

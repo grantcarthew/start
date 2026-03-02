@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/cuecontext"
 	"github.com/grantcarthew/start/internal/cache"
 	"github.com/grantcarthew/start/internal/config"
@@ -792,147 +793,201 @@ func TestCheckTasks_FileMissing(t *testing.T) {
 
 // --- CheckSettings tests ---
 
-func TestCheckSettings_NoneConfigured(t *testing.T) {
+// settingsTestPaths creates a temp local directory and writes settings.cue if content is non-empty.
+func settingsTestPaths(t *testing.T, content string) config.Paths {
+	t.Helper()
+	tmpDir := t.TempDir()
+	localDir := filepath.Join(tmpDir, "local")
+	if err := os.MkdirAll(localDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if content != "" {
+		if err := os.WriteFile(filepath.Join(localDir, "settings.cue"), []byte(content), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return config.Paths{
+		Global:       filepath.Join(tmpDir, "global"),
+		Local:        localDir,
+		GlobalExists: false,
+		LocalExists:  true,
+	}
+}
+
+// findResult searches section results for a matching label.
+func findResult(section SectionResult, label string) (CheckResult, bool) {
+	for _, r := range section.Results {
+		if r.Label == label {
+			return r, true
+		}
+	}
+	return CheckResult{}, false
+}
+
+func TestCheckSettings_ShowsAllSettings(t *testing.T) {
 	t.Parallel()
+	paths := settingsTestPaths(t, "")
 	cctx := cuecontext.New()
 	v := cctx.CompileString("{}")
 
-	section := CheckSettings(v)
+	section := CheckSettings(paths, v)
 
 	if section.Name != "Settings" {
 		t.Errorf("Name = %q, want %q", section.Name, "Settings")
 	}
-	if len(section.Results) != 1 {
-		t.Fatalf("expected 1 result, got %d", len(section.Results))
+
+	// Should have results for all 4 settings
+	if len(section.Results) != len(config.SettingsRegistry) {
+		t.Errorf("got %d results, want %d", len(section.Results), len(config.SettingsRegistry))
 	}
-	if section.Results[0].Status != StatusInfo {
-		t.Errorf("status = %v, want StatusInfo", section.Results[0].Status)
+
+	// default_agent should show as not set (no default)
+	if r, ok := findResult(section, "default_agent"); ok {
+		if r.Status != StatusInfo {
+			t.Errorf("default_agent status = %v, want StatusInfo", r.Status)
+		}
+	} else {
+		t.Error("missing default_agent result")
 	}
-	if section.Results[0].Label != "None configured" {
-		t.Errorf("label = %q, want %q", section.Results[0].Label, "None configured")
+
+	// assets_index should have a default
+	if r, ok := findResult(section, "assets_index"); ok {
+		if r.Status != StatusPass {
+			t.Errorf("assets_index status = %v, want StatusPass", r.Status)
+		}
+		if !strings.Contains(r.Message, "default") {
+			t.Errorf("assets_index message = %q, want containing 'default'", r.Message)
+		}
+	} else {
+		t.Error("missing assets_index result")
 	}
 }
 
 func TestCheckSettings_DefaultAgentExists(t *testing.T) {
 	t.Parallel()
+	paths := settingsTestPaths(t, `settings: { default_agent: "claude" }`)
 	cctx := cuecontext.New()
 	v := cctx.CompileString(`
 		agents: { claude: { bin: "echo" } }
 		settings: { default_agent: "claude" }
 	`)
 
-	section := CheckSettings(v)
+	section := CheckSettings(paths, v)
 
-	found := false
-	for _, r := range section.Results {
-		if r.Label == "default_agent" {
-			found = true
-			if r.Status != StatusPass {
-				t.Errorf("status = %v, want StatusPass", r.Status)
-			}
-			if r.Message != "claude" {
-				t.Errorf("message = %q, want %q", r.Message, "claude")
-			}
-		}
+	r, ok := findResult(section, "default_agent")
+	if !ok {
+		t.Fatal("missing default_agent result")
 	}
-	if !found {
-		t.Error("missing default_agent result")
+	if r.Status != StatusPass {
+		t.Errorf("status = %v, want StatusPass", r.Status)
+	}
+	if !strings.Contains(r.Message, "claude") {
+		t.Errorf("message = %q, want containing 'claude'", r.Message)
+	}
+	if !strings.Contains(r.Message, "local") {
+		t.Errorf("message = %q, want containing 'local'", r.Message)
 	}
 }
 
 func TestCheckSettings_DefaultAgentMissing(t *testing.T) {
 	t.Parallel()
+	paths := settingsTestPaths(t, `settings: { default_agent: "nonexistent" }`)
 	cctx := cuecontext.New()
 	v := cctx.CompileString(`
 		agents: { claude: { bin: "echo" } }
 		settings: { default_agent: "nonexistent" }
 	`)
 
-	section := CheckSettings(v)
+	section := CheckSettings(paths, v)
 
-	found := false
-	for _, r := range section.Results {
-		if r.Label == "default_agent" {
-			found = true
-			if r.Status != StatusWarn {
-				t.Errorf("status = %v, want StatusWarn", r.Status)
-			}
-			if r.Fix == "" {
-				t.Error("expected a fix suggestion")
-			}
-		}
+	r, ok := findResult(section, "default_agent")
+	if !ok {
+		t.Fatal("missing default_agent result")
 	}
-	if !found {
-		t.Error("missing default_agent result")
+	if r.Status != StatusWarn {
+		t.Errorf("status = %v, want StatusWarn", r.Status)
+	}
+	if r.Fix == "" {
+		t.Error("expected a fix suggestion")
 	}
 }
 
 func TestCheckSettings_DefaultAgentNoAgents(t *testing.T) {
 	t.Parallel()
+	paths := settingsTestPaths(t, `settings: { default_agent: "claude" }`)
 	cctx := cuecontext.New()
 	v := cctx.CompileString(`settings: { default_agent: "claude" }`)
 
-	section := CheckSettings(v)
+	section := CheckSettings(paths, v)
 
-	found := false
-	for _, r := range section.Results {
-		if r.Label == "default_agent" {
-			found = true
-			if r.Status != StatusWarn {
-				t.Errorf("status = %v, want StatusWarn", r.Status)
-			}
-			if !strings.Contains(r.Fix, "No agents configured") {
-				t.Errorf("fix = %q, should mention no agents configured", r.Fix)
-			}
-		}
+	r, ok := findResult(section, "default_agent")
+	if !ok {
+		t.Fatal("missing default_agent result")
 	}
-	if !found {
-		t.Error("missing default_agent result")
+	if r.Status != StatusWarn {
+		t.Errorf("status = %v, want StatusWarn", r.Status)
+	}
+	if !strings.Contains(r.Fix, "No agents configured") {
+		t.Errorf("fix = %q, should mention no agents configured", r.Fix)
+	}
+}
+
+func TestCheckSettings_DefaultAgentNoConfig(t *testing.T) {
+	t.Parallel()
+	paths := settingsTestPaths(t, `settings: { default_agent: "claude" }`)
+	var zero cue.Value // simulates config failed to load
+
+	section := CheckSettings(paths, zero)
+
+	r, ok := findResult(section, "default_agent")
+	if !ok {
+		t.Fatal("missing default_agent result")
+	}
+	if r.Status != StatusInfo {
+		t.Errorf("status = %v, want StatusInfo", r.Status)
+	}
+	if !strings.Contains(r.Message, "claude") {
+		t.Errorf("message = %q, want containing 'claude'", r.Message)
+	}
+	if !strings.Contains(r.Message, "cannot verify") {
+		t.Errorf("message = %q, want containing 'cannot verify'", r.Message)
 	}
 }
 
 func TestCheckSettings_ShellExists(t *testing.T) {
 	t.Parallel()
+	paths := settingsTestPaths(t, `settings: { shell: "sh" }`)
 	cctx := cuecontext.New()
 	v := cctx.CompileString(`settings: { shell: "sh" }`)
 
-	section := CheckSettings(v)
+	section := CheckSettings(paths, v)
 
-	found := false
-	for _, r := range section.Results {
-		if r.Label == "shell" {
-			found = true
-			if r.Status != StatusPass {
-				t.Errorf("status = %v, want StatusPass", r.Status)
-			}
-		}
+	r, ok := findResult(section, "shell")
+	if !ok {
+		t.Fatal("missing shell result")
 	}
-	if !found {
-		t.Error("missing shell result")
+	if r.Status != StatusPass {
+		t.Errorf("status = %v, want StatusPass", r.Status)
 	}
 }
 
 func TestCheckSettings_ShellMissing(t *testing.T) {
 	t.Parallel()
+	paths := settingsTestPaths(t, `settings: { shell: "nonexistent-shell-xyz-123" }`)
 	cctx := cuecontext.New()
 	v := cctx.CompileString(`settings: { shell: "nonexistent-shell-xyz-123" }`)
 
-	section := CheckSettings(v)
+	section := CheckSettings(paths, v)
 
-	found := false
-	for _, r := range section.Results {
-		if r.Label == "shell" {
-			found = true
-			if r.Status != StatusWarn {
-				t.Errorf("status = %v, want StatusWarn", r.Status)
-			}
-			if r.Fix == "" {
-				t.Error("expected a fix suggestion")
-			}
-		}
+	r, ok := findResult(section, "shell")
+	if !ok {
+		t.Fatal("missing shell result")
 	}
-	if !found {
-		t.Error("missing shell result")
+	if r.Status != StatusWarn {
+		t.Errorf("status = %v, want StatusWarn", r.Status)
+	}
+	if r.Fix == "" {
+		t.Error("expected a fix suggestion")
 	}
 }
 

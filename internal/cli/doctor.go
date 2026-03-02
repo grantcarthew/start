@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"cuelang.org/go/cue"
 	"github.com/grantcarthew/start/internal/assets"
 	"github.com/grantcarthew/start/internal/cache"
 	"github.com/grantcarthew/start/internal/config"
@@ -118,17 +119,12 @@ func prepareDoctor() (doctor.Report, error) {
 		}
 	}
 
-	// Settings checks
+	// Settings checks always run (reads settings.cue directly via config paths)
+	var settingsCfg cue.Value
 	if cfgLoaded {
-		report.Sections = append(report.Sections, doctor.CheckSettings(cfgResult.Value))
-	} else {
-		report.Sections = append(report.Sections, doctor.SectionResult{
-			Name: "Settings",
-			Results: []doctor.CheckResult{
-				{Status: doctor.StatusInfo, Label: "Skipped", Message: "no valid config"},
-			},
-		})
+		settingsCfg = cfgResult.Value
 	}
+	report.Sections = append(report.Sections, doctor.CheckSettings(paths, settingsCfg))
 
 	// Agent checks
 	if cfgLoaded {

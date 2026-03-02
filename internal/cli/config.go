@@ -79,7 +79,7 @@ func runConfigList(cmd *cobra.Command, args []string) error {
 	stderr := cmd.ErrOrStderr()
 
 	// Settings
-	entries, err := resolveAllSettings(paths, local)
+	entries, err := config.ResolveAllSettings(paths, local)
 	if err != nil {
 		printWarning(stderr, "failed to load settings: %s", err)
 	}
