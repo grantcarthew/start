@@ -164,4 +164,3 @@ func parseSimpleCUE(data []byte) (map[string]string, error) {
 
 	return fields, nil
 }
-

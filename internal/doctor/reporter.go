@@ -104,7 +104,6 @@ func statusColor(s Status) *color.Color {
 	}
 }
 
-
 // printResult prints a single check result.
 func (r *Reporter) printResult(result CheckResult, noIcons bool) {
 	indent := strings.Repeat("  ", result.Indent+1)
