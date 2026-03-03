@@ -27,7 +27,7 @@ Use Go's `text/template` package with `{{.placeholder}}` syntax for all UTD temp
 - `{{.file_contents}}` - File contents
 - `{{.command}}` - Command string
 - `{{.command_output}}` - Command output
-- `{{.date}}` - Current timestamp
+- `{{.datetime}}` - Current timestamp
 - `{{.instructions}}` - Task-specific instructions
 
 **Full Go template support:**
@@ -198,7 +198,7 @@ Template can be extended with custom functions:
 **Simple substitution:**
 
 ```cue
-prompt: "Current date: {{.date}}"
+prompt: "Current datetime: {{.datetime}}"
 ```
 
 Result: `Current date: 2025-12-02T10:30:00+10:00`

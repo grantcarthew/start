@@ -124,7 +124,7 @@ Select (1-20):
      - `{{.instructions}}` - user's instructions argument
      - `{{.file_contents}}` - content from file field
      - `{{.command_output}}` - output from command field
-     - `{{.date}}` - current timestamp
+     - `{{.datetime}}` - current timestamp
 
 7. Resolve context UTD (definition order)
 

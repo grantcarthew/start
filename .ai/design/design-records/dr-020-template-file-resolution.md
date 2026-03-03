@@ -127,7 +127,7 @@ UTD placeholders (in content files):
 | `{{.file_contents}}` | Resolved file contents |
 | `{{.command}}` | Command string |
 | `{{.command_output}}` | Command execution output |
-| `{{.date}}` | Current timestamp (ISO 8601) |
+| `{{.datetime}}` | Current timestamp (ISO 8601) |
 | `{{.instructions}}` | User CLI arguments (tasks only) |
 
 **Note on `{{.file}}` behavior:**

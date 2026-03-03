@@ -18,11 +18,11 @@ import (
 // quotedPlaceholderPattern detects placeholders that are incorrectly wrapped in quotes.
 // Since escapeForShell wraps all placeholder values in single quotes, templates should NOT
 // include quotes around any placeholder.
-var quotedPlaceholderPattern = regexp.MustCompile(`['"]{{\.(?:bin|model|role|role_file|prompt|date)}}['"]`)
+var quotedPlaceholderPattern = regexp.MustCompile(`['"]{{\.(?:bin|model|role|role_file|prompt|datetime)}}['"]`)
 
 // singleBracePlaceholderPattern detects placeholders using {name} syntax instead of {{.name}}.
 // This is a common mistake when users expect simple substitution syntax.
-var singleBracePlaceholderPattern = regexp.MustCompile(`\{(bin|model|role|role_file|prompt|date)\}`)
+var singleBracePlaceholderPattern = regexp.MustCompile(`\{(bin|model|role|role_file|prompt|datetime)\}`)
 
 // expandTilde expands a leading ~ to the user's home directory.
 // This is necessary because single-quoted strings in shell don't expand ~.
@@ -136,7 +136,7 @@ func (e *Executor) BuildCommand(cfg ExecuteConfig) (string, error) {
 		"role":      escapeForShell(cfg.Role),
 		"role_file": escapeForShell(expandTilde(cfg.RoleFile)),
 		"prompt":    escapeForShell(cfg.Prompt),
-		"date":      escapeForShell(time.Now().Format(time.RFC3339)),
+		"datetime":  escapeForShell(time.Now().Format(time.RFC3339)),
 	}
 
 	// Parse and execute command template

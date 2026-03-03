@@ -9,13 +9,13 @@ gemini --model {{.model}} --print {{.prompt}}
 {{.bin}} --print {{.prompt}}
 ```
 
-Placeholders: `{{.bin}}` `{{.model}}` `{{.role}}` `{{.role_file}}` `{{.prompt}}` `{{.date}}`
+Placeholders: `{{.bin}}` `{{.model}}` `{{.role}}` `{{.role_file}}` `{{.prompt}}` `{{.datetime}}`
 
 Note: `{{.role_file}}` is a path to a temp file containing the role content. Use it with whatever system-prompt flag your agent binary accepts.
 
 UTD templates (roles, contexts, tasks — `prompt` field or file content):
 
-Placeholders: `{{.instructions}}` `{{.file}}` `{{.file_contents}}` `{{.command}}` `{{.command_output}}` `{{.date}}`
+Placeholders: `{{.instructions}}` `{{.file}}` `{{.file_contents}}` `{{.command}}` `{{.command_output}}` `{{.datetime}}`
 
 Common mistakes:
 - `claude "{{.prompt}}"` — wrong, causes double-quoting; use `claude {{.prompt}}`

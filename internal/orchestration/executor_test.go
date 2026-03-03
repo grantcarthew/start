@@ -340,8 +340,8 @@ func TestValidateCommandTemplate(t *testing.T) {
 			errMsg:  "quoted placeholder",
 		},
 		{
-			name:    "invalid single-quoted date",
-			tmpl:    "{{.bin}} --timestamp '{{.date}}'",
+			name:    "invalid single-quoted datetime",
+			tmpl:    "{{.bin}} --timestamp '{{.datetime}}'",
 			wantErr: true,
 			errMsg:  "quoted placeholder",
 		},

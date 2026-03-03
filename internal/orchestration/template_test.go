@@ -46,9 +46,9 @@ func TestTemplateProcessor_Process(t *testing.T) {
 			wantContains: "Hello, world!",
 		},
 		{
-			name: "prompt with date placeholder",
+			name: "prompt with datetime placeholder",
 			fields: UTDFields{
-				Prompt: "Today is {{.date}}",
+				Prompt: "Today is {{.datetime}}",
 			},
 			wantContains: "Today is 20", // Partial match for year prefix
 		},
