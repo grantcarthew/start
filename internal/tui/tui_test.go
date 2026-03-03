@@ -125,7 +125,7 @@ func TestProgress_Quiet(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	p := NewProgress(f, true)
 	p.Update("loading %d%%", 50)

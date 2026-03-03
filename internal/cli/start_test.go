@@ -2135,7 +2135,7 @@ func TestEnsureIndex_FreshCacheSkipsFetchMessage(t *testing.T) {
 	r := newResolver(cfg, flags, stdout, io.Discard, strings.NewReader(""))
 
 	// Call ensureIndex — with a fresh cache it should NOT print "Fetching registry index..."
-	r.ensureIndex()
+	_, _, _ = r.ensureIndex()
 
 	if strings.Contains(stdout.String(), "Fetching registry index") {
 		t.Errorf("fresh cache should skip 'Fetching registry index...' message, got:\n%s", stdout.String())
@@ -2172,7 +2172,7 @@ func TestEnsureIndex_StaleCacheShowsFetchMessage(t *testing.T) {
 	r := newResolver(cfg, flags, stdout, io.Discard, strings.NewReader(""))
 
 	// Call ensureIndex — stale cache should print "Fetching registry index..."
-	r.ensureIndex()
+	_, _, _ = r.ensureIndex()
 
 	if !strings.Contains(stdout.String(), "Fetching registry index") {
 		t.Errorf("stale cache should show 'Fetching registry index...' message, got:\n%s", stdout.String())
@@ -2196,7 +2196,7 @@ func TestEnsureIndex_MissingCacheShowsFetchMessage(t *testing.T) {
 	r := newResolver(cfg, flags, stdout, io.Discard, strings.NewReader(""))
 
 	// Call ensureIndex — missing cache should print "Fetching registry index..."
-	r.ensureIndex()
+	_, _, _ = r.ensureIndex()
 
 	if !strings.Contains(stdout.String(), "Fetching registry index") {
 		t.Errorf("missing cache should show 'Fetching registry index...' message, got:\n%s", stdout.String())
@@ -2219,7 +2219,7 @@ func TestEnsureIndex_QuietSuppressesFetchMessage(t *testing.T) {
 	flags := &Flags{Quiet: true}
 	r := newResolver(cfg, flags, stdout, io.Discard, strings.NewReader(""))
 
-	r.ensureIndex()
+	_, _, _ = r.ensureIndex()
 
 	if strings.Contains(stdout.String(), "Fetching registry index") {
 		t.Errorf("Quiet mode should suppress 'Fetching registry index...' message, got:\n%s", stdout.String())
@@ -2255,7 +2255,7 @@ func TestEnsureIndex_MismatchedModuleShowsFetchMessage(t *testing.T) {
 	r := newResolver(cfg, flags, stdout, io.Discard, strings.NewReader(""))
 
 	// Call ensureIndex — module mismatch should trigger a fresh fetch.
-	r.ensureIndex()
+	_, _, _ = r.ensureIndex()
 
 	if !strings.Contains(stdout.String(), "Fetching registry index") {
 		t.Errorf("mismatched module cache should show 'Fetching registry index...' message, got:\n%s", stdout.String())
@@ -2292,7 +2292,7 @@ func TestEnsureIndex_FreshCacheNotRewritten(t *testing.T) {
 	flags := &Flags{}
 	r := newResolver(cfg, flags, stdout, io.Discard, strings.NewReader(""))
 
-	r.ensureIndex()
+	_, _, _ = r.ensureIndex()
 
 	// Read the cache file back — the timestamp should not have been updated.
 	data, err := os.ReadFile(cachePath)

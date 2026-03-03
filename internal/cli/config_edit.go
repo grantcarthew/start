@@ -334,9 +334,10 @@ func configContextEdit(stdin io.Reader, stdout io.Writer, local bool, name strin
 	}
 	input = strings.TrimSpace(strings.ToLower(input))
 	newRequired := ctx.Required
-	if input == "y" || input == "yes" {
+	switch input {
+	case "y", "yes":
 		newRequired = true
-	} else if input == "n" || input == "no" {
+	case "n", "no":
 		newRequired = false
 	}
 
@@ -348,9 +349,10 @@ func configContextEdit(stdin io.Reader, stdout io.Writer, local bool, name strin
 			return fmt.Errorf("reading input: %w", err)
 		}
 		input = strings.TrimSpace(strings.ToLower(input))
-		if input == "y" || input == "yes" {
+		switch input {
+		case "y", "yes":
 			newDefault = true
-		} else if input == "n" || input == "no" {
+		case "n", "no":
 			newDefault = false
 		}
 	}

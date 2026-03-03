@@ -74,7 +74,6 @@ func runAssetsSearch(cmd *cobra.Command, args []string) error {
 			return nil
 		}
 		query = input
-		terms = assets.ParseSearchPatterns(query)
 	}
 
 	ctx := context.Background()
