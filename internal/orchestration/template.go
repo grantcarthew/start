@@ -129,7 +129,7 @@ func (p *TemplateProcessor) Process(fields UTDFields, instructions string) (Proc
 	data := TemplateData{
 		"file":         fields.File,
 		"command":      fields.Command,
-		"date":         time.Now().Format(time.RFC3339),
+		"datetime":     time.Now().Format(time.RFC3339),
 		"instructions": instructions,
 	}
 

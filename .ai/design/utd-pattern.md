@@ -44,7 +44,7 @@ All placeholders use Go template syntax: `{{.name}}`
 - `{{.file_contents}}` - File contents (actual text)
 - `{{.command}}` - Command string (e.g., `git status --short`)
 - `{{.command_output}}` - Command execution output (stdout + stderr)
-- `{{.date}}` - Current timestamp (ISO 8601 format)
+- `{{.datetime}}` - Current timestamp (ISO 8601 format)
 
 **Task-Specific Placeholder:**
 
@@ -95,7 +95,7 @@ Result: Command output becomes the prompt text.
 prompt: "Review this code for security issues."
 ```
 
-Result: Prompt text (with runtime placeholders like `{{.date}}` resolved).
+Result: Prompt text (with runtime placeholders like `{{.datetime}}` resolved).
 
 ---
 

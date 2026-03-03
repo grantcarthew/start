@@ -120,7 +120,7 @@ This is the critical first project that determines whether CUE can fulfill the r
 - **Timeout field naming** - `timeout` not `command_timeout` (simpler, clearer)
 - **Timeout constraint** - 1-3600 seconds (no default in schema, user provides via pattern)
 - **Template syntax** - Go templates with `{{.placeholder}}` not `{placeholder}`
-- **Placeholders** - `{{.file}}`, `{{.file_contents}}`, `{{.command}}`, `{{.command_output}}`, `{{.date}}`
+- **Placeholders** - `{{.file}}`, `{{.file_contents}}`, `{{.command}}`, `{{.command_output}}`, `{{.datetime}}`
 - **Resolution priority** - prompt > file > command
 
 ### Task Schema Design

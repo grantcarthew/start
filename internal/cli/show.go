@@ -729,7 +729,7 @@ func resolveShowFile(filePath, origin string) (resolvedPath, content string, err
 
 // partialFillAgentCommand substitutes the static {{.bin}} and {{.model}}
 // placeholders in an agent command template with their resolved values.
-// Runtime placeholders ({{.prompt}}, {{.role}}, {{.role_file}}, {{.date}})
+// Runtime placeholders ({{.prompt}}, {{.role}}, {{.role_file}}, {{.datetime}})
 // are left as-is since they are only known at execution time.
 func partialFillAgentCommand(command string, v cue.Value) string {
 	bin := ""
