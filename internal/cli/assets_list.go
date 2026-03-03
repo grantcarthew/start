@@ -323,7 +323,6 @@ func printInstalledAssets(w io.Writer, installed []InstalledAsset, verbose bool)
 	}
 }
 
-
 // assetTypeToConfigFile returns the config file name for an asset type.
 func assetTypeToConfigFile(category string) string {
 	switch category {

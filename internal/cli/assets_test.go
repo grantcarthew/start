@@ -827,9 +827,9 @@ func TestFilterIndexByCategory(t *testing.T) {
 	}
 
 	tests := []struct {
-		category    string
-		wantAgents  bool
-		wantRoles   bool
+		category   string
+		wantAgents bool
+		wantRoles  bool
 	}{
 		{"agents", true, false},
 		{"roles", false, true},
