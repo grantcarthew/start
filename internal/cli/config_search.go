@@ -39,6 +39,9 @@ Use 'start search' to also include the asset registry in results.`,
 
 // runConfigSearch searches local and global config, excluding the registry.
 func runConfigSearch(cmd *cobra.Command, args []string) error {
+	if shown, err := checkHelpArg(cmd, args); shown || err != nil {
+		return err
+	}
 	query := strings.Join(args, " ")
 
 	tagFlags, _ := cmd.Flags().GetStringSlice("tag")

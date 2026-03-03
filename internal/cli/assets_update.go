@@ -56,6 +56,9 @@ Use --force to re-fetch and update assets even when already at the latest versio
 
 // runAssetsUpdate updates installed assets.
 func runAssetsUpdate(cmd *cobra.Command, args []string) error {
+	if shown, err := checkHelpArg(cmd, args); shown || err != nil {
+		return err
+	}
 	query := ""
 	if len(args) > 0 {
 		query = args[0]

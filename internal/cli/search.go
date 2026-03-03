@@ -51,6 +51,9 @@ Use --tag to filter by tags. Tags can be used alone or combined with a query.`,
 
 // runSearch searches local config, global config, and the registry.
 func runSearch(cmd *cobra.Command, args []string) error {
+	if shown, err := checkHelpArg(cmd, args); shown || err != nil {
+		return err
+	}
 	query := strings.Join(args, " ")
 
 	tagFlags, _ := cmd.Flags().GetStringSlice("tag")

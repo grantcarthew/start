@@ -37,6 +37,9 @@ Multiple words are combined with AND logic.`,
 
 // runAssetsInfo shows detailed information about an asset.
 func runAssetsInfo(cmd *cobra.Command, args []string) error {
+	if shown, err := checkHelpArg(cmd, args); shown || err != nil {
+		return err
+	}
 	prompted := false
 	if len(args) == 0 {
 		input, err := promptSearchQuery(cmd.OutOrStdout(), cmd.InOrStdin())

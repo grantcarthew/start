@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 
@@ -35,16 +33,16 @@ Shows all available assets grouped by type (agents, roles, contexts, tasks).
 Installed assets are marked with ★.
 
 Optionally filter by category: agents, roles, contexts, or tasks.
-Category filtering is supported with --json but not with --raw.
+Category filtering is supported with --json but not with --export.
 
-Use --json to output machine-readable JSON, or --raw to display the
+Use --json to output machine-readable JSON, or --export to display the
 raw CUE source files from the index module.`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: runAssetsIndex,
 	}
 
 	indexCmd.Flags().Bool("json", false, "Output index as JSON")
-	indexCmd.Flags().Bool("raw", false, "Output raw CUE source files")
+	indexCmd.Flags().Bool("export", false, "Output raw CUE source files")
 
 	parent.AddCommand(indexCmd)
 }
@@ -68,7 +66,7 @@ func runAssetsIndex(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
 	flags := getFlags(cmd)
 	jsonFlag, _ := cmd.Flags().GetBool("json")
-	rawFlag, _ := cmd.Flags().GetBool("raw")
+	exportFlag, _ := cmd.Flags().GetBool("export")
 
 	// Create registry client
 	client, err := registry.NewClient()
@@ -104,11 +102,11 @@ func runAssetsIndex(cmd *cobra.Command, args []string) error {
 	w := cmd.OutOrStdout()
 
 	switch {
-	case rawFlag:
+	case exportFlag:
 		if category != "" {
-			return fmt.Errorf("category filter cannot be used with --raw")
+			return fmt.Errorf("category filter cannot be used with --export")
 		}
-		return printRawIndex(w, result.SourceDir)
+		return printExportIndex(w, result.SourceDir)
 	case jsonFlag:
 		return printJSONIndex(w, result.SourceDir, client.Registry(), category)
 	default:
@@ -122,26 +120,9 @@ func runAssetsIndex(cmd *cobra.Command, args []string) error {
 	}
 }
 
-// printRawIndex reads and prints all .cue files from the index source directory.
-func printRawIndex(w io.Writer, sourceDir string) error {
-	entries, err := os.ReadDir(sourceDir)
-	if err != nil {
-		return fmt.Errorf("reading index directory: %w", err)
-	}
-
-	for _, entry := range entries {
-		if entry.IsDir() || filepath.Ext(entry.Name()) != ".cue" {
-			continue
-		}
-		data, err := os.ReadFile(filepath.Join(sourceDir, entry.Name()))
-		if err != nil {
-			return fmt.Errorf("reading %s: %w", entry.Name(), err)
-		}
-		_, _ = fmt.Fprintf(w, "// %s\n", entry.Name())
-		_, _ = fmt.Fprint(w, string(data))
-		_, _ = fmt.Fprintln(w)
-	}
-	return nil
+// printExportIndex reads and prints all .cue files from the index source directory.
+func printExportIndex(w io.Writer, sourceDir string) error {
+	return printCueFiles(w, sourceDir)
 }
 
 // printJSONIndex loads the index and outputs it as formatted JSON.

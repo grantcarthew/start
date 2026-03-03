@@ -61,6 +61,9 @@ Instructions are passed to the task template via the {{.instructions}} placehold
 
 // runTask executes the task command.
 func runTask(cmd *cobra.Command, args []string) error {
+	if shown, err := checkHelpArg(cmd, args); shown || err != nil {
+		return err
+	}
 	if len(args) == 0 {
 		if err := runConfigTaskList(cmd, args); err != nil {
 			return err
