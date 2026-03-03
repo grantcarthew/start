@@ -10,12 +10,14 @@ See [p-writing-guide.md](./p-writing-guide.md) for guidelines on creating and ma
 
 ### Active Projects
 
-None.
-
+| Project | Title |
+|---------|-------|
+| [p-039](./p-039-cli-json-output-assets.md) | CLI JSON Output - Shared Prep and Assets Commands |
+| [p-040](./p-040-cli-json-output-config-doctor.md) | CLI JSON Output - Config, Search, and Doctor Commands |
 
 ### Development Status
 
-Index caching and multi-match guard for task resolution complete. No active project.
+Implementing rich `--json` output across all data commands (issue #69). Split into two projects: p-039 (assets) and p-040 (config/search/doctor).
 
 ### Completed Projects
 
