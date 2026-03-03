@@ -52,6 +52,9 @@ Use --local to install to project config (./.start/).`,
 
 // runAssetsAdd searches for and installs one or more assets.
 func runAssetsAdd(cmd *cobra.Command, args []string) error {
+	if shown, err := checkHelpArg(cmd, args); shown || err != nil {
+		return err
+	}
 	prompted := false
 	if len(args) == 0 {
 		query, err := promptSearchQuery(cmd.OutOrStdout(), cmd.InOrStdin())

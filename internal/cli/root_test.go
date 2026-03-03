@@ -140,6 +140,63 @@ func TestHelpArgLeafCommands(t *testing.T) {
 			args: []string{"config", "order", "help"},
 			want: "Reorder",
 		},
+		{
+			name: "config export help",
+			args: []string{"config", "export", "help"},
+			want: "Output raw CUE",
+		},
+		{
+			name: "config open help",
+			args: []string{"config", "open", "help"},
+			want: "EDITOR",
+		},
+		{
+			name: "config search help",
+			args: []string{"config", "search", "help"},
+			want: "installed assets",
+		},
+		{
+			name: "config settings help",
+			args: []string{"config", "settings", "help"},
+			want: "settings",
+		},
+		// top-level commands
+		{
+			name: "search help",
+			args: []string{"search", "help"},
+			want: "registry",
+		},
+		{
+			name: "task help",
+			args: []string{"task", "help"},
+			want: "List configured tasks",
+		},
+		{
+			name: "doctor help",
+			args: []string{"doctor", "help"},
+			want: "Check start installation",
+		},
+		// assets subcommands
+		{
+			name: "assets add help",
+			args: []string{"assets", "add", "help"},
+			want: "Install",
+		},
+		{
+			name: "assets search help",
+			args: []string{"assets", "search", "help"},
+			want: "registry index",
+		},
+		{
+			name: "assets info help",
+			args: []string{"assets", "info", "help"},
+			want: "asset",
+		},
+		{
+			name: "assets update help",
+			args: []string{"assets", "update", "help"},
+			want: "Update installed",
+		},
 	}
 
 	for _, tt := range tests {

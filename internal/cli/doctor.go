@@ -43,6 +43,9 @@ Exit codes:
 
 // runDoctor executes the doctor command.
 func runDoctor(cmd *cobra.Command, args []string) error {
+	if shown, err := checkHelpArg(cmd, args); shown || err != nil {
+		return err
+	}
 	report, err := prepareDoctor()
 	if err != nil {
 		return err

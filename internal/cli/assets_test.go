@@ -414,9 +414,9 @@ func TestAssetsIndexCommandExists(t *testing.T) {
 	if jsonFlag == nil {
 		t.Error("--json flag not found")
 	}
-	rawFlag := indexCmd.Flags().Lookup("raw")
-	if rawFlag == nil {
-		t.Error("--raw flag not found")
+	exportFlag := indexCmd.Flags().Lookup("export")
+	if exportFlag == nil {
+		t.Error("--export flag not found")
 	}
 }
 
@@ -738,7 +738,7 @@ func TestAssetsListCategoryValidation(t *testing.T) {
 }
 
 // TestAssetsIndexCategoryValidation tests that invalid category args are rejected before network I/O,
-// and that --raw rejects a category arg since the index is a single file.
+// and that --export rejects a category arg since the index is a single file.
 func TestAssetsIndexCategoryValidation(t *testing.T) {
 	t.Parallel()
 
@@ -754,15 +754,15 @@ func TestAssetsIndexCategoryValidation(t *testing.T) {
 		}
 	})
 
-	t.Run("category with --raw", func(t *testing.T) {
+	t.Run("category with --export", func(t *testing.T) {
 		cmd := NewRootCmd()
 		cmd.SetOut(io.Discard)
 		cmd.SetErr(io.Discard)
-		cmd.SetArgs([]string{"assets", "index", "agents", "--raw"})
+		cmd.SetArgs([]string{"assets", "index", "agents", "--export"})
 		err := cmd.Execute()
 
-		if err == nil || !strings.Contains(err.Error(), "cannot be used with --raw") {
-			t.Errorf("expected --raw conflict error, got %v", err)
+		if err == nil || !strings.Contains(err.Error(), "cannot be used with --export") {
+			t.Errorf("expected --export conflict error, got %v", err)
 		}
 	})
 }

@@ -32,6 +32,9 @@ Use --local to target project-specific configuration (.start/).`,
 
 // runConfigOpen handles the "config open [category]" command.
 func runConfigOpen(cmd *cobra.Command, args []string) error {
+	if shown, err := checkHelpArg(cmd, args); shown || err != nil {
+		return err
+	}
 	flags := getFlags(cmd)
 	local := flags.Local
 

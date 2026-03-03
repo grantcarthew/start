@@ -48,6 +48,9 @@ Use 'start search' to also include local and global config in results.`,
 
 // runAssetsSearch searches the registry index for matching assets.
 func runAssetsSearch(cmd *cobra.Command, args []string) error {
+	if shown, err := checkHelpArg(cmd, args); shown || err != nil {
+		return err
+	}
 	query := strings.Join(args, " ")
 
 	tagFlags, _ := cmd.Flags().GetStringSlice("tag")
