@@ -26,9 +26,9 @@ func TestConfigAgent_FullWorkflow(t *testing.T) {
 	}
 
 	t.Run("add agent interactively", func(t *testing.T) {
-		// Prompts: name, bin, command template, default model, description
+		// Prompts: name, bin, command template, default model, models (skip), description, tags (skip)
 		stdout := &bytes.Buffer{}
-		if err := configAgentAdd(slowStdin("claude\nclaude\n"+`claude --model {{.model}} "{{.prompt}}"`+"\nsonnet\nAnthropic Claude\n"), stdout, false); err != nil {
+		if err := configAgentAdd(slowStdin("claude\nclaude\n"+`claude --model {{.model}} "{{.prompt}}"`+"\nsonnet\n\nAnthropic Claude\n\n"), stdout, false); err != nil {
 			t.Fatalf("add failed: %v", err)
 		}
 
@@ -85,8 +85,8 @@ func TestConfigAgent_FullWorkflow(t *testing.T) {
 	})
 
 	t.Run("add second agent", func(t *testing.T) {
-		// Prompts: name, bin, command template, default model (empty), description (empty)
-		if err := configAgentAdd(slowStdin("gemini\ngemini\n"+`gemini "{{.prompt}}"`+"\n\n\n"), &bytes.Buffer{}, false); err != nil {
+		// Prompts: name, bin, command template, default model (empty), description (empty), tags (skip)
+		if err := configAgentAdd(slowStdin("gemini\ngemini\n"+`gemini "{{.prompt}}"`+"\n\n\n\n"), &bytes.Buffer{}, false); err != nil {
 			t.Fatalf("add gemini failed: %v", err)
 		}
 	})
@@ -173,7 +173,7 @@ func TestConfigAgent_FullWorkflow(t *testing.T) {
 
 	t.Run("remove with -y short flag", func(t *testing.T) {
 		// Re-add gemini for this test
-		if err := configAgentAdd(slowStdin("gemini\ngemini\n"+`gemini "{{.prompt}}"`+"\n\n\n"), &bytes.Buffer{}, false); err != nil {
+		if err := configAgentAdd(slowStdin("gemini\ngemini\n"+`gemini "{{.prompt}}"`+"\n\n\n\n"), &bytes.Buffer{}, false); err != nil {
 			t.Fatalf("re-add gemini failed: %v", err)
 		}
 
@@ -195,7 +195,7 @@ func TestConfigAgent_FullWorkflow(t *testing.T) {
 
 	t.Run("add duplicate fails", func(t *testing.T) {
 		// Provide full add responses; duplicate check fires after all prompts
-		err := configAgentAdd(slowStdin("claude\nclaude\n"+`claude "{{.prompt}}"`+"\n\n\n"), &bytes.Buffer{}, false)
+		err := configAgentAdd(slowStdin("claude\nclaude\n"+`claude "{{.prompt}}"`+"\n\n\n\n"), &bytes.Buffer{}, false)
 		if err == nil {
 			t.Fatal("expected error for duplicate agent")
 		}
@@ -217,9 +217,9 @@ func TestConfigRole_FullWorkflow(t *testing.T) {
 	}
 
 	t.Run("add role with file", func(t *testing.T) {
-		// Prompts: name, description, content choice (Enter→"1"→file), file path
+		// Prompts: name, description, content choice (Enter→"1"→file), file path, optional (N), tags (skip)
 		stdout := &bytes.Buffer{}
-		if err := configRoleAdd(slowStdin("go-expert\nGo programming expert\n\n~/.config/start/roles/go-expert.md\n"), stdout, false); err != nil {
+		if err := configRoleAdd(slowStdin("go-expert\nGo programming expert\n\n~/.config/start/roles/go-expert.md\n\n\n"), stdout, false); err != nil {
 			t.Fatalf("add failed: %v", err)
 		}
 
@@ -230,8 +230,8 @@ func TestConfigRole_FullWorkflow(t *testing.T) {
 	})
 
 	t.Run("add role with prompt", func(t *testing.T) {
-		// Prompts: name, description, content choice "3"→inline, prompt text, blank line to finish
-		if err := configRoleAdd(slowStdin("reviewer\nCode review expert\n3\nYou are a code reviewer. Review code for bugs and style issues.\n\n"), &bytes.Buffer{}, false); err != nil {
+		// Prompts: name, description, content choice "3"→inline, prompt text, blank line to finish, tags (skip)
+		if err := configRoleAdd(slowStdin("reviewer\nCode review expert\n3\nYou are a code reviewer. Review code for bugs and style issues.\n\n\n"), &bytes.Buffer{}, false); err != nil {
 			t.Fatalf("add failed: %v", err)
 		}
 	})
@@ -309,9 +309,9 @@ func TestConfigContext_FullWorkflow(t *testing.T) {
 	}
 
 	t.Run("add required context", func(t *testing.T) {
-		// Prompts: name, description, content choice (Enter→file), file path, required "y"
+		// Prompts: name, description, content choice (Enter→file), file path, required "y", tags (skip)
 		stdout := &bytes.Buffer{}
-		if err := configContextAdd(slowStdin("project\nProject documentation\n\nPROJECT.md\ny\n"), stdout, false); err != nil {
+		if err := configContextAdd(slowStdin("project\nProject documentation\n\nPROJECT.md\ny\n\n"), stdout, false); err != nil {
 			t.Fatalf("add failed: %v", err)
 		}
 
@@ -326,8 +326,8 @@ func TestConfigContext_FullWorkflow(t *testing.T) {
 
 	t.Run("add default context", func(t *testing.T) {
 		// Prompts: name, description (empty), content choice (Enter→file), file path,
-		//          required "n", default "y"
-		if err := configContextAdd(slowStdin("readme\n\n\nREADME.md\nn\ny\n"), &bytes.Buffer{}, false); err != nil {
+		//          required "n", default "y", tags (skip)
+		if err := configContextAdd(slowStdin("readme\n\n\nREADME.md\nn\ny\n\n"), &bytes.Buffer{}, false); err != nil {
 			t.Fatalf("add failed: %v", err)
 		}
 	})
@@ -406,9 +406,9 @@ func TestConfigTask_FullWorkflow(t *testing.T) {
 
 	t.Run("add task with prompt and role", func(t *testing.T) {
 		// Prompts: name, description, content choice (Enter→"3"→inline), prompt text,
-		//          blank line to finish, role
+		//          blank line to finish, role, tags (skip)
 		stdout := &bytes.Buffer{}
-		if err := configTaskAdd(slowStdin("review\nCode review task\n\nReview this code for bugs and improvements\n\ncode-reviewer\n"), stdout, false); err != nil {
+		if err := configTaskAdd(slowStdin("review\nCode review task\n\nReview this code for bugs and improvements\n\ncode-reviewer\n\n"), stdout, false); err != nil {
 			t.Fatalf("add failed: %v", err)
 		}
 
@@ -503,13 +503,13 @@ func TestConfigLocal_Isolation(t *testing.T) {
 	}
 
 	t.Run("add global agent", func(t *testing.T) {
-		if err := configAgentAdd(slowStdin("global-agent\nglobal\n"+`global "{{.prompt}}"`+"\n\n\n"), &bytes.Buffer{}, false); err != nil {
+		if err := configAgentAdd(slowStdin("global-agent\nglobal\n"+`global "{{.prompt}}"`+"\n\n\n\n"), &bytes.Buffer{}, false); err != nil {
 			t.Fatalf("add global failed: %v", err)
 		}
 	})
 
 	t.Run("add local agent", func(t *testing.T) {
-		if err := configAgentAdd(slowStdin("local-agent\nlocal\n"+`local "{{.prompt}}"`+"\n\n\n"), &bytes.Buffer{}, true); err != nil {
+		if err := configAgentAdd(slowStdin("local-agent\nlocal\n"+`local "{{.prompt}}"`+"\n\n\n\n"), &bytes.Buffer{}, true); err != nil {
 			t.Fatalf("add local failed: %v", err)
 		}
 
@@ -575,14 +575,14 @@ func TestConfigTask_SubstringResolution(t *testing.T) {
 
 	// Add tasks with namespace-style names
 	// Prompts: name, description (empty), content choice (Enter→"3"→inline), prompt text,
-	//          blank line to finish, role (empty)
+	//          blank line to finish, role (empty), tags (skip)
 	for _, tc := range []struct{ name, prompt string }{
 		{"cwd/dotai/create-role", "Create a role"},
 		{"confluence/read-doc", "Read a doc"},
 		{"golang/review/architecture", "Review arch"},
 		{"golang/review/code", "Review code"},
 	} {
-		if err := configTaskAdd(slowStdin(tc.name+"\n\n\n"+tc.prompt+"\n\n\n"), &bytes.Buffer{}, false); err != nil {
+		if err := configTaskAdd(slowStdin(tc.name+"\n\n\n"+tc.prompt+"\n\n\n\n"), &bytes.Buffer{}, false); err != nil {
 			t.Fatalf("add task %s failed: %v", tc.name, err)
 		}
 	}
@@ -734,10 +734,10 @@ func TestConfigTask_SubstringResolution(t *testing.T) {
 
 	t.Run("remove with ambiguous query in non-interactive mode without --yes errors", func(t *testing.T) {
 		// Re-add some tasks first
-		if err := configTaskAdd(slowStdin("golang/review/security\n\n\nReview security.\n\n\n"), &bytes.Buffer{}, false); err != nil {
+		if err := configTaskAdd(slowStdin("golang/review/security\n\n\nReview security.\n\n\n\n"), &bytes.Buffer{}, false); err != nil {
 			t.Fatalf("re-add failed: %v", err)
 		}
-		if err := configTaskAdd(slowStdin("golang/review/perf\n\n\nReview perf.\n\n\n"), &bytes.Buffer{}, false); err != nil {
+		if err := configTaskAdd(slowStdin("golang/review/perf\n\n\nReview perf.\n\n\n\n"), &bytes.Buffer{}, false); err != nil {
 			t.Fatalf("re-add failed: %v", err)
 		}
 
@@ -774,7 +774,7 @@ func TestConfigRemove_MultipleArgs(t *testing.T) {
 			{"golang/review/security", "Security"},
 			{"confluence/read-doc", "Read"},
 		} {
-			if err := configTaskAdd(slowStdin(tc.name+"\n\n\n"+tc.prompt+"\n\n\n"), &bytes.Buffer{}, false); err != nil {
+			if err := configTaskAdd(slowStdin(tc.name+"\n\n\n"+tc.prompt+"\n\n\n\n"), &bytes.Buffer{}, false); err != nil {
 				t.Fatalf("add %s failed: %v", tc.name, err)
 			}
 		}
@@ -818,11 +818,11 @@ func TestConfigRemove_MultipleArgs(t *testing.T) {
 		}
 
 		// Add an agent named "shared"
-		if err := configAgentAdd(slowStdin("shared\nshared\n"+`shared "{{.prompt}}"`+"\n\n\n"), &bytes.Buffer{}, false); err != nil {
+		if err := configAgentAdd(slowStdin("shared\nshared\n"+`shared "{{.prompt}}"`+"\n\n\n\n"), &bytes.Buffer{}, false); err != nil {
 			t.Fatalf("add agent failed: %v", err)
 		}
 		// Add a role named "shared"
-		if err := configRoleAdd(slowStdin("shared\n\n3\nShared role prompt.\n\n"), &bytes.Buffer{}, false); err != nil {
+		if err := configRoleAdd(slowStdin("shared\n\n3\nShared role prompt.\n\n\n"), &bytes.Buffer{}, false); err != nil {
 			t.Fatalf("add role failed: %v", err)
 		}
 
@@ -859,7 +859,7 @@ func TestConfigRemove_MultipleArgs(t *testing.T) {
 		}
 
 		for _, name := range []string{"alpha", "beta", "gamma"} {
-			if err := configAgentAdd(slowStdin(name+"\n"+name+"\n"+name+` "{{.prompt}}"`+"\n\n\n"), &bytes.Buffer{}, false); err != nil {
+			if err := configAgentAdd(slowStdin(name+"\n"+name+"\n"+name+` "{{.prompt}}"`+"\n\n\n\n"), &bytes.Buffer{}, false); err != nil {
 				t.Fatalf("add %s failed: %v", name, err)
 			}
 		}
@@ -908,7 +908,7 @@ func TestConfigRemove_MultipleArgs(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := configAgentAdd(slowStdin("testagent\ntest\n"+`test "{{.prompt}}"`+"\n\n\n"), &bytes.Buffer{}, false); err != nil {
+		if err := configAgentAdd(slowStdin("testagent\ntest\n"+`test "{{.prompt}}"`+"\n\n\n\n"), &bytes.Buffer{}, false); err != nil {
 			t.Fatalf("add failed: %v", err)
 		}
 
@@ -933,6 +933,178 @@ func TestConfigRemove_MultipleArgs(t *testing.T) {
 			t.Errorf("testagent should still exist after failed remove: %s", content)
 		}
 	})
+}
+
+func TestConfigAgentAdd_WithModelsAndTags(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+	chdir(t, tmpDir)
+
+	globalDir := filepath.Join(tmpDir, "start")
+	if err := os.MkdirAll(globalDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Prompts: name, bin, command, defaultModel="sonnet",
+	//          models: "fast=claude-3-haiku\n\n" (one alias then empty to finish),
+	//          description, tags: "ai,coding\n"
+	stdout := &bytes.Buffer{}
+	err := configAgentAdd(slowStdin("myagent\nmybin\n"+`mybin "{{.prompt}}"`+"\nsonnet\nfast=claude-3-haiku\n\nMy agent\nai,coding\n"), stdout, false)
+	if err != nil {
+		t.Fatalf("add failed: %v", err)
+	}
+
+	content, _ := os.ReadFile(filepath.Join(globalDir, "agents.cue"))
+	s := string(content)
+	if !strings.Contains(s, `"fast"`) || !strings.Contains(s, `"claude-3-haiku"`) {
+		t.Errorf("agents.cue missing models: %s", s)
+	}
+	if !strings.Contains(s, `"ai"`) || !strings.Contains(s, `"coding"`) {
+		t.Errorf("agents.cue missing tags: %s", s)
+	}
+}
+
+func TestConfigAgentAdd_NoModelsWhenNoDefaultModel(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+	chdir(t, tmpDir)
+
+	globalDir := filepath.Join(tmpDir, "start")
+	if err := os.MkdirAll(globalDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	// No defaultModel → no models prompt. Prompts: name, bin, command, defaultModel(empty), description, tags(skip)
+	stdout := &bytes.Buffer{}
+	err := configAgentAdd(slowStdin("nomodel\nbin\n"+`bin "{{.prompt}}"`+"\n\nA desc\n\n"), stdout, false)
+	if err != nil {
+		t.Fatalf("add failed: %v", err)
+	}
+
+	content, _ := os.ReadFile(filepath.Join(globalDir, "agents.cue"))
+	s := string(content)
+	if strings.Contains(s, "models:") {
+		t.Errorf("agents.cue should not have models when no default model: %s", s)
+	}
+}
+
+func TestConfigRoleAdd_OptionalWithFileSource(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+	chdir(t, tmpDir)
+
+	globalDir := filepath.Join(tmpDir, "start")
+	if err := os.MkdirAll(globalDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Prompts: name, description, content choice (Enter→file), file path, optional "y", tags (skip)
+	err := configRoleAdd(slowStdin("opt-role\nOptional role\n\n~/.config/start/roles/opt.md\ny\n\n"), &bytes.Buffer{}, false)
+	if err != nil {
+		t.Fatalf("add failed: %v", err)
+	}
+
+	content, _ := os.ReadFile(filepath.Join(globalDir, "roles.cue"))
+	if !strings.Contains(string(content), "optional: true") {
+		t.Errorf("roles.cue missing optional: true: %s", content)
+	}
+}
+
+func TestConfigRoleAdd_NoOptionalWithPromptSource(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+	chdir(t, tmpDir)
+
+	globalDir := filepath.Join(tmpDir, "start")
+	if err := os.MkdirAll(globalDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Prompts: name, description, content choice "3"→inline, prompt text, blank line, tags (skip)
+	// No optional prompt since content source is not file
+	err := configRoleAdd(slowStdin("prompt-role\nA role\n3\nDo stuff.\n\n\n"), &bytes.Buffer{}, false)
+	if err != nil {
+		t.Fatalf("add failed: %v", err)
+	}
+
+	content, _ := os.ReadFile(filepath.Join(globalDir, "roles.cue"))
+	if strings.Contains(string(content), "optional") {
+		t.Errorf("roles.cue should not have optional for prompt-based role: %s", content)
+	}
+}
+
+func TestConfigRoleEdit_OptionalPrompt(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+	chdir(t, tmpDir)
+
+	globalDir := filepath.Join(tmpDir, "start")
+	if err := os.MkdirAll(globalDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Add a role with file source, optional=false
+	err := configRoleAdd(slowStdin("edit-role\nEditable\n\n~/.config/start/roles/edit.md\n\n\n"), &bytes.Buffer{}, false)
+	if err != nil {
+		t.Fatalf("add failed: %v", err)
+	}
+
+	// Edit: description (keep), keep content (Y), optional "y", tags (keep)
+	err = configRoleEdit(slowStdin("\n\ny\n\n"), &bytes.Buffer{}, false, "edit-role")
+	if err != nil {
+		t.Fatalf("edit failed: %v", err)
+	}
+
+	content, _ := os.ReadFile(filepath.Join(globalDir, "roles.cue"))
+	if !strings.Contains(string(content), "optional: true") {
+		t.Errorf("roles.cue missing optional: true after edit: %s", content)
+	}
+}
+
+func TestConfigContextAdd_WithTags(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+	chdir(t, tmpDir)
+
+	globalDir := filepath.Join(tmpDir, "start")
+	if err := os.MkdirAll(globalDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Prompts: name, description, content choice (Enter→file), file path, required "n", default "n", tags "docs,ref"
+	err := configContextAdd(slowStdin("tagged-ctx\nA context\n\nctx.md\nn\nn\ndocs,ref\n"), &bytes.Buffer{}, false)
+	if err != nil {
+		t.Fatalf("add failed: %v", err)
+	}
+
+	content, _ := os.ReadFile(filepath.Join(globalDir, "contexts.cue"))
+	s := string(content)
+	if !strings.Contains(s, `"docs"`) || !strings.Contains(s, `"ref"`) {
+		t.Errorf("contexts.cue missing tags: %s", s)
+	}
+}
+
+func TestConfigTaskAdd_WithTags(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+	chdir(t, tmpDir)
+
+	globalDir := filepath.Join(tmpDir, "start")
+	if err := os.MkdirAll(globalDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Prompts: name, description, content choice (Enter→"3"→inline), prompt, blank line, role (empty), tags "review,go"
+	err := configTaskAdd(slowStdin("tagged-task\nA task\n\nDo this.\n\n\nreview,go\n"), &bytes.Buffer{}, false)
+	if err != nil {
+		t.Fatalf("add failed: %v", err)
+	}
+
+	content, _ := os.ReadFile(filepath.Join(globalDir, "tasks.cue"))
+	s := string(content)
+	if !strings.Contains(s, `"review"`) || !strings.Contains(s, `"go"`) {
+		t.Errorf("tasks.cue missing tags: %s", s)
+	}
 }
 
 func TestConfigListAll_GroupsCategories(t *testing.T) {

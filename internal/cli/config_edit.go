@@ -250,6 +250,28 @@ func configRoleEdit(stdin io.Reader, stdout io.Writer, local bool, name string) 
 		}
 	}
 
+	newOptional := role.Optional
+	if newFile != "" {
+		optBracket := "y/N"
+		if role.Optional {
+			optBracket = "Y/n"
+		}
+		_, _ = fmt.Fprintf(stdout, "\nOptional %s? %s ", tui.Annotate("currently %t", role.Optional), tui.Bracket("%s", optBracket))
+		optInput, err := reader.ReadString('\n')
+		if err != nil {
+			return fmt.Errorf("reading input: %w", err)
+		}
+		optInput = strings.TrimSpace(strings.ToLower(optInput))
+		switch optInput {
+		case "y", "yes":
+			newOptional = true
+		case "n", "no":
+			newOptional = false
+		}
+	} else {
+		newOptional = false
+	}
+
 	_, _ = fmt.Fprintln(stdout)
 	newTags, err := promptTags(stdout, stdin, role.Tags)
 	if err != nil {
@@ -261,6 +283,7 @@ func configRoleEdit(stdin io.Reader, stdout io.Writer, local bool, name string) 
 	role.Command = newCommand
 	role.Prompt = newPrompt
 	role.Tags = newTags
+	role.Optional = newOptional
 	roles[resolvedName] = role
 
 	if err := writeRolesFile(rolePath, roles, order); err != nil {

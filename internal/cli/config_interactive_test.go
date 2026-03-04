@@ -52,16 +52,16 @@ func TestLoadNamesForCategory(t *testing.T) {
 	}
 
 	// Seed one item in each category using stdin-driven interactive input.
-	if err := configAgentAdd(slowStdin("my-agent\nagent\n"+`agent "{{.prompt}}"`+"\n\n\n"), &bytes.Buffer{}, false); err != nil {
+	if err := configAgentAdd(slowStdin("my-agent\nagent\n"+`agent "{{.prompt}}"`+"\n\n\n\n"), &bytes.Buffer{}, false); err != nil {
 		t.Fatalf("setup agent add failed: %v", err)
 	}
-	if err := configRoleAdd(slowStdin("my-role\n\n3\nYou are a role.\n\n"), &bytes.Buffer{}, false); err != nil {
+	if err := configRoleAdd(slowStdin("my-role\n\n3\nYou are a role.\n\n\n"), &bytes.Buffer{}, false); err != nil {
 		t.Fatalf("setup role add failed: %v", err)
 	}
-	if err := configContextAdd(slowStdin("my-context\n\n3\nContext info.\n\n\n\n"), &bytes.Buffer{}, false); err != nil {
+	if err := configContextAdd(slowStdin("my-context\n\n3\nContext info.\n\n\n\n\n"), &bytes.Buffer{}, false); err != nil {
 		t.Fatalf("setup context add failed: %v", err)
 	}
-	if err := configTaskAdd(slowStdin("my-task\n\n\nDo a task.\n\n\n"), &bytes.Buffer{}, false); err != nil {
+	if err := configTaskAdd(slowStdin("my-task\n\n\nDo a task.\n\n\n\n"), &bytes.Buffer{}, false); err != nil {
 		t.Fatalf("setup task add failed: %v", err)
 	}
 
