@@ -332,6 +332,21 @@ func promptTags(w io.Writer, r io.Reader, current []string) ([]string, error) {
 	return tags, nil
 }
 
+// promptModelsAdd prompts for adding model aliases in the add flow (no existing models).
+// Returns the map (may be nil if user skips).
+func promptModelsAdd(w io.Writer, r io.Reader) (map[string]string, error) {
+	reader := bufio.NewReader(r)
+	_, _ = fmt.Fprintln(w, "Add model aliases (alias=model-id, empty to finish):")
+	result, err := readModelAliases(w, reader)
+	if err != nil {
+		return nil, err
+	}
+	if len(result) == 0 {
+		return nil, nil
+	}
+	return result, nil
+}
+
 // promptModels prompts for editing a map of model aliases.
 // Offers options: (k)eep, (c)lear, (e)dit.
 func promptModels(w io.Writer, r io.Reader, current map[string]string) (map[string]string, error) {
@@ -411,6 +426,20 @@ func promptModelsEdit(w io.Writer, reader *bufio.Reader, current map[string]stri
 
 	// Add new models
 	_, _ = fmt.Fprintln(w, "Add new models (alias=model-id, empty to finish):")
+	newModels, err := readModelAliases(w, reader)
+	if err != nil {
+		return nil, err
+	}
+	for alias, modelID := range newModels {
+		result[alias] = modelID
+	}
+
+	return result, nil
+}
+
+// readModelAliases reads alias=model-id pairs from the reader until an empty line.
+func readModelAliases(w io.Writer, reader *bufio.Reader) (map[string]string, error) {
+	result := make(map[string]string)
 	for {
 		_, _ = fmt.Fprint(w, "  > ")
 		input, err := reader.ReadString('\n')
@@ -438,7 +467,6 @@ func promptModelsEdit(w io.Writer, reader *bufio.Reader, current map[string]stri
 
 		result[alias] = modelID
 	}
-
 	return result, nil
 }
 

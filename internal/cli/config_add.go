@@ -109,7 +109,20 @@ func configAgentAdd(stdin io.Reader, stdout io.Writer, local bool) error {
 		return err
 	}
 
+	var models map[string]string
+	if defaultModel != "" {
+		models, err = promptModelsAdd(stdout, stdin)
+		if err != nil {
+			return err
+		}
+	}
+
 	description, err := promptString(stdout, stdin, "Description (optional)", "")
+	if err != nil {
+		return err
+	}
+
+	tags, err := promptTags(stdout, stdin, nil)
 	if err != nil {
 		return err
 	}
@@ -120,6 +133,8 @@ func configAgentAdd(stdin io.Reader, stdout io.Writer, local bool) error {
 		Command:      command,
 		DefaultModel: defaultModel,
 		Description:  description,
+		Models:       models,
+		Tags:         tags,
 	}
 
 	paths, err := config.ResolvePaths("")
@@ -193,12 +208,31 @@ func configRoleAdd(stdin io.Reader, stdout io.Writer, local bool) error {
 		return fmt.Errorf("specify only one of: file, command, or prompt")
 	}
 
+	var optional bool
+	if file != "" {
+		_, _ = fmt.Fprintf(stdout, "Optional %s? %s ", tui.Annotate("skip if file missing"), tui.Bracket("y/N"))
+		reader := bufio.NewReader(stdin)
+		input, err := reader.ReadString('\n')
+		if err != nil {
+			return fmt.Errorf("reading input: %w", err)
+		}
+		input = strings.TrimSpace(strings.ToLower(input))
+		optional = input == "y" || input == "yes"
+	}
+
+	tags, err := promptTags(stdout, stdin, nil)
+	if err != nil {
+		return err
+	}
+
 	role := RoleConfig{
 		Name:        name,
 		Description: description,
 		File:        file,
 		Command:     command,
 		Prompt:      prompt,
+		Optional:    optional,
+		Tags:        tags,
 	}
 
 	paths, err := config.ResolvePaths("")
@@ -294,6 +328,11 @@ func configContextAdd(stdin io.Reader, stdout io.Writer, local bool) error {
 		}
 	}
 
+	tags, err := promptTags(stdout, stdin, nil)
+	if err != nil {
+		return err
+	}
+
 	ctx := ContextConfig{
 		Name:        name,
 		Description: description,
@@ -302,6 +341,7 @@ func configContextAdd(stdin io.Reader, stdout io.Writer, local bool) error {
 		Prompt:      prompt,
 		Required:    required,
 		Default:     isDefault,
+		Tags:        tags,
 	}
 
 	paths, err := config.ResolvePaths("")
@@ -380,6 +420,11 @@ func configTaskAdd(stdin io.Reader, stdout io.Writer, local bool) error {
 		return err
 	}
 
+	tags, err := promptTags(stdout, stdin, nil)
+	if err != nil {
+		return err
+	}
+
 	task := TaskConfig{
 		Name:        name,
 		Description: description,
@@ -387,6 +432,7 @@ func configTaskAdd(stdin io.Reader, stdout io.Writer, local bool) error {
 		Command:     command,
 		Prompt:      prompt,
 		Role:        role,
+		Tags:        tags,
 	}
 
 	paths, err := config.ResolvePaths("")

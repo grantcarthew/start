@@ -692,8 +692,8 @@ func TestConfigContextAdd_PreservesOrder(t *testing.T) {
 	chdir(t, tmpDir)
 
 	// Add a new context "beta" - should appear at end
-	// Prompts: name, description (empty), content choice (Enter=default file), file path, required (N), default (N)
-	if err := configContextAdd(slowStdin("beta\n\n\nbeta.md\n\n\n"), &bytes.Buffer{}, false); err != nil {
+	// Prompts: name, description (empty), content choice (Enter=default file), file path, required (N), default (N), tags (skip)
+	if err := configContextAdd(slowStdin("beta\n\n\nbeta.md\n\n\n\n"), &bytes.Buffer{}, false); err != nil {
 		t.Fatalf("add failed: %v", err)
 	}
 
@@ -739,8 +739,8 @@ func TestConfigRoleAdd_PreservesOrder(t *testing.T) {
 	chdir(t, tmpDir)
 
 	// Add a new role "beta"
-	// Prompts: name, description (empty), content choice "3" (inline prompt), prompt text, blank line to finish
-	if err := configRoleAdd(slowStdin("beta\n\n3\nBeta role\n\n"), &bytes.Buffer{}, false); err != nil {
+	// Prompts: name, description (empty), content choice "3" (inline prompt), prompt text, blank line to finish, tags (skip)
+	if err := configRoleAdd(slowStdin("beta\n\n3\nBeta role\n\n\n"), &bytes.Buffer{}, false); err != nil {
 		t.Fatalf("add failed: %v", err)
 	}
 
