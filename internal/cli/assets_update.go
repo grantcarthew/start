@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -25,11 +26,12 @@ import (
 
 // UpdateResult tracks the result of an update operation.
 type UpdateResult struct {
-	Asset      InstalledAsset
-	OldVersion string
-	NewVersion string
-	Updated    bool
-	Error      error
+	Asset        InstalledAsset `json:"asset"`
+	OldVersion   string         `json:"oldVersion,omitempty"`
+	NewVersion   string         `json:"newVersion,omitempty"`
+	Updated      bool           `json:"updated"`
+	Error        error          `json:"-"`
+	ErrorMessage string         `json:"error,omitempty"`
 }
 
 // addAssetsUpdateCommand adds the update subcommand to the assets command.
@@ -50,6 +52,7 @@ Use --force to re-fetch and update assets even when already at the latest versio
 	}
 
 	updateCmd.Flags().Bool("force", false, "Re-fetch even if already at latest version")
+	updateCmd.Flags().Bool("json", false, "Output as JSON")
 
 	parent.AddCommand(updateCmd)
 }
@@ -64,6 +67,7 @@ func runAssetsUpdate(cmd *cobra.Command, args []string) error {
 		query = args[0]
 	}
 
+	jsonFlag, _ := cmd.Flags().GetBool("json")
 	ctx := context.Background()
 
 	// Load configuration
@@ -73,6 +77,10 @@ func runAssetsUpdate(cmd *cobra.Command, args []string) error {
 	}
 
 	if !paths.AnyExists() {
+		if jsonFlag {
+			_, _ = fmt.Fprintln(cmd.OutOrStdout(), "[]")
+			return nil
+		}
 		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "No configuration found. Run 'start' to set up.")
 		return nil
 	}
@@ -97,6 +105,10 @@ func runAssetsUpdate(cmd *cobra.Command, args []string) error {
 	installed := collectInstalledAssets(cfg.Value, paths, localCfg)
 
 	if len(installed) == 0 {
+		if jsonFlag {
+			_, _ = fmt.Fprintln(cmd.OutOrStdout(), "[]")
+			return nil
+		}
 		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "No assets installed from registry.")
 		return nil
 	}
@@ -114,6 +126,10 @@ func runAssetsUpdate(cmd *cobra.Command, args []string) error {
 		installed = filtered
 
 		if len(installed) == 0 {
+			if jsonFlag {
+				_, _ = fmt.Fprintln(cmd.OutOrStdout(), "[]")
+				return nil
+			}
 			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "No installed assets matching %q\n", query)
 			return nil
 		}
@@ -149,6 +165,21 @@ func runAssetsUpdate(cmd *cobra.Command, args []string) error {
 		results = append(results, result)
 	}
 	prog.Done()
+
+	if jsonFlag {
+		// Populate ErrorMessage for JSON serialisation
+		for i := range results {
+			if results[i].Error != nil {
+				results[i].ErrorMessage = results[i].Error.Error()
+			}
+		}
+		data, err := json.MarshalIndent(results, "", "  ")
+		if err != nil {
+			return fmt.Errorf("marshalling update results: %w", err)
+		}
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), string(data))
+		return nil
+	}
 
 	// Print results
 	printUpdateResults(cmd.OutOrStdout(), results, dryRun)

@@ -1,8 +1,8 @@
 # P-039: CLI JSON Output - Shared Prep and Assets Commands
 
-- Status: Pending
-- Started:
-- Completed:
+- Status: Complete
+- Started: 2026-03-05
+- Completed: 2026-03-05
 - GitHub: #69
 
 ## Overview
@@ -90,10 +90,16 @@ Command analysis:
 - Gated by `--yes` flag at `assets_validate.go:88` (network protection; applies regardless of output format)
 - Three output sections: `printValidateIndexSection`, `printValidateModules`, `printValidateStats`
 - Uses `doctor.SectionResult` and `doctor.CheckResult` types for index section
+- Note: `doctor.SectionResult` and `doctor.CheckResult` (`internal/doctor/doctor.go:56,67`) have no JSON tags; validate JSON output will need its own structs or doctor types will need tags added (doctor itself is out of scope per p-040, but validate consumes these types)
 
 `assets update` (`internal/cli/assets_update.go`):
 - No `--json` flag
 - Output: `printUpdateResults` at `assets_update.go:154` - per-asset results with version changes
+
+JSON output struct needs:
+- `assets info --json` requires a struct combining `SearchResult` fields with installation status (installed bool, scope string). Options: add fields to `SearchResult`, create an `AssetInfoResult` wrapper, or inline a one-off struct in the marshal block.
+- `assets validate --json` needs a top-level struct wrapping the three sections (index, modules, stats). The index section uses `doctor.SectionResult`/`doctor.CheckResult` which have no JSON tags and are out of scope (p-040). Validate-specific exported structs are the cleanest approach.
+- `assets search --json` can marshal `[]SearchResult` directly once JSON tags are added.
 
 Test coverage:
 - `internal/cli/assets_test.go`: 12 test functions covering list, search, index, info
@@ -103,16 +109,16 @@ Test coverage:
 
 ## Success Criteria
 
-- [ ] `SearchResult` has JSON tags (with decision on `MatchScore` visibility)
-- [ ] `assets list --json` includes tags, description, and category-specific fields
-- [ ] `assets search --json` outputs search results with category, name, description, tags, match score
-- [ ] `assets info --json` outputs single asset detail with all available fields
-- [ ] `assets validate --json` outputs validation results per module
-- [ ] `assets update --json` outputs update results with old/new version and success/error
-- [ ] Empty results output `[]` for arrays, `{}` for objects
-- [ ] All new JSON output uses `json.MarshalIndent("", "  ")` with camelCase field names
-- [ ] Tests cover JSON output for each modified command
-- [ ] All tests pass via `scripts/invoke-tests`
+- [x] `SearchResult` has JSON tags (with decision on `MatchScore` visibility)
+- [x] `assets list --json` includes tags, description, and category-specific fields
+- [x] `assets search --json` outputs search results with category, name, description, tags, match score
+- [x] `assets info --json` outputs single asset detail with all available fields
+- [x] `assets validate --json` outputs validation results per module
+- [x] `assets update --json` outputs update results with old/new version and success/error
+- [x] Empty results output `[]` for arrays, `{}` for objects
+- [x] All new JSON output uses `json.MarshalIndent("", "  ")` with camelCase field names
+- [x] Tests cover JSON output for each modified command
+- [x] All tests pass via `scripts/invoke-tests`
 
 ## Deliverables
 
@@ -145,20 +151,22 @@ For `UpdateResult.Error`, serialise as a string field:
 
 For `assets validate`, create exported structs (`ValidateModuleResult`, `ValidateCategoryResult`) mirroring the unexported types with JSON tags.
 
-## Decision Points
+## Implementation Notes
 
-1. Include `MatchScore` in `SearchResult` JSON output?
+The following edge cases need handling during implementation:
 
-- A: Include as `"matchScore"` (useful for consumers to understand relevance ranking)
-- B: Exclude with `json:"-"` (internal implementation detail)
+`assets update` empty/no-config paths: Lines 75-78 and 99-100 print text messages for empty state. With `--json`, these should output `[]` and return early (matching the `assets list` pattern).
 
-2. `assets info --json` with multiple matches?
+`assets info --json` with all matches (Decision 2B): The interactive selection prompt at `assets_info.go:115` must be bypassed entirely. Output `results` as a JSON array. The `checkIfInstalled` call at line 133 is per-asset; for JSON array output, either skip install status or iterate all results.
 
-- A: Output the best match (first result) as a single JSON object, consistent with non-terminal behaviour at `assets_info.go:125`
-- B: Output all matches as a JSON array, let the consumer choose
-- C: Error if query is ambiguous (force exact match for JSON output)
+`assets validate --json` struct mapping: The validate command's three output sections (index via `doctor.SectionResult`, modules via `validateCatResult`, stats) need a single top-level JSON struct. Since `doctor.CheckResult` and `doctor.SectionResult` have no JSON tags and are out of scope for this project, create validate-specific exported structs that mirror the data.
 
-3. `UpdateResult.Error` serialisation approach?
+`assets search --json` prompt bypass: The interactive prompt fallback at `assets_search.go:63` is already gated by `isTerminal(stdin)`. With `--json`, the validation error should be returned directly regardless of terminal status.
 
-- A: Custom `MarshalJSON` method on `UpdateResult` that converts `Error` to a string field
-- B: Parallel `ErrorMessage string` field with `json:"error,omitempty"` populated before marshalling, `Error` tagged `json:"-"`
+## Decision Points (Resolved)
+
+1. Include `MatchScore` in `SearchResult` JSON output? Decision: A — Include as `"matchScore"`
+2. `assets info --json` with multiple matches? Decision: B — Output all matches as a JSON array
+3. `UpdateResult.Error` serialisation approach? Decision: B — Parallel `ErrorMessage string` field with `json:"error,omitempty"`, `Error` tagged `json:"-"`
+
+4. `assets info --json` installation status in array output? Decision: C — Load config once, build lookup set (reuse `collectInstalledNames` pattern from `assets_search.go:125`), check each result against it
