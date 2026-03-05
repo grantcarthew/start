@@ -3,6 +3,7 @@ package cli
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"strconv"
@@ -18,6 +19,16 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// AssetInfoResult combines a search result with installation status for JSON output.
+type AssetInfoResult struct {
+	Category       string              `json:"category"`
+	Name           string              `json:"name"`
+	Entry          registry.IndexEntry `json:"entry"`
+	MatchScore     int                 `json:"matchScore"`
+	Installed      bool                `json:"installed"`
+	InstalledScope string              `json:"installedScope,omitempty"`
+}
+
 // addAssetsInfoCommand adds the info subcommand to the assets command.
 func addAssetsInfoCommand(parent *cobra.Command) {
 	infoCmd := &cobra.Command{
@@ -27,11 +38,14 @@ func addAssetsInfoCommand(parent *cobra.Command) {
 
 Searches for the asset in the registry index and displays full details
 including description, module path, tags, and installation status.
-Multiple words are combined with AND logic.`,
+Multiple words are combined with AND logic.
+
+Use --json to output machine-readable JSON.`,
 		Args: cobra.MinimumNArgs(0),
 		RunE: runAssetsInfo,
 	}
 
+	infoCmd.Flags().Bool("json", false, "Output as JSON")
 	parent.AddCommand(infoCmd)
 }
 
@@ -40,8 +54,13 @@ func runAssetsInfo(cmd *cobra.Command, args []string) error {
 	if shown, err := checkHelpArg(cmd, args); shown || err != nil {
 		return err
 	}
+	jsonFlag, _ := cmd.Flags().GetBool("json")
+
 	prompted := false
 	if len(args) == 0 {
+		if jsonFlag {
+			return fmt.Errorf("query is required with --json")
+		}
 		input, err := promptSearchQuery(cmd.OutOrStdout(), cmd.InOrStdin())
 		if err != nil {
 			return err
@@ -55,6 +74,9 @@ func runAssetsInfo(cmd *cobra.Command, args []string) error {
 
 	query := strings.Join(args, " ")
 	if len(query) < 3 {
+		if jsonFlag {
+			return fmt.Errorf("query must be at least 3 characters")
+		}
 		w := cmd.OutOrStdout()
 		stdin := cmd.InOrStdin()
 		if !isTerminal(stdin) {
@@ -101,12 +123,41 @@ func runAssetsInfo(cmd *cobra.Command, args []string) error {
 
 	w := cmd.OutOrStdout()
 	if len(results) == 0 {
+		if jsonFlag {
+			_, _ = fmt.Fprintln(w, "[]")
+			return nil
+		}
 		if prompted {
 			_, _ = fmt.Fprintf(w, "No assets found matching %q\n", query)
 			return nil
 		}
 		return fmt.Errorf("no assets found matching %q", query)
 	}
+
+	if jsonFlag {
+		// Build lookup map for installation status and scope (single config load)
+		installedScopes := collectInstalledScopes()
+		var infoResults []AssetInfoResult
+		for _, r := range results {
+			key := r.Category + "/" + r.Name
+			ir := AssetInfoResult{
+				Category:       r.Category,
+				Name:           r.Name,
+				Entry:          r.Entry,
+				MatchScore:     r.MatchScore,
+				Installed:      installedScopes[key] != "",
+				InstalledScope: installedScopes[key],
+			}
+			infoResults = append(infoResults, ir)
+		}
+		data, err := json.MarshalIndent(infoResults, "", "  ")
+		if err != nil {
+			return fmt.Errorf("marshalling asset info: %w", err)
+		}
+		_, _ = fmt.Fprintln(w, string(data))
+		return nil
+	}
+
 	var selected assets.SearchResult
 	if len(results) == 1 {
 		selected = results[0]

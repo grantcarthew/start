@@ -12,10 +12,10 @@ import (
 
 // SearchResult holds a matched index entry with its category and name.
 type SearchResult struct {
-	Category   string // "agents", "roles", "contexts", "tasks"
-	Name       string
-	Entry      registry.IndexEntry
-	MatchScore int // Higher = better match
+	Category   string              `json:"category"`
+	Name       string              `json:"name"`
+	Entry      registry.IndexEntry `json:"entry"`
+	MatchScore int                 `json:"matchScore"`
 }
 
 // ParseSearchTerms splits an input string into unique, lowercased search terms.

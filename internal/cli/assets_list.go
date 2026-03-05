@@ -26,14 +26,17 @@ import (
 
 // InstalledAsset represents an installed asset with version info.
 type InstalledAsset struct {
-	Category     string `json:"category"`
-	Name         string `json:"name"`
-	InstalledVer string `json:"version,omitempty"`
-	LatestVer    string `json:"latestVersion,omitempty"`
-	UpdateAvail  bool   `json:"updateAvailable,omitempty"`
-	Scope        string `json:"scope"`
-	Origin       string `json:"origin"`
-	ConfigFile   string `json:"configFile"`
+	Category     string   `json:"category"`
+	Name         string   `json:"name"`
+	Description  string   `json:"description,omitempty"`
+	Tags         []string `json:"tags,omitempty"`
+	Models       []string `json:"models,omitempty"`
+	InstalledVer string   `json:"version,omitempty"`
+	LatestVer    string   `json:"latestVersion,omitempty"`
+	UpdateAvail  bool     `json:"updateAvailable,omitempty"`
+	Scope        string   `json:"scope"`
+	Origin       string   `json:"origin"`
+	ConfigFile   string   `json:"configFile"`
 }
 
 // addAssetsListCommand adds the list subcommand to the assets command.
@@ -200,10 +203,47 @@ func collectInstalledAssets(v cue.Value, paths config.Paths, localCfg cue.Value)
 
 			installedVer := assets.VersionFromOrigin(origin)
 
+			// Extract description
+			var description string
+			if descVal := assetVal.LookupPath(cue.ParsePath("description")); descVal.Exists() {
+				description, _ = descVal.String()
+			}
+
+			// Extract tags
+			var tags []string
+			if tagsVal := assetVal.LookupPath(cue.ParsePath("tags")); tagsVal.Exists() {
+				tagIter, tagErr := tagsVal.List()
+				if tagErr == nil {
+					for tagIter.Next() {
+						if s, sErr := tagIter.Value().String(); sErr == nil {
+							tags = append(tags, s)
+						}
+					}
+				}
+			}
+
+			// Extract models (agents only)
+			var models []string
+			if cat == "agents" {
+				if modelsVal := assetVal.LookupPath(cue.ParsePath("models")); modelsVal.Exists() {
+					modIter, modErr := modelsVal.List()
+					if modErr == nil {
+						for modIter.Next() {
+							if s, sErr := modIter.Value().String(); sErr == nil {
+								models = append(models, s)
+							}
+						}
+					}
+				}
+			}
+
 			scope, configFile := determineScopeAndFile(localCfg, paths, cat, name)
 			asset := InstalledAsset{
 				Category:     cat,
 				Name:         name,
+				Description:  description,
+				Tags:         tags,
+				Models:       models,
 				InstalledVer: installedVer,
 				Scope:        scope,
 				Origin:       origin,

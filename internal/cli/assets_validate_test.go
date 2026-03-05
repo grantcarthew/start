@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -10,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/grantcarthew/start/internal/doctor"
 	"github.com/grantcarthew/start/internal/registry"
 )
 
@@ -583,5 +585,159 @@ func TestPrintValidateStatsOutput(t *testing.T) {
 		if !strings.Contains(out, want) {
 			t.Errorf("stats output missing %q: %q", want, out)
 		}
+	}
+}
+
+// TestOutputValidateJSON verifies that validate results marshal correctly.
+func TestOutputValidateJSON(t *testing.T) {
+	t.Parallel()
+
+	indexSection := doctor.SectionResult{
+		Name: "Index",
+		Results: []doctor.CheckResult{
+			{Status: doctor.StatusPass, Label: "Valid", Message: "v0.1.8"},
+		},
+	}
+
+	cats := []validateCatResult{
+		{name: "agents", modules: []validateModuleResult{
+			{name: "ai/claude", version: "v0.2.0", status: validateModulePass},
+			{name: "ai/gemini", version: "v0.1.0", status: validateModuleFail, issues: []string{"index version mismatch"}},
+		}},
+		{name: "roles", modules: []validateModuleResult{
+			{name: "golang", version: "v0.1.0", status: validateModulePass},
+		}},
+	}
+
+	var buf bytes.Buffer
+	err := outputValidateJSON(&buf, indexSection, cats)
+	if err != nil {
+		t.Fatalf("outputValidateJSON failed: %v", err)
+	}
+
+	var result ValidateResult
+	if err := json.Unmarshal(buf.Bytes(), &result); err != nil {
+		t.Fatalf("Unmarshal failed: %v", err)
+	}
+
+	// Index checks
+	if len(result.Index.Checks) != 1 {
+		t.Fatalf("expected 1 index check, got %d", len(result.Index.Checks))
+	}
+	if result.Index.Checks[0].Status != "pass" {
+		t.Errorf("expected index check status 'pass', got %q", result.Index.Checks[0].Status)
+	}
+	if result.Index.Checks[0].Message != "v0.1.8" {
+		t.Errorf("expected index check message 'v0.1.8', got %q", result.Index.Checks[0].Message)
+	}
+
+	// Categories
+	if len(result.Categories) != 2 {
+		t.Fatalf("expected 2 categories, got %d", len(result.Categories))
+	}
+	if result.Categories[0].Name != "agents" {
+		t.Errorf("expected first category 'agents', got %q", result.Categories[0].Name)
+	}
+	if len(result.Categories[0].Modules) != 2 {
+		t.Fatalf("expected 2 agent modules, got %d", len(result.Categories[0].Modules))
+	}
+	if result.Categories[0].Modules[1].Status != "fail" {
+		t.Errorf("expected gemini status 'fail', got %q", result.Categories[0].Modules[1].Status)
+	}
+	if len(result.Categories[0].Modules[1].Issues) != 1 {
+		t.Errorf("expected 1 issue for gemini, got %d", len(result.Categories[0].Modules[1].Issues))
+	}
+
+	// Stats
+	if result.Stats.Checked != 3 {
+		t.Errorf("expected 3 checked, got %d", result.Stats.Checked)
+	}
+	if result.Stats.Pass != 2 {
+		t.Errorf("expected 2 pass, got %d", result.Stats.Pass)
+	}
+	if result.Stats.Fail != 1 {
+		t.Errorf("expected 1 fail, got %d", result.Stats.Fail)
+	}
+}
+
+// TestOutputValidateJSONNilCategories verifies JSON output when categories are nil.
+func TestOutputValidateJSONNilCategories(t *testing.T) {
+	t.Parallel()
+
+	indexSection := doctor.SectionResult{
+		Name: "Index",
+		Results: []doctor.CheckResult{
+			{Status: doctor.StatusFail, Label: "Unreachable", Message: "cannot resolve"},
+		},
+	}
+
+	var buf bytes.Buffer
+	err := outputValidateJSON(&buf, indexSection, nil)
+	if err != nil {
+		t.Fatalf("outputValidateJSON failed: %v", err)
+	}
+
+	var result ValidateResult
+	if err := json.Unmarshal(buf.Bytes(), &result); err != nil {
+		t.Fatalf("Unmarshal failed: %v", err)
+	}
+
+	if len(result.Index.Checks) != 1 {
+		t.Fatalf("expected 1 index check, got %d", len(result.Index.Checks))
+	}
+	if result.Index.Checks[0].Status != "fail" {
+		t.Errorf("expected 'fail', got %q", result.Index.Checks[0].Status)
+	}
+	if len(result.Categories) != 0 {
+		t.Errorf("expected empty categories, got %d", len(result.Categories))
+	}
+	if result.Stats.Checked != 0 {
+		t.Errorf("expected 0 checked, got %d", result.Stats.Checked)
+	}
+}
+
+// TestValidateHasFailure tests the validateHasFailure helper.
+func TestValidateHasFailure(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		cats []validateCatResult
+		want bool
+	}{
+		{
+			name: "all pass",
+			cats: []validateCatResult{
+				{name: "agents", modules: []validateModuleResult{
+					{status: validateModulePass},
+				}},
+			},
+			want: false,
+		},
+		{
+			name: "has failure",
+			cats: []validateCatResult{
+				{name: "agents", modules: []validateModuleResult{
+					{status: validateModulePass},
+					{status: validateModuleFail},
+				}},
+			},
+			want: true,
+		},
+		{
+			name: "empty",
+			cats: nil,
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := validateHasFailure(tt.cats)
+			if got != tt.want {
+				t.Errorf("validateHasFailure() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }

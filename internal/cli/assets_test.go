@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -774,6 +775,9 @@ func TestPrintInstalledAssetsJSON(t *testing.T) {
 		{
 			Category:     "agents",
 			Name:         "ai/claude",
+			Description:  "Claude by Anthropic",
+			Tags:         []string{"anthropic", "ai"},
+			Models:       []string{"claude-sonnet-4-20250514"},
 			InstalledVer: "v0.2.0",
 			Scope:        "global",
 			Origin:       "github.com/test/agents/ai/claude@v0.2.0",
@@ -782,6 +786,8 @@ func TestPrintInstalledAssetsJSON(t *testing.T) {
 		{
 			Category:     "roles",
 			Name:         "golang/assistant",
+			Description:  "Go programming expert",
+			Tags:         []string{"golang"},
 			InstalledVer: "v0.1.0",
 			Scope:        "local",
 			Origin:       "github.com/test/roles/golang/assistant@v0.1.0",
@@ -807,8 +813,187 @@ func TestPrintInstalledAssetsJSON(t *testing.T) {
 	if !strings.Contains(output, `"scope": "global"`) {
 		t.Errorf("output missing scope field, got: %s", output)
 	}
+	if !strings.Contains(output, `"description": "Claude by Anthropic"`) {
+		t.Errorf("output missing description field, got: %s", output)
+	}
+	if !strings.Contains(output, `"anthropic"`) {
+		t.Errorf("output missing tags, got: %s", output)
+	}
+	if !strings.Contains(output, `"claude-sonnet-4-20250514"`) {
+		t.Errorf("output missing models, got: %s", output)
+	}
 	if strings.Contains(output, `"updateAvailable"`) {
 		t.Errorf("omitempty should suppress false updateAvailable, got: %s", output)
+	}
+}
+
+// TestInstalledAssetJSONOmitsEmptyOptionalFields verifies omitempty suppresses nil slices.
+func TestInstalledAssetJSONOmitsEmptyOptionalFields(t *testing.T) {
+	t.Parallel()
+	asset := InstalledAsset{
+		Category: "roles",
+		Name:     "test",
+		Scope:    "global",
+		Origin:   "github.com/test/roles/test@v0.1.0",
+	}
+
+	data, err := json.MarshalIndent(asset, "", "  ")
+	if err != nil {
+		t.Fatalf("MarshalIndent failed: %v", err)
+	}
+	output := string(data)
+
+	if strings.Contains(output, `"tags"`) {
+		t.Errorf("omitempty should suppress nil tags, got: %s", output)
+	}
+	if strings.Contains(output, `"models"`) {
+		t.Errorf("omitempty should suppress nil models, got: %s", output)
+	}
+	if strings.Contains(output, `"description"`) {
+		t.Errorf("omitempty should suppress empty description, got: %s", output)
+	}
+}
+
+// TestSearchResultJSON tests that SearchResult marshals to valid JSON with correct field names.
+func TestSearchResultJSON(t *testing.T) {
+	t.Parallel()
+	results := []assets.SearchResult{
+		{
+			Category: "agents",
+			Name:     "ai/claude",
+			Entry: registry.IndexEntry{
+				Module:      "github.com/test/agents/ai/claude@v0",
+				Description: "Claude by Anthropic",
+				Tags:        []string{"anthropic", "ai"},
+				Version:     "v0.2.0",
+			},
+			MatchScore: 5,
+		},
+	}
+
+	data, err := json.MarshalIndent(results, "", "  ")
+	if err != nil {
+		t.Fatalf("MarshalIndent failed: %v", err)
+	}
+	output := string(data)
+
+	for _, want := range []string{
+		`"category": "agents"`,
+		`"name": "ai/claude"`,
+		`"matchScore": 5`,
+		`"entry"`,
+		`"module": "github.com/test/agents/ai/claude@v0"`,
+		`"description": "Claude by Anthropic"`,
+	} {
+		if !strings.Contains(output, want) {
+			t.Errorf("output missing %s, got: %s", want, output)
+		}
+	}
+}
+
+// TestUpdateResultJSON tests that UpdateResult marshals with error as string and omits Error field.
+func TestUpdateResultJSON(t *testing.T) {
+	t.Parallel()
+	results := []UpdateResult{
+		{
+			Asset:      InstalledAsset{Category: "agents", Name: "ai/claude", Scope: "global", Origin: "test"},
+			OldVersion: "v0.1.0",
+			NewVersion: "v0.2.0",
+			Updated:    true,
+		},
+		{
+			Asset:        InstalledAsset{Category: "roles", Name: "golang", Scope: "global", Origin: "test"},
+			OldVersion:   "v0.1.0",
+			Updated:      false,
+			Error:        fmt.Errorf("network timeout"),
+			ErrorMessage: "network timeout",
+		},
+	}
+
+	data, err := json.MarshalIndent(results, "", "  ")
+	if err != nil {
+		t.Fatalf("MarshalIndent failed: %v", err)
+	}
+	output := string(data)
+
+	// First result: updated, no error
+	if !strings.Contains(output, `"oldVersion": "v0.1.0"`) {
+		t.Errorf("output missing oldVersion, got: %s", output)
+	}
+	if !strings.Contains(output, `"newVersion": "v0.2.0"`) {
+		t.Errorf("output missing newVersion, got: %s", output)
+	}
+	if !strings.Contains(output, `"updated": true`) {
+		t.Errorf("output missing updated=true, got: %s", output)
+	}
+
+	// Second result: error serialised as string
+	if !strings.Contains(output, `"error": "network timeout"`) {
+		t.Errorf("output missing error string, got: %s", output)
+	}
+
+	// Verify the Error (interface) field is excluded from JSON
+	var decoded []map[string]interface{}
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("Unmarshal failed: %v", err)
+	}
+	for _, item := range decoded {
+		if _, ok := item["Error"]; ok {
+			t.Errorf("Error interface field should be excluded via json:\"-\", got: %v", item)
+		}
+	}
+}
+
+// TestAssetInfoResultJSON tests that AssetInfoResult marshals correctly.
+func TestAssetInfoResultJSON(t *testing.T) {
+	t.Parallel()
+	results := []AssetInfoResult{
+		{
+			Category: "agents",
+			Name:     "ai/claude",
+			Entry: registry.IndexEntry{
+				Module:      "github.com/test/agents/ai/claude@v0",
+				Description: "Claude by Anthropic",
+			},
+			MatchScore:     5,
+			Installed:      true,
+			InstalledScope: "global",
+		},
+		{
+			Category: "roles",
+			Name:     "golang/assistant",
+			Entry: registry.IndexEntry{
+				Module:      "github.com/test/roles/golang/assistant@v0",
+				Description: "Go expert",
+			},
+			MatchScore: 3,
+			Installed:  false,
+		},
+	}
+
+	data, err := json.MarshalIndent(results, "", "  ")
+	if err != nil {
+		t.Fatalf("MarshalIndent failed: %v", err)
+	}
+	output := string(data)
+
+	for _, want := range []string{
+		`"installed": true`,
+		`"installedScope": "global"`,
+		`"installed": false`,
+	} {
+		if !strings.Contains(output, want) {
+			t.Errorf("output missing %s, got: %s", want, output)
+		}
+	}
+
+	// installedScope should be omitted for non-installed
+	var decoded []map[string]interface{}
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("Unmarshal failed: %v", err)
+	}
+	if _, ok := decoded[1]["installedScope"]; ok {
+		t.Errorf("installedScope should be omitted for non-installed asset")
 	}
 }
 

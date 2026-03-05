@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -43,6 +44,46 @@ type validateCatResult struct {
 	modules []validateModuleResult
 }
 
+// ValidateResult is the top-level JSON output for assets validate.
+type ValidateResult struct {
+	Index      ValidateIndexResult      `json:"index"`
+	Categories []ValidateCategoryResult `json:"categories"`
+	Stats      ValidateStatsResult      `json:"stats"`
+}
+
+// ValidateIndexResult holds the index validation checks for JSON output.
+type ValidateIndexResult struct {
+	Checks []ValidateCheckResult `json:"checks"`
+}
+
+// ValidateCheckResult mirrors doctor.CheckResult for JSON output.
+type ValidateCheckResult struct {
+	Status  string `json:"status"`
+	Label   string `json:"label"`
+	Message string `json:"message,omitempty"`
+}
+
+// ValidateCategoryResult holds per-category module results for JSON output.
+type ValidateCategoryResult struct {
+	Name    string                 `json:"name"`
+	Modules []ValidateModuleResult `json:"modules"`
+}
+
+// ValidateModuleResult holds per-module validation results for JSON output.
+type ValidateModuleResult struct {
+	Name    string   `json:"name"`
+	Version string   `json:"version,omitempty"`
+	Status  string   `json:"status"`
+	Issues  []string `json:"issues,omitempty"`
+}
+
+// ValidateStatsResult holds summary statistics for JSON output.
+type ValidateStatsResult struct {
+	Checked int `json:"checked"`
+	Pass    int `json:"pass"`
+	Fail    int `json:"fail"`
+}
+
 // validateError is a silent exit-code-1 error for validation failures.
 type validateError struct{}
 
@@ -70,6 +111,7 @@ Exit codes:
 		RunE: runAssetsValidate,
 	}
 	cmd.Flags().Bool("yes", false, "Confirm intent to run network checks")
+	cmd.Flags().Bool("json", false, "Output as JSON")
 	parent.AddCommand(cmd)
 }
 
@@ -156,17 +198,30 @@ func runAssetsValidate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("creating registry client: %w", err)
 	}
 
+	jsonFlag, _ := cmd.Flags().GetBool("json")
+
 	// Section 1: Index validation
 	prog.Update("Fetching index...")
 	indexSection, idx, fatal := validateIndex(ctx, client, indexPath, tags)
 	prog.Done() // clear before printing section output
-	printValidateIndexSection(w, indexSection)
+
+	if !jsonFlag {
+		printValidateIndexSection(w, indexSection)
+	}
 	if fatal {
+		if jsonFlag {
+			if err := outputValidateJSON(w, indexSection, nil); err != nil {
+				return err
+			}
+		}
 		cmd.SilenceErrors = true
 		cmd.SilenceUsage = true
 		return &validateError{}
 	}
 	if idx == nil {
+		if jsonFlag {
+			return outputValidateJSON(w, indexSection, nil)
+		}
 		return nil
 	}
 
@@ -183,6 +238,19 @@ func runAssetsValidate(cmd *cobra.Command, args []string) error {
 	}
 	cats := validateModules(ctx, client, idx, tags, cacheDir, onModule)
 	prog.Done() // clear before printing section output
+
+	if jsonFlag {
+		hasFailure := validateHasFailure(cats)
+		if err := outputValidateJSON(w, indexSection, cats); err != nil {
+			return err
+		}
+		if hasFailure {
+			cmd.SilenceErrors = true
+			cmd.SilenceUsage = true
+			return &validateError{}
+		}
+		return nil
+	}
 
 	printValidateModules(w, cats, flags.Verbose)
 
@@ -686,6 +754,69 @@ func validateIsStale(cacheDir, tag, relPath string) (bool, error) {
 		return false, fmt.Errorf("git diff failed for tag %s: %w", tag, err)
 	}
 	return strings.TrimSpace(string(out)) != "", nil
+}
+
+// outputValidateJSON marshals the full validate result as JSON.
+func outputValidateJSON(w io.Writer, indexSection doctor.SectionResult, cats []validateCatResult) error {
+	result := ValidateResult{
+		Index: ValidateIndexResult{
+			Checks: make([]ValidateCheckResult, 0, len(indexSection.Results)),
+		},
+		Categories: make([]ValidateCategoryResult, 0),
+	}
+
+	for _, cr := range indexSection.Results {
+		result.Index.Checks = append(result.Index.Checks, ValidateCheckResult{
+			Status:  cr.Status.String(),
+			Label:   cr.Label,
+			Message: cr.Message,
+		})
+	}
+
+	for _, cat := range cats {
+		catResult := ValidateCategoryResult{
+			Name:    cat.name,
+			Modules: make([]ValidateModuleResult, 0, len(cat.modules)),
+		}
+		for _, m := range cat.modules {
+			status := "pass"
+			if m.status == validateModuleFail {
+				status = "fail"
+			}
+			catResult.Modules = append(catResult.Modules, ValidateModuleResult{
+				Name:    m.name,
+				Version: m.version,
+				Status:  status,
+				Issues:  m.issues,
+			})
+			result.Stats.Checked++
+			if m.status == validateModulePass {
+				result.Stats.Pass++
+			} else {
+				result.Stats.Fail++
+			}
+		}
+		result.Categories = append(result.Categories, catResult)
+	}
+
+	data, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshalling validate results: %w", err)
+	}
+	_, _ = fmt.Fprintln(w, string(data))
+	return nil
+}
+
+// validateHasFailure returns true if any module has a failure status.
+func validateHasFailure(cats []validateCatResult) bool {
+	for _, cat := range cats {
+		for _, m := range cat.modules {
+			if m.status == validateModuleFail {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // printValidateIndexSection prints the index validation result (Section 1).

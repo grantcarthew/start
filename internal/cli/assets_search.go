@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"strings"
@@ -42,6 +43,7 @@ Use 'start search' to also include local and global config in results.`,
 		RunE: runAssetsSearch,
 	}
 	searchCmd.Flags().StringSlice("tag", nil, "Filter by tags (comma-separated)")
+	searchCmd.Flags().Bool("json", false, "Output as JSON")
 
 	parent.AddCommand(searchCmd)
 }
@@ -52,12 +54,16 @@ func runAssetsSearch(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	query := strings.Join(args, " ")
+	jsonFlag, _ := cmd.Flags().GetBool("json")
 
 	tagFlags, _ := cmd.Flags().GetStringSlice("tag")
 	tags := assets.ParseSearchTerms(strings.Join(tagFlags, ","))
 
 	terms := assets.ParseSearchPatterns(query)
 	if err := assets.ValidateSearchQuery(terms, tags); err != nil {
+		if jsonFlag {
+			return err
+		}
 		w := cmd.OutOrStdout()
 		stdin := cmd.InOrStdin()
 		if !isTerminal(stdin) {
@@ -108,7 +114,20 @@ func runAssetsSearch(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(results) == 0 {
+		if jsonFlag {
+			_, _ = fmt.Fprintln(cmd.OutOrStdout(), "[]")
+			return nil
+		}
 		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "No matches found for %q\n", displayQuery)
+		return nil
+	}
+
+	if jsonFlag {
+		data, err := json.MarshalIndent(results, "", "  ")
+		if err != nil {
+			return fmt.Errorf("marshalling search results: %w", err)
+		}
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), string(data))
 		return nil
 	}
 
@@ -123,6 +142,19 @@ func runAssetsSearch(cmd *cobra.Command, args []string) error {
 
 // collectInstalledNames returns a set of "category/name" keys for installed assets.
 func collectInstalledNames() map[string]bool {
+	scopes := collectInstalledScopes()
+	if scopes == nil {
+		return nil
+	}
+	names := make(map[string]bool, len(scopes))
+	for k := range scopes {
+		names[k] = true
+	}
+	return names
+}
+
+// collectInstalledScopes returns a map of "category/name" to scope for installed assets.
+func collectInstalledScopes() map[string]string {
 	paths, err := config.ResolvePaths("")
 	if err != nil || !paths.AnyExists() {
 		return nil
@@ -143,11 +175,11 @@ func collectInstalledNames() map[string]bool {
 	}
 
 	installedAssets := collectInstalledAssets(cfg.Value, paths, localCfg)
-	names := make(map[string]bool, len(installedAssets))
+	scopes := make(map[string]string, len(installedAssets))
 	for _, a := range installedAssets {
-		names[a.Category+"/"+a.Name] = true
+		scopes[a.Category+"/"+a.Name] = a.Scope
 	}
-	return names
+	return scopes
 }
 
 // printSearchResults prints search results grouped by category.

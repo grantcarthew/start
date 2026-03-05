@@ -12,7 +12,7 @@ Avoid references to the prototype in new documentation. This is a new design.
 
 Projects are stored in `.ai/projects/`. Continue by reading the active project.
 
-Active Project: `.ai/projects/p-039-cli-json-output-assets.md`
+Active Project: `.ai/projects/p-040-cli-json-output-config-doctor.md`
 
 Project Workflow:
 - Active projects are in `.ai/projects/`
