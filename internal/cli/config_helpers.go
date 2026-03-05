@@ -153,6 +153,9 @@ func promptContentSource(w io.Writer, r io.Reader, defaultChoice, currentPrompt 
 	return file, command, prompt, nil
 }
 
+// ansiEscapeRe matches ANSI CSI escape sequences (arrow keys, home, end, etc.).
+var ansiEscapeRe = regexp.MustCompile(`\x1b\[[0-9;]*[A-Za-z~]`)
+
 // promptText prompts for multi-line text input.
 // Users can type text directly (finish with a blank line) or press Enter
 // to open $EDITOR for longer input.
@@ -168,8 +171,9 @@ func promptText(w io.Writer, r io.Reader, label, defaultVal string) (string, err
 	}
 	_, _ = fmt.Fprintln(w)
 	_, _ = tui.ColorDim.Fprintln(w, "  Type text, then press Enter on a blank line to finish")
-	_, _ = tui.ColorDim.Fprintln(w, "  Or press Enter now to open $EDITOR")
-	_, _ = fmt.Fprint(w, "> ")
+	_, _ = tui.ColorDim.Fprintln(w, "  Or press Enter now to open $EDITOR for full editing")
+	_, _ = tui.ColorDim.Fprintln(w, "  Arrow keys are not supported in this mode")
+	_, _ = tui.ColorSuccess.Fprint(w, "↪ ")
 
 	reader := bufio.NewReader(r)
 	firstLine, err := reader.ReadString('\n')
@@ -177,6 +181,7 @@ func promptText(w io.Writer, r io.Reader, label, defaultVal string) (string, err
 		return "", fmt.Errorf("reading input: %w", err)
 	}
 	firstLine = strings.TrimRight(firstLine, "\r\n")
+	firstLine = ansiEscapeRe.ReplaceAllString(firstLine, "")
 
 	// Empty first line: open editor
 	if firstLine == "" {
@@ -213,16 +218,19 @@ func promptText(w io.Writer, r io.Reader, label, defaultVal string) (string, err
 	lines = append(lines, firstLine)
 
 	for {
+		_, _ = tui.ColorSuccess.Fprint(w, "↪ ")
 		line, err := reader.ReadString('\n')
 		if err != nil {
 			// EOF without newline - include what we have
 			line = strings.TrimRight(line, "\r\n")
+			line = ansiEscapeRe.ReplaceAllString(line, "")
 			if line != "" {
 				lines = append(lines, line)
 			}
 			break
 		}
 		line = strings.TrimRight(line, "\r\n")
+		line = ansiEscapeRe.ReplaceAllString(line, "")
 		if strings.TrimSpace(line) == "" {
 			break
 		}
