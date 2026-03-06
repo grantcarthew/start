@@ -301,14 +301,20 @@ func promptDefaultModel(w io.Writer, r io.Reader, current string, models map[str
 }
 
 // promptTags prompts for editing a slice of tags.
-// Shows current tags and allows: comma-separated input to replace, empty to clear, Enter to keep.
-func promptTags(w io.Writer, r io.Reader, current []string) ([]string, error) {
-	if len(current) > 0 {
-		_, _ = fmt.Fprintf(w, "Current tags: %s\n", tui.Bracket("%s", strings.Join(current, ", ")))
-	} else {
-		_, _ = fmt.Fprintf(w, "Current tags: %s\n", tui.Annotate("none"))
+// Shows current tags (when showCurrent is true) and allows: comma-separated input to replace, empty to clear, Enter to keep.
+func promptTags(w io.Writer, r io.Reader, current []string, showCurrent bool) ([]string, error) {
+	if showCurrent {
+		if len(current) > 0 {
+			_, _ = fmt.Fprintf(w, "Current tags: %s\n", tui.Bracket("%s", strings.Join(current, ", ")))
+		} else {
+			_, _ = fmt.Fprintf(w, "Current tags: %s\n", tui.Annotate("none"))
+		}
 	}
-	_, _ = fmt.Fprintf(w, "Tags %s: ", tui.Annotate("comma-separated, - to clear, Enter to keep"))
+	if showCurrent {
+		_, _ = fmt.Fprintf(w, "Tags %s: ", tui.Annotate("comma-separated, - to clear, Enter to keep"))
+	} else {
+		_, _ = fmt.Fprintf(w, "Tags %s: ", tui.Annotate("comma-separated, or Enter to skip"))
+	}
 
 	reader := bufio.NewReader(r)
 	input, err := reader.ReadString('\n')

@@ -173,7 +173,7 @@ func configAgentEdit(stdin io.Reader, stdout io.Writer, local bool, name string)
 	}
 
 	_, _ = fmt.Fprintln(stdout)
-	newTags, err := promptTags(stdout, stdin, agent.Tags)
+	newTags, err := promptTags(stdout, stdin, agent.Tags, true)
 	if err != nil {
 		return err
 	}
@@ -273,7 +273,7 @@ func configRoleEdit(stdin io.Reader, stdout io.Writer, local bool, name string) 
 	}
 
 	_, _ = fmt.Fprintln(stdout)
-	newTags, err := promptTags(stdout, stdin, role.Tags)
+	newTags, err := promptTags(stdout, stdin, role.Tags, true)
 	if err != nil {
 		return err
 	}
@@ -381,7 +381,7 @@ func configContextEdit(stdin io.Reader, stdout io.Writer, local bool, name strin
 	}
 
 	_, _ = fmt.Fprintln(stdout)
-	newTags, err := promptTags(stdout, stdin, ctx.Tags)
+	newTags, err := promptTags(stdout, stdin, ctx.Tags, true)
 	if err != nil {
 		return err
 	}
@@ -465,7 +465,7 @@ func configTaskEdit(stdin io.Reader, stdout io.Writer, local bool, name string) 
 	}
 
 	_, _ = fmt.Fprintln(stdout)
-	newTags, err := promptTags(stdout, stdin, task.Tags)
+	newTags, err := promptTags(stdout, stdin, task.Tags, true)
 	if err != nil {
 		return err
 	}

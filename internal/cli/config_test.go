@@ -1378,7 +1378,7 @@ func TestPromptTags_KeepCurrent(t *testing.T) {
 	stdout := &bytes.Buffer{}
 	stdin := strings.NewReader("\n") // Just press Enter
 
-	result, err := promptTags(stdout, stdin, current)
+	result, err := promptTags(stdout, stdin, current, true)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1398,7 +1398,7 @@ func TestPromptTags_Clear(t *testing.T) {
 	stdout := &bytes.Buffer{}
 	stdin := strings.NewReader("-\n")
 
-	result, err := promptTags(stdout, stdin, current)
+	result, err := promptTags(stdout, stdin, current, true)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1413,7 +1413,7 @@ func TestPromptTags_Replace(t *testing.T) {
 	stdout := &bytes.Buffer{}
 	stdin := strings.NewReader("new1, new2, new3\n")
 
-	result, err := promptTags(stdout, stdin, current)
+	result, err := promptTags(stdout, stdin, current, true)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1428,7 +1428,7 @@ func TestPromptTags_Empty(t *testing.T) {
 	stdout := &bytes.Buffer{}
 	stdin := strings.NewReader("first, second\n")
 
-	result, err := promptTags(stdout, stdin, current)
+	result, err := promptTags(stdout, stdin, current, true)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1440,6 +1440,30 @@ func TestPromptTags_Empty(t *testing.T) {
 	output := stdout.String()
 	if !strings.Contains(output, "(none)") {
 		t.Errorf("expected '(none)' for empty current tags, got: %s", output)
+	}
+}
+
+func TestPromptTags_NoShowCurrent(t *testing.T) {
+	current := []string{"tag1", "tag2"}
+	stdout := &bytes.Buffer{}
+	stdin := strings.NewReader("new1\n")
+
+	result, err := promptTags(stdout, stdin, current, false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result) != 1 || result[0] != "new1" {
+		t.Errorf("expected [new1], got: %v", result)
+	}
+	output := stdout.String()
+	if strings.Contains(output, "Current tags") {
+		t.Errorf("expected no 'Current tags' line when showCurrent=false, got: %s", output)
+	}
+	if strings.Contains(output, "Enter to keep") {
+		t.Errorf("expected no 'Enter to keep' hint when showCurrent=false, got: %s", output)
+	}
+	if !strings.Contains(output, "Enter to skip") {
+		t.Errorf("expected 'Enter to skip' hint when showCurrent=false, got: %s", output)
 	}
 }
 
