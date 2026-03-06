@@ -3,7 +3,6 @@ package cli
 import (
 	"bufio"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"strconv"
@@ -124,7 +123,9 @@ func runAssetsInfo(cmd *cobra.Command, args []string) error {
 	w := cmd.OutOrStdout()
 	if len(results) == 0 {
 		if jsonFlag {
-			_, _ = fmt.Fprintln(w, "[]")
+			if err := writeJSON(w, []AssetInfoResult{}); err != nil {
+				return fmt.Errorf("marshalling asset info: %w", err)
+			}
 			return nil
 		}
 		if prompted {
@@ -150,11 +151,9 @@ func runAssetsInfo(cmd *cobra.Command, args []string) error {
 			}
 			infoResults = append(infoResults, ir)
 		}
-		data, err := json.MarshalIndent(infoResults, "", "  ")
-		if err != nil {
+		if err := writeJSON(w, infoResults); err != nil {
 			return fmt.Errorf("marshalling asset info: %w", err)
 		}
-		_, _ = fmt.Fprintln(w, string(data))
 		return nil
 	}
 

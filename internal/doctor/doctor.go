@@ -2,6 +2,7 @@
 package doctor
 
 import (
+	"encoding/json"
 	"io"
 	"runtime"
 )
@@ -35,6 +36,11 @@ func (s Status) String() string {
 	}
 }
 
+// MarshalJSON implements json.Marshaler for Status, emitting the string representation.
+func (s Status) MarshalJSON() ([]byte, error) {
+	return json.Marshal(s.String())
+}
+
 // Symbol returns the display symbol for a Status.
 func (s Status) Symbol() string {
 	switch s {
@@ -55,26 +61,26 @@ func (s Status) Symbol() string {
 
 // CheckResult holds the result of a single check item.
 type CheckResult struct {
-	Status  Status
-	Label   string   // Short label (e.g., "claude", "agents.cue")
-	Message string   // Detail message (e.g., "/usr/local/bin/claude", "NOT FOUND")
-	Fix     string   // Suggested fix action
-	Details []string // Additional details for verbose mode
-	Indent  int      // Additional indentation level (0 = normal, 1+ = nested)
-	NoIcon  bool     // Suppress status icon for this result
+	Status  Status   `json:"status"`
+	Label   string   `json:"label"`   // Short label (e.g., "claude", "agents.cue")
+	Message string   `json:"message"` // Detail message (e.g., "/usr/local/bin/claude", "NOT FOUND")
+	Fix     string   `json:"fix,omitempty"`     // Suggested fix action
+	Details []string `json:"details,omitempty"` // Additional details for verbose mode
+	Indent  int      `json:"-"`                 // Additional indentation level (0 = normal, 1+ = nested)
+	NoIcon  bool     `json:"-"`                 // Suppress status icon for this result
 }
 
 // SectionResult holds the results for a check section.
 type SectionResult struct {
-	Name    string        // Section name (e.g., "Agents", "Configuration")
-	Results []CheckResult // Individual check results
-	Summary string        // Optional summary (e.g., "2 configured")
-	NoIcons bool          // If true, don't show status icons (for info-only sections)
+	Name    string        `json:"name"`
+	Results []CheckResult `json:"results"`
+	Summary string        `json:"summary,omitempty"` // Optional summary (e.g., "2 configured")
+	NoIcons bool          `json:"-"`                 // If true, don't show status icons (for info-only sections)
 }
 
 // Report holds the complete diagnostic report.
 type Report struct {
-	Sections []SectionResult
+	Sections []SectionResult `json:"sections"`
 }
 
 // HasIssues returns true if the report contains any failures or warnings.

@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -173,11 +172,9 @@ func runAssetsUpdate(cmd *cobra.Command, args []string) error {
 				results[i].ErrorMessage = results[i].Error.Error()
 			}
 		}
-		data, err := json.MarshalIndent(results, "", "  ")
-		if err != nil {
+		if err := writeJSON(cmd.OutOrStdout(), results); err != nil {
 			return fmt.Errorf("marshalling update results: %w", err)
 		}
-		_, _ = fmt.Fprintln(cmd.OutOrStdout(), string(data))
 		return nil
 	}
 

@@ -19,10 +19,10 @@ import (
 
 // searchSection groups search results under a labelled section.
 type searchSection struct {
-	Label         string // Section name (e.g. "local", "global", "registry")
-	Path          string // Optional path shown in parentheses with cyan colour
-	Results       []assets.SearchResult
-	ShowInstalled bool // Only true for registry section
+	Label         string               `json:"label"`
+	Path          string               `json:"path,omitempty"`
+	Results       []assets.SearchResult `json:"results"`
+	ShowInstalled bool                 `json:"-"` // Only true for registry section; display-only
 }
 
 // addSearchCommand adds the top-level search command.
@@ -45,6 +45,7 @@ Use --tag to filter by tags. Tags can be used alone or combined with a query.`,
 		RunE: runSearch,
 	}
 	searchCmd.Flags().StringSlice("tag", nil, "Filter by tags (comma-separated)")
+	searchCmd.Flags().Bool("json", false, "Output as JSON")
 
 	parent.AddCommand(searchCmd)
 }
@@ -55,12 +56,16 @@ func runSearch(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	query := strings.Join(args, " ")
+	jsonFlag, _ := cmd.Flags().GetBool("json")
 
 	tagFlags, _ := cmd.Flags().GetStringSlice("tag")
 	tags := assets.ParseSearchTerms(strings.Join(tagFlags, ","))
 
 	terms := assets.ParseSearchPatterns(query)
 	if err := assets.ValidateSearchQuery(terms, tags); err != nil {
+		if jsonFlag {
+			return err
+		}
 		w := cmd.OutOrStdout()
 		stdin := cmd.InOrStdin()
 		if !isTerminal(stdin) {
@@ -179,6 +184,16 @@ func runSearch(cmd *cobra.Command, args []string) error {
 				})
 			}
 		}
+	}
+
+	if jsonFlag {
+		if sections == nil {
+			sections = []searchSection{}
+		}
+		if err := writeJSON(cmd.OutOrStdout(), sections); err != nil {
+			return fmt.Errorf("marshalling search results: %w", err)
+		}
+		return nil
 	}
 
 	displayQuery := query

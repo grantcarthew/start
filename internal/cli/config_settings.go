@@ -47,6 +47,7 @@ Available settings:
 	}
 
 	settingsCmd.Flags().Bool("unset", false, "Remove a setting value")
+	settingsCmd.Flags().Bool("json", false, "Output as JSON")
 
 	parent.AddCommand(settingsCmd)
 }
@@ -61,6 +62,7 @@ func executeConfigSettings(cmd *cobra.Command, args []string) error {
 	flags := getFlags(cmd)
 	local := flags.Local
 	unset, _ := cmd.Flags().GetBool("unset")
+	jsonFlag, _ := cmd.Flags().GetBool("json")
 
 	if unset {
 		if len(args) == 0 {
@@ -74,14 +76,23 @@ func executeConfigSettings(cmd *cobra.Command, args []string) error {
 
 	switch len(args) {
 	case 0:
+		if jsonFlag {
+			return listSettingsJSON(stdout, local)
+		}
 		// List all settings
 		return listSettings(stdout, local)
 	case 1:
 		if args[0] == "list" || args[0] == "ls" {
+			if jsonFlag {
+				return listSettingsJSON(stdout, local)
+			}
 			return listSettings(stdout, local)
 		}
 		if args[0] == "edit" {
 			return editSettings(local)
+		}
+		if jsonFlag {
+			return showSettingJSON(stdout, args[0], local)
 		}
 		// Show single setting
 		return showSetting(stdout, args[0], local)
@@ -185,6 +196,47 @@ func showSetting(w io.Writer, key string, localOnly bool) error {
 		_, _ = fmt.Fprintf(w, "%s %s\n", entry.Value, tui.Annotate("%s", entry.Source))
 	}
 
+	return nil
+}
+
+// listSettingsJSON outputs all settings as a JSON object keyed by setting name.
+func listSettingsJSON(w io.Writer, localOnly bool) error {
+	paths, err := config.ResolvePaths("")
+	if err != nil {
+		return fmt.Errorf("resolving config paths: %w", err)
+	}
+
+	entries, err := config.ResolveAllSettings(paths, localOnly)
+	if err != nil {
+		return err
+	}
+
+	if err := writeJSON(w, entries); err != nil {
+		return fmt.Errorf("marshalling settings: %w", err)
+	}
+	return nil
+}
+
+// showSettingJSON outputs a single setting as a JSON object.
+func showSettingJSON(w io.Writer, key string, localOnly bool) error {
+	if _, valid := config.SettingsRegistry[key]; !valid {
+		return fmt.Errorf("unknown setting %q\n\nValid settings: %s", key, config.ValidSettingsKeysString())
+	}
+
+	paths, err := config.ResolvePaths("")
+	if err != nil {
+		return fmt.Errorf("resolving config paths: %w", err)
+	}
+
+	entries, err := config.ResolveAllSettings(paths, localOnly)
+	if err != nil {
+		return err
+	}
+
+	entry := entries[key]
+	if err := writeJSON(w, entry); err != nil {
+		return fmt.Errorf("marshalling setting: %w", err)
+	}
 	return nil
 }
 

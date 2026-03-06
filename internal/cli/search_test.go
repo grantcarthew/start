@@ -2,7 +2,9 @@ package cli
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -223,6 +225,108 @@ func TestPrintSearchSections(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestSearchCommandJSON_ShortQueryError(t *testing.T) {
+	// With --json, a short query returns error immediately instead of prompting
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	chdir(t, tmpDir)
+
+	cmd := NewRootCmd()
+	stdout := &bytes.Buffer{}
+	cmd.SetOut(stdout)
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"search", "go", "--json"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error for short query with --json")
+	}
+	if !strings.Contains(err.Error(), "3 characters") {
+		t.Errorf("error should mention 3 characters, got: %v", err)
+	}
+	// Should not have produced any JSON output
+	if stdout.Len() > 0 {
+		t.Errorf("expected no output on error, got: %s", stdout.String())
+	}
+}
+
+func TestSearchCommandJSON_WithConfigResults(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	globalDir := filepath.Join(tmpDir, "start")
+	if err := os.MkdirAll(globalDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	content := `roles: {
+	"golang": {
+		description: "Go programming expert"
+		prompt: "You are a Go expert."
+	}
+}`
+	if err := os.WriteFile(filepath.Join(globalDir, "config.cue"), []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	chdir(t, tmpDir)
+
+	cmd := NewRootCmd()
+	stdout := &bytes.Buffer{}
+	cmd.SetOut(stdout)
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"search", "golang", "--json"})
+
+	// May fail due to registry unavailability but should still output JSON
+	_ = cmd.Execute()
+
+	output := strings.TrimSpace(stdout.String())
+	if output == "" {
+		t.Fatal("expected JSON output even if registry unavailable")
+	}
+
+	var sections []map[string]interface{}
+	if err := json.Unmarshal([]byte(output), &sections); err != nil {
+		t.Fatalf("output is not valid JSON: %v\noutput: %s", err, output)
+	}
+
+	// Should find the global config result at minimum
+	if len(sections) == 0 {
+		t.Error("expected at least one section (global config) in JSON output")
+	}
+
+	// Verify section structure
+	for _, section := range sections {
+		if _, ok := section["label"]; !ok {
+			t.Error("section missing 'label' field")
+		}
+		if _, ok := section["results"]; !ok {
+			t.Error("section missing 'results' field")
+		}
+	}
+}
+
+func TestSearchCommandJSON_NoResults(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	chdir(t, tmpDir)
+
+	cmd := NewRootCmd()
+	stdout := &bytes.Buffer{}
+	cmd.SetOut(stdout)
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"search", "nonexistentthing", "--json"})
+
+	_ = cmd.Execute()
+
+	output := strings.TrimSpace(stdout.String())
+	if output != "[]" {
+		t.Errorf("expected empty JSON array, got: %s", output)
+	}
 }
 
 func TestSearchCommandValidation(t *testing.T) {

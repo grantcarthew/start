@@ -38,6 +38,7 @@ Exit codes:
 		RunE: runDoctor,
 	}
 
+	cmd.Flags().Bool("json", false, "Output as JSON")
 	parent.AddCommand(cmd)
 }
 
@@ -49,6 +50,19 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	report, err := prepareDoctor()
 	if err != nil {
 		return err
+	}
+
+	jsonFlag, _ := cmd.Flags().GetBool("json")
+	if jsonFlag {
+		if err := writeJSON(cmd.OutOrStdout(), report); err != nil {
+			return fmt.Errorf("marshalling doctor report: %w", err)
+		}
+		if report.HasIssues() {
+			cmd.SilenceErrors = true
+			cmd.SilenceUsage = true
+			return errDoctorIssuesFound
+		}
+		return nil
 	}
 
 	flags := getFlags(cmd)

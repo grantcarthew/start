@@ -33,6 +33,7 @@ Use 'start search' to also include the asset registry in results.`,
 		RunE: runConfigSearch,
 	}
 	searchCmd.Flags().StringSlice("tag", nil, "Filter by tags (comma-separated)")
+	searchCmd.Flags().Bool("json", false, "Output as JSON")
 
 	parent.AddCommand(searchCmd)
 }
@@ -43,12 +44,16 @@ func runConfigSearch(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	query := strings.Join(args, " ")
+	jsonFlag, _ := cmd.Flags().GetBool("json")
 
 	tagFlags, _ := cmd.Flags().GetStringSlice("tag")
 	tags := assets.ParseSearchTerms(strings.Join(tagFlags, ","))
 
 	terms := assets.ParseSearchPatterns(query)
 	if err := assets.ValidateSearchQuery(terms, tags); err != nil {
+		if jsonFlag {
+			return err
+		}
 		w := cmd.OutOrStdout()
 		stdin := cmd.InOrStdin()
 		if !isTerminal(stdin) {
@@ -140,6 +145,16 @@ func runConfigSearch(cmd *cobra.Command, args []string) error {
 				})
 			}
 		}
+	}
+
+	if jsonFlag {
+		if sections == nil {
+			sections = []searchSection{}
+		}
+		if err := writeJSON(cmd.OutOrStdout(), sections); err != nil {
+			return fmt.Errorf("marshalling search results: %w", err)
+		}
+		return nil
 	}
 
 	displayQuery := query

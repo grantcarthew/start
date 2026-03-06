@@ -14,15 +14,15 @@ import (
 
 // AgentConfig represents an agent configuration for editing.
 type AgentConfig struct {
-	Name         string
-	Bin          string
-	Command      string
-	DefaultModel string
-	Description  string
-	Models       map[string]string
-	Tags         []string
-	Source       string // "global" or "local" - for display only
-	Origin       string // Registry module path when installed from registry
+	Name         string            `json:"name"`
+	Bin          string            `json:"bin,omitempty"`
+	Command      string            `json:"command,omitempty"`
+	DefaultModel string            `json:"defaultModel,omitempty"`
+	Description  string            `json:"description,omitempty"`
+	Models       map[string]string `json:"models,omitempty"`
+	Tags         []string          `json:"tags,omitempty"`
+	Source       string            `json:"source"` // "global" or "local"
+	Origin       string            `json:"origin,omitempty"` // Registry module path when installed from registry
 }
 
 // loadAgentsForScope loads agents from the appropriate scope.
@@ -205,15 +205,15 @@ func getDefaultAgentFromConfig(cfg cue.Value) string {
 
 // RoleConfig represents a role configuration for editing.
 type RoleConfig struct {
-	Name        string
-	Description string
-	File        string
-	Command     string
-	Prompt      string
-	Tags        []string
-	Optional    bool   // If true, skip gracefully when file is missing
-	Source      string // "global" or "local" - for display only
-	Origin      string // Registry module path when installed from registry
+	Name        string   `json:"name"`
+	Description string   `json:"description,omitempty"`
+	File        string   `json:"file,omitempty"`
+	Command     string   `json:"command,omitempty"`
+	Prompt      string   `json:"prompt,omitempty"`
+	Tags        []string `json:"tags,omitempty"`
+	Optional    bool     `json:"optional,omitempty"` // If true, skip gracefully when file is missing
+	Source      string   `json:"source"`             // "global" or "local"
+	Origin      string   `json:"origin,omitempty"`   // Registry module path when installed from registry
 }
 
 // loadRolesForScope loads roles from the appropriate scope.
@@ -328,16 +328,16 @@ func writeRolesFile(path string, roles map[string]RoleConfig, order []string) er
 
 // ContextConfig represents a context configuration for editing.
 type ContextConfig struct {
-	Name        string
-	Description string
-	File        string
-	Command     string
-	Prompt      string
-	Required    bool
-	Default     bool
-	Tags        []string
-	Source      string // "global" or "local" - for display only
-	Origin      string // Registry module path when installed from registry
+	Name        string   `json:"name"`
+	Description string   `json:"description,omitempty"`
+	File        string   `json:"file,omitempty"`
+	Command     string   `json:"command,omitempty"`
+	Prompt      string   `json:"prompt,omitempty"`
+	Required    bool     `json:"required,omitempty"`
+	Default     bool     `json:"default,omitempty"`
+	Tags        []string `json:"tags,omitempty"`
+	Source      string   `json:"source"`           // "global" or "local"
+	Origin      string   `json:"origin,omitempty"` // Registry module path when installed from registry
 }
 
 // loadContextsForScope loads contexts from the appropriate scope.
@@ -456,15 +456,15 @@ func writeContextsFile(path string, contexts map[string]ContextConfig, order []s
 
 // TaskConfig represents a task configuration for editing.
 type TaskConfig struct {
-	Name        string
-	Description string
-	File        string
-	Command     string
-	Prompt      string
-	Role        string
-	Tags        []string
-	Source      string // "global" or "local" - for display only
-	Origin      string // Registry module path when installed from registry
+	Name        string   `json:"name"`
+	Description string   `json:"description,omitempty"`
+	File        string   `json:"file,omitempty"`
+	Command     string   `json:"command,omitempty"`
+	Prompt      string   `json:"prompt,omitempty"`
+	Role        string   `json:"role,omitempty"`
+	Tags        []string `json:"tags,omitempty"`
+	Source      string   `json:"source"`           // "global" or "local"
+	Origin      string   `json:"origin,omitempty"` // Registry module path when installed from registry
 }
 
 // loadTasksForScope loads tasks from the appropriate scope.

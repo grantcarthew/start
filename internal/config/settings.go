@@ -20,8 +20,8 @@ type SettingInfo struct {
 
 // SettingEntry holds a resolved setting value and its source.
 type SettingEntry struct {
-	Value  string
-	Source string // "default", "global", "local", or "not set"
+	Value  string `json:"value"`
+	Source string `json:"source"` // "default", "global", "local", or "not set"
 }
 
 // SettingsRegistry defines all valid settings keys and their types.
