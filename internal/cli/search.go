@@ -245,11 +245,17 @@ func printSearchSections(w io.Writer, sections []searchSection, verbose bool, in
 
 		// Print in category order
 		categories := []string{"agents", "roles", "contexts", "tasks"}
+		firstCat := true
 		for _, cat := range categories {
 			catResults := grouped[cat]
 			if len(catResults) == 0 {
 				continue
 			}
+
+			if !firstCat {
+				_, _ = fmt.Fprintln(w)
+			}
+			firstCat = false
 
 			_, _ = fmt.Fprint(w, "  ")
 			_, _ = tui.CategoryColor(cat).Fprint(w, cat)

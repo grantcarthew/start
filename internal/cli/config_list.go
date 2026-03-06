@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"io"
+	"sort"
 	"strings"
 
 	"github.com/grantcarthew/start/internal/tui"
@@ -202,6 +203,7 @@ func runConfigListCmd(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	_, _ = fmt.Fprintln(cmd.OutOrStdout())
 	local := getFlags(cmd).Local
 	jsonFlag, _ := cmd.Flags().GetBool("json")
 
@@ -270,6 +272,7 @@ func listAgents(w io.Writer, stderr io.Writer, local bool) error {
 	if err != nil {
 		printWarning(stderr, "failed to load agents: %s", err)
 	}
+	sort.Strings(order)
 
 	_, _ = tui.ColorAgents.Fprint(w, "agents")
 	_, _ = fmt.Fprintln(w, "/")
@@ -278,8 +281,6 @@ func listAgents(w io.Writer, stderr io.Writer, local bool) error {
 		_, _ = tui.ColorDim.Fprintln(w, "  none")
 		return nil
 	}
-
-	_, _ = fmt.Fprintln(w)
 
 	defaultAgent := ""
 	if cfg, err := loadConfigForScope(local); err == nil {
@@ -314,6 +315,7 @@ func listRoles(w io.Writer, stderr io.Writer, local bool) error {
 	if err != nil {
 		printWarning(stderr, "failed to load roles: %s", err)
 	}
+	sort.Strings(order)
 
 	_, _ = tui.ColorRoles.Fprint(w, "roles")
 	_, _ = fmt.Fprintln(w, "/")
@@ -322,8 +324,6 @@ func listRoles(w io.Writer, stderr io.Writer, local bool) error {
 		_, _ = tui.ColorDim.Fprintln(w, "  none")
 		return nil
 	}
-
-	_, _ = fmt.Fprintln(w)
 
 	for _, name := range order {
 		role := roles[name]
@@ -349,6 +349,7 @@ func listContexts(w io.Writer, stderr io.Writer, local bool) error {
 	if err != nil {
 		printWarning(stderr, "failed to load contexts: %s", err)
 	}
+	sort.Strings(order)
 
 	_, _ = tui.ColorContexts.Fprint(w, "contexts")
 	_, _ = fmt.Fprintln(w, "/")
@@ -357,8 +358,6 @@ func listContexts(w io.Writer, stderr io.Writer, local bool) error {
 		_, _ = tui.ColorDim.Fprintln(w, "  none")
 		return nil
 	}
-
-	_, _ = fmt.Fprintln(w)
 
 	for _, name := range order {
 		ctx := contexts[name]
@@ -392,6 +391,7 @@ func listContexts(w io.Writer, stderr io.Writer, local bool) error {
 
 // runConfigTaskList is a Cobra-compatible wrapper used by task.go.
 func runConfigTaskList(cmd *cobra.Command, _ []string) error {
+	_, _ = fmt.Fprintln(cmd.OutOrStdout())
 	return listTasks(cmd.OutOrStdout(), cmd.ErrOrStderr(), getFlags(cmd).Local)
 }
 
@@ -401,6 +401,7 @@ func listTasks(w io.Writer, stderr io.Writer, local bool) error {
 	if err != nil {
 		printWarning(stderr, "failed to load tasks: %s", err)
 	}
+	sort.Strings(order)
 
 	_, _ = tui.ColorTasks.Fprint(w, "tasks")
 	_, _ = fmt.Fprintln(w, "/")
@@ -409,8 +410,6 @@ func listTasks(w io.Writer, stderr io.Writer, local bool) error {
 		_, _ = tui.ColorDim.Fprintln(w, "  none")
 		return nil
 	}
-
-	_, _ = fmt.Fprintln(w)
 
 	for _, name := range order {
 		task := tasks[name]

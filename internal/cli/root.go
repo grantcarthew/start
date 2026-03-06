@@ -53,7 +53,7 @@ It manages prompt composition, context injection, and workflow automation.
 Examples:
   start                           Launch agent with default role and contexts
   start --role go-expert          Launch with a specific role
-  start task pre-commit-review    Run a predefined task
+  start task review/pre-commit    Run a predefined task
   start doctor                    Check installation and configuration`,
 		Version: cliVersion,
 		// SilenceUsage prevents usage from being printed on RunE errors.

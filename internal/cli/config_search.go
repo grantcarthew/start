@@ -162,6 +162,7 @@ func runConfigSearch(cmd *cobra.Command, args []string) error {
 		displayQuery = "--tag " + strings.Join(tags, ",")
 	}
 
+	_, _ = fmt.Fprintln(cmd.OutOrStdout())
 	if len(sections) == 0 {
 		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "No matches found for %q\n", displayQuery)
 		return nil

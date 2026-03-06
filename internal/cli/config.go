@@ -56,8 +56,8 @@ func runConfigList(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("resolving config paths: %w", err)
 	}
 
-	_, _ = tui.ColorHeader.Fprintln(w, "Configuration Paths:")
 	_, _ = fmt.Fprintln(w)
+	_, _ = tui.ColorHeader.Fprintln(w, "Configuration Paths:")
 	globalStatus := "not found"
 	if paths.GlobalExists {
 		globalStatus = "exists"

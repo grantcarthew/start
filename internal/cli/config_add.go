@@ -104,17 +104,15 @@ func configAgentAdd(stdin io.Reader, stdout io.Writer, local bool) error {
 		return fmt.Errorf("command template is required")
 	}
 
-	defaultModel, err := promptString(stdout, stdin, "Default model (optional)", "")
+	var models map[string]string
+	models, err = promptModelsAdd(stdout, stdin)
 	if err != nil {
 		return err
 	}
 
-	var models map[string]string
-	if defaultModel != "" {
-		models, err = promptModelsAdd(stdout, stdin)
-		if err != nil {
-			return err
-		}
+	defaultModel, err := promptDefaultModel(stdout, stdin, "", models)
+	if err != nil {
+		return err
 	}
 
 	description, err := promptString(stdout, stdin, "Description (optional)", "")
