@@ -122,7 +122,7 @@ func configAgentAdd(stdin io.Reader, stdout io.Writer, local bool) error {
 		return err
 	}
 
-	tags, err := promptTags(stdout, stdin, nil)
+	tags, err := promptTags(stdout, stdin, nil, false)
 	if err != nil {
 		return err
 	}
@@ -220,7 +220,7 @@ func configRoleAdd(stdin io.Reader, stdout io.Writer, local bool) error {
 		optional = input == "y" || input == "yes"
 	}
 
-	tags, err := promptTags(stdout, stdin, nil)
+	tags, err := promptTags(stdout, stdin, nil, false)
 	if err != nil {
 		return err
 	}
@@ -328,7 +328,7 @@ func configContextAdd(stdin io.Reader, stdout io.Writer, local bool) error {
 		}
 	}
 
-	tags, err := promptTags(stdout, stdin, nil)
+	tags, err := promptTags(stdout, stdin, nil, false)
 	if err != nil {
 		return err
 	}
@@ -420,7 +420,7 @@ func configTaskAdd(stdin io.Reader, stdout io.Writer, local bool) error {
 		return err
 	}
 
-	tags, err := promptTags(stdout, stdin, nil)
+	tags, err := promptTags(stdout, stdin, nil, false)
 	if err != nil {
 		return err
 	}
