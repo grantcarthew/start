@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -799,11 +798,9 @@ func outputValidateJSON(w io.Writer, indexSection doctor.SectionResult, cats []v
 		result.Categories = append(result.Categories, catResult)
 	}
 
-	data, err := json.MarshalIndent(result, "", "  ")
-	if err != nil {
+	if err := writeJSON(w, result); err != nil {
 		return fmt.Errorf("marshalling validate results: %w", err)
 	}
-	_, _ = fmt.Fprintln(w, string(data))
 	return nil
 }
 

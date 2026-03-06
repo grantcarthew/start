@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"encoding/json"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -279,5 +280,76 @@ func TestDoctorError(t *testing.T) {
 	// Verify it's the same as the package-level error
 	if errDoctorIssuesFound.Error() != "issues found" {
 		t.Errorf("errDoctorIssuesFound.Error() = %q, want %q", errDoctorIssuesFound.Error(), "issues found")
+	}
+}
+
+func TestDoctorCommand_JSONOutput(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	t.Setenv("HOME", tmpDir)
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	chdir(t, tmpDir)
+
+	cmd := NewRootCmd()
+	stdout := new(bytes.Buffer)
+	stderr := new(bytes.Buffer)
+	cmd.SetOut(stdout)
+	cmd.SetErr(stderr)
+	cmd.SetArgs([]string{"doctor", "--json"})
+
+	_ = cmd.Execute()
+
+	output := stdout.String()
+	if output == "" {
+		t.Fatal("expected JSON output, got empty string")
+	}
+
+	var report map[string]interface{}
+	if err := json.Unmarshal([]byte(strings.TrimSpace(output)), &report); err != nil {
+		t.Fatalf("output is not valid JSON: %v\noutput: %s", err, output)
+	}
+
+	sections, ok := report["sections"]
+	if !ok {
+		t.Fatal("JSON output missing 'sections' key")
+	}
+
+	sectionList, ok := sections.([]interface{})
+	if !ok || len(sectionList) == 0 {
+		t.Fatal("'sections' should be a non-empty array")
+	}
+
+	// Verify first section has expected fields
+	firstSection, ok := sectionList[0].(map[string]interface{})
+	if !ok {
+		t.Fatal("section should be an object")
+	}
+	if _, ok := firstSection["name"]; !ok {
+		t.Error("section missing 'name' field")
+	}
+	if _, ok := firstSection["results"]; !ok {
+		t.Error("section missing 'results' field")
+	}
+
+	// Verify a check result has status as string
+	results, _ := firstSection["results"].([]interface{})
+	if len(results) > 0 {
+		result, _ := results[0].(map[string]interface{})
+		status, _ := result["status"].(string)
+		if status == "" {
+			t.Error("check result 'status' should be a non-empty string")
+		}
+	}
+}
+
+func TestDoctorCommand_JSONHasFlag(t *testing.T) {
+	cmd := NewRootCmd()
+	doctorCmd, _, _ := cmd.Find([]string{"doctor"})
+	if doctorCmd == nil {
+		t.Fatal("doctor command not found")
+	}
+	if f := doctorCmd.Flags().Lookup("json"); f == nil {
+		t.Error("doctor command should have --json flag")
 	}
 }

@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"strings"
@@ -123,11 +122,9 @@ func runAssetsSearch(cmd *cobra.Command, args []string) error {
 	}
 
 	if jsonFlag {
-		data, err := json.MarshalIndent(results, "", "  ")
-		if err != nil {
+		if err := writeJSON(cmd.OutOrStdout(), results); err != nil {
 			return fmt.Errorf("marshalling search results: %w", err)
 		}
-		_, _ = fmt.Fprintln(cmd.OutOrStdout(), string(data))
 		return nil
 	}
 

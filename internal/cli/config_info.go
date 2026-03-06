@@ -25,6 +25,7 @@ resolved content after global/local merging.`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: runConfigInfo,
 	}
+	cmd.Flags().Bool("json", false, "Output as JSON")
 	parent.AddCommand(cmd)
 }
 
@@ -37,8 +38,12 @@ func runConfigInfo(cmd *cobra.Command, args []string) error {
 	stdin := cmd.InOrStdin()
 	stdout := cmd.OutOrStdout()
 	local := getFlags(cmd).Local
+	jsonFlag, _ := cmd.Flags().GetBool("json")
 
 	if len(args) == 0 {
+		if jsonFlag {
+			return fmt.Errorf("query required with --json")
+		}
 		if !isTerminal(stdin) {
 			return fmt.Errorf("interactive info requires a terminal")
 		}
@@ -52,7 +57,28 @@ func runConfigInfo(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(matches) == 0 {
+		if jsonFlag {
+			if err := writeJSON(stdout, []ConfigListItem{}); err != nil {
+				return fmt.Errorf("marshalling config info: %w", err)
+			}
+			return nil
+		}
 		return fmt.Errorf("%q not found", query)
+	}
+
+	if jsonFlag {
+		var results []ConfigListItem
+		for _, m := range matches {
+			item, err := buildConfigListItem(m, local)
+			if err != nil {
+				return err
+			}
+			results = append(results, item)
+		}
+		if err := writeJSON(stdout, results); err != nil {
+			return fmt.Errorf("marshalling config info: %w", err)
+		}
+		return nil
 	}
 
 	var selected configMatch

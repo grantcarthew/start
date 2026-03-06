@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -9,6 +10,16 @@ import (
 	"github.com/grantcarthew/start/internal/orchestration"
 	"github.com/grantcarthew/start/internal/tui"
 )
+
+// writeJSON encodes v as indented JSON to w with HTML escaping disabled.
+// Use this instead of json.MarshalIndent to prevent shell characters like
+// >, <, and & from being escaped to \u003e, \u003c, and \u0026.
+func writeJSON(w io.Writer, v any) error {
+	enc := json.NewEncoder(w)
+	enc.SetEscapeHTML(false)
+	enc.SetIndent("", "  ")
+	return enc.Encode(v)
+}
 
 // printWarning prints a warning message in yellow.
 func printWarning(w io.Writer, format string, args ...interface{}) {

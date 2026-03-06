@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -2098,6 +2099,424 @@ func TestConfigSearch_TagFilter(t *testing.T) {
 	}
 	if strings.Contains(output, "deploy") {
 		t.Errorf("expected 'deploy' task to be excluded by tag filter, got: %s", output)
+	}
+}
+
+func TestConfigListJSON_NoConfig(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	chdir(t, tmpDir)
+
+	cmd := NewRootCmd()
+	stdout := &bytes.Buffer{}
+	cmd.SetOut(stdout)
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"config", "list", "--json", "--local"})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := strings.TrimSpace(stdout.String())
+	if output != "[]" {
+		t.Errorf("expected empty JSON array, got: %s", output)
+	}
+}
+
+func TestConfigListJSON_WithAgents(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	globalDir := filepath.Join(tmpDir, "start")
+	if err := os.MkdirAll(globalDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	agentsContent := `agents: {
+	"claude": {
+		bin: "claude"
+		command: "claude \"{{.prompt}}\""
+		description: "Anthropic Claude"
+		tags: ["ai", "llm"]
+	}
+}`
+	if err := os.WriteFile(filepath.Join(globalDir, "agents.cue"), []byte(agentsContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	chdir(t, tmpDir)
+
+	cmd := NewRootCmd()
+	stdout := &bytes.Buffer{}
+	cmd.SetOut(stdout)
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"config", "list", "--json"})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var items []map[string]interface{}
+	if err := json.Unmarshal([]byte(strings.TrimSpace(stdout.String())), &items); err != nil {
+		t.Fatalf("invalid JSON: %v\noutput: %s", err, stdout.String())
+	}
+
+	if len(items) == 0 {
+		t.Fatal("expected at least one item in JSON output")
+	}
+
+	var found bool
+	for _, item := range items {
+		if item["name"] == "claude" {
+			found = true
+			if item["category"] != "agent" {
+				t.Errorf("category = %q, want %q", item["category"], "agent")
+			}
+			if item["description"] != "Anthropic Claude" {
+				t.Errorf("description = %q, want %q", item["description"], "Anthropic Claude")
+			}
+			if item["source"] == nil || item["source"] == "" {
+				t.Error("source field should be non-empty")
+			}
+		}
+	}
+	if !found {
+		t.Error("claude agent not found in JSON output")
+	}
+}
+
+func TestConfigListJSON_CategoryFilter(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	globalDir := filepath.Join(tmpDir, "start")
+	if err := os.MkdirAll(globalDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	content := `agents: {
+	"claude": {
+		bin: "claude"
+		command: "claude"
+	}
+}
+roles: {
+	"assistant": {
+		prompt: "You are helpful."
+	}
+}`
+	if err := os.WriteFile(filepath.Join(globalDir, "config.cue"), []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	chdir(t, tmpDir)
+
+	cmd := NewRootCmd()
+	stdout := &bytes.Buffer{}
+	cmd.SetOut(stdout)
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"config", "list", "agent", "--json"})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var items []map[string]interface{}
+	if err := json.Unmarshal([]byte(strings.TrimSpace(stdout.String())), &items); err != nil {
+		t.Fatalf("invalid JSON: %v\noutput: %s", err, stdout.String())
+	}
+
+	for _, item := range items {
+		if item["category"] != "agent" {
+			t.Errorf("expected only agent items, got category %q", item["category"])
+		}
+	}
+}
+
+func TestConfigInfoJSON_MultipleMatches(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	globalDir := filepath.Join(tmpDir, "start")
+	if err := os.MkdirAll(globalDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	// "go" matches both "golang" (role) and "go-review" (task)
+	content := `roles: {
+	"golang": {
+		description: "Go programming expert"
+		prompt: "You are a Go expert."
+	}
+}
+tasks: {
+	"go-review": {
+		description: "Review Go code"
+		prompt: "Review this Go code."
+	}
+}`
+	if err := os.WriteFile(filepath.Join(globalDir, "config.cue"), []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	chdir(t, tmpDir)
+
+	cmd := NewRootCmd()
+	stdout := &bytes.Buffer{}
+	cmd.SetOut(stdout)
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"config", "info", "go", "--json"})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var items []map[string]interface{}
+	if err := json.Unmarshal([]byte(strings.TrimSpace(stdout.String())), &items); err != nil {
+		t.Fatalf("invalid JSON: %v\noutput: %s", err, stdout.String())
+	}
+
+	if len(items) < 2 {
+		t.Fatalf("expected multiple matches, got %d: %s", len(items), stdout.String())
+	}
+
+	// All matches should have required fields
+	for _, item := range items {
+		if item["name"] == nil || item["name"] == "" {
+			t.Error("item missing 'name' field")
+		}
+		if item["category"] == nil || item["category"] == "" {
+			t.Error("item missing 'category' field")
+		}
+		if item["source"] == nil || item["source"] == "" {
+			t.Error("item missing 'source' field")
+		}
+	}
+}
+
+func TestConfigInfoJSON_WithMatch(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	globalDir := filepath.Join(tmpDir, "start")
+	if err := os.MkdirAll(globalDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	agentsContent := `agents: {
+	"claude": {
+		bin: "claude"
+		command: "claude \"{{.prompt}}\""
+		description: "Anthropic Claude"
+	}
+}`
+	if err := os.WriteFile(filepath.Join(globalDir, "agents.cue"), []byte(agentsContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	chdir(t, tmpDir)
+
+	cmd := NewRootCmd()
+	stdout := &bytes.Buffer{}
+	cmd.SetOut(stdout)
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"config", "info", "claude", "--json"})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var items []map[string]interface{}
+	if err := json.Unmarshal([]byte(strings.TrimSpace(stdout.String())), &items); err != nil {
+		t.Fatalf("invalid JSON: %v\noutput: %s", err, stdout.String())
+	}
+
+	if len(items) != 1 {
+		t.Fatalf("expected 1 item, got %d", len(items))
+	}
+
+	if items[0]["name"] != "claude" {
+		t.Errorf("name = %q, want %q", items[0]["name"], "claude")
+	}
+	if items[0]["category"] != "agent" {
+		t.Errorf("category = %q, want %q", items[0]["category"], "agent")
+	}
+}
+
+func TestConfigInfoJSON_NoArgs(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	chdir(t, tmpDir)
+
+	cmd := NewRootCmd()
+	stdout := &bytes.Buffer{}
+	cmd.SetOut(stdout)
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"config", "info", "--json"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error for no-args with --json")
+	}
+	if !strings.Contains(err.Error(), "query required") {
+		t.Errorf("error should mention 'query required', got: %v", err)
+	}
+}
+
+func TestConfigInfoJSON_NotFound(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	chdir(t, tmpDir)
+
+	cmd := NewRootCmd()
+	stdout := &bytes.Buffer{}
+	cmd.SetOut(stdout)
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"config", "info", "nonexistent-item", "--json"})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := strings.TrimSpace(stdout.String())
+	if output != "[]" {
+		t.Errorf("expected empty JSON array for not-found, got: %s", output)
+	}
+}
+
+func TestConfigSearchJSON_WithResults(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	globalDir := filepath.Join(tmpDir, "start")
+	if err := os.MkdirAll(globalDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	content := `roles: {
+	"golang": {
+		description: "Go programming expert"
+		prompt: "You are a Go expert."
+	}
+}`
+	if err := os.WriteFile(filepath.Join(globalDir, "config.cue"), []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	chdir(t, tmpDir)
+
+	cmd := NewRootCmd()
+	stdout := &bytes.Buffer{}
+	cmd.SetOut(stdout)
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"config", "search", "golang", "--json"})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var sections []map[string]interface{}
+	if err := json.Unmarshal([]byte(strings.TrimSpace(stdout.String())), &sections); err != nil {
+		t.Fatalf("invalid JSON: %v\noutput: %s", err, stdout.String())
+	}
+
+	if len(sections) == 0 {
+		t.Fatal("expected at least one section in JSON output")
+	}
+
+	firstSection := sections[0]
+	if _, ok := firstSection["label"]; !ok {
+		t.Error("section missing 'label' field")
+	}
+	if _, ok := firstSection["results"]; !ok {
+		t.Error("section missing 'results' field")
+	}
+}
+
+func TestConfigSearchJSON_NoResults(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	chdir(t, tmpDir)
+
+	cmd := NewRootCmd()
+	stdout := &bytes.Buffer{}
+	cmd.SetOut(stdout)
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"config", "search", "golang", "--json"})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := strings.TrimSpace(stdout.String())
+	if output != "[]" {
+		t.Errorf("expected empty JSON array for no results, got: %s", output)
+	}
+}
+
+func TestConfigSettingsJSON_List(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	chdir(t, tmpDir)
+
+	cmd := NewRootCmd()
+	stdout := &bytes.Buffer{}
+	cmd.SetOut(stdout)
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"config", "settings", "--json"})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var entries map[string]map[string]interface{}
+	if err := json.Unmarshal([]byte(strings.TrimSpace(stdout.String())), &entries); err != nil {
+		t.Fatalf("invalid JSON: %v\noutput: %s", err, stdout.String())
+	}
+
+	// All 4 valid setting keys should be present
+	for _, key := range []string{"assets_index", "default_agent", "shell", "timeout"} {
+		if _, ok := entries[key]; !ok {
+			t.Errorf("missing setting key %q in JSON output", key)
+		}
+	}
+
+	// Each entry should have a source field
+	for k, entry := range entries {
+		if _, ok := entry["source"]; !ok {
+			t.Errorf("setting %q missing 'source' field", k)
+		}
+	}
+}
+
+func TestConfigSettingsJSON_SingleKey(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	chdir(t, tmpDir)
+
+	cmd := NewRootCmd()
+	stdout := &bytes.Buffer{}
+	cmd.SetOut(stdout)
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"config", "settings", "default_agent", "--json"})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var entry map[string]interface{}
+	if err := json.Unmarshal([]byte(strings.TrimSpace(stdout.String())), &entry); err != nil {
+		t.Fatalf("invalid JSON: %v\noutput: %s", err, stdout.String())
+	}
+
+	if _, ok := entry["source"]; !ok {
+		t.Error("entry missing 'source' field")
 	}
 }
 
