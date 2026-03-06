@@ -626,6 +626,8 @@ func (r *resolver) autoInstall(client *registry.Client, result assets.SearchResu
 		return fmt.Errorf("resolving config paths: %w", err)
 	}
 
+	debugf(r.stderr, r.flags, dbgResolve, "Auto-installing %s/%s from registry", result.Category, result.Name)
+
 	if !r.flags.Quiet {
 		_, _ = fmt.Fprintf(r.stdout, "Installing %s from registry...\n", result.Name)
 	}
@@ -638,6 +640,7 @@ func (r *resolver) autoInstall(client *registry.Client, result assets.SearchResu
 		_, _ = fmt.Fprintf(r.stdout, "Installed %s to global config\n\n", result.Name)
 	}
 
+	debugf(r.stderr, r.flags, dbgResolve, "Auto-installed %s/%s", result.Category, result.Name)
 	r.didInstall = true
 	return nil
 }
@@ -713,6 +716,7 @@ func (r *resolver) ensureIndex() (*registry.Index, *registry.Client, error) {
 	}
 
 	r.index = index
+	debugf(r.stderr, r.flags, dbgResolve, "Index fetched: version %s", indexVersion)
 	return index, client, nil
 }
 

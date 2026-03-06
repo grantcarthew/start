@@ -69,7 +69,7 @@ func runTask(cmd *cobra.Command, args []string) error {
 			return err
 		}
 		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "\nRun %s to search and run a task.\n", tui.Annotate("start task <name>"))
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Run %s to search for installable tasks.\n", tui.Annotate("start assets search <name>"))
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Run %s to search all configuration and assets.\n", tui.Annotate("start search <name>"))
 		return nil
 	}
 
@@ -129,6 +129,7 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 
 	// If flag resolution installed assets, reload config
 	if flagInstalled {
+		debugf(stderr, flags, dbgConfig, "Reloading config after registry installs")
 		if err := r.reloadConfig(workingDir); err != nil {
 			return err
 		}
@@ -482,9 +483,11 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 
 	// Build and log final command
 	if flags.Debug {
-		cmdStr, err := env.Executor.BuildCommand(execConfig)
-		if err == nil {
+		cmdStr, buildErr := env.Executor.BuildCommand(execConfig)
+		if buildErr == nil {
 			debugf(stderr, flags, dbgExec, "Final command: %s", cmdStr)
+		} else {
+			debugf(stderr, flags, dbgExec, "BuildCommand error: %v", buildErr)
 		}
 	}
 

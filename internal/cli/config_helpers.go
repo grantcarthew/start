@@ -455,7 +455,8 @@ func promptModelsEdit(w io.Writer, reader *bufio.Reader, current map[string]stri
 func readModelAliases(w io.Writer, reader *bufio.Reader) (map[string]string, error) {
 	result := make(map[string]string)
 	for {
-		_, _ = fmt.Fprint(w, "  > ")
+		_, _ = fmt.Fprint(w, "  ")
+		_, _ = tui.ColorSuccess.Fprint(w, "> ")
 		input, err := reader.ReadString('\n')
 		if err != nil {
 			return nil, fmt.Errorf("reading input: %w", err)
@@ -647,9 +648,25 @@ func scoreAndSortNames[T any](items map[string]T, patterns []*regexp.Regexp) []s
 // rather than erroring. On zero matches it returns a "not found" error.
 // Results are sorted by score descending then name ascending.
 func resolveAllMatchingNames[T any](items map[string]T, typeName, query string) ([]string, error) {
-	// Fast path: exact match
+	// Fast path: exact match — but only when the query contains "/" or has no
+	// "query/" siblings. If siblings exist (e.g. "claude" matched alongside
+	// "claude/edit"), fall through to the regex search so all are returned.
 	if _, ok := items[query]; ok {
-		return []string{query}, nil
+		if strings.Contains(query, "/") {
+			return []string{query}, nil
+		}
+		prefix := query + "/"
+		hasSiblings := false
+		for name := range items {
+			if strings.HasPrefix(name, prefix) {
+				hasSiblings = true
+				break
+			}
+		}
+		if !hasSiblings {
+			return []string{query}, nil
+		}
+		// Has siblings — fall through so the regex search returns all matches.
 	}
 
 	terms := assets.ParseSearchPatterns(query)

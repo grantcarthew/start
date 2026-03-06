@@ -1,0 +1,510 @@
+#!/usr/bin/env bash
+# Manual CLI testing script
+# Prints each command, copies it to the clipboard, then waits for Enter.
+# Progress is saved so you can resume where you left off.
+# Run from the repository root: ./scripts/manual-test
+#
+# Options:
+#   --reset    Clear saved progress and start from the beginning
+
+CYAN='\033[0;36m'
+YELLOW='\033[1;33m'
+GREEN='\033[0;32m'
+BOLD='\033[1m'
+DIM='\033[2m'
+NC='\033[0m'
+
+PROGRESS_FILE="$(dirname "$0")/manual-test-progress"
+step=0
+resume_from=0
+total=$(grep -c '^cmd "' "$0")
+
+# Parse arguments
+for arg in "$@"; do
+    case $arg in
+        --reset)
+            rm -f "$PROGRESS_FILE"
+            echo "Progress cleared."
+            ;;
+        *)
+            echo "Unknown option: $arg"
+            echo "Usage: $0 [--reset]"
+            exit 1
+            ;;
+    esac
+done
+
+# Load saved progress
+if [[ -f "$PROGRESS_FILE" ]]; then
+    resume_from=$(cat "$PROGRESS_FILE")
+fi
+
+cmd() {
+    local section="$1"
+    local description="$2"
+    local command="$3"
+
+    step=$((step + 1))
+
+    # Skip already-completed steps
+    if [[ $step -le $resume_from ]]; then
+        return
+    fi
+
+    echo
+    echo -e "${BOLD}[$step/$total] $section — $description${NC}"
+    echo -e "  ${YELLOW}$command${NC}"
+    echo -n "$command" | xclip -selection clipboard
+    echo -e "  ${CYAN}(copied to clipboard) Press Enter to continue...${NC}"
+    read -r
+
+    # Save progress after each step
+    echo "$step" > "$PROGRESS_FILE"
+}
+
+section() {
+    echo
+    echo -e "${BOLD}========================================"
+    echo -e "  $1"
+    echo -e "========================================${NC}"
+}
+
+# Ensure binary exists
+if [[ ! -f "./start" ]]; then
+    echo "Building start binary..."
+    go build -o ./start ./cmd/start || exit 1
+fi
+
+echo -e "${BOLD}Manual CLI Test Script${NC}"
+if [[ $resume_from -gt 0 ]]; then
+    echo -e "${GREEN}Resuming from step $((resume_from + 1))${NC} (completed: $resume_from)"
+    echo -e "${DIM}Run with --reset to start from the beginning.${NC}"
+else
+    echo "Each command is printed and copied to clipboard."
+    echo "Run it in another terminal, then press Enter here to advance."
+    echo -e "${DIM}Progress is saved automatically — re-run to resume.${NC}"
+fi
+
+# --------------------------------------------------------------------------
+section "1. Help & Version"
+# --------------------------------------------------------------------------
+
+cmd "help" "--help" \
+    "./start --help"
+
+cmd "help" "--version" \
+    "./start --version"
+
+cmd "help" "prompt --help" \
+    "./start prompt --help"
+
+cmd "help" "task --help" \
+    "./start task --help"
+
+cmd "help" "config --help" \
+    "./start config --help"
+
+cmd "help" "config list --help" \
+    "./start config list --help"
+
+cmd "help" "config info --help" \
+    "./start config info --help"
+
+cmd "help" "config add --help" \
+    "./start config add --help"
+
+cmd "help" "config edit --help" \
+    "./start config edit --help"
+
+cmd "help" "config remove --help" \
+    "./start config remove --help"
+
+cmd "help" "config search --help" \
+    "./start config search --help"
+
+cmd "help" "config open --help" \
+    "./start config open --help"
+
+cmd "help" "config order --help" \
+    "./start config order --help"
+
+cmd "help" "config export --help" \
+    "./start config export --help"
+
+cmd "help" "config settings --help" \
+    "./start config settings --help"
+
+cmd "help" "show --help" \
+    "./start show --help"
+
+cmd "help" "assets --help" \
+    "./start assets --help"
+
+cmd "help" "doctor --help" \
+    "./start doctor --help"
+
+cmd "help" "completion --help" \
+    "./start completion --help"
+
+# --------------------------------------------------------------------------
+section "2. Start Command (Default)"
+# --------------------------------------------------------------------------
+
+cmd "start" "--dry-run" \
+    "./start --dry-run"
+
+cmd "start" "--dry-run --debug" \
+    "./start --dry-run --debug"
+
+cmd "start" "--quiet --dry-run" \
+    "./start --quiet --dry-run"
+
+cmd "start" "--verbose --dry-run" \
+    "./start --verbose --dry-run"
+
+cmd "start" "--agent claude --dry-run" \
+    "./start --agent claude --dry-run"
+
+cmd "start" "--agent nonexistent (expect error)" \
+    "./start --agent nonexistent-agent-xyz --dry-run"
+
+cmd "start" "--model opus --dry-run" \
+    "./start --model 'claude-opus-4-5' --dry-run"
+
+cmd "start" "--context default --dry-run" \
+    "./start -c default --dry-run"
+
+cmd "start" "--context nonexistent (expect warning)" \
+    "./start -c nonexistent-tag-xyz --dry-run"
+
+cmd "start" "--no-role --dry-run" \
+    "./start --no-role --dry-run"
+
+# --------------------------------------------------------------------------
+section "3. Prompt Command"
+# --------------------------------------------------------------------------
+
+cmd "prompt" "prompt with text --dry-run" \
+    "./start prompt 'Hello world' --dry-run"
+
+cmd "prompt" "prompt with context tag --dry-run" \
+    "./start prompt 'Hello world' -c default --dry-run"
+
+cmd "prompt" "prompt --debug --dry-run" \
+    "./start prompt 'Hello world' --dry-run --debug"
+
+# --------------------------------------------------------------------------
+section "4. Task Command"
+# --------------------------------------------------------------------------
+
+cmd "task" "task (no args - lists tasks)" \
+    "./start task"
+
+cmd "task" "task nonexistent (expect error)" \
+    "./start task nonexistent-task-xyz-123"
+
+# --------------------------------------------------------------------------
+section "5. Error Handling"
+# --------------------------------------------------------------------------
+
+cmd "errors" "unknown command (expect error)" \
+    "./start unknowncommand"
+
+cmd "errors" "invalid flag (expect error)" \
+    "./start --invalid-flag-xyz"
+
+# --------------------------------------------------------------------------
+section "6. Config Overview"
+# --------------------------------------------------------------------------
+
+cmd "config" "config (overview)" \
+    "./start config"
+
+cmd "config" "config --local (local overview)" \
+    "./start config --local"
+
+# --------------------------------------------------------------------------
+section "7. Config List"
+# --------------------------------------------------------------------------
+
+cmd "config list" "list all" \
+    "./start config list"
+
+cmd "config list" "list agents" \
+    "./start config list agents"
+
+cmd "config list" "list roles" \
+    "./start config list roles"
+
+cmd "config list" "list contexts" \
+    "./start config list contexts"
+
+cmd "config list" "list tasks" \
+    "./start config list tasks"
+
+cmd "config list" "list --json" \
+    "./start config list --json"
+
+cmd "config list" "list agents --json" \
+    "./start config list agents --json"
+
+cmd "config list" "ls alias" \
+    "./start config ls"
+
+cmd "config list" "list --local" \
+    "./start config list --local"
+
+cmd "config list" "list -l" \
+    "./start config list -l"
+
+# --------------------------------------------------------------------------
+section "8. Config Info"
+# --------------------------------------------------------------------------
+
+cmd "config info" "info claude" \
+    "./start config info claude"
+
+cmd "config info" "info claude --json" \
+    "./start config info claude --json"
+
+cmd "config info" "info nonexistent (expect error)" \
+    "./start config info nonexistent-xyz-123"
+
+# --------------------------------------------------------------------------
+section "9. Config Search"
+# --------------------------------------------------------------------------
+
+cmd "config search" "search claude" \
+    "./start config search claude"
+
+cmd "config search" "search golang" \
+    "./start config search golang"
+
+# --------------------------------------------------------------------------
+section "10. Config Add (interactive)"
+# --------------------------------------------------------------------------
+
+cmd "config add" "add (interactive - prompts for category)" \
+    "./start config add"
+
+cmd "config add" "add agent (interactive)" \
+    "./start config add agent"
+
+cmd "config add" "add role (interactive)" \
+    "./start config add role"
+
+cmd "config add" "add context (interactive)" \
+    "./start config add context"
+
+cmd "config add" "add task (interactive)" \
+    "./start config add task"
+
+# --------------------------------------------------------------------------
+section "11. Config Edit (interactive)"
+# --------------------------------------------------------------------------
+
+cmd "config edit" "edit (interactive - prompts for category and item)" \
+    "./start config edit"
+
+cmd "config edit" "edit claude (interactive)" \
+    "./start config edit claude"
+
+# --------------------------------------------------------------------------
+section "12. Config Remove"
+# --------------------------------------------------------------------------
+
+cmd "config remove" "remove nonexistent (expect error)" \
+    "./start config remove nonexistent-xyz-123 --yes"
+
+cmd "config remove" "remove (interactive - no args)" \
+    "./start config remove"
+
+# --------------------------------------------------------------------------
+section "13. Config Open"
+# --------------------------------------------------------------------------
+
+cmd "config open" "open (interactive - prompts for category)" \
+    "./start config open"
+
+cmd "config open" "open agent" \
+    "./start config open agent"
+
+cmd "config open" "open role" \
+    "./start config open role"
+
+# --------------------------------------------------------------------------
+section "14. Config Order"
+# --------------------------------------------------------------------------
+
+cmd "config order" "order (interactive)" \
+    "./start config order"
+
+cmd "config order" "order role" \
+    "./start config order role"
+
+# --------------------------------------------------------------------------
+section "15. Config Export"
+# --------------------------------------------------------------------------
+
+cmd "config export" "export (all)" \
+    "./start config export"
+
+cmd "config export" "export agent" \
+    "./start config export agent"
+
+cmd "config export" "export role" \
+    "./start config export role"
+
+cmd "config export" "export context" \
+    "./start config export context"
+
+cmd "config export" "export task" \
+    "./start config export task"
+
+cmd "config export" "export setting" \
+    "./start config export setting"
+
+cmd "config export" "export --local" \
+    "./start config export --local"
+
+# --------------------------------------------------------------------------
+section "16. Config Settings"
+# --------------------------------------------------------------------------
+
+cmd "config settings" "settings (list all)" \
+    "./start config settings"
+
+cmd "config settings" "settings --json" \
+    "./start config settings --json"
+
+cmd "config settings" "settings default_agent (show)" \
+    "./start config settings default_agent"
+
+cmd "config settings" "settings default_agent --json" \
+    "./start config settings default_agent --json"
+
+cmd "config settings" "settings default_agent claude (set)" \
+    "./start config settings default_agent claude"
+
+cmd "config settings" "settings default_agent --unset" \
+    "./start config settings default_agent --unset"
+
+cmd "config settings" "settings edit (open in \$EDITOR)" \
+    "EDITOR=cat ./start config settings edit"
+
+cmd "config settings" "settings unknown key (expect error)" \
+    "./start config settings nonexistent_key_xyz"
+
+# --------------------------------------------------------------------------
+section "17. Show Command"
+# --------------------------------------------------------------------------
+
+cmd "show" "show (listing all)" \
+    "./start show"
+
+cmd "show" "show claude (verbose dump)" \
+    "./start show claude"
+
+cmd "show" "show --global" \
+    "./start show --global"
+
+cmd "show" "show --local" \
+    "./start show --local"
+
+cmd "show" "show --global claude" \
+    "./start show --global claude"
+
+cmd "show" "show nonexistent (expect error)" \
+    "./start show nonexistent-xyz-123"
+
+# --------------------------------------------------------------------------
+section "18. Assets Commands"
+# --------------------------------------------------------------------------
+
+cmd "assets" "assets search role" \
+    "./start assets search role"
+
+cmd "assets" "assets search golang" \
+    "./start assets search golang"
+
+cmd "assets" "assets search --verbose" \
+    "./start assets search role --verbose"
+
+cmd "assets" "assets search --json" \
+    "./start assets search role --json"
+
+cmd "assets" "assets search too short (expect error)" \
+    "./start assets search ab"
+
+cmd "assets" "assets search no results" \
+    "./start assets search xyznonexistent123"
+
+cmd "assets" "assets list" \
+    "./start assets list"
+
+cmd "assets" "assets list roles" \
+    "./start assets list roles"
+
+cmd "assets" "assets list tasks" \
+    "./start assets list tasks"
+
+cmd "assets" "assets list --json" \
+    "./start assets list --json"
+
+cmd "assets" "assets info (direct path)" \
+    "./start assets info golang/code-review"
+
+cmd "assets" "assets info (search)" \
+    "./start assets info 'code review'"
+
+cmd "assets" "assets add (direct path)" \
+    "./start assets add golang/code-review"
+
+cmd "assets" "assets update (all)" \
+    "./start assets update"
+
+cmd "assets" "assets update (specific)" \
+    "./start assets update golang"
+
+cmd "assets" "assets update --dry-run" \
+    "./start assets update --dry-run"
+
+cmd "assets" "assets update --force" \
+    "./start assets update --force"
+
+cmd "assets" "assets index (expect error - not asset repo)" \
+    "./start assets index"
+
+# --------------------------------------------------------------------------
+section "19. Doctor Command"
+# --------------------------------------------------------------------------
+
+cmd "doctor" "doctor" \
+    "./start doctor"
+
+# --------------------------------------------------------------------------
+section "20. Completion Commands"
+# --------------------------------------------------------------------------
+
+cmd "completion" "completion bash" \
+    "./start completion bash"
+
+cmd "completion" "completion zsh" \
+    "./start completion zsh"
+
+cmd "completion" "completion fish" \
+    "./start completion fish"
+
+cmd "completion" "completion bash --help" \
+    "./start completion bash --help"
+
+cmd "completion" "completion zsh --help" \
+    "./start completion zsh --help"
+
+cmd "completion" "completion fish --help" \
+    "./start completion fish --help"
+
+# --------------------------------------------------------------------------
+echo
+echo -e "${GREEN}${BOLD}All commands covered. Manual testing complete.${NC}"
+rm -f "$PROGRESS_FILE"

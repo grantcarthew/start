@@ -336,6 +336,7 @@ func executeStart(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, selec
 
 	// If any registry installs happened, reload config
 	if r.didInstall {
+		debugf(stderr, flags, dbgConfig, "Reloading config after registry installs")
 		if err := r.reloadConfig(workingDir); err != nil {
 			return err
 		}
