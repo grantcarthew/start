@@ -101,7 +101,8 @@ func (r *resolver) resolveAsset(name, cueKey, category, displayType string, allo
 
 	// Tier 1: Exact or short name match in installed config
 	if resolved, err := findExactInstalledName(r.cfg.Value, cueKey, name); err != nil {
-		return "", err
+		// Ambiguous short name - fall through to substring search
+		debugf(r.stderr, r.flags, dbgResolve, "%s %q: short name ambiguous, falling through: %v", displayType, name, err)
 	} else if resolved != "" {
 		debugf(r.stderr, r.flags, dbgResolve, "%s %q: installed match -> %q", displayType, name, resolved)
 		return resolved, nil
@@ -268,7 +269,8 @@ func (r *resolver) resolveContexts(terms []string) ([]string, error) {
 
 		// Exact or short name match in installed config
 		if resolvedCtx, err := findExactInstalledName(r.cfg.Value, internalcue.KeyContexts, term); err != nil {
-			return nil, err
+			// Ambiguous short name - fall through to substring search
+			debugf(r.stderr, r.flags, dbgResolve, "Context %q: short name ambiguous, falling through: %v", term, err)
 		} else if resolvedCtx != "" {
 			debugf(r.stderr, r.flags, dbgResolve, "Context %q: installed match -> %q", term, resolvedCtx)
 			resolved = append(resolved, resolvedCtx)

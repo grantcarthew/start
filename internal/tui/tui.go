@@ -30,6 +30,7 @@ var (
 	ColorTasks     = color.New(color.FgHiYellow)
 	ColorSettings  = color.New(color.FgMagenta)
 	ColorPrompts   = color.New(color.Faint)
+	ColorPaths     = color.New(color.FgHiCyan)
 	ColorInstalled = color.New(color.FgHiGreen)
 	ColorRegistry  = color.New(color.FgYellow)
 )

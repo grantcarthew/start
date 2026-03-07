@@ -26,9 +26,9 @@ func TestConfigAgent_FullWorkflow(t *testing.T) {
 	}
 
 	t.Run("add agent interactively", func(t *testing.T) {
-		// Prompts: name, bin, command template, default model, models (skip), description, tags (skip)
+		// Prompts: name, bin, command, models(skip), defaultModel="sonnet", description, tags(skip)
 		stdout := &bytes.Buffer{}
-		if err := configAgentAdd(slowStdin("claude\nclaude\n"+`claude --model {{.model}} "{{.prompt}}"`+"\nsonnet\n\nAnthropic Claude\n\n"), stdout, false); err != nil {
+		if err := configAgentAdd(slowStdin("claude\nclaude\n"+`claude --model {{.model}} "{{.prompt}}"`+"\n\nsonnet\nAnthropic Claude\n\n"), stdout, false); err != nil {
 			t.Fatalf("add failed: %v", err)
 		}
 
@@ -86,7 +86,7 @@ func TestConfigAgent_FullWorkflow(t *testing.T) {
 
 	t.Run("add second agent", func(t *testing.T) {
 		// Prompts: name, bin, command template, default model (empty), description (empty), tags (skip)
-		if err := configAgentAdd(slowStdin("gemini\ngemini\n"+`gemini "{{.prompt}}"`+"\n\n\n\n"), &bytes.Buffer{}, false); err != nil {
+		if err := configAgentAdd(slowStdin("gemini\ngemini\n"+`gemini "{{.prompt}}"`+"\n\n\n\n\n"), &bytes.Buffer{}, false); err != nil {
 			t.Fatalf("add gemini failed: %v", err)
 		}
 	})
@@ -173,7 +173,7 @@ func TestConfigAgent_FullWorkflow(t *testing.T) {
 
 	t.Run("remove with -y short flag", func(t *testing.T) {
 		// Re-add gemini for this test
-		if err := configAgentAdd(slowStdin("gemini\ngemini\n"+`gemini "{{.prompt}}"`+"\n\n\n\n"), &bytes.Buffer{}, false); err != nil {
+		if err := configAgentAdd(slowStdin("gemini\ngemini\n"+`gemini "{{.prompt}}"`+"\n\n\n\n\n"), &bytes.Buffer{}, false); err != nil {
 			t.Fatalf("re-add gemini failed: %v", err)
 		}
 
@@ -195,7 +195,7 @@ func TestConfigAgent_FullWorkflow(t *testing.T) {
 
 	t.Run("add duplicate fails", func(t *testing.T) {
 		// Provide full add responses; duplicate check fires after all prompts
-		err := configAgentAdd(slowStdin("claude\nclaude\n"+`claude "{{.prompt}}"`+"\n\n\n\n"), &bytes.Buffer{}, false)
+		err := configAgentAdd(slowStdin("claude\nclaude\n"+`claude "{{.prompt}}"`+"\n\n\n\n\n"), &bytes.Buffer{}, false)
 		if err == nil {
 			t.Fatal("expected error for duplicate agent")
 		}
@@ -503,13 +503,13 @@ func TestConfigLocal_Isolation(t *testing.T) {
 	}
 
 	t.Run("add global agent", func(t *testing.T) {
-		if err := configAgentAdd(slowStdin("global-agent\nglobal\n"+`global "{{.prompt}}"`+"\n\n\n\n"), &bytes.Buffer{}, false); err != nil {
+		if err := configAgentAdd(slowStdin("global-agent\nglobal\n"+`global "{{.prompt}}"`+"\n\n\n\n\n"), &bytes.Buffer{}, false); err != nil {
 			t.Fatalf("add global failed: %v", err)
 		}
 	})
 
 	t.Run("add local agent", func(t *testing.T) {
-		if err := configAgentAdd(slowStdin("local-agent\nlocal\n"+`local "{{.prompt}}"`+"\n\n\n\n"), &bytes.Buffer{}, true); err != nil {
+		if err := configAgentAdd(slowStdin("local-agent\nlocal\n"+`local "{{.prompt}}"`+"\n\n\n\n\n"), &bytes.Buffer{}, true); err != nil {
 			t.Fatalf("add local failed: %v", err)
 		}
 
@@ -818,7 +818,7 @@ func TestConfigRemove_MultipleArgs(t *testing.T) {
 		}
 
 		// Add an agent named "shared"
-		if err := configAgentAdd(slowStdin("shared\nshared\n"+`shared "{{.prompt}}"`+"\n\n\n\n"), &bytes.Buffer{}, false); err != nil {
+		if err := configAgentAdd(slowStdin("shared\nshared\n"+`shared "{{.prompt}}"`+"\n\n\n\n\n"), &bytes.Buffer{}, false); err != nil {
 			t.Fatalf("add agent failed: %v", err)
 		}
 		// Add a role named "shared"
@@ -859,7 +859,7 @@ func TestConfigRemove_MultipleArgs(t *testing.T) {
 		}
 
 		for _, name := range []string{"alpha", "beta", "gamma"} {
-			if err := configAgentAdd(slowStdin(name+"\n"+name+"\n"+name+` "{{.prompt}}"`+"\n\n\n\n"), &bytes.Buffer{}, false); err != nil {
+			if err := configAgentAdd(slowStdin(name+"\n"+name+"\n"+name+` "{{.prompt}}"`+"\n\n\n\n\n"), &bytes.Buffer{}, false); err != nil {
 				t.Fatalf("add %s failed: %v", name, err)
 			}
 		}
@@ -908,7 +908,7 @@ func TestConfigRemove_MultipleArgs(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := configAgentAdd(slowStdin("testagent\ntest\n"+`test "{{.prompt}}"`+"\n\n\n\n"), &bytes.Buffer{}, false); err != nil {
+		if err := configAgentAdd(slowStdin("testagent\ntest\n"+`test "{{.prompt}}"`+"\n\n\n\n\n"), &bytes.Buffer{}, false); err != nil {
 			t.Fatalf("add failed: %v", err)
 		}
 
@@ -945,11 +945,12 @@ func TestConfigAgentAdd_WithModelsAndTags(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Prompts: name, bin, command, defaultModel="sonnet",
+	// Prompts: name, bin, command,
 	//          models: "fast=claude-3-haiku\n\n" (one alias then empty to finish),
+	//          defaultModel: "1" (select first from list),
 	//          description, tags: "ai,coding\n"
 	stdout := &bytes.Buffer{}
-	err := configAgentAdd(slowStdin("myagent\nmybin\n"+`mybin "{{.prompt}}"`+"\nsonnet\nfast=claude-3-haiku\n\nMy agent\nai,coding\n"), stdout, false)
+	err := configAgentAdd(slowStdin("myagent\nmybin\n"+`mybin "{{.prompt}}"`+"\nfast=claude-3-haiku\n\n1\nMy agent\nai,coding\n"), stdout, false)
 	if err != nil {
 		t.Fatalf("add failed: %v", err)
 	}
@@ -974,9 +975,9 @@ func TestConfigAgentAdd_NoModelsWhenNoDefaultModel(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// No defaultModel → no models prompt. Prompts: name, bin, command, defaultModel(empty), description, tags(skip)
+	// Prompts: name, bin, command, models(empty=skip), defaultModel(empty=skip), description, tags(skip)
 	stdout := &bytes.Buffer{}
-	err := configAgentAdd(slowStdin("nomodel\nbin\n"+`bin "{{.prompt}}"`+"\n\nA desc\n\n"), stdout, false)
+	err := configAgentAdd(slowStdin("nomodel\nbin\n"+`bin "{{.prompt}}"`+"\n\n\nA desc\n\n"), stdout, false)
 	if err != nil {
 		t.Fatalf("add failed: %v", err)
 	}

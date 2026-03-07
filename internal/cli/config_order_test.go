@@ -761,7 +761,7 @@ func TestConfigRoleAdd_PreservesOrder(t *testing.T) {
 	}
 }
 
-func TestConfigRoleList_PreservesDefinitionOrder(t *testing.T) {
+func TestConfigRoleList_SortsAlphabetically(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", tmpDir)
 
@@ -811,8 +811,9 @@ func TestConfigRoleList_PreservesDefinitionOrder(t *testing.T) {
 		t.Fatalf("expected all roles in output, got: %s", output)
 	}
 
-	if zebraIdx >= alphaIdx || alphaIdx >= middleIdx {
-		t.Errorf("role order not preserved (expected zebra < alpha < middle): zebra=%d, alpha=%d, middle=%d\noutput: %s",
-			zebraIdx, alphaIdx, middleIdx, output)
+	// Alphabetical order: alpha < middle < zebra
+	if alphaIdx >= middleIdx || middleIdx >= zebraIdx {
+		t.Errorf("role list not sorted alphabetically (expected alpha < middle < zebra): alpha=%d, middle=%d, zebra=%d\noutput: %s",
+			alphaIdx, middleIdx, zebraIdx, output)
 	}
 }

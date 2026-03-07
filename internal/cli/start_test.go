@@ -283,6 +283,74 @@ settings: {
 	}
 }
 
+func TestExecuteTask_AmbiguousTaskRole(t *testing.T) {
+	tmpDir := t.TempDir()
+	configDir := filepath.Join(tmpDir, ".start")
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		t.Fatalf("creating config dir: %v", err)
+	}
+
+	// Two roles sharing the short name "assistant" plus a task referencing
+	// the ambiguous short name. The resolver should be invoked and return
+	// an actionable "ambiguous" error rather than a silent downstream failure.
+	config := `
+agents: {
+	echo: {
+		bin: "echo"
+		command: "{{.bin}} 'Agent executed'"
+		default_model: "default"
+		models: {
+			default: "echo-model"
+		}
+	}
+}
+
+roles: {
+	"golang/assistant": {
+		file: ""
+		description: "Go assistant"
+	}
+	"personal/assistant": {
+		file: ""
+		description: "Personal assistant"
+	}
+}
+
+tasks: {
+	"test-task": {
+		role: "assistant"
+		prompt: "Test task prompt."
+	}
+}
+
+settings: {
+	default_agent: "echo"
+}
+`
+	configFile := filepath.Join(configDir, "settings.cue")
+	if err := os.WriteFile(configFile, []byte(config), 0644); err != nil {
+		t.Fatalf("writing config: %v", err)
+	}
+
+	chdir(t, tmpDir)
+
+	flags := &Flags{DryRun: true, Quiet: true}
+
+	stdout := new(bytes.Buffer)
+	stderr := new(bytes.Buffer)
+
+	err := executeTask(stdout, stderr, strings.NewReader(""), flags, "test-task", "", nil)
+	if err == nil {
+		t.Fatal("Expected error for ambiguous task role, got nil")
+	}
+
+	// The resolver should produce an "ambiguous" error listing the candidates,
+	// not a downstream failure about an unresolved role name.
+	if !strings.Contains(err.Error(), "ambiguous") {
+		t.Errorf("Expected ambiguous error, got: %v", err)
+	}
+}
+
 func TestExecuteStart_ContextSelection(t *testing.T) {
 	tmpDir := setupStartTestConfig(t)
 	chdir(t, tmpDir)

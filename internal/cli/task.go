@@ -387,7 +387,19 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 				// If the task's role is not installed, resolve through three-tier
 				// search which may auto-install from registry (same as --role flag).
 				if resolved, err := findExactInstalledName(env.Cfg.Value, internalcue.KeyRoles, roleName); err != nil {
-					return err
+					// Ambiguous short name - route through resolver for interactive selection.
+					debugf(stderr, flags, dbgTask, "Task role %q: short name ambiguous, routing to resolver: %v", roleName, err)
+					beforeInstall := r.didInstall
+					roleName, err = r.resolveRole(roleName)
+					if err != nil {
+						return err
+					}
+					if r.didInstall && !beforeInstall {
+						env, err = reloadEnv(workingDir, agentName, flags, stdout, stderr, stdin)
+						if err != nil {
+							return err
+						}
+					}
 				} else if resolved != "" {
 					roleName = resolved
 				} else {

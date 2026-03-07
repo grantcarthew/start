@@ -57,7 +57,7 @@ func runConfigList(cmd *cobra.Command, args []string) error {
 	}
 
 	_, _ = fmt.Fprintln(w)
-	_, _ = tui.ColorHeader.Fprintln(w, "Configuration Paths:")
+	_, _ = tui.ColorPaths.Fprintln(w, "Configuration Paths:")
 	globalStatus := "not found"
 	if paths.GlobalExists {
 		globalStatus = "exists"
@@ -66,9 +66,11 @@ func runConfigList(cmd *cobra.Command, args []string) error {
 	if paths.LocalExists {
 		localStatus = "exists"
 	}
-	_, _ = fmt.Fprintf(w, "  Global: %s ", paths.Global)
+	_, _ = tui.ColorDim.Fprintf(w, "  Global: ")
+	_, _ = fmt.Fprintf(w, "%s ", paths.Global)
 	_, _ = fmt.Fprintln(w, tui.Annotate("%s", globalStatus))
-	_, _ = fmt.Fprintf(w, "  Local:  %s ", paths.Local)
+	_, _ = tui.ColorDim.Fprintf(w, "  Local:  ")
+	_, _ = fmt.Fprintf(w, "%s ", paths.Local)
 	_, _ = fmt.Fprintln(w, tui.Annotate("%s", localStatus))
 
 	// Determine scope for listing
@@ -87,7 +89,8 @@ func runConfigList(cmd *cobra.Command, args []string) error {
 	_, _ = fmt.Fprintln(w)
 	_, _ = tui.ColorSettings.Fprint(w, "settings")
 	_, _ = fmt.Fprint(w, "/ ")
-	_, _ = fmt.Fprintln(w, tui.Annotate("%s", scopeLabel))
+	_, _ = fmt.Fprint(w, tui.Annotate("%s", scopeLabel))
+	_, _ = tui.ColorDim.Fprintf(w, ": %d\n", len(entries))
 	if len(entries) > 0 {
 		printSettingsEntries(w, entries)
 	}

@@ -16,7 +16,7 @@ NC='\033[0m'
 
 PROGRESS_FILE="$(dirname "$0")/manual-test-progress"
 step=0
-resume_from=0
+completed=0
 total=$(grep -c '^cmd "' "$0")
 
 # Parse arguments
@@ -36,7 +36,7 @@ done
 
 # Load saved progress
 if [[ -f "$PROGRESS_FILE" ]]; then
-    resume_from=$(cat "$PROGRESS_FILE")
+    completed=$(wc -l < "$PROGRESS_FILE")
 fi
 
 cmd() {
@@ -44,10 +44,11 @@ cmd() {
     local description="$2"
     local command="$3"
 
+    local key="$section|$description"
     step=$((step + 1))
 
     # Skip already-completed steps
-    if [[ $step -le $resume_from ]]; then
+    if grep -qFx "$key" "$PROGRESS_FILE" 2>/dev/null; then
         return
     fi
 
@@ -59,7 +60,8 @@ cmd() {
     read -r
 
     # Save progress after each step
-    echo "$step" > "$PROGRESS_FILE"
+    echo "$key" >> "$PROGRESS_FILE"
+    completed=$((completed + 1))
 }
 
 section() {
@@ -76,8 +78,8 @@ if [[ ! -f "./start" ]]; then
 fi
 
 echo -e "${BOLD}Manual CLI Test Script${NC}"
-if [[ $resume_from -gt 0 ]]; then
-    echo -e "${GREEN}Resuming from step $((resume_from + 1))${NC} (completed: $resume_from)"
+if [[ $completed -gt 0 ]]; then
+    echo -e "${GREEN}Resuming${NC} (completed: $completed/$total)"
     echo -e "${DIM}Run with --reset to start from the beginning.${NC}"
 else
     echo "Each command is printed and copied to clipboard."
@@ -452,13 +454,13 @@ cmd "assets" "assets list --json" \
     "./start assets list --json"
 
 cmd "assets" "assets info (direct path)" \
-    "./start assets info golang/code-review"
+    "./start assets info golang/debug"
 
 cmd "assets" "assets info (search)" \
     "./start assets info 'code review'"
 
 cmd "assets" "assets add (direct path)" \
-    "./start assets add golang/code-review"
+    "./start assets add golang/debug"
 
 cmd "assets" "assets update (all)" \
     "./start assets update"

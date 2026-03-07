@@ -319,7 +319,7 @@ func TestConfigListContext_WithContexts(t *testing.T) {
 	}
 }
 
-func TestConfigListContext_PreservesDefinitionOrder(t *testing.T) {
+func TestConfigListContext_SortsAlphabetically(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", tmpDir)
 
@@ -329,8 +329,7 @@ func TestConfigListContext_PreservesDefinitionOrder(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Define contexts in a specific order: zebra, alpha, middle
-	// If sorted alphabetically, order would be: alpha, middle, zebra
+	// Define contexts in non-alphabetical order: zebra, alpha, middle
 	contextsContent := `contexts: {
 	"zebra": {
 		file: "zebra.md"
@@ -364,7 +363,6 @@ func TestConfigListContext_PreservesDefinitionOrder(t *testing.T) {
 
 	output := stdout.String()
 
-	// Verify order is preserved (definition order, not alphabetical)
 	zebraIdx := strings.Index(output, "zebra")
 	alphaIdx := strings.Index(output, "alpha")
 	middleIdx := strings.Index(output, "middle")
@@ -373,10 +371,10 @@ func TestConfigListContext_PreservesDefinitionOrder(t *testing.T) {
 		t.Fatalf("expected all contexts in output, got: %s", output)
 	}
 
-	// Definition order: zebra < alpha < middle
-	if zebraIdx >= alphaIdx || alphaIdx >= middleIdx {
-		t.Errorf("context order not preserved (expected zebra < alpha < middle): zebra=%d, alpha=%d, middle=%d\noutput: %s",
-			zebraIdx, alphaIdx, middleIdx, output)
+	// Alphabetical order: alpha < middle < zebra
+	if alphaIdx >= middleIdx || middleIdx >= zebraIdx {
+		t.Errorf("context list not sorted alphabetically (expected alpha < middle < zebra): alpha=%d, middle=%d, zebra=%d\noutput: %s",
+			alphaIdx, middleIdx, zebraIdx, output)
 	}
 }
 
