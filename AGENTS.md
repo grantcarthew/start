@@ -75,26 +75,14 @@ The prototype explored the design space and validated the core concepts. Key arc
 
 Documentation is structured as:
 
-- `.ai/` - AI agent working files (projects, design records, tasks)
-- `.ai/design/` - Design decisions and architecture (Design Records)
+- `.ai/` - AI agent working files (projects, design, tasks)
+- `.ai/design/` - Technical standards and reference documents
 - `.ai/projects/` - Project documents
 - `.ai/tasks/` - Task prompts
 
-## Document Driven Development (DDD)
-
-This project uses Document Driven Development. Design decisions are documented in Design Records (DRs) before implementation.
-
-Location: `.ai/design/design-records/`
-
-Process:
-
-- Create DRs for architectural decisions, algorithms, breaking changes, API/CLI structure
-- Get next DR number from `.ai/design/design-records/README.md`
-- Follow reconciliation process after 5-10 DRs
-
 ## Testing
 
-When implementing code, ensure it is testable. Read `.ai/design/design-records/dr-024-testing-strategy.md` for the testing approach.
+When implementing code, ensure it is testable. Read `.ai/design/testing-strategy.md` for the testing approach.
 
 Key principles:
 

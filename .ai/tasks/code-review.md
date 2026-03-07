@@ -12,7 +12,7 @@ The primary goal is to ensure code is correct, maintainable, efficient, and simp
    - README.md
    - AGENTS.md
    - Active project document (from AGENTS.md)
-   - All relevant Design Records (.ai/design/design-records/)
+   - Design standards in `.ai/design/`
 
 2. Read the code being reviewed:
    - Start with entry points (main files, index files)
@@ -34,9 +34,8 @@ The primary goal is to ensure code is correct, maintainable, efficient, and simp
 
 General approach:
 
-- Use Design Records as source of truth for architectural decisions
-- If code differs from DRs, document the discrepancy
-- If DRs appear incorrect, note this for discussion
+- Use design standards in `.ai/design/` as source of truth for architectural decisions
+- If code differs from standards, document the discrepancy
 - Focus on meaningful issues, not cosmetic preferences
 - Prioritize correctness over optimization
 
@@ -76,11 +75,10 @@ Data Validation:
 
 Does the code fit well into the larger system?
 
-Design Records Alignment:
+Design Standards Alignment:
 
-- Does implementation match architectural decisions in DRs?
-- Are DR-documented trade-offs respected?
-- Are design patterns from DRs followed consistently?
+- Does implementation match the standards in `.ai/design/`?
+- Are design patterns followed consistently?
 
 Simplicity:
 
@@ -248,12 +246,6 @@ API Documentation:
 - Are public APIs documented?
 - Are parameters and return values described?
 - Are examples provided for complex APIs?
-
-DR References:
-
-- Are DR references included where design decisions are implemented?
-- Format: `// See dr-042 for authentication strategy`
-- Are references accurate and up-to-date?
 
 Code Clarity:
 

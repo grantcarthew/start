@@ -12,7 +12,7 @@ For an overarching interactive workflow that coordinates these tasks, see [.ai/w
 
 ### [design-phase.md](./design-phase.md)
 
-Guides agents through design work - asking questions, exploring alternatives, making decisions, and creating Design Records.
+Guides agents through design work - asking questions, exploring alternatives, and making decisions.
 
 When to use: Starting design work, making architectural decisions, documenting trade-offs.
 
@@ -20,31 +20,29 @@ Key activities:
 
 - Ask probing design questions
 - Explore alternatives and trade-offs
-- Create Design Records (DRs)
-- Maintain DR index
+- Document decisions
 
 ### [implementation-phase.md](./implementation-phase.md)
 
-Guides agents through implementation work - translating design decisions into code while following DRs.
+Guides agents through implementation work - translating design decisions into code.
 
 When to use: Writing code, implementing features, building according to design decisions.
 
 Key activities:
 
-- Implement according to DRs
-- Reference DRs in code comments
+- Implement according to design standards
 - Write tests
 - Flag design gaps if discovered
 
 ### [code-review.md](./code-review.md)
 
-Guides agents through comprehensive code review, ensuring correctness, maintainability, and alignment with Design Records.
+Guides agents through comprehensive code review, ensuring correctness, maintainability, and alignment with design standards.
 
 When to use: Reviewing code for quality, verifying implementation matches design, identifying issues before deployment.
 
 Key activities:
 
-- Review code against Design Records
+- Review code against design standards in `.ai/design/`
 - Analyze correctness, design, and quality
 - Check error handling and testing
 - Create rectification project for issues found
