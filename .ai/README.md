@@ -3,7 +3,7 @@
 AI agent working files for Documentation Driven Development.
 
 - `projects/` - Project documents
-- `design/` - Design records
+- `design/` - Technical standards and reference documents
 - `reviews/` - Code and documentation reviews
 - `tasks/` - Task prompts
 - `roles/` - Role definitions

@@ -26,7 +26,7 @@ Present the feature scope to the user for confirmation.
 Read all relevant documentation:
 
 - Project document (goals, scope, success criteria)
-- Related design records
+- Relevant standards in `.ai/design/`
 - Existing code that will be modified
 
 Summarise findings for the user.
@@ -43,23 +43,9 @@ If decisions cannot be made now, add them to the project's Decision Points secti
 
 Do not proceed until the user is satisfied with the direction.
 
-### 4. Create Design Record
+### 4. Implement
 
-Read `.ai/design/dr-writing-guide.md` for DR structure.
-
-Draft a design record covering:
-
-- Problem being solved
-- Decision made
-- Why this approach
-- Trade-offs accepted
-- Alternatives considered
-
-User reviews and approves before finalising.
-
-### 5. Implement
-
-Implement the feature according to the DR:
+Implement the feature:
 
 - Write the code
 - Write tests (unit, integration, e2e as appropriate)
@@ -67,19 +53,19 @@ Implement the feature according to the DR:
 
 Present implementation to user for feedback.
 
-### 6. Test and Fix
+### 5. Test and Fix
 
 Run the test suite. Fix any failures.
 
 Continue until tests pass and implementation is solid.
 
-### 7. Code Review (Optional)
+### 6. Code Review (Optional)
 
 If the changes are significant, get an external code review.
 
 Fix any reported issues.
 
-### 8. Update Project
+### 7. Update Project
 
 Update the project document:
 
@@ -93,7 +79,7 @@ If all success criteria are met:
 - Update `.ai/projects/README.md` with completion date
 - Update `AGENTS.md` to set next project as active
 
-### 9. Repeat
+### 8. Repeat
 
 Return to step 1 for the next feature.
 
@@ -101,7 +87,6 @@ Return to step 1 for the next feature.
 
 Users may:
 
-- Skip step 4 for simple features not requiring a DR
 - Combine steps when appropriate
 - Revisit earlier steps if new information emerges
 - End the session at any step and resume later

@@ -71,14 +71,6 @@ All planned projects complete. Rich `--json` output implemented across all data 
 
 ---
 
-## Projects vs Design Records
-
-**Projects** are work packages that define **what to build** and **how to validate it**.
-
-**Design Records (DRs)** document **why we chose** a specific approach and the trade-offs.
-
-A single project may generate multiple DRs. Projects describe the work; DRs document the decisions made during that work.
-
 See [p-writing-guide.md](./p-writing-guide.md) for detailed guidance.
 
 ---

@@ -557,7 +557,7 @@ start --version
 
 - `AGENTS.md` - Repository context for AI agents
 - `CHANGELOG.md` - Version history
-- `.ai/design/design-records/` - Design decisions and rationale
+- `.ai/design/` - Technical standards and reference documents
 - `README.md` - User-facing documentation
 
 ---

@@ -498,7 +498,5 @@ This ensures consistent UTD behavior across all use cases.
 
 ## See Also
 
-- [Design Records](design-records/) - Architectural decisions
-- [Task Schema](../cue/task-schema.md) - Task-specific UTD usage
-- [Role Schema](../cue/role-schema.md) - Role-specific UTD usage
-- [Context Schema](../cue/context-schema.md) - Context-specific UTD usage
+- [Template and File Resolution](template-file-resolution.md) - Placeholder semantics and file resolution
+- [Go text/template package](https://pkg.go.dev/text/template)

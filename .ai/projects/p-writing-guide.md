@@ -81,37 +81,6 @@ Add as needed:
 
 ---
 
-## Projects vs Design Records
-
-### Projects Are
-
-- Work packages with clear deliverables
-- Time-bounded efforts
-- Focus on what to build and how to validate it
-- May generate multiple DRs
-- Can span research, design, and implementation
-- Answer: "What are we doing?"
-
-### Design Records Are
-
-- Architectural decisions
-- Focus on why we chose a specific approach
-- Document trade-offs and alternatives
-- Created during project execution
-- Permanent record of reasoning
-- Answer: "Why did we do it this way?"
-
-### Relationship
-
-A single project may create multiple DRs. For example:
-
-- p-001: API Redesign might generate:
-  - dr-001: Authentication Strategy
-  - dr-002: Error Response Format
-  - dr-003: Versioning Approach
-
-Projects describe the work to be done. DRs document the decisions made while doing that work.
-
 ---
 
 ## What Belongs in Project Documents
@@ -164,7 +133,7 @@ Concrete outputs:
 
 - `internal/cli/exit_codes.go` - Exit code constants
 - `docs/automation.md` - Automation guide
-- dr-001: CLI Automation Conventions
+- `docs/automation.md` - Automation conventions
 
 ### Current State
 
@@ -224,11 +193,11 @@ Exception: Pseudocode in Technical Approach for clarity.
 
 ### Resolved Design Decisions
 
-Resolved design decisions belong in DRs, not project docs. Use Decision Points for unresolved questions, then move answers to DRs or project context once decided.
+Use Decision Points for unresolved questions, then incorporate answers into the project document or standards once decided.
 
-Bad: Detailed trade-off analysis with final decision in project doc
+Bad: Lengthy trade-off analysis with final decision buried in project doc
 
-Good: Decision Point with options, then dr-001 created when decided
+Good: Decision Point with options, resolved and noted in the project
 
 ### Step-by-Step Instructions
 
@@ -321,8 +290,6 @@ Good criteria:
 
 - [ ] All API endpoints return correct exit codes
 - [ ] Verbose mode shows request/response details
-- [ ] Created DR documenting conventions
-
 Bad criteria:
 
 - "Understand the API better" (not measurable)
@@ -340,7 +307,7 @@ Projects often start with questions that need owner decisions - that's okay!
 - B: Redis
 - C: No caching initially
 
-These get resolved during the project and move to DRs or project details.
+These get resolved during the project and incorporated into project details or standards.
 
 ### Link to Related Work
 
@@ -349,11 +316,6 @@ These get resolved during the project and move to DRs or project details.
 - Requires: p-001 (database setup)
 - Blocks: p-005 (needs auth from this project)
 
-## Related DRs
-
-- Will create: dr-003 (session management)
-- Builds on: dr-001 (API design)
-
 ---
 
 ## Project Lifecycle
@@ -361,7 +323,7 @@ These get resolved during the project and move to DRs or project details.
 1. Create - Define goals, scope, success criteria
 2. Review - Ensure project is well-scoped and achievable
 3. Start - Set status to Active, add start date
-4. Execute - Work on deliverables, create DRs, resolve decision points
+4. Execute - Work on deliverables, resolve decision points
 5. Update - Add notes, learnings as you go
 6. Complete - Verify success criteria, set completion date
 7. Archive - Move to Completed status, update README index
@@ -394,13 +356,10 @@ and personalised features for registered users.
 - [ ] Users can register and log in
 - [ ] Sessions persist across browser restarts
 - [ ] Unauthenticated API requests return 401
-- [ ] Created dr-001 documenting auth approach
-
 ## Deliverables
 
 - `internal/auth/` - Authentication package
 - `docs/auth.md` - Authentication documentation
-- dr-001: Authentication Strategy
 ```
 
 ### Bad Project Document
