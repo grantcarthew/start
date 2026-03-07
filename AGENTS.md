@@ -4,9 +4,7 @@
 
 ## Project Status
 
-Fresh start, design phase. This project builds on extensive research from [start-prototype](https://github.com/grantcarthew/start-prototype), which validated the core concepts through a TOML-based implementation. The prototype revealed that TOML's lack of table ordering and limited validation made it unsuitable for this use case. This version is rebuilt from the ground up using CUE.
-
-Avoid references to the prototype in new documentation. This is a new design.
+Active development. The CLI is fully implemented with commands for agent launching, config management, asset installation, and diagnostics. Built on CUE for type-safe, order-preserving configuration.
 
 ### Active Project
 
@@ -100,18 +98,15 @@ Key principles:
 
 The `./Context` directory contains cloned source code and documentation for development reference. Each directory has an INDEX.csv file cataloging its contents:
 
-- Context/cue - CUE language source code, standard library, and implementation
+- context/cue - CUE language source code, standard library, and implementation
   - Use for: Understanding CUE internals, package structure, encoding implementations, module system
-  - See: `Context/cue/INDEX.csv` for detailed catalog
+  - See: `context/cue/INDEX.csv` for detailed catalog
 
-- Context/cuelang-org - CUE official documentation site
+- context/cuelang-org - CUE official documentation site
   - Use for: Tutorials, concepts, how-to guides, language reference, examples
-  - See: `Context/cuelang-org/INDEX.csv` for detailed catalog
+  - See: `context/cuelang-org/INDEX.csv` for detailed catalog
   - Key content: `content/docs/tutorial/` (especially working-with-a-custom-module-registry)
 
-- Context/cobra - Cobra CLI framework source code
-  - Use for: CLI implementation patterns, command structure, flag handling, shell completions
-  - See: `Context/cobra/INDEX.csv` for detailed catalog
 
 ## Start Assets Repository
 
