@@ -260,12 +260,7 @@ func SearchCategoryEntries(category string, entries map[string]registry.IndexEnt
 
 	results := searchCategory(category, entries, patterns, tags)
 
-	sort.Slice(results, func(i, j int) bool {
-		if results[i].MatchScore != results[j].MatchScore {
-			return results[i].MatchScore > results[j].MatchScore
-		}
-		return results[i].Name < results[j].Name
-	})
+	sortResults(results)
 
 	return results, nil
 }
@@ -309,14 +304,19 @@ func SearchInstalledConfig(cfg cue.Value, cueKey, category, query string, tags [
 
 	results := searchCategory(category, entries, patterns, tags)
 
+	sortResults(results)
+
+	return results, nil
+}
+
+// sortResults sorts search results by score descending, then by name ascending.
+func sortResults(results []SearchResult) {
 	sort.Slice(results, func(i, j int) bool {
 		if results[i].MatchScore != results[j].MatchScore {
 			return results[i].MatchScore > results[j].MatchScore
 		}
 		return results[i].Name < results[j].Name
 	})
-
-	return results, nil
 }
 
 // extractIndexEntryFromCUE extracts description, tags, and origin from a CUE value
