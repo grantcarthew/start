@@ -112,6 +112,7 @@ func listSettings(w io.Writer, localOnly bool) error {
 	}
 
 	// Show config paths
+	_, _ = fmt.Fprintln(w)
 	printConfigPaths(w, paths)
 	_, _ = fmt.Fprintln(w)
 
@@ -120,14 +121,15 @@ func listSettings(w io.Writer, localOnly bool) error {
 		return err
 	}
 
+	_, _ = tui.ColorSettings.Fprint(w, "settings")
+	_, _ = fmt.Fprintln(w, "/")
 	printSettingsEntries(w, entries)
 	return nil
 }
 
 // printConfigPaths displays the configuration directory paths.
 func printConfigPaths(w io.Writer, paths config.Paths) {
-	_, _ = tui.ColorHeader.Fprintln(w, "Configuration Paths:")
-	_, _ = fmt.Fprintln(w)
+	_, _ = tui.ColorPaths.Fprintln(w, "Configuration Paths:")
 	globalStatus := "not found"
 	if paths.GlobalExists {
 		globalStatus = "exists"
@@ -136,9 +138,11 @@ func printConfigPaths(w io.Writer, paths config.Paths) {
 	if paths.LocalExists {
 		localStatus = "exists"
 	}
-	_, _ = fmt.Fprintf(w, "  Global: %s ", paths.Global)
+	_, _ = tui.ColorDim.Fprintf(w, "  Global: ")
+	_, _ = fmt.Fprintf(w, "%s ", paths.Global)
 	_, _ = fmt.Fprintln(w, tui.Annotate("%s", globalStatus))
-	_, _ = fmt.Fprintf(w, "  Local:  %s ", paths.Local)
+	_, _ = tui.ColorDim.Fprintf(w, "  Local:  ")
+	_, _ = fmt.Fprintf(w, "%s ", paths.Local)
 	_, _ = fmt.Fprintln(w, tui.Annotate("%s", localStatus))
 }
 

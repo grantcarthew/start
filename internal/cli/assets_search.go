@@ -132,6 +132,7 @@ func runAssetsSearch(cmd *cobra.Command, args []string) error {
 	installed := collectInstalledNames()
 
 	// Print results
+	_, _ = fmt.Fprintln(cmd.OutOrStdout())
 	printSearchResults(cmd.OutOrStdout(), results, flags.Verbose, installed)
 
 	return nil

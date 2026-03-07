@@ -162,6 +162,7 @@ func runAssetsList(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
+	_, _ = fmt.Fprintln(cmd.OutOrStdout())
 	printInstalledAssets(cmd.OutOrStdout(), installed, flags.Verbose)
 
 	return nil

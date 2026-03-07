@@ -141,6 +141,7 @@ func runShowListing(cmd *cobra.Command) error {
 	if err != nil {
 		return fmt.Errorf("resolving config paths: %w", err)
 	}
+	_, _ = fmt.Fprintln(w)
 	printConfigPaths(w, paths)
 	_, _ = fmt.Fprintln(w)
 
@@ -149,6 +150,8 @@ func runShowListing(cmd *cobra.Command) error {
 	if err != nil {
 		return err
 	}
+	_, _ = tui.ColorSettings.Fprint(w, "settings")
+	_, _ = fmt.Fprintln(w, "/")
 	printSettingsEntries(w, entries)
 	_, _ = fmt.Fprintln(w)
 
@@ -245,10 +248,18 @@ func runShowSearch(cmd *cobra.Command, name string) error {
 
 	// Step 1: Exact match in installed config across all categories
 	var exactMatches []AssetMatch
+	var ambiguousMatches []AssetMatch
 	for _, cat := range showCategories {
 		resolved, err := findExactInstalledName(cfg.Value, cat.key, name)
 		if err != nil {
-			return err
+			// Ambiguous short name within one category — collect all matches
+			// for interactive selection instead of erroring out.
+			matches, searchErr := searchInstalled(cfg.Value, cat.key, cat.category, name)
+			if searchErr != nil {
+				return searchErr
+			}
+			ambiguousMatches = append(ambiguousMatches, matches...)
+			continue
 		}
 		if resolved != "" {
 			exactMatches = append(exactMatches, AssetMatch{
@@ -258,6 +269,13 @@ func runShowSearch(cmd *cobra.Command, name string) error {
 				Score:    100,
 			})
 		}
+	}
+
+	if len(ambiguousMatches) > 0 {
+		allMatches := make([]AssetMatch, 0, len(exactMatches)+len(ambiguousMatches))
+		allMatches = append(allMatches, exactMatches...)
+		allMatches = append(allMatches, ambiguousMatches...)
+		return promptShowSelection(w, stdin, scope, allMatches, name, nil)
 	}
 
 	if len(exactMatches) == 1 {
