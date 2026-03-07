@@ -169,7 +169,7 @@ start assets add jira/item/research
 
 ### Configuration
 
-Configuration is stored in CUE format at `~/.config/start/config.cue` (global) and `./.start/config.cue` (project-local). The `--local` flag targets project config instead of global.
+Configuration is stored in CUE format in `~/.config/start/` (global) and `./.start/` (project-local). Each directory can contain one or more `.cue` files. The `--local` flag targets project config instead of global.
 
 ```bash
 # View effective configuration
@@ -264,8 +264,14 @@ start show <name>
 # Browse available registry packages
 start assets browse
 
+# Show the full registry catalog
+start assets index
+
 # Search for packages
 start assets search go
+
+# Show details for a specific asset
+start assets info golang/assistant
 
 # Install a package
 start assets add golang/teacher
@@ -276,6 +282,9 @@ start assets list
 
 # Update installed packages
 start assets update
+
+# Validate index and module version consistency (maintainer tool)
+start assets validate --yes
 ```
 
 ### Configuration
@@ -320,6 +329,9 @@ start config open
 
 # Search config by keyword
 start config search <query>
+
+# Export config as text to stdout
+start config export
 
 # Manage settings
 start config settings default_agent claude
