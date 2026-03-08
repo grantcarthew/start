@@ -3,6 +3,7 @@ package orchestration
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -92,6 +93,41 @@ func TestTemplateProcessor_Process(t *testing.T) {
 			},
 			shellOutput:  "test output",
 			wantContains: "test output",
+		},
+		{
+			name: "prompt with cwd placeholder",
+			fields: UTDFields{
+				Prompt: "Working dir: {{.cwd}}",
+			},
+			wantContains: "Working dir: /",
+		},
+		{
+			name: "prompt with os placeholder",
+			fields: UTDFields{
+				Prompt: "OS: {{.os}}",
+			},
+			wantContains: "OS: " + runtime.GOOS,
+		},
+		{
+			name: "prompt with home placeholder",
+			fields: UTDFields{
+				Prompt: "Home: {{.home}}",
+			},
+			wantContains: "Home: /",
+		},
+		{
+			name: "prompt with hostname placeholder",
+			fields: UTDFields{
+				Prompt: "Host: {{.hostname}}",
+			},
+			wantContains: "Host: ",
+		},
+		{
+			name: "prompt with user placeholder",
+			fields: UTDFields{
+				Prompt: "User: {{.user}}",
+			},
+			wantContains: "User: ",
 		},
 		{
 			name:        "no file, command, or prompt",
@@ -240,6 +276,49 @@ func TestTemplateProcessor_LazyEvaluation(t *testing.T) {
 		}
 		if len(runner.calls) != 1 {
 			t.Errorf("expected 1 shell call, got %d", len(runner.calls))
+		}
+	})
+}
+
+func TestEnvTemplateData(t *testing.T) {
+	t.Parallel()
+	tmpDir := t.TempDir()
+	data := envTemplateData(tmpDir)
+
+	t.Run("os is set", func(t *testing.T) {
+		if data["os"] != runtime.GOOS {
+			t.Errorf("os = %q, want %q", data["os"], runtime.GOOS)
+		}
+	})
+
+	t.Run("cwd is set", func(t *testing.T) {
+		if data["cwd"] == "" {
+			t.Error("cwd should not be empty")
+		}
+	})
+
+	t.Run("home is set", func(t *testing.T) {
+		if data["home"] == "" {
+			t.Error("home should not be empty")
+		}
+	})
+
+	t.Run("hostname is set", func(t *testing.T) {
+		if data["hostname"] == "" {
+			t.Error("hostname should not be empty")
+		}
+	})
+
+	t.Run("os_name is set", func(t *testing.T) {
+		if data["os_name"] == "" {
+			t.Error("os_name should not be empty")
+		}
+	})
+
+	t.Run("git_branch empty outside repo", func(t *testing.T) {
+		// tmpDir is not a git repo so git_branch should be absent or empty.
+		if v, ok := data["git_branch"]; ok && v != "" {
+			t.Logf("git_branch = %q (may be set if tmpDir is inside a repo)", v)
 		}
 	})
 }

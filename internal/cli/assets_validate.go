@@ -110,6 +110,7 @@ Exit codes:
 		RunE: runAssetsValidate,
 	}
 	cmd.Flags().Bool("yes", false, "Confirm intent to run network checks")
+	_ = cmd.Flags().MarkHidden("yes")
 	cmd.Flags().Bool("json", false, "Output as JSON")
 	parent.AddCommand(cmd)
 }
@@ -389,8 +390,10 @@ func validateVerifyRepo(cacheDir string) error {
 }
 
 // validateFetchTags fetches all remote tags into the local clone.
+// Using an explicit refspec with --force ensures new and updated tags are
+// always written, which --tags alone may miss for recently added refs.
 func validateFetchTags(cacheDir string) error {
-	out, err := exec.Command("git", "-C", cacheDir, "fetch", "--tags", "origin").CombinedOutput()
+	out, err := exec.Command("git", "-C", cacheDir, "fetch", "--force", "origin", "refs/tags/*:refs/tags/*").CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("fetching tags: %s", strings.TrimSpace(string(out)))
 	}

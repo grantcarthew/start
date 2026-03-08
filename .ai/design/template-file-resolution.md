@@ -32,6 +32,17 @@ Available in `file`, `command`, and `prompt` fields of tasks, roles, and context
 | `{{.command_output}}` | Command execution output |
 | `{{.datetime}}` | Current timestamp (ISO 8601) |
 | `{{.instructions}}` | User CLI argument (tasks only; empty string otherwise) |
+| `{{.cwd}}` | Current working directory |
+| `{{.home}}` | User home directory |
+| `{{.user}}` | Current username |
+| `{{.hostname}}` | Machine hostname |
+| `{{.os}}` | Operating system (`linux`, `darwin`, `windows`) |
+| `{{.shell}}` | Current shell basename (e.g., `bash`, `zsh`) |
+| `{{.git_branch}}` | Current git branch (empty if not in a git repo) |
+| `{{.git_root}}` | Git repository root directory (empty if not in a git repo) |
+| `{{.git_user}}` | Git user name from `git config user.name` (empty if not set) |
+| `{{.git_email}}` | Git user email from `git config user.email` (empty if not set) |
+| `{{.os_name}}` | OS/distro name (e.g., `EndeavourOS`, `macOS`, falls back to `{{.os}}`) |
 
 Lazy evaluation: `{{.file_contents}}` only reads the file if that placeholder appears in the template. `{{.command_output}}` only executes the command if that placeholder appears.
 
