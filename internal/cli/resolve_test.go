@@ -761,6 +761,143 @@ func TestSearchRegistryCategory(t *testing.T) {
 	}
 }
 
+// TestResolveAsset_SingleInstalledPlusRegistryMatch verifies that when a single
+// installed substring match exists and the registry also has a matching asset,
+// both are presented for selection (error in non-TTY) rather than silently
+// returning the installed match. This covers the structural bug fixed in p-041.
+func TestResolveAsset_SingleInstalledPlusRegistryMatch(t *testing.T) {
+	t.Parallel()
+
+	cfg := buildTestCfg(t, `{
+		roles: {
+			"golang/assistant": {
+				description: "Go programming expert"
+				prompt: "You are a Go expert"
+			}
+		}
+	}`)
+
+	r := newResolver(cfg, &Flags{}, io.Discard, io.Discard, strings.NewReader(""))
+	// Inject fake registry index - "assistant" matches both installed and registry.
+	r.didFetch = true
+	r.index = &registry.Index{
+		Roles: map[string]registry.IndexEntry{
+			"python/assistant": {
+				Module:      "github.com/test/roles/python/assistant@v0",
+				Description: "Python programming expert",
+			},
+		},
+	}
+
+	_, err := r.resolveAsset("assistant", internalcue.KeyRoles, "roles", "Role", true)
+	if err == nil {
+		t.Fatal("expected ambiguous error for multiple matches, got nil")
+	}
+	if !strings.Contains(err.Error(), "ambiguous") {
+		t.Errorf("error = %q, want containing 'ambiguous'", err.Error())
+	}
+	if !strings.Contains(err.Error(), "golang/assistant") {
+		t.Errorf("error should list golang/assistant: %v", err)
+	}
+	if !strings.Contains(err.Error(), "python/assistant") {
+		t.Errorf("error should list python/assistant: %v", err)
+	}
+}
+
+// TestResolveAsset_SingleInstalledNoRegistryMatch verifies that a single
+// installed substring match resolves directly when the registry has no match.
+func TestResolveAsset_SingleInstalledNoRegistryMatch(t *testing.T) {
+	t.Parallel()
+
+	cfg := buildTestCfg(t, `{
+		roles: {
+			"golang/assistant": {
+				description: "Go programming expert"
+				prompt: "You are a Go expert"
+			}
+		}
+	}`)
+
+	r := newResolver(cfg, &Flags{}, io.Discard, io.Discard, strings.NewReader(""))
+	// Registry has no assistant match.
+	r.didFetch = true
+	r.index = &registry.Index{
+		Roles: map[string]registry.IndexEntry{
+			"python/debug": {
+				Module:      "github.com/test/roles/python/debug@v0",
+				Description: "Python debugger",
+			},
+		},
+	}
+
+	name, err := r.resolveAsset("assistant", internalcue.KeyRoles, "roles", "Role", true)
+	if err != nil {
+		t.Fatalf("resolveAsset() error = %v", err)
+	}
+	if name != "golang/assistant" {
+		t.Errorf("resolveAsset() = %q, want %q", name, "golang/assistant")
+	}
+}
+
+// TestResolveAsset_ExactFullNameSkipsRegistry verifies that an exact full name
+// match in installed config resolves via Phase 1 without touching the registry.
+func TestResolveAsset_ExactFullNameSkipsRegistry(t *testing.T) {
+	t.Parallel()
+
+	cfg := buildTestCfg(t, `{
+		roles: {
+			"golang/assistant": {
+				prompt: "You are a Go expert"
+			}
+		}
+	}`)
+
+	// skipRegistry=true: any registry call would return nil. Phase 1 must catch it.
+	r := newTestResolver(cfg)
+	name, err := r.resolveAsset("golang/assistant", internalcue.KeyRoles, "roles", "Role", true)
+	if err != nil {
+		t.Fatalf("resolveAsset() error = %v", err)
+	}
+	if name != "golang/assistant" {
+		t.Errorf("resolveAsset() = %q, want %q", name, "golang/assistant")
+	}
+}
+
+// TestResolveAsset_AgentSingleInstalledPlusRegistryMatch verifies the same
+// fix applies for agent resolution via resolveAgent.
+func TestResolveAsset_AgentSingleInstalledPlusRegistryMatch(t *testing.T) {
+	t.Parallel()
+
+	cfg := buildTestCfg(t, `{
+		agents: {
+			"claude-code": {
+				description: "Claude for coding"
+				bin: "claude"
+				command: "{{.bin}}"
+			}
+		}
+	}`)
+
+	r := newResolver(cfg, &Flags{}, io.Discard, io.Discard, strings.NewReader(""))
+	r.didFetch = true
+	r.index = &registry.Index{
+		Agents: map[string]registry.IndexEntry{
+			"claude-chat": {
+				Module:      "github.com/test/agents/claude-chat@v0",
+				Description: "Claude for chatting",
+			},
+		},
+	}
+
+	_, err := r.resolveAgent("claude")
+	if err == nil {
+		t.Fatal("expected ambiguous error for multiple matches, got nil")
+	}
+	if !strings.Contains(err.Error(), "ambiguous") {
+		t.Errorf("error = %q, want containing 'ambiguous'", err.Error())
+	}
+}
+
 // TestContextScoreThreshold_LowScoreExcluded verifies context results below
 // threshold are excluded.
 func TestContextScoreThreshold_LowScoreExcluded(t *testing.T) {

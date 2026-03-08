@@ -58,6 +58,7 @@ All planned projects complete. Rich `--json` output implemented across all data 
 | [p-038](./completed/p-038-cli-index-cache.md) | CLI Index Cache | 2026-03-02 |
 | [p-039](./completed/p-039-cli-json-output-assets.md) | CLI JSON Output - Shared Prep and Assets Commands | 2026-03-06 |
 | [p-040](./completed/p-040-cli-json-output-config-doctor.md) | CLI JSON Output - Config, Search, and Doctor Commands | 2026-03-06 |
+| [p-041](./completed/p-041-cli-unified-asset-resolution.md) | Unified Asset Resolution | 2026-03-08 |
 
 ---
 
