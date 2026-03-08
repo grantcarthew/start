@@ -177,6 +177,56 @@ func TestValidator_Exists(t *testing.T) {
 	}
 }
 
+func TestValidationError_DetailedError(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		err         *ValidationError
+		wantContain []string
+	}{
+		{
+			name:        "message only no filename",
+			err:         &ValidationError{Message: "something went wrong"},
+			wantContain: []string{"Configuration error", "something went wrong"},
+		},
+		{
+			name:        "with filename no line",
+			err:         &ValidationError{Filename: "settings.cue", Message: "bad value"},
+			wantContain: []string{"Configuration error in settings.cue", "bad value"},
+		},
+		{
+			name:        "with filename and line",
+			err:         &ValidationError{Filename: "config.cue", Line: 10, Message: "type mismatch"},
+			wantContain: []string{"Configuration error in config.cue", "Line 10", "type mismatch"},
+		},
+		{
+			name:        "with filename line and column",
+			err:         &ValidationError{Filename: "config.cue", Line: 5, Column: 3, Message: "syntax error"},
+			wantContain: []string{"Line 5", "column 3", "syntax error"},
+		},
+		{
+			name: "with source context",
+			err: &ValidationError{
+				Message: "bad field",
+				Context: "  5 | name: 42\n",
+			},
+			wantContain: []string{"bad field", "5 | name: 42"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.err.DetailedError()
+			for _, want := range tt.wantContain {
+				if !strings.Contains(result, want) {
+					t.Errorf("DetailedError() = %q, want containing %q", result, want)
+				}
+			}
+		})
+	}
+}
+
 func TestValidationError_Error(t *testing.T) {
 	t.Parallel()
 	tests := []struct {

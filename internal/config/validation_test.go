@@ -152,6 +152,77 @@ func TestValidateConfig(t *testing.T) {
 	}
 }
 
+func TestCUEFilesInDir(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns only cue files", func(t *testing.T) {
+		t.Parallel()
+		dir := t.TempDir()
+		for _, name := range []string{"a.cue", "b.cue"} {
+			if err := os.WriteFile(filepath.Join(dir, name), []byte("x: 1"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := os.WriteFile(filepath.Join(dir, "readme.md"), []byte("# docs"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+
+		files, err := CUEFilesInDir(dir)
+		if err != nil {
+			t.Fatalf("CUEFilesInDir() error = %v", err)
+		}
+		if len(files) != 2 {
+			t.Errorf("CUEFilesInDir() len = %d, want 2", len(files))
+		}
+		for _, f := range files {
+			if filepath.Ext(f) != ".cue" {
+				t.Errorf("CUEFilesInDir() returned non-.cue file: %q", f)
+			}
+		}
+	})
+
+	t.Run("empty directory returns nil", func(t *testing.T) {
+		t.Parallel()
+		dir := t.TempDir()
+
+		files, err := CUEFilesInDir(dir)
+		if err != nil {
+			t.Fatalf("CUEFilesInDir() error = %v", err)
+		}
+		if len(files) != 0 {
+			t.Errorf("CUEFilesInDir() = %v, want empty", files)
+		}
+	})
+
+	t.Run("nonexistent directory returns error", func(t *testing.T) {
+		t.Parallel()
+		_, err := CUEFilesInDir("/nonexistent/path/xyz")
+		if err == nil {
+			t.Error("CUEFilesInDir() on nonexistent dir should return error")
+		}
+	})
+
+	t.Run("subdirectories are skipped", func(t *testing.T) {
+		t.Parallel()
+		dir := t.TempDir()
+		subdir := filepath.Join(dir, "subdir.cue") // dir named like a .cue file
+		if err := os.MkdirAll(subdir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, "real.cue"), []byte("x: 1"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+
+		files, err := CUEFilesInDir(dir)
+		if err != nil {
+			t.Fatalf("CUEFilesInDir() error = %v", err)
+		}
+		if len(files) != 1 {
+			t.Errorf("CUEFilesInDir() len = %d, want 1 (subdirectory should be skipped)", len(files))
+		}
+	})
+}
+
 func TestValidationResult_HasErrors(t *testing.T) {
 	t.Parallel()
 	tests := []struct {

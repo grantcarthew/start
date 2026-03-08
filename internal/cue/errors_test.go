@@ -428,6 +428,39 @@ extra: true
 	})
 }
 
+func TestErrorSummary_MultipleErrors(t *testing.T) {
+	t.Parallel()
+	ctx := cuecontext.New()
+	// Two distinct type conflicts produce two errors
+	v := ctx.CompileString(`
+		a: "x" & 1
+		b: true & "y"
+	`)
+	err := v.Err()
+	if err == nil {
+		t.Fatal("expected CUE error")
+	}
+
+	summary := ErrorSummary(err)
+	if summary == "" {
+		t.Error("ErrorSummary returned empty string for multi-error")
+	}
+	// If multiple errors were produced, summary should mention "more"
+	// If CUE collapses them into one, it still returns a non-empty string.
+	t.Logf("ErrorSummary result: %s", summary)
+}
+
+func TestErrorSummary_NonCUEError(t *testing.T) {
+	t.Parallel()
+	// A plain Go error — errors.Errors may return empty, triggering the
+	// len(cueErrs)==0 branch which returns err.Error() directly.
+	err := &testError{msg: "plain error"}
+	summary := ErrorSummary(err)
+	if summary == "" {
+		t.Error("ErrorSummary returned empty string for non-CUE error")
+	}
+}
+
 // testError is a simple error type for testing
 type testError struct {
 	msg string

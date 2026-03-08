@@ -210,6 +210,54 @@ func TestDeriveFileName(t *testing.T) {
 	}
 }
 
+func TestManager_EnsureUTDDir(t *testing.T) {
+	t.Parallel()
+
+	t.Run("creates directory when absent", func(t *testing.T) {
+		t.Parallel()
+		base := t.TempDir()
+		dir := filepath.Join(base, "nested", "temp")
+		m := &Manager{BaseDir: dir}
+
+		if err := m.EnsureUTDDir(); err != nil {
+			t.Fatalf("EnsureUTDDir() error = %v", err)
+		}
+
+		info, err := os.Stat(dir)
+		if err != nil {
+			t.Fatalf("directory not created: %v", err)
+		}
+		if !info.IsDir() {
+			t.Error("EnsureUTDDir() created a file, not a directory")
+		}
+	})
+
+	t.Run("succeeds when directory already exists", func(t *testing.T) {
+		t.Parallel()
+		dir := t.TempDir()
+		m := &Manager{BaseDir: dir}
+
+		if err := m.EnsureUTDDir(); err != nil {
+			t.Fatalf("EnsureUTDDir() error = %v (directory already existed)", err)
+		}
+	})
+
+	t.Run("returns error when path is inside a file", func(t *testing.T) {
+		t.Parallel()
+		base := t.TempDir()
+		blocker := filepath.Join(base, "blocker")
+		if err := os.WriteFile(blocker, []byte("block"), 0o444); err != nil {
+			t.Fatal(err)
+		}
+		// BaseDir is inside a regular file — os.MkdirAll must fail.
+		m := &Manager{BaseDir: filepath.Join(blocker, "subdir")}
+
+		if err := m.EnsureUTDDir(); err == nil {
+			t.Error("EnsureUTDDir() should return error when path is invalid")
+		}
+	})
+}
+
 func TestManager_Clean(t *testing.T) {
 	t.Parallel()
 	tmpDir := t.TempDir()
