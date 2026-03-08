@@ -45,6 +45,17 @@ All placeholders use Go template syntax: `{{.name}}`
 - `{{.command}}` - Command string (e.g., `git status --short`)
 - `{{.command_output}}` - Command execution output (stdout + stderr)
 - `{{.datetime}}` - Current timestamp (ISO 8601 format)
+- `{{.cwd}}` - Current working directory
+- `{{.home}}` - User home directory
+- `{{.user}}` - Current username
+- `{{.hostname}}` - Machine hostname
+- `{{.os}}` - Operating system (`linux`, `darwin`, `windows`)
+- `{{.shell}}` - Current shell basename (e.g., `bash`, `zsh`)
+- `{{.git_branch}}` - Current git branch (empty if not in a git repo)
+- `{{.git_root}}` - Git repository root directory (empty if not in a git repo)
+- `{{.git_user}}` - Git user name from `git config user.name` (empty if not set)
+- `{{.git_email}}` - Git user email from `git config user.email` (empty if not set)
+- `{{.os_name}}` - OS/distro name (e.g., `EndeavourOS`, `macOS`, falls back to `{{.os}}`)
 
 **Task-Specific Placeholder:**
 

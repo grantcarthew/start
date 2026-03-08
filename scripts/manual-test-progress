@@ -1,0 +1,25 @@
+help|--help
+help|--version
+help|prompt --help
+help|task --help
+help|search --help
+help|config --help
+help|config list --help
+help|config info --help
+help|config add --help
+help|config edit --help
+help|config remove --help
+help|config search --help
+help|config open --help
+help|config order --help
+help|config export --help
+help|config settings --help
+help|show --help
+help|assets --help
+help|assets browse --help
+help|assets index --help
+help|assets search --help
+help|assets add --help
+help|assets list --help
+help|assets info --help
+help|assets update --help

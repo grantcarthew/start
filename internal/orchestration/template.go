@@ -4,6 +4,11 @@ package orchestration
 import (
 	"bytes"
 	"fmt"
+	"os"
+	"os/exec"
+	"os/user"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"text/template"
 	"time"
@@ -126,12 +131,11 @@ func (p *TemplateProcessor) Process(fields UTDFields, instructions string) (Proc
 		strings.Contains(templateStr, "{{ .command_output }}")
 
 	// Build template data with lowercase keys to match documented placeholders
-	data := TemplateData{
-		"file":         fields.File,
-		"command":      fields.Command,
-		"datetime":     time.Now().Format(time.RFC3339),
-		"instructions": instructions,
-	}
+	data := envTemplateData(p.workingDir)
+	data["file"] = fields.File
+	data["command"] = fields.Command
+	data["datetime"] = time.Now().Format(time.RFC3339)
+	data["instructions"] = instructions
 
 	// Lazy evaluation: only read file if needed
 	if needsFileContents && fields.File != "" && !result.FileRead {
@@ -175,6 +179,82 @@ func (p *TemplateProcessor) Process(fields UTDFields, instructions string) (Proc
 
 	result.Content = buf.String()
 	return result, nil
+}
+
+// envTemplateData builds the environment-based template variables.
+// All values fall back to empty string on error so templates always render.
+func envTemplateData(workingDir string) TemplateData {
+	data := TemplateData{}
+
+	if workingDir != "" {
+		data["cwd"] = workingDir
+	} else if cwd, err := os.Getwd(); err == nil {
+		data["cwd"] = cwd
+	}
+	if home, err := os.UserHomeDir(); err == nil {
+		data["home"] = home
+	}
+	if u, err := user.Current(); err == nil {
+		data["user"] = u.Username
+	}
+	if hostname, err := os.Hostname(); err == nil {
+		data["hostname"] = hostname
+	}
+	data["os"] = runtime.GOOS
+	if sh := os.Getenv("SHELL"); sh != "" {
+		data["shell"] = filepath.Base(sh)
+	}
+
+	// Git variables: run in workingDir, fall back to empty string if not a repo.
+	if branch, err := gitOutput(workingDir, "rev-parse", "--abbrev-ref", "HEAD"); err == nil {
+		data["git_branch"] = branch
+	}
+	if root, err := gitOutput(workingDir, "rev-parse", "--show-toplevel"); err == nil {
+		data["git_root"] = root
+	}
+	if name, err := gitOutput(workingDir, "config", "user.name"); err == nil {
+		data["git_user"] = name
+	}
+	if email, err := gitOutput(workingDir, "config", "user.email"); err == nil {
+		data["git_email"] = email
+	}
+
+	data["os_name"] = osName()
+
+	return data
+}
+
+// gitOutput runs a git command in dir and returns trimmed stdout.
+func gitOutput(dir string, args ...string) (string, error) {
+	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
+	out, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
+// osName returns a human-readable OS/distro name.
+// On Linux it reads NAME from /etc/os-release; on macOS it runs sw_vers;
+// on other platforms it falls back to runtime.GOOS.
+func osName() string {
+	switch runtime.GOOS {
+	case "linux":
+		if data, err := os.ReadFile("/etc/os-release"); err == nil {
+			for _, line := range strings.Split(string(data), "\n") {
+				if strings.HasPrefix(line, "NAME=") {
+					return strings.Trim(strings.TrimPrefix(line, "NAME="), `"`)
+				}
+			}
+		}
+	case "darwin":
+		cmd := exec.Command("sw_vers", "-productName")
+		if out, err := cmd.Output(); err == nil {
+			return strings.TrimSpace(string(out))
+		}
+	}
+	return runtime.GOOS
 }
 
 // IsUTDValid checks if UTD fields satisfy the minimum requirement.
