@@ -167,204 +167,93 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 		taskResult.FileRead = true
 		resolvedName = taskName // Display file path as task name
 	} else {
-		// Per DR-015: Unified task resolution across installed config and registry
+		// Per DR-015: Unified task resolution - two-phase approach.
 
-		// Step 1: Check for exact or short name match in installed config (fast path, no registry fetch)
-		resolved, err := findExactInstalledName(env.Cfg.Value, internalcue.KeyTasks, taskName)
-		if err != nil {
-			// Ambiguous short name - fall through to substring search and interactive picker
-			debugf(stderr, flags, dbgTask, "Short name %q is ambiguous, falling through to search: %v", taskName, err)
-			resolved = ""
+		// Phase 1: Full exact name in installed config - unambiguous, no registry needed.
+		// Skip when tags filter is active so Phase 2 applies the tag filter correctly.
+		if len(tags) == 0 && isExactInstalledKey(env.Cfg.Value, internalcue.KeyTasks, taskName) {
+			resolvedName = taskName
+			debugf(stderr, flags, dbgTask, "Exact full name match: %s", resolvedName)
 		}
 
-		// For tasks: when an exact/short name match exists, also check if a
-		// regex search would find additional matches. If multiple tasks match
-		// the search term (e.g., "review" matches both "start/review" and
-		// "review/git-diff"), fall through to the full search to show a
-		// selection list rather than silently running the short-name match.
-		// This includes registry tasks via the cached index (no network call
-		// when the cache is fresh).
-		hasInstalledMatches := false
-		var installedMatches []TaskMatch
-		if resolved != "" {
-			var searchErr error
-			installedMatches, searchErr = findInstalledTasks(env.Cfg, taskName, tags)
-			if searchErr != nil {
-				debugf(stderr, flags, dbgTask, "Installed search failed, using exact match: %v", searchErr)
-			} else if len(installedMatches) > 1 {
-				debugf(stderr, flags, dbgTask, "Exact match %q found but %d installed matches, falling through to search", resolved, len(installedMatches))
-				resolved = ""
-				hasInstalledMatches = true
-			} else if len(tags) > 0 && !taskInMatches(resolved, installedMatches) {
-				// Exact match doesn't pass tag filter - fall through to search
-				debugf(stderr, flags, dbgTask, "Exact match %q does not match tags %v, falling through", resolved, tags)
-				resolved = ""
-				if len(installedMatches) > 0 {
-					hasInstalledMatches = true
-				}
+		if resolvedName == "" {
+			// Phase 2: Collect all candidates from installed config and registry, merge, select.
+			installedMatches, err := findInstalledTasks(env.Cfg, taskName, tags)
+			if err != nil {
+				return err
 			}
-		}
 
-		// Registry-aware guard: when installed search found <= 1 match,
-		// also check registry tasks via the cached index. If combined
-		// matches > 1, fall through to the selection list.
-		registryGuardTriggered := false
-		var registryGuardMatches []TaskMatch
-		if resolved != "" {
-			guardIndex, _, _ := r.ensureIndex()
-			if guardIndex != nil {
-				var guardErr error
-				registryGuardMatches, guardErr = findRegistryTasks(guardIndex, taskName, tags)
-				if guardErr == nil {
-					merged := mergeTaskMatches(installedMatches, registryGuardMatches)
-					if len(merged) > 1 {
-						debugf(stderr, flags, dbgTask, "Exact match %q found but %d unique matches (installed+registry), falling through to search", resolved, len(merged))
-						resolved = ""
-						hasInstalledMatches = len(installedMatches) > 0
-						registryGuardTriggered = true
-					}
-				}
+			if len(installedMatches) == 0 && !flags.Quiet {
+				_, _ = fmt.Fprintf(stdout, "Task not found in configuration\n")
 			}
-		}
 
-		if resolved != "" {
-			debugf(stderr, flags, dbgTask, "Installed match found: %s", resolved)
-			resolvedName = resolved
-		} else {
-			// Step 1b: Substring search in installed config before going to registry.
-			// Single match is used directly. Multiple matches include registry in search.
-			if !hasInstalledMatches {
-				installedMatches, err = findInstalledTasks(env.Cfg, taskName, tags)
+			// ensureIndex returns nil error; errors are stored in r.indexErr for graceful fallback.
+			index, client, _ := r.ensureIndex()
+			var registryMatches []TaskMatch
+			if index != nil {
+				registryMatches, err = findRegistryTasks(index, taskName, tags)
 				if err != nil {
 					return err
 				}
-				if len(installedMatches) > 0 {
-					debugf(stderr, flags, dbgTask, "No exact match but %d installed substring matches", len(installedMatches))
-					hasInstalledMatches = true
-				}
+			} else if len(installedMatches) == 0 {
+				return fmt.Errorf("task %q not found and registry is unavailable", taskName)
 			}
 
-			// Single installed substring match - use directly without registry.
-			// Skip when the registry guard triggered: there are registry matches
-			// too, so we must fall through to the combined selection list.
-			if hasInstalledMatches && len(installedMatches) == 1 && !registryGuardTriggered {
-				debugf(stderr, flags, dbgTask, "Single installed substring match: %s", installedMatches[0].Name)
-				resolvedName = installedMatches[0].Name
-			}
+			allMatches := mergeTaskMatches(installedMatches, registryMatches)
+			debugf(stderr, flags, dbgTask, "Found %d installed matches, %d registry matches, %d total",
+				len(installedMatches), len(registryMatches), len(allMatches))
 
-			// Step 2: No installed match - fetch registry for exact match
-			var index *registry.Index
-			var client *registry.Client
-			if resolvedName == "" {
-				if !hasInstalledMatches {
-					debugf(stderr, flags, dbgTask, "No installed match, fetching registry index...")
+			switch len(allMatches) {
+			case 0:
+				return fmt.Errorf("task %q not found", taskName)
+			case 1:
+				match := allMatches[0]
+				if match.Source == TaskSourceRegistry {
 					if !flags.Quiet {
-						_, _ = fmt.Fprintf(stdout, "Task not found in configuration\n")
+						_, _ = fmt.Fprintf(stdout, "Installing %s from registry...\n", match.Name)
+					}
+					result := assets.SearchResult{
+						Category: "tasks",
+						Name:     match.Name,
+						Entry:    match.Entry,
+					}
+					env, err = installTaskAndReloadEnv(stdout, stderr, stdin, flags, client, index, result, workingDir, agentName)
+					if err != nil {
+						return err
 					}
 				}
-
-				index, client, err = r.ensureIndex()
+				resolvedName = match.Name
+			default:
+				// Multiple matches - interactive selection
+				debugf(stderr, flags, dbgTask, "Multiple matches, prompting for selection")
+				isTTY := isTerminal(stdin)
+				if !isTTY {
+					var names []string
+					for _, m := range allMatches {
+						names = append(names, m.Name)
+					}
+					return fmt.Errorf("ambiguous task %q matches: %s\nSpecify exact name or run interactively", taskName, strings.Join(names, ", "))
+				}
+				reader := bufio.NewReader(stdin)
+				selected, err := promptTaskSelection(stdout, reader, allMatches, taskName)
 				if err != nil {
-					return fmt.Errorf("fetching registry index: %w", err)
+					return err
 				}
-				// When hasInstalledMatches is true, a nil index is not fatal:
-				// step 3 will merge with installed matches only.
-				if index == nil && !hasInstalledMatches {
-					return fmt.Errorf("task %q not found and registry is unavailable", taskName)
-				}
-
-				// Check for exact or short name match in registry.
-				// Skip when there are installed matches to show the full match list.
-				if !hasInstalledMatches && index != nil {
-					exactRegistry, err := findExactInRegistry(index.Tasks, "tasks", taskName)
-					if err != nil {
-						return err
+				if selected.Source == TaskSourceRegistry {
+					if !flags.Quiet {
+						_, _ = fmt.Fprintf(stdout, "Installing %s from registry...\n", selected.Name)
 					}
-					if exactRegistry != nil {
-						debugf(stderr, flags, dbgTask, "Exact match found in registry: %s", exactRegistry.Name)
-						if !flags.Quiet {
-							_, _ = fmt.Fprintf(stdout, "Installing %s from registry...\n", exactRegistry.Name)
-						}
-						env, err = installTaskAndReloadEnv(stdout, stderr, stdin, flags, client, index, *exactRegistry, workingDir, agentName)
-						if err != nil {
-							return err
-						}
-						resolvedName = exactRegistry.Name
+					result := assets.SearchResult{
+						Category: "tasks",
+						Name:     selected.Name,
+						Entry:    selected.Entry,
 					}
-				}
-			}
-
-			if resolvedName == "" {
-				// Step 3: Combined match across installed + registry.
-				// Reuse guard results when available, otherwise search registry.
-				var registryMatches []TaskMatch
-				if registryGuardTriggered {
-					registryMatches = registryGuardMatches
-				} else if index != nil {
-					registryMatches, err = findRegistryTasks(index, taskName, tags)
+					env, err = installTaskAndReloadEnv(stdout, stderr, stdin, flags, client, index, result, workingDir, agentName)
 					if err != nil {
 						return err
 					}
 				}
-				allMatches := mergeTaskMatches(installedMatches, registryMatches)
-
-				debugf(stderr, flags, dbgTask, "Found %d installed matches, %d registry matches, %d total",
-					len(installedMatches), len(registryMatches), len(allMatches))
-
-				switch len(allMatches) {
-				case 0:
-					return fmt.Errorf("task %q not found", taskName)
-				case 1:
-					// Single match - use it
-					match := allMatches[0]
-					if match.Source == TaskSourceRegistry {
-						if !flags.Quiet {
-							_, _ = fmt.Fprintf(stdout, "Installing %s from registry...\n", match.Name)
-						}
-						result := assets.SearchResult{
-							Category: "tasks",
-							Name:     match.Name,
-							Entry:    match.Entry,
-						}
-						env, err = installTaskAndReloadEnv(stdout, stderr, stdin, flags, client, index, result, workingDir, agentName)
-						if err != nil {
-							return err
-						}
-					}
-					resolvedName = match.Name
-				default:
-					// Multiple matches - interactive selection
-					debugf(stderr, flags, dbgTask, "Multiple matches, prompting for selection")
-					isTTY := isTerminal(stdin)
-					if !isTTY {
-						var names []string
-						for _, m := range allMatches {
-							names = append(names, m.Name)
-						}
-						return fmt.Errorf("ambiguous task %q matches: %s\nSpecify exact name or run interactively", taskName, strings.Join(names, ", "))
-					}
-					reader := bufio.NewReader(stdin)
-					selected, err := promptTaskSelection(stdout, reader, allMatches, taskName)
-					if err != nil {
-						return err
-					}
-
-					if selected.Source == TaskSourceRegistry {
-						if !flags.Quiet {
-							_, _ = fmt.Fprintf(stdout, "Installing %s from registry...\n", selected.Name)
-						}
-						result := assets.SearchResult{
-							Category: "tasks",
-							Name:     selected.Name,
-							Entry:    selected.Entry,
-						}
-						env, err = installTaskAndReloadEnv(stdout, stderr, stdin, flags, client, index, result, workingDir, agentName)
-						if err != nil {
-							return err
-						}
-					}
-					resolvedName = selected.Name
-				}
+				resolvedName = selected.Name
 			}
 		}
 

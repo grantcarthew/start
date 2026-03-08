@@ -43,7 +43,7 @@ const contextScoreThreshold = 2
 // maxAssetResults is the maximum number of results to display in interactive selection.
 const maxAssetResults = 20
 
-// resolver performs three-tier resolution for asset-selecting flags.
+// resolver performs two-phase resolution for asset-selecting flags.
 // It lazily fetches the registry index and tracks whether any installs occurred.
 type resolver struct {
 	cfg          internalcue.LoadResult
@@ -80,10 +80,9 @@ func (r *resolver) resolveRole(name string) (string, error) {
 	return r.resolveAsset(name, internalcue.KeyRoles, "roles", "Role", true)
 }
 
-// resolveAsset performs three-tier resolution for an asset:
-// 1. Exact match in installed config
-// 2. Exact match in registry index
-// 3. Substring search across installed config + registry
+// resolveAsset performs two-phase resolution for an asset:
+// Phase 1: Exact full name match in installed config - use directly, no registry needed.
+// Phase 2: Collect all candidates from installed config and registry, merge, select.
 // displayType is the capitalised display name (e.g., "Agent", "Role").
 // When allowFilePath is true, file paths bypass resolution (per DR-038).
 func (r *resolver) resolveAsset(name, cueKey, category, displayType string, allowFilePath bool) (string, error) {
@@ -99,51 +98,24 @@ func (r *resolver) resolveAsset(name, cueKey, category, displayType string, allo
 
 	searchType := strings.ToLower(displayType)
 
-	// Tier 1: Exact or short name match in installed config
-	if resolved, err := findExactInstalledName(r.cfg.Value, cueKey, name); err != nil {
-		// Ambiguous short name - fall through to substring search
-		debugf(r.stderr, r.flags, dbgResolve, "%s %q: short name ambiguous, falling through: %v", displayType, name, err)
-	} else if resolved != "" {
-		debugf(r.stderr, r.flags, dbgResolve, "%s %q: installed match -> %q", displayType, name, resolved)
-		return resolved, nil
+	// Phase 1: Exact full name in installed config - unambiguous, no registry needed.
+	if isExactInstalledKey(r.cfg.Value, cueKey, name) {
+		debugf(r.stderr, r.flags, dbgResolve, "%s %q: exact installed match", displayType, name)
+		return name, nil
 	}
 
-	// Tier 1b: Substring search in installed config before going to registry.
-	// Single match is used directly. Multiple matches include registry in search.
+	// Phase 2: Collect all candidates from installed config and registry, merge, select.
 	installedMatches, err := searchInstalled(r.cfg.Value, cueKey, category, name)
 	if err != nil {
 		return "", err
 	}
-	if len(installedMatches) == 1 {
-		debugf(r.stderr, r.flags, dbgResolve, "%s %q: single installed substring match %q",
-			displayType, name, installedMatches[0].Name)
-		return installedMatches[0].Name, nil
+
+	if len(installedMatches) == 0 && !r.flags.Quiet {
+		_, _ = fmt.Fprintf(r.stdout, "%s %q not found in configuration\n", displayType, name)
 	}
 
-	// Tier 2: Exact match in registry (only when no installed matches)
-	if len(installedMatches) == 0 {
-		if !r.flags.Quiet {
-			_, _ = fmt.Fprintf(r.stdout, "%s %q not found in configuration\n", displayType, name)
-		}
-	}
-	index, client, err := r.ensureIndex()
-	if len(installedMatches) == 0 && err == nil && index != nil {
-		entries := registryEntries(index, category)
-		result, err := findExactInRegistry(entries, category, name)
-		if err != nil {
-			return "", err
-		}
-		if result != nil {
-			debugf(r.stderr, r.flags, dbgResolve, "%s %q: exact registry match %q", displayType, name, result.Name)
-			if err := r.autoInstall(client, *result); err != nil {
-				return "", err
-			}
-			return result.Name, nil
-		}
-	}
-
-	// Tier 3: Combined search across installed + registry.
-	// Reuse installed matches from tier 1b.
+	// ensureIndex returns nil error; errors are stored in r.indexErr for graceful fallback.
+	index, client, _ := r.ensureIndex()
 	var registryMatches []AssetMatch
 	if index != nil {
 		entries := registryEntries(index, category)
@@ -152,8 +124,8 @@ func (r *resolver) resolveAsset(name, cueKey, category, displayType string, allo
 			return "", err
 		}
 	}
-	allMatches := mergeAssetMatches(installedMatches, registryMatches)
 
+	allMatches := mergeAssetMatches(installedMatches, registryMatches)
 	debugf(r.stderr, r.flags, dbgResolve, "%s %q: %d installed, %d registry, %d total matches",
 		displayType, name, len(installedMatches), len(registryMatches), len(allMatches))
 
@@ -173,6 +145,16 @@ func (r *resolver) resolveAsset(name, cueKey, category, displayType string, allo
 	}
 
 	return selected.Name, nil
+}
+
+// isExactInstalledKey returns true if name is a verbatim key in the config category.
+// Used for Phase 1 exact-name fast path that bypasses registry lookup.
+func isExactInstalledKey(cfg cue.Value, cueKey, name string) bool {
+	catVal := cfg.LookupPath(cue.ParsePath(cueKey))
+	if !catVal.Exists() {
+		return false
+	}
+	return catVal.LookupPath(cue.MakePath(cue.Str(name))).Exists()
 }
 
 // registryEntries returns the entries map for a category from the index.
