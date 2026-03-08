@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	cuelib "cuelang.org/go/cue"
@@ -750,6 +751,58 @@ func TestLoader_LoadWithPackage(t *testing.T) {
 		}
 		if baz != 123 {
 			t.Errorf("baz = %d, want 123", baz)
+		}
+	})
+}
+
+func TestIdentifyBrokenFiles(t *testing.T) {
+	t.Parallel()
+
+	t.Run("all valid returns combined-failure message", func(t *testing.T) {
+		t.Parallel()
+		dir := t.TempDir()
+		validPath := filepath.Join(dir, "valid.cue")
+		writeCUEFile(t, dir, "valid.cue", `x: 1`)
+
+		result := IdentifyBrokenFiles([]string{validPath})
+		if !strings.Contains(result, "(files parse individually but fail when combined)") {
+			t.Errorf("expected fallback message, got: %q", result)
+		}
+	})
+
+	t.Run("broken file is identified", func(t *testing.T) {
+		t.Parallel()
+		dir := t.TempDir()
+		validPath := filepath.Join(dir, "valid.cue")
+		brokenPath := filepath.Join(dir, "broken.cue")
+		writeCUEFile(t, dir, "valid.cue", `x: 1`)
+		writeCUEFile(t, dir, "broken.cue", `this is not {{ valid cue`)
+
+		result := IdentifyBrokenFiles([]string{validPath, brokenPath})
+		if !strings.Contains(result, "broken.cue") {
+			t.Errorf("expected broken.cue in result, got: %q", result)
+		}
+		if strings.Contains(result, "(files parse individually but fail when combined)") {
+			t.Errorf("should not show fallback message when broken files exist, got: %q", result)
+		}
+	})
+
+	t.Run("unreadable file is reported", func(t *testing.T) {
+		t.Parallel()
+		dir := t.TempDir()
+		missing := filepath.Join(dir, "nonexistent.cue")
+
+		result := IdentifyBrokenFiles([]string{missing})
+		if !strings.Contains(result, "nonexistent.cue") {
+			t.Errorf("expected nonexistent.cue in result, got: %q", result)
+		}
+	})
+
+	t.Run("empty list returns combined-failure message", func(t *testing.T) {
+		t.Parallel()
+		result := IdentifyBrokenFiles([]string{})
+		if !strings.Contains(result, "(files parse individually but fail when combined)") {
+			t.Errorf("expected fallback message for empty list, got: %q", result)
 		}
 	})
 }

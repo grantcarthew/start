@@ -2,6 +2,7 @@ package doctor
 
 import (
 	"bytes"
+	"encoding/json"
 	"strings"
 	"testing"
 )
@@ -49,6 +50,56 @@ func TestStatus_Symbol(t *testing.T) {
 				t.Errorf("Status.Symbol() = %q, want %q", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestStatus_MarshalJSON(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		status Status
+		want   string
+	}{
+		{StatusPass, `"pass"`},
+		{StatusWarn, `"warn"`},
+		{StatusFail, `"fail"`},
+		{StatusInfo, `"info"`},
+		{StatusNotFound, `"notfound"`},
+		{Status(99), `"unknown"`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.status.String(), func(t *testing.T) {
+			data, err := json.Marshal(tt.status)
+			if err != nil {
+				t.Fatalf("json.Marshal(Status) error = %v", err)
+			}
+			if string(data) != tt.want {
+				t.Errorf("json.Marshal(Status(%d)) = %s, want %s", tt.status, data, tt.want)
+			}
+		})
+	}
+}
+
+func TestStatus_MarshalJSON_InStruct(t *testing.T) {
+	t.Parallel()
+	result := CheckResult{
+		Status:  StatusPass,
+		Label:   "test",
+		Message: "ok",
+	}
+
+	data, err := json.Marshal(result)
+	if err != nil {
+		t.Fatalf("json.Marshal(CheckResult) error = %v", err)
+	}
+
+	var decoded map[string]interface{}
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("json.Unmarshal error = %v", err)
+	}
+
+	if decoded["status"] != "pass" {
+		t.Errorf("status = %v, want %q", decoded["status"], "pass")
 	}
 }
 

@@ -204,6 +204,32 @@ func TestPaths_ForScope(t *testing.T) {
 	}
 }
 
+func TestPaths_Dir(t *testing.T) {
+	t.Parallel()
+	p := Paths{
+		Global: "/home/user/.config/start",
+		Local:  "/project/.start",
+	}
+
+	tests := []struct {
+		name  string
+		local bool
+		want  string
+	}{
+		{"global scope", false, "/home/user/.config/start"},
+		{"local scope", true, "/project/.start"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := p.Dir(tt.local)
+			if got != tt.want {
+				t.Errorf("Dir(%v) = %q, want %q", tt.local, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestPaths_AnyExists(t *testing.T) {
 	tests := []struct {
 		name   string

@@ -455,6 +455,54 @@ func TestExecutor_ExecuteWithoutReplace(t *testing.T) {
 			t.Errorf("output = %q, want containing 'hello world'", output)
 		}
 	})
+
+	t.Run("failing command returns error with stdout", func(t *testing.T) {
+		t.Parallel()
+		// Use a compound command: echo to stdout, then exit non-zero.
+		// sh -c handles this directly without needing a binary named "false".
+		dir := t.TempDir()
+		// Write a tiny script that prints and exits non-zero.
+		script := dir + "/fail.sh"
+		if err := os.WriteFile(script, []byte("#!/bin/sh\necho failing\nexit 1\n"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+
+		config := ExecuteConfig{
+			Agent: Agent{
+				Bin:     script,
+				Command: "{{.bin}}",
+			},
+		}
+
+		output, err := executor.ExecuteWithoutReplace(config)
+		if err == nil {
+			t.Error("ExecuteWithoutReplace() should return error for non-zero exit")
+		}
+		if !strings.Contains(output, "failing") {
+			t.Errorf("stdout should be captured even on failure, got %q", output)
+		}
+	})
+
+	t.Run("with working directory", func(t *testing.T) {
+		t.Parallel()
+		dir := t.TempDir()
+		config := ExecuteConfig{
+			Agent: Agent{
+				Bin:     "pwd",
+				Command: "{{.bin}}",
+			},
+			WorkingDir: dir,
+		}
+
+		output, err := executor.ExecuteWithoutReplace(config)
+		if err != nil {
+			t.Fatalf("ExecuteWithoutReplace() error = %v", err)
+		}
+		// pwd output should contain the working directory path.
+		if !strings.Contains(strings.TrimSpace(output), dir) {
+			t.Errorf("output = %q, want containing %q", output, dir)
+		}
+	})
 }
 
 func TestIsValidEnvVarName(t *testing.T) {
