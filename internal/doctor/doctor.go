@@ -62,8 +62,8 @@ func (s Status) Symbol() string {
 // CheckResult holds the result of a single check item.
 type CheckResult struct {
 	Status  Status   `json:"status"`
-	Label   string   `json:"label"`   // Short label (e.g., "claude", "agents.cue")
-	Message string   `json:"message"` // Detail message (e.g., "/usr/local/bin/claude", "NOT FOUND")
+	Label   string   `json:"label"`             // Short label (e.g., "claude", "agents.cue")
+	Message string   `json:"message"`           // Detail message (e.g., "/usr/local/bin/claude", "NOT FOUND")
 	Fix     string   `json:"fix,omitempty"`     // Suggested fix action
 	Details []string `json:"details,omitempty"` // Additional details for verbose mode
 	Indent  int      `json:"-"`                 // Additional indentation level (0 = normal, 1+ = nested)

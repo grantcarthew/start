@@ -24,20 +24,6 @@ var quotedPlaceholderPattern = regexp.MustCompile(`['"]{{\.(?:bin|model|role|rol
 // This is a common mistake when users expect simple substitution syntax.
 var singleBracePlaceholderPattern = regexp.MustCompile(`\{(bin|model|role|role_file|prompt|datetime)\}`)
 
-// expandTilde expands a leading ~ to the user's home directory.
-// This is necessary because single-quoted strings in shell don't expand ~.
-// Falls back to the original path on error (non-fatal for shell arguments).
-func expandTilde(path string) string {
-	if path == "" {
-		return path
-	}
-	expanded, err := ExpandTilde(path)
-	if err != nil {
-		return path
-	}
-	return expanded
-}
-
 // Agent represents an agent configuration.
 type Agent struct {
 	Name         string
@@ -127,14 +113,42 @@ func (e *Executor) BuildCommand(cfg ExecuteConfig) (string, error) {
 		}
 	}
 
+	// Expand ~ in path fields before shell-escaping, since single-quoted strings
+	// in shell don't expand tilde. Fail early with a clear message if home dir
+	// is unavailable rather than passing an unexpanded path to the agent.
+	bin, err := ExpandTilde(cfg.Agent.Bin)
+	if err != nil {
+		return "", fmt.Errorf("expanding bin path %q: %w", cfg.Agent.Bin, err)
+	}
+
+	// Validate the binary directly on the raw (pre-escape) path.
+	// This avoids strings.Fields misparsing shell-quoted tokens when the
+	// bin path contains spaces (e.g. "/my tools/claude").
+	if bin == "" {
+		return "", fmt.Errorf(`agent 'bin' field is empty
+
+Check your agent's 'bin' field`)
+	}
+	if _, err := exec.LookPath(bin); err != nil {
+		return "", fmt.Errorf(`binary %q not found
+
+  Error: %s
+
+Check your agent's 'bin' field or ensure the executable is in PATH`, cfg.Agent.Bin, err)
+	}
+
+	roleFile, err := ExpandTilde(cfg.RoleFile)
+	if err != nil {
+		return "", fmt.Errorf("expanding role file path %q: %w", cfg.RoleFile, err)
+	}
+
 	// Build template data with lowercase keys to match CUE conventions.
 	// All values are shell-escaped and wrapped in single quotes for safety.
-	// Path-like fields (bin, role_file) have ~ expanded since shell won't do it in quotes.
 	data := CommandData{
-		"bin":       escapeForShell(expandTilde(cfg.Agent.Bin)),
+		"bin":       escapeForShell(bin),
 		"model":     escapeForShell(model),
 		"role":      escapeForShell(cfg.Role),
-		"role_file": escapeForShell(expandTilde(cfg.RoleFile)),
+		"role_file": escapeForShell(roleFile),
 		"prompt":    escapeForShell(cfg.Prompt),
 		"datetime":  escapeForShell(time.Now().Format(time.RFC3339)),
 	}
@@ -186,22 +200,6 @@ Check your agent's 'command' field`, template)
   Template: %s
 
 Check your agent's 'command' field - it must include an executable`, template)
-	}
-
-	// Extract command token and strip surrounding quotes
-	firstToken := fields[cmdIndex]
-	firstToken = strings.Trim(firstToken, "'\"")
-
-	// Check if it's a valid executable
-	if _, err := exec.LookPath(firstToken); err != nil {
-		return fmt.Errorf(`command template does not start with a valid executable
-
-  Template:   %s
-  Parsed as:  %s
-  Error:      %s
-
-The first element of the command must be an executable binary.
-Example: {{.bin}} --print {{.prompt}}`, template, firstToken, err)
 	}
 
 	return nil

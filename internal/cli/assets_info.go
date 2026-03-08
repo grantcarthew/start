@@ -111,7 +111,9 @@ func runAssetsInfo(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("fetching index: %w", err)
 	}
-	_ = cache.WriteIndex(indexVersion)
+	if err := cache.WriteIndex(indexVersion); err != nil {
+		debugf(cmd.ErrOrStderr(), getFlags(cmd), dbgCache, "cache write failed: %v", err)
+	}
 	prog.Done()
 
 	// Search for matching assets

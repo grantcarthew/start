@@ -104,6 +104,16 @@ func TestExecutor_BuildCommand(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "empty bin field",
+			config: ExecuteConfig{
+				Agent: Agent{
+					Bin:     "",
+					Command: "{{.bin}} --print {{.prompt}}",
+				},
+			},
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -203,65 +213,6 @@ func TestEscapeForShell_NoEnvExpansion(t *testing.T) {
 			got := escapeForShell(tt.input)
 			if got != tt.want {
 				t.Errorf("escapeForShell(%q) = %q, want %q", tt.input, got, tt.want)
-			}
-		})
-	}
-}
-
-func TestExpandTilde(t *testing.T) {
-	t.Parallel()
-	home, err := os.UserHomeDir()
-	if err != nil {
-		t.Skipf("cannot get home directory: %v", err)
-	}
-
-	tests := []struct {
-		name string
-		path string
-		want string
-	}{
-		{
-			name: "empty string",
-			path: "",
-			want: "",
-		},
-		{
-			name: "just tilde",
-			path: "~",
-			want: home,
-		},
-		{
-			name: "tilde with path",
-			path: "~/bin/claude",
-			want: home + "/bin/claude",
-		},
-		{
-			name: "tilde in middle (not expanded)",
-			path: "/path/~/file",
-			want: "/path/~/file",
-		},
-		{
-			name: "no tilde",
-			path: "/usr/bin/claude",
-			want: "/usr/bin/claude",
-		},
-		{
-			name: "relative path",
-			path: "./bin/claude",
-			want: "./bin/claude",
-		},
-		{
-			name: "tilde without slash (not expanded)",
-			path: "~user/bin",
-			want: "~user/bin",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := expandTilde(tt.path)
-			if got != tt.want {
-				t.Errorf("expandTilde(%q) = %q, want %q", tt.path, got, tt.want)
 			}
 		})
 	}
@@ -447,6 +398,39 @@ func TestGenerateDryRunCommand(t *testing.T) {
 		if !strings.Contains(result, expected) {
 			t.Errorf("result should contain %q", expected)
 		}
+	}
+}
+
+func TestBuildCommand_BinWithSpaces(t *testing.T) {
+	t.Parallel()
+
+	// Create a real executable in a temp directory whose path contains a space.
+	dir := t.TempDir()
+	binDir := dir + "/my tools"
+	if err := os.MkdirAll(binDir, 0o755); err != nil {
+		t.Fatalf("creating bin dir: %v", err)
+	}
+	binPath := binDir + "/mytool"
+	if err := os.WriteFile(binPath, []byte("#!/bin/sh\necho ok\n"), 0o755); err != nil {
+		t.Fatalf("writing fake binary: %v", err)
+	}
+
+	executor := NewExecutor("")
+	cfg := ExecuteConfig{
+		Agent: Agent{
+			Bin:     binPath,
+			Command: "{{.bin}} --print {{.prompt}}",
+		},
+		Prompt: "hello",
+	}
+
+	cmd, err := executor.BuildCommand(cfg)
+	if err != nil {
+		t.Fatalf("BuildCommand() unexpected error: %v", err)
+	}
+	// The bin path should appear shell-escaped (single-quoted) in the output.
+	if !strings.Contains(cmd, "'"+binPath+"'") {
+		t.Errorf("command = %q, want it to contain quoted bin path", cmd)
 	}
 }
 

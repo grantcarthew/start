@@ -477,14 +477,3 @@ func unsetSetting(w io.Writer, flags *Flags, key string, localOnly bool) error {
 	}
 	return nil
 }
-
-// resolveAssetsIndexPath returns the configured assets_index setting value,
-// or empty string if not set or on any error. Callers should pass the result
-// to registry.EffectiveIndexPath to get the final module path.
-func resolveAssetsIndexPath() string {
-	settings, err := loadSettingsForScope(false)
-	if err != nil {
-		return ""
-	}
-	return settings["assets_index"]
-}

@@ -21,7 +21,7 @@ type AgentConfig struct {
 	Description  string            `json:"description,omitempty"`
 	Models       map[string]string `json:"models,omitempty"`
 	Tags         []string          `json:"tags,omitempty"`
-	Source       string            `json:"source"` // "global" or "local"
+	Source       string            `json:"source"`           // "global" or "local"
 	Origin       string            `json:"origin,omitempty"` // Registry module path when installed from registry
 }
 

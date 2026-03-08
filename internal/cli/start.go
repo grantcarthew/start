@@ -59,6 +59,7 @@ const (
 	dbgCompose = "compose"
 	dbgExec    = "exec"
 	dbgResolve = "resolve"
+	dbgCache   = "cache"
 )
 
 // debugf prints debug output if debug mode is enabled.
@@ -110,7 +111,10 @@ func resolveAgentName(cfg internalcue.LoadResult, flags *Flags, stdout, stderr i
 	}
 
 	// No default - check configured agents
-	choices := getConfiguredAgents(cfg.Value)
+	choices, err := getConfiguredAgents(cfg.Value)
+	if err != nil {
+		return "", err
+	}
 	switch len(choices) {
 	case 0:
 		return "", fmt.Errorf("no agent configured")
@@ -188,14 +192,14 @@ type agentChoice struct {
 }
 
 // getConfiguredAgents returns the list of configured agents in definition order.
-func getConfiguredAgents(cfg cue.Value) []agentChoice {
+func getConfiguredAgents(cfg cue.Value) ([]agentChoice, error) {
 	agents := cfg.LookupPath(cue.ParsePath(internalcue.KeyAgents))
 	if !agents.Exists() {
-		return nil
+		return nil, nil
 	}
 	iter, err := agents.Fields()
 	if err != nil {
-		return nil
+		return nil, fmt.Errorf("reading agents configuration: %w", err)
 	}
 	var choices []agentChoice
 	for iter.Next() {
@@ -207,7 +211,7 @@ func getConfiguredAgents(cfg cue.Value) []agentChoice {
 		}
 		choices = append(choices, agentChoice{Name: name, Description: desc})
 	}
-	return choices
+	return choices, nil
 }
 
 // promptAgentSelection prompts the user to select an agent from multiple choices.
@@ -363,9 +367,9 @@ func executeStart(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, selec
 	var composeErr error
 	if flags.NoRole {
 		debugf(stderr, flags, dbgRole, "Skipping role (--no-role)")
-		result, composeErr = env.Composer.Compose(env.Cfg.Value, selection, customText, "")
+		result, composeErr = env.Composer.Compose(env.Cfg.Value, selection, customText)
 	} else {
-		result, composeErr = env.Composer.ComposeWithRole(env.Cfg.Value, selection, roleName, customText, "")
+		result, composeErr = env.Composer.ComposeWithRole(env.Cfg.Value, selection, roleName, customText)
 	}
 	if composeErr != nil {
 		// Show UI with role resolutions before returning error
@@ -413,7 +417,7 @@ func executeStart(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, selec
 
 	if flags.DryRun {
 		debugf(stderr, flags, dbgExec, "Dry-run mode, skipping execution")
-		return executeDryRun(stdout, env.Executor, execConfig, result, env.Agent, model, modelSource)
+		return executeDryRun(stdout, cmdStr, execConfig, result, env.Agent, model, modelSource)
 	}
 
 	// Print execution info
@@ -450,13 +454,8 @@ func printWarnings(flags *Flags, stderr io.Writer, warnings []string) {
 }
 
 // executeDryRun handles --dry-run mode.
-func executeDryRun(w io.Writer, executor *orchestration.Executor, cfg orchestration.ExecuteConfig, result orchestration.ComposeResult, agent orchestration.Agent, model, modelSource string) error {
-	// Build command string
-	cmdStr, err := executor.BuildCommand(cfg)
-	if err != nil {
-		return fmt.Errorf("building command: %w", err)
-	}
-
+// cmdStr is the pre-built, pre-validated command string from the caller.
+func executeDryRun(w io.Writer, cmdStr string, cfg orchestration.ExecuteConfig, result orchestration.ComposeResult, agent orchestration.Agent, model, modelSource string) error {
 	// Create temp directory
 	tempMgr := temp.NewDryRunManager()
 	dir, err := tempMgr.DryRunDir()

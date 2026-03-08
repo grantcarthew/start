@@ -452,9 +452,9 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 	var composeErr error
 	if flags.NoRole {
 		debugf(stderr, flags, dbgRole, "Skipping role (--no-role)")
-		composeResult, composeErr = env.Composer.Compose(env.Cfg.Value, selection, taskResult.Content, "")
+		composeResult, composeErr = env.Composer.Compose(env.Cfg.Value, selection, taskResult.Content)
 	} else {
-		composeResult, composeErr = env.Composer.ComposeWithRole(env.Cfg.Value, selection, roleName, taskResult.Content, "")
+		composeResult, composeErr = env.Composer.ComposeWithRole(env.Cfg.Value, selection, roleName, taskResult.Content)
 	}
 	if composeErr != nil {
 		// Show UI with role resolutions before returning error
@@ -493,19 +493,16 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 		DryRun:     flags.DryRun,
 	}
 
-	// Build and log final command
-	if flags.Debug {
-		cmdStr, buildErr := env.Executor.BuildCommand(execConfig)
-		if buildErr == nil {
-			debugf(stderr, flags, dbgExec, "Final command: %s", cmdStr)
-		} else {
-			debugf(stderr, flags, dbgExec, "BuildCommand error: %v", buildErr)
-		}
+	// Build command and validate before proceeding
+	cmdStr, err := env.Executor.BuildCommand(execConfig)
+	if err != nil {
+		return err
 	}
+	debugf(stderr, flags, dbgExec, "Final command: %s", cmdStr)
 
 	if flags.DryRun {
 		debugf(stderr, flags, dbgExec, "Dry-run mode, skipping execution")
-		return executeTaskDryRun(stdout, env.Executor, execConfig, composeResult, env.Agent, model, modelSource, resolvedName, instructions)
+		return executeTaskDryRun(stdout, cmdStr, execConfig, composeResult, env.Agent, model, modelSource, resolvedName, instructions)
 	}
 
 	// Print execution info
@@ -514,18 +511,13 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 	}
 
 	debugf(stderr, flags, dbgExec, "Executing agent (process replacement)")
-	// Execute agent (replaces current process)
-	return env.Executor.Execute(execConfig)
+	// Execute agent (replaces current process) - command already validated
+	return env.Executor.ExecuteCommand(cmdStr, execConfig)
 }
 
 // executeTaskDryRun handles --dry-run mode for tasks.
-func executeTaskDryRun(w io.Writer, executor *orchestration.Executor, cfg orchestration.ExecuteConfig, result orchestration.ComposeResult, agent orchestration.Agent, model, modelSource, taskName, instructions string) error {
-	// Build command string
-	cmdStr, err := executor.BuildCommand(cfg)
-	if err != nil {
-		return fmt.Errorf("building command: %w", err)
-	}
-
+// cmdStr is the pre-built, pre-validated command string from the caller.
+func executeTaskDryRun(w io.Writer, cmdStr string, cfg orchestration.ExecuteConfig, result orchestration.ComposeResult, agent orchestration.Agent, model, modelSource, taskName, instructions string) error {
 	// Create temp directory
 	tempMgr := temp.NewDryRunManager()
 	dir, err := tempMgr.DryRunDir()

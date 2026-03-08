@@ -264,7 +264,7 @@ func TestComposer_Compose(t *testing.T) {
 			processor := NewTemplateProcessor(nil, nil, "")
 			composer := NewComposer(processor, "")
 
-			result, err := composer.Compose(cfg, tt.selection, tt.customText, "")
+			result, err := composer.Compose(cfg, tt.selection, tt.customText)
 			if err != nil {
 				t.Fatalf("Compose() error = %v", err)
 			}
@@ -338,7 +338,7 @@ func TestComposer_ComposeWithRole(t *testing.T) {
 	composer := NewComposer(processor, "")
 
 	t.Run("uses default role", func(t *testing.T) {
-		result, err := composer.ComposeWithRole(cfg, ContextSelection{IncludeRequired: true}, "", "", "")
+		result, err := composer.ComposeWithRole(cfg, ContextSelection{IncludeRequired: true}, "", "")
 		if err != nil {
 			t.Fatalf("ComposeWithRole() error = %v", err)
 		}
@@ -352,7 +352,7 @@ func TestComposer_ComposeWithRole(t *testing.T) {
 	})
 
 	t.Run("uses specified role", func(t *testing.T) {
-		result, err := composer.ComposeWithRole(cfg, ContextSelection{IncludeRequired: true}, "reviewer", "", "")
+		result, err := composer.ComposeWithRole(cfg, ContextSelection{IncludeRequired: true}, "reviewer", "")
 		if err != nil {
 			t.Fatalf("ComposeWithRole() error = %v", err)
 		}
@@ -367,7 +367,7 @@ func TestComposer_ComposeWithRole(t *testing.T) {
 
 	t.Run("explicit nonexistent role returns error", func(t *testing.T) {
 		// Per DR-039: explicit --role with missing file always errors
-		_, err := composer.ComposeWithRole(cfg, ContextSelection{IncludeRequired: true}, "nonexistent", "", "")
+		_, err := composer.ComposeWithRole(cfg, ContextSelection{IncludeRequired: true}, "nonexistent", "")
 		if err == nil {
 			t.Error("expected error for explicit nonexistent role")
 		}
@@ -467,7 +467,7 @@ func TestComposer_ContextWithFile(t *testing.T) {
 	processor := NewTemplateProcessor(nil, nil, tmpDir)
 	composer := NewComposer(processor, tmpDir)
 
-	result, err := composer.Compose(cfg, ContextSelection{IncludeRequired: true}, "", "")
+	result, err := composer.Compose(cfg, ContextSelection{IncludeRequired: true}, "")
 	if err != nil {
 		t.Fatalf("Compose() error = %v", err)
 	}
@@ -839,7 +839,7 @@ func TestComposeWithRole_OptionalBehavior(t *testing.T) {
 		composer := NewComposer(processor, tmpDir)
 
 		// Explicit role selection should error even if optional: true
-		_, err := composer.ComposeWithRole(cfg, ContextSelection{}, "optional-missing", "", "")
+		_, err := composer.ComposeWithRole(cfg, ContextSelection{}, "optional-missing", "")
 		if err == nil {
 			t.Error("expected error for explicit role with missing file, even if optional")
 		}
@@ -855,7 +855,7 @@ func TestComposeWithRole_OptionalBehavior(t *testing.T) {
 		processor := NewTemplateProcessor(nil, nil, tmpDir)
 		composer := NewComposer(processor, tmpDir)
 
-		result, err := composer.ComposeWithRole(cfg, ContextSelection{}, roleFile, "", "")
+		result, err := composer.ComposeWithRole(cfg, ContextSelection{}, roleFile, "")
 		if err != nil {
 			t.Fatalf("ComposeWithRole() error = %v", err)
 		}
@@ -1779,6 +1779,102 @@ func TestResolveModulePath(t *testing.T) {
 		want := filepath.Join(v2Dir, "data.cue")
 		if result != want {
 			t.Errorf("got %q, want %q", result, want)
+		}
+	})
+}
+
+func TestComposer_ModulePathResolutionError(t *testing.T) {
+	// Use an empty cache dir so all @module/ resolution fails.
+	cacheDir := t.TempDir()
+	t.Setenv("CUE_CACHE_DIR", cacheDir)
+
+	cctx := cuecontext.New()
+	workingDir := t.TempDir()
+	processor := NewTemplateProcessor(nil, nil, workingDir)
+	composer := NewComposer(processor, workingDir)
+
+	t.Run("context module path error captured in status", func(t *testing.T) {
+		cfg := cctx.CompileString(`
+			contexts: {
+				"golang/assistant": {
+					origin: "github.com/test/contexts/golang/assistant@v0.1.0"
+					file: "@module/context.md"
+				}
+			}
+		`)
+		if err := cfg.Err(); err != nil {
+			t.Fatalf("compile config: %v", err)
+		}
+
+		result, err := composer.Compose(cfg, ContextSelection{
+			Tags: []string{"golang/assistant"},
+		}, "")
+		if err != nil {
+			t.Fatalf("Compose() unexpected error: %v", err)
+		}
+
+		if len(result.Contexts) == 0 {
+			t.Fatal("expected at least one context in result")
+		}
+		ctx := result.Contexts[0]
+		if ctx.Status != "error" {
+			t.Errorf("context status = %q, want %q", ctx.Status, "error")
+		}
+		if !strings.Contains(ctx.Error, "resolving module path") {
+			t.Errorf("context error = %q, want it to contain %q", ctx.Error, "resolving module path")
+		}
+		if !strings.Contains(ctx.Error, "start assets add") {
+			t.Errorf("context error = %q, want it to contain actionable hint", ctx.Error)
+		}
+	})
+
+	t.Run("role module path error is fatal for explicit role", func(t *testing.T) {
+		cfg := cctx.CompileString(`
+			roles: {
+				"golang/assistant": {
+					origin: "github.com/test/roles/golang/assistant@v0.1.0"
+					file: "@module/role.md"
+				}
+			}
+		`)
+		if err := cfg.Err(); err != nil {
+			t.Fatalf("compile config: %v", err)
+		}
+
+		_, err := composer.ComposeWithRole(cfg, ContextSelection{}, "golang/assistant", "")
+		if err == nil {
+			t.Fatal("ComposeWithRole() expected error, got nil")
+		}
+		if !strings.Contains(err.Error(), "resolving module path") {
+			t.Errorf("error = %q, want it to contain %q", err.Error(), "resolving module path")
+		}
+		if !strings.Contains(err.Error(), "start assets add") {
+			t.Errorf("error = %q, want it to contain actionable hint", err.Error())
+		}
+	})
+
+	t.Run("task module path error is returned", func(t *testing.T) {
+		cfg := cctx.CompileString(`
+			tasks: {
+				"golang/review": {
+					origin: "github.com/test/tasks/golang/review@v0.1.0"
+					file: "@module/task.md"
+				}
+			}
+		`)
+		if err := cfg.Err(); err != nil {
+			t.Fatalf("compile config: %v", err)
+		}
+
+		_, err := composer.ResolveTask(cfg, "golang/review", "")
+		if err == nil {
+			t.Fatal("ResolveTask() expected error, got nil")
+		}
+		if !strings.Contains(err.Error(), "resolving module path") {
+			t.Errorf("error = %q, want it to contain %q", err.Error(), "resolving module path")
+		}
+		if !strings.Contains(err.Error(), "start assets add") {
+			t.Errorf("error = %q, want it to contain actionable hint", err.Error())
 		}
 	})
 }

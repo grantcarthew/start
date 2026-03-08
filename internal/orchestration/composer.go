@@ -128,7 +128,7 @@ type ComposeResult struct {
 }
 
 // Compose builds the final prompt from configuration.
-func (c *Composer) Compose(cfg cue.Value, selection ContextSelection, customText, instructions string) (ComposeResult, error) {
+func (c *Composer) Compose(cfg cue.Value, selection ContextSelection, customText string) (ComposeResult, error) {
 	var result ComposeResult
 	result.Selection = selection
 	var promptParts []string
@@ -258,8 +258,8 @@ func (c *Composer) Compose(cfg cue.Value, selection ContextSelection, customText
 // ComposeWithRole composes prompt and resolves role.
 // When roleName is provided (explicit --role), errors are fatal.
 // When using default selection, optional roles are skipped gracefully.
-func (c *Composer) ComposeWithRole(cfg cue.Value, selection ContextSelection, roleName, customText, instructions string) (ComposeResult, error) {
-	result, err := c.Compose(cfg, selection, customText, instructions)
+func (c *Composer) ComposeWithRole(cfg cue.Value, selection ContextSelection, roleName, customText string) (ComposeResult, error) {
+	result, err := c.Compose(cfg, selection, customText)
 	if err != nil {
 		return result, err
 	}
@@ -441,9 +441,10 @@ func (c *Composer) resolveContext(cfg cue.Value, name string) (ProcessResult, er
 		origin := ExtractOrigin(ctxVal)
 		if origin != "" {
 			resolved, err := ResolveModulePath(fields.File, origin)
-			if err == nil {
-				fields.File = resolved
+			if err != nil {
+				return ProcessResult{}, fmt.Errorf("resolving module path %s: %w\nRun 'start assets add' to reinstall", fields.File, err)
 			}
+			fields.File = resolved
 		}
 	}
 
@@ -500,9 +501,10 @@ func (c *Composer) resolveRole(cfg cue.Value, name string) (content, filePath st
 		origin := ExtractOrigin(roleVal)
 		if origin != "" {
 			resolved, err := ResolveModulePath(fields.File, origin)
-			if err == nil {
-				fields.File = resolved
+			if err != nil {
+				return "", "", fmt.Errorf("resolving module path %s: %w\nRun 'start assets add' to reinstall", fields.File, err)
 			}
+			fields.File = resolved
 		}
 	}
 
@@ -680,10 +682,10 @@ func (c *Composer) ResolveTask(cfg cue.Value, name, instructions string) (Proces
 		origin := ExtractOrigin(taskVal)
 		if origin != "" {
 			resolved, err := ResolveModulePath(fields.File, origin)
-			if err == nil {
-				fields.File = resolved
+			if err != nil {
+				return ProcessResult{}, fmt.Errorf("resolving module path %s: %w\nRun 'start assets add' to reinstall", fields.File, err)
 			}
-			// If resolution fails, keep original path (will produce clearer error later)
+			fields.File = resolved
 		}
 	}
 
