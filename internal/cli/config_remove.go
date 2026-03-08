@@ -50,6 +50,7 @@ func runConfigRemove(cmd *cobra.Command, args []string) error {
 		return runConfigRemoveInteractive(stdin, stdout, local, skipConfirm, getFlags(cmd).Quiet)
 	}
 
+	_, _ = fmt.Fprintln(stdout)
 	query := args[0]
 	matches, err := searchAllConfigCategories(query, local)
 	if err != nil {
@@ -108,6 +109,7 @@ func runConfigRemove(cmd *cobra.Command, args []string) error {
 
 // runConfigRemoveInteractive prompts for category, item(s), confirmation, then removes.
 func runConfigRemoveInteractive(stdin io.Reader, stdout io.Writer, local bool, skipConfirm bool, quiet bool) error {
+	_, _ = fmt.Fprintln(stdout)
 	_, _ = fmt.Fprintln(stdout, "Remove:")
 	category, err := promptSelectCategory(stdout, stdin, allConfigCategories)
 	if err != nil || category == "" {

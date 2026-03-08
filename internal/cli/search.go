@@ -211,6 +211,7 @@ func runSearch(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
+	_, _ = fmt.Fprintln(cmd.OutOrStdout())
 	installed := collectInstalledNames()
 	flags := getFlags(cmd)
 	printSearchSections(cmd.OutOrStdout(), sections, flags.Verbose, installed)

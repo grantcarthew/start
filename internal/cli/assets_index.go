@@ -169,7 +169,7 @@ func filterIndexByCategory(index *registry.Index, category string) *registry.Ind
 // header always reflects the full index.
 func printIndex(w io.Writer, index *registry.Index, version string, verbose bool, installed map[string]bool, category string) {
 	total := len(index.Agents) + len(index.Roles) + len(index.Contexts) + len(index.Tasks)
-	_, _ = fmt.Fprintf(w, "Index: %s (%d assets)\n\n", version, total)
+	_, _ = fmt.Fprintf(w, "\nIndex: %s (%d assets)\n\n", version, total)
 
 	categories := []struct {
 		name    string

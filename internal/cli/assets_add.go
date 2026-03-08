@@ -285,7 +285,7 @@ func promptAssetSelection(w io.Writer, r io.Reader, results []assets.SearchResul
 		)
 	}
 
-	_, _ = fmt.Fprintf(w, "Found %d matches:\n\n", len(results))
+	_, _ = fmt.Fprintf(w, "\nFound %d matches:\n\n", len(results))
 
 	for i, res := range results {
 		marker := "  "

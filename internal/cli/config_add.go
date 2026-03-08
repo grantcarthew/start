@@ -54,6 +54,7 @@ func runConfigAdd(cmd *cobra.Command, args []string) error {
 	}
 
 	if category == "" {
+		_, _ = fmt.Fprintln(stdout)
 		_, _ = fmt.Fprintln(stdout, "Add:")
 		var err error
 		category, err = promptSelectCategory(stdout, stdin, allConfigCategories)
@@ -62,6 +63,8 @@ func runConfigAdd(cmd *cobra.Command, args []string) error {
 		}
 		// promptSelectCategory returns plural; normalize to singular
 		category = strings.TrimSuffix(category, "s")
+	} else {
+		_, _ = fmt.Fprintln(stdout)
 	}
 
 	switch category {

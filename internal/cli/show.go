@@ -233,6 +233,7 @@ func runShowListing(cmd *cobra.Command) error {
 // runShowSearch handles cross-category search for `start show <name>`.
 func runShowSearch(cmd *cobra.Command, name string) error {
 	w := cmd.OutOrStdout()
+	_, _ = fmt.Fprintln(w)
 	stderr := cmd.ErrOrStderr()
 	flags := getFlags(cmd)
 	scope, err := showScopeFromCmd(cmd)
@@ -585,7 +586,6 @@ func printVerboseDump(w io.Writer, r ShowResult) {
 	label := tui.ColorDim.Sprint
 
 	// Header
-	_, _ = fmt.Fprintln(w)
 	_, _ = tui.CategoryColor(cat).Fprint(w, r.ItemType)
 	_, _ = fmt.Fprintf(w, ": %s", r.Name)
 	if r.ShowReason != "" {

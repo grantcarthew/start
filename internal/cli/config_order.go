@@ -71,12 +71,15 @@ func runConfigOrder(cmd *cobra.Command, args []string) error {
 	}
 
 	if category == "" {
+		_, _ = fmt.Fprintln(stdout)
 		_, _ = fmt.Fprintln(stdout, "Reorder:")
 		var err error
 		category, err = promptSelectCategory(stdout, stdin, []string{"roles", "contexts"})
 		if err != nil || category == "" {
 			return err
 		}
+	} else {
+		_, _ = fmt.Fprintln(stdout)
 	}
 
 	switch category {
