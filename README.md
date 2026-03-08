@@ -368,18 +368,19 @@ start completion fish
 
 ### Global Flags
 
-| Flag         | Short | Description                              |
-| ------------ | ----- | ---------------------------------------- |
-| `--agent`    | `-a`  | Override agent for this session          |
-| `--role`     | `-r`  | Override role (config name or file path) |
-| `--model`    | `-m`  | Override model selection                 |
-| `--context`  | `-c`  | Select contexts (tags or file paths)     |
-| `--dry-run`  |       | Preview execution without launching      |
-| `--local`    | `-l`  | Use project-local config (`./.start/`)   |
-| `--quiet`    | `-q`  | Suppress output                          |
-| `--verbose`  |       | Detailed output                          |
-| `--debug`    |       | Debug output (implies `--verbose`)       |
-| `--no-color` |       | Disable coloured output                  |
+| Flag         | Short | Description                                             |
+| ------------ | ----- | ------------------------------------------------------- |
+| `--agent`    | `-a`  | Override agent for this session                         |
+| `--role`     | `-r`  | Override role (config name or file path)                |
+| `--model`    | `-m`  | Override model selection                                |
+| `--context`  | `-c`  | Select contexts (tags or file paths, repeatable)        |
+| `--dry-run`  |       | Preview execution without launching                     |
+| `--local`    | `-l`  | Use project-local config (`./.start/`)                  |
+| `--quiet`    | `-q`  | Suppress output                                         |
+| `--verbose`  |       | Detailed output                                         |
+| `--debug`    |       | Debug output (implies `--verbose`)                      |
+| `--no-color` |       | Disable coloured output                                 |
+| `--no-role`  |       | Skip role assignment (mutually exclusive with `--role`) |
 
 ### File Path Support
 
@@ -394,9 +395,9 @@ start task ./tasks/my-workflow.md "Additional instructions"
 
 ### Task Resolution Order
 
-1. Exact name match in configuration
-2. Substring match (e.g., `review` matches `code-review`)
-3. Registry lookup with auto-install
+1. Exact full name match in installed configuration
+2. Combined search across installed config and registry — merged results presented for selection
+3. Auto-install from registry when a single unambiguous match is found
 
 ## Contributing
 
