@@ -103,6 +103,9 @@ cmd "help" "prompt --help" \
 cmd "help" "task --help" \
     "./start task --help"
 
+cmd "help" "search --help" \
+    "./start search --help"
+
 cmd "help" "config --help" \
     "./start config --help"
 
@@ -142,11 +145,44 @@ cmd "help" "show --help" \
 cmd "help" "assets --help" \
     "./start assets --help"
 
+cmd "help" "assets browse --help" \
+    "./start assets browse --help"
+
+cmd "help" "assets index --help" \
+    "./start assets index --help"
+
+cmd "help" "assets search --help" \
+    "./start assets search --help"
+
+cmd "help" "assets add --help" \
+    "./start assets add --help"
+
+cmd "help" "assets list --help" \
+    "./start assets list --help"
+
+cmd "help" "assets info --help" \
+    "./start assets info --help"
+
+cmd "help" "assets update --help" \
+    "./start assets update --help"
+
+cmd "help" "assets validate --help" \
+    "./start assets validate --help"
+
 cmd "help" "doctor --help" \
     "./start doctor --help"
 
 cmd "help" "completion --help" \
     "./start completion --help"
+
+cmd "help" "help agents topic" \
+    "./start help agents"
+
+cmd "help" "help templates topic" \
+    "./start help templates"
+
+cmd "help" "help config topic" \
+    "./start help config"
 
 # --------------------------------------------------------------------------
 section "2. Start Command (Default)"
@@ -164,6 +200,12 @@ cmd "start" "--quiet --dry-run" \
 cmd "start" "--verbose --dry-run" \
     "./start --verbose --dry-run"
 
+cmd "start" "--no-color --dry-run" \
+    "./start --no-color --dry-run"
+
+cmd "start" "--local --dry-run" \
+    "./start --local --dry-run"
+
 cmd "start" "--agent claude --dry-run" \
     "./start --agent claude --dry-run"
 
@@ -172,6 +214,15 @@ cmd "start" "--agent nonexistent (expect error)" \
 
 cmd "start" "--model opus --dry-run" \
     "./start --model 'claude-opus-4-5' --dry-run"
+
+cmd "start" "--role go-expert --dry-run" \
+    "./start --role go-expert --dry-run"
+
+cmd "start" "--role nonexistent --dry-run (expect error)" \
+    "./start --role nonexistent-role-xyz --dry-run"
+
+cmd "start" "--role and --no-role (expect error)" \
+    "./start --role go-expert --no-role --dry-run"
 
 cmd "start" "--context default --dry-run" \
     "./start -c default --dry-run"
@@ -195,6 +246,15 @@ cmd "prompt" "prompt with context tag --dry-run" \
 cmd "prompt" "prompt --debug --dry-run" \
     "./start prompt 'Hello world' --dry-run --debug"
 
+cmd "prompt" "prompt with file path --dry-run" \
+    "./start prompt ./README.md --dry-run"
+
+cmd "prompt" "prompt --no-role --dry-run" \
+    "./start prompt 'Hello world' --no-role --dry-run"
+
+cmd "prompt" "prompt --role go-expert --dry-run" \
+    "./start prompt 'Hello world' --role go-expert --dry-run"
+
 # --------------------------------------------------------------------------
 section "4. Task Command"
 # --------------------------------------------------------------------------
@@ -204,6 +264,18 @@ cmd "task" "task (no args - lists tasks)" \
 
 cmd "task" "task nonexistent (expect error)" \
     "./start task nonexistent-task-xyz-123"
+
+cmd "task" "task with dry-run" \
+    "./start task golang/debug --dry-run"
+
+cmd "task" "task with instructions --dry-run" \
+    "./start task golang/debug 'look at main.go' --dry-run"
+
+cmd "task" "task --tag filter" \
+    "./start task debug --tag golang"
+
+cmd "task" "task --no-role --dry-run" \
+    "./start task golang/debug --no-role --dry-run"
 
 # --------------------------------------------------------------------------
 section "5. Error Handling"
@@ -216,7 +288,32 @@ cmd "errors" "invalid flag (expect error)" \
     "./start --invalid-flag-xyz"
 
 # --------------------------------------------------------------------------
-section "6. Config Overview"
+section "6. Search Command"
+# --------------------------------------------------------------------------
+
+cmd "search" "search golang" \
+    "./start search golang"
+
+cmd "search" "search --json" \
+    "./start search golang --json"
+
+cmd "search" "search --verbose" \
+    "./start search golang --verbose"
+
+cmd "search" "search --tag filter" \
+    "./start search --tag golang"
+
+cmd "search" "search too short (expect error)" \
+    "./start search ab"
+
+cmd "search" "search no results" \
+    "./start search xyznonexistent123"
+
+cmd "search" "find alias" \
+    "./start find golang"
+
+# --------------------------------------------------------------------------
+section "7. Config Overview"
 # --------------------------------------------------------------------------
 
 cmd "config" "config (overview)" \
@@ -226,7 +323,7 @@ cmd "config" "config --local (local overview)" \
     "./start config --local"
 
 # --------------------------------------------------------------------------
-section "7. Config List"
+section "8. Config List"
 # --------------------------------------------------------------------------
 
 cmd "config list" "list all" \
@@ -250,6 +347,12 @@ cmd "config list" "list --json" \
 cmd "config list" "list agents --json" \
     "./start config list agents --json"
 
+cmd "config list" "list contexts --json" \
+    "./start config list contexts --json"
+
+cmd "config list" "list tasks --json" \
+    "./start config list tasks --json"
+
 cmd "config list" "ls alias" \
     "./start config ls"
 
@@ -260,7 +363,7 @@ cmd "config list" "list -l" \
     "./start config list -l"
 
 # --------------------------------------------------------------------------
-section "8. Config Info"
+section "9. Config Info"
 # --------------------------------------------------------------------------
 
 cmd "config info" "info claude" \
@@ -273,7 +376,7 @@ cmd "config info" "info nonexistent (expect error)" \
     "./start config info nonexistent-xyz-123"
 
 # --------------------------------------------------------------------------
-section "9. Config Search"
+section "10. Config Search"
 # --------------------------------------------------------------------------
 
 cmd "config search" "search claude" \
@@ -283,7 +386,7 @@ cmd "config search" "search golang" \
     "./start config search golang"
 
 # --------------------------------------------------------------------------
-section "10. Config Add (interactive)"
+section "11. Config Add (interactive)"
 # --------------------------------------------------------------------------
 
 cmd "config add" "add (interactive - prompts for category)" \
@@ -302,7 +405,7 @@ cmd "config add" "add task (interactive)" \
     "./start config add task"
 
 # --------------------------------------------------------------------------
-section "11. Config Edit (interactive)"
+section "12. Config Edit (interactive)"
 # --------------------------------------------------------------------------
 
 cmd "config edit" "edit (interactive - prompts for category and item)" \
@@ -312,7 +415,7 @@ cmd "config edit" "edit claude (interactive)" \
     "./start config edit claude"
 
 # --------------------------------------------------------------------------
-section "12. Config Remove"
+section "13. Config Remove"
 # --------------------------------------------------------------------------
 
 cmd "config remove" "remove nonexistent (expect error)" \
@@ -322,7 +425,7 @@ cmd "config remove" "remove (interactive - no args)" \
     "./start config remove"
 
 # --------------------------------------------------------------------------
-section "13. Config Open"
+section "14. Config Open"
 # --------------------------------------------------------------------------
 
 cmd "config open" "open (interactive - prompts for category)" \
@@ -334,18 +437,36 @@ cmd "config open" "open agent" \
 cmd "config open" "open role" \
     "./start config open role"
 
+cmd "config open" "open context" \
+    "./start config open context"
+
+cmd "config open" "open task" \
+    "./start config open task"
+
+cmd "config open" "open setting" \
+    "./start config open setting"
+
 # --------------------------------------------------------------------------
-section "14. Config Order"
+section "15. Config Order"
 # --------------------------------------------------------------------------
 
 cmd "config order" "order (interactive)" \
     "./start config order"
 
+cmd "config order" "order agent" \
+    "./start config order agent"
+
 cmd "config order" "order role" \
     "./start config order role"
 
+cmd "config order" "order context" \
+    "./start config order context"
+
+cmd "config order" "order task" \
+    "./start config order task"
+
 # --------------------------------------------------------------------------
-section "15. Config Export"
+section "16. Config Export"
 # --------------------------------------------------------------------------
 
 cmd "config export" "export (all)" \
@@ -370,7 +491,7 @@ cmd "config export" "export --local" \
     "./start config export --local"
 
 # --------------------------------------------------------------------------
-section "16. Config Settings"
+section "17. Config Settings"
 # --------------------------------------------------------------------------
 
 cmd "config settings" "settings (list all)" \
@@ -385,11 +506,23 @@ cmd "config settings" "settings default_agent (show)" \
 cmd "config settings" "settings default_agent --json" \
     "./start config settings default_agent --json"
 
+cmd "config settings" "settings assets_index (show)" \
+    "./start config settings assets_index"
+
+cmd "config settings" "settings shell (show)" \
+    "./start config settings shell"
+
+cmd "config settings" "settings timeout (show)" \
+    "./start config settings timeout"
+
 cmd "config settings" "settings default_agent claude (set)" \
     "./start config settings default_agent claude"
 
 cmd "config settings" "settings default_agent --unset" \
     "./start config settings default_agent --unset"
+
+cmd "config settings" "settings --local default_agent (local scope)" \
+    "./start config settings --local default_agent"
 
 cmd "config settings" "settings edit (open in \$EDITOR)" \
     "EDITOR=cat ./start config settings edit"
@@ -398,7 +531,7 @@ cmd "config settings" "settings unknown key (expect error)" \
     "./start config settings nonexistent_key_xyz"
 
 # --------------------------------------------------------------------------
-section "17. Show Command"
+section "18. Show Command"
 # --------------------------------------------------------------------------
 
 cmd "show" "show (listing all)" \
@@ -416,12 +549,24 @@ cmd "show" "show --local" \
 cmd "show" "show --global claude" \
     "./start show --global claude"
 
+cmd "show" "show --global --local (expect error)" \
+    "./start show --global --local claude"
+
 cmd "show" "show nonexistent (expect error)" \
     "./start show nonexistent-xyz-123"
 
+cmd "show" "view alias" \
+    "./start view claude"
+
 # --------------------------------------------------------------------------
-section "18. Assets Commands"
+section "19. Assets Commands"
 # --------------------------------------------------------------------------
+
+cmd "assets" "assets (no args - lists installed)" \
+    "./start assets"
+
+cmd "assets" "assets browse (opens browser)" \
+    "./start assets browse"
 
 cmd "assets" "assets search role" \
     "./start assets search role"
@@ -435,6 +580,9 @@ cmd "assets" "assets search --verbose" \
 cmd "assets" "assets search --json" \
     "./start assets search role --json"
 
+cmd "assets" "assets search --tag filter" \
+    "./start assets search --tag golang"
+
 cmd "assets" "assets search too short (expect error)" \
     "./start assets search ab"
 
@@ -444,8 +592,14 @@ cmd "assets" "assets search no results" \
 cmd "assets" "assets list" \
     "./start assets list"
 
+cmd "assets" "assets list agents" \
+    "./start assets list agents"
+
 cmd "assets" "assets list roles" \
     "./start assets list roles"
+
+cmd "assets" "assets list contexts" \
+    "./start assets list contexts"
 
 cmd "assets" "assets list tasks" \
     "./start assets list tasks"
@@ -453,14 +607,35 @@ cmd "assets" "assets list tasks" \
 cmd "assets" "assets list --json" \
     "./start assets list --json"
 
+cmd "assets" "assets list --verbose" \
+    "./start assets list --verbose"
+
+cmd "assets" "assets index (show catalog)" \
+    "./start assets index"
+
+cmd "assets" "assets index --json" \
+    "./start assets index --json"
+
+cmd "assets" "assets index --export" \
+    "./start assets index --export"
+
+cmd "assets" "assets index roles (category filter)" \
+    "./start assets index roles"
+
 cmd "assets" "assets info (direct path)" \
     "./start assets info golang/debug"
 
 cmd "assets" "assets info (search)" \
     "./start assets info 'code review'"
 
+cmd "assets" "assets info --json" \
+    "./start assets info --json golang/debug"
+
 cmd "assets" "assets add (direct path)" \
     "./start assets add golang/debug"
+
+cmd "assets" "assets add --local (install to project config)" \
+    "./start assets add --local golang/debug"
 
 cmd "assets" "assets update (all)" \
     "./start assets update"
@@ -474,18 +649,27 @@ cmd "assets" "assets update --dry-run" \
 cmd "assets" "assets update --force" \
     "./start assets update --force"
 
-cmd "assets" "assets index (expect error - not asset repo)" \
-    "./start assets index"
+cmd "assets" "assets update --json" \
+    "./start assets update --json"
+
+cmd "assets" "assets validate (gate message - no --yes)" \
+    "./start assets validate"
+
+cmd "assets" "assets validate --yes (network-heavy maintainer check)" \
+    "./start assets validate --yes"
+
+cmd "assets" "assets validate --yes --json" \
+    "./start assets validate --yes --json"
 
 # --------------------------------------------------------------------------
-section "19. Doctor Command"
+section "20. Doctor Command"
 # --------------------------------------------------------------------------
 
 cmd "doctor" "doctor" \
     "./start doctor"
 
 # --------------------------------------------------------------------------
-section "20. Completion Commands"
+section "21. Completion Commands"
 # --------------------------------------------------------------------------
 
 cmd "completion" "completion bash" \
@@ -497,6 +681,9 @@ cmd "completion" "completion zsh" \
 cmd "completion" "completion fish" \
     "./start completion fish"
 
+cmd "completion" "completion powershell" \
+    "./start completion powershell"
+
 cmd "completion" "completion bash --help" \
     "./start completion bash --help"
 
@@ -505,6 +692,9 @@ cmd "completion" "completion zsh --help" \
 
 cmd "completion" "completion fish --help" \
     "./start completion fish --help"
+
+cmd "completion" "completion powershell --help" \
+    "./start completion powershell --help"
 
 # --------------------------------------------------------------------------
 echo
