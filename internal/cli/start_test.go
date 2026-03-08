@@ -1896,7 +1896,10 @@ func TestGetConfiguredAgents(t *testing.T) {
 		}
 	}`)
 
-	choices := getConfiguredAgents(cfg.Value)
+	choices, err := getConfiguredAgents(cfg.Value)
+	if err != nil {
+		t.Fatalf("getConfiguredAgents() unexpected error: %v", err)
+	}
 	if len(choices) != 3 {
 		t.Fatalf("expected 3 agents, got %d", len(choices))
 	}
@@ -1925,7 +1928,10 @@ func TestGetConfiguredAgents_Empty(t *testing.T) {
 		}
 	}`)
 
-	choices := getConfiguredAgents(cfg.Value)
+	choices, err := getConfiguredAgents(cfg.Value)
+	if err != nil {
+		t.Fatalf("getConfiguredAgents() unexpected error: %v", err)
+	}
 	if len(choices) != 0 {
 		t.Errorf("expected 0 agents, got %d", len(choices))
 	}

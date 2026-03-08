@@ -121,7 +121,7 @@ func TestIntegration_CUELoaderWithComposer(t *testing.T) {
 		IncludeDefaults: false,
 	}
 
-	composeResult, err := composer.Compose(result.Value, selection, "", "")
+	composeResult, err := composer.Compose(result.Value, selection, "")
 	if err != nil {
 		t.Fatalf("composing: %v", err)
 	}
@@ -161,7 +161,7 @@ func TestIntegration_CUELoaderWithComposer_DefaultContexts(t *testing.T) {
 		IncludeDefaults: true,
 	}
 
-	composeResult, err := composer.Compose(result.Value, selection, "", "")
+	composeResult, err := composer.Compose(result.Value, selection, "")
 	if err != nil {
 		t.Fatalf("composing: %v", err)
 	}
@@ -210,7 +210,7 @@ func TestIntegration_CUELoaderWithComposer_TaggedContexts(t *testing.T) {
 		Tags:            []string{"debug"},
 	}
 
-	composeResult, err := composer.Compose(result.Value, selection, "", "")
+	composeResult, err := composer.Compose(result.Value, selection, "")
 	if err != nil {
 		t.Fatalf("composing: %v", err)
 	}
@@ -251,7 +251,7 @@ func TestIntegration_ComposeWithRole(t *testing.T) {
 	}
 
 	// Test with specific role
-	composeResult, err := composer.ComposeWithRole(result.Value, selection, "reviewer", "", "")
+	composeResult, err := composer.ComposeWithRole(result.Value, selection, "reviewer", "")
 	if err != nil {
 		t.Fatalf("composing with role: %v", err)
 	}

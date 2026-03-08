@@ -124,18 +124,10 @@ func AssetExists(cfg cue.Value, category, name string) bool {
 
 // assetTypeToConfigFile returns the config file name for an asset type.
 func assetTypeToConfigFile(category string) string {
-	switch category {
-	case "agents":
-		return "agents.cue"
-	case "roles":
-		return "roles.cue"
-	case "tasks":
-		return "tasks.cue"
-	case "contexts":
-		return "contexts.cue"
-	default:
-		return "settings.cue"
+	if f, ok := internalcue.ConfigFiles[category]; ok {
+		return f
 	}
+	return internalcue.ConfigFiles[internalcue.KeySettings]
 }
 
 // ExtractAssetContent loads the asset module and extracts its content as a CUE AST struct.

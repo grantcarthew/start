@@ -295,7 +295,10 @@ func (r *resolver) resolveContexts(terms []string) ([]string, error) {
 		}
 
 		// Exact name match in registry (only when no installed matches)
-		index, client, _ := r.ensureIndex()
+		index, client, indexErr := r.ensureIndex()
+		if indexErr != nil {
+			debugf(r.stderr, r.flags, dbgResolve, "Registry unavailable for context search: %v", indexErr)
+		}
 		if !hasInstalledMatches && index != nil {
 			result, err := findExactInRegistry(index.Contexts, "contexts", term)
 			if err != nil {
@@ -714,12 +717,25 @@ func (r *resolver) ensureIndex() (*registry.Index, *registry.Client, error) {
 		return nil, client, nil // Graceful fallback
 	}
 	if !usedCache {
-		_ = cache.WriteIndex(indexVersion)
+		if err := cache.WriteIndex(indexVersion); err != nil {
+			debugf(r.stderr, r.flags, dbgResolve, "Cache write failed: %v", err)
+		}
 	}
 
 	r.index = index
 	debugf(r.stderr, r.flags, dbgResolve, "Index fetched: version %s", indexVersion)
 	return index, client, nil
+}
+
+// resolveAssetsIndexPath returns the configured assets_index setting value,
+// or empty string if not set or on any error. Callers should pass the result
+// to registry.EffectiveIndexPath to get the final module path.
+func resolveAssetsIndexPath() string {
+	settings, err := loadSettingsForScope(false)
+	if err != nil {
+		return ""
+	}
+	return settings["assets_index"]
 }
 
 // reloadConfig reloads the merged config after installs.

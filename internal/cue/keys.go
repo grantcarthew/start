@@ -9,3 +9,12 @@ const (
 	KeyTasks    = "tasks"
 	KeySettings = "settings"
 )
+
+// ConfigFiles maps each category key to its CUE config filename.
+var ConfigFiles = map[string]string{
+	KeyAgents:   "agents.cue",
+	KeyRoles:    "roles.cue",
+	KeyContexts: "contexts.cue",
+	KeyTasks:    "tasks.cue",
+	KeySettings: "settings.cue",
+}

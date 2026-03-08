@@ -96,7 +96,9 @@ func runAssetsIndex(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("fetching index module: %w", err)
 	}
-	_ = cache.WriteIndex(resolvedPath)
+	if err := cache.WriteIndex(resolvedPath); err != nil {
+		debugf(cmd.ErrOrStderr(), getFlags(cmd), dbgCache, "cache write failed: %v", err)
+	}
 	prog.Done()
 
 	w := cmd.OutOrStdout()

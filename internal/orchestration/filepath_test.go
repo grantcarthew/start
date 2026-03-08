@@ -22,6 +22,8 @@ func TestIsFilePath(t *testing.T) {
 		{name: "just dot slash", input: "./", want: true},
 		{name: "just slash", input: "/", want: true},
 		{name: "just tilde", input: "~", want: true},
+		{name: "tilde user syntax", input: "~user/bin", want: false},
+		{name: "tilde without slash", input: "~foo", want: false},
 
 		// Config names (should return false)
 		{name: "simple name", input: "go-expert", want: false},

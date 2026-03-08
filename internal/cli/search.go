@@ -19,10 +19,10 @@ import (
 
 // searchSection groups search results under a labelled section.
 type searchSection struct {
-	Label         string               `json:"label"`
-	Path          string               `json:"path,omitempty"`
+	Label         string                `json:"label"`
+	Path          string                `json:"path,omitempty"`
 	Results       []assets.SearchResult `json:"results"`
-	ShowInstalled bool                 `json:"-"` // Only true for registry section; display-only
+	ShowInstalled bool                  `json:"-"` // Only true for registry section; display-only
 }
 
 // addSearchCommand adds the top-level search command.
@@ -171,7 +171,9 @@ func runSearch(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			registryErr = err
 		} else {
-			_ = cache.WriteIndex(indexVersion)
+			if err := cache.WriteIndex(indexVersion); err != nil {
+				debugf(cmd.ErrOrStderr(), getFlags(cmd), dbgCache, "cache write failed: %v", err)
+			}
 			results, err := assets.SearchIndex(index, query, tags)
 			if err != nil {
 				return err
