@@ -274,7 +274,7 @@ func printAssetInfo(w io.Writer, asset assets.SearchResult, installed bool, scop
 // promptAssetInfoSelection shows a numbered list of asset matches and lets the
 // user pick one. Returns nil and nil if the user cancels (empty input).
 func promptAssetInfoSelection(w io.Writer, r io.Reader, results []assets.SearchResult, query string) (*assets.SearchResult, error) {
-	_, _ = fmt.Fprintf(w, "Found %d matches for %q:\n\n", len(results), query)
+	_, _ = fmt.Fprintf(w, "\nFound %d matches for %q:\n\n", len(results), query)
 
 	for i, res := range results {
 		_, _ = fmt.Fprintf(w, "  %2d. ", i+1)

@@ -134,7 +134,6 @@ func runAssetsSearch(cmd *cobra.Command, args []string) error {
 	installed := collectInstalledNames()
 
 	// Print results
-	_, _ = fmt.Fprintln(cmd.OutOrStdout())
 	printSearchResults(cmd.OutOrStdout(), results, flags.Verbose, installed)
 
 	return nil
@@ -185,7 +184,7 @@ func collectInstalledScopes() map[string]string {
 // printSearchResults prints search results grouped by category.
 // installed is an optional set of "category/name" keys for marking installed assets.
 func printSearchResults(w io.Writer, results []assets.SearchResult, verbose bool, installed map[string]bool) {
-	_, _ = fmt.Fprintf(w, "Found %d matches:\n\n", len(results))
+	_, _ = fmt.Fprintf(w, "\nFound %d matches:\n\n", len(results))
 
 	// Group by category for display
 	grouped := make(map[string][]assets.SearchResult)
