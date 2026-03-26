@@ -22,6 +22,7 @@ import (
 	internalcue "github.com/grantcarthew/start/internal/cue"
 	"github.com/grantcarthew/start/internal/detection"
 	"github.com/grantcarthew/start/internal/registry"
+	"github.com/grantcarthew/start/internal/tui"
 )
 
 // AutoSetupResult contains the result of auto-setup.
@@ -181,14 +182,25 @@ func (a *AutoSetup) promptSelection(detected []detection.DetectedAgent) (detecti
 		)
 	}
 
-	_, _ = fmt.Fprintln(a.stdout, "Multiple AI CLI tools detected:")
+	_, _ = tui.ColorHeader.Fprintln(a.stdout, "Multiple AI CLI tools detected:")
 	_, _ = fmt.Fprintln(a.stdout)
 
+	// Calculate key column width for alignment
+	keyWidth := 0
+	for _, d := range detected {
+		if len(d.Key) > keyWidth {
+			keyWidth = len(d.Key)
+		}
+	}
+
 	for i, d := range detected {
+		_, _ = fmt.Fprintf(a.stdout, "  %d. ", i+1)
+		_, _ = tui.ColorAgents.Fprintf(a.stdout, "%-*s", keyWidth, d.Key)
 		if d.Entry.Description != "" {
-			_, _ = fmt.Fprintf(a.stdout, "  %d. %s - %s\n", i+1, d.Entry.Bin, d.Entry.Description)
+			_, _ = fmt.Fprint(a.stdout, "  ")
+			_, _ = tui.ColorDim.Fprintln(a.stdout, d.Entry.Description)
 		} else {
-			_, _ = fmt.Fprintf(a.stdout, "  %d. %s\n", i+1, d.Entry.Bin)
+			_, _ = fmt.Fprintln(a.stdout)
 		}
 	}
 
