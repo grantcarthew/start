@@ -319,7 +319,7 @@ func TestConfigListContext_WithContexts(t *testing.T) {
 	}
 }
 
-func TestConfigListContext_SortsAlphabetically(t *testing.T) {
+func TestConfigListContext_PreservesInjectionOrder(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", tmpDir)
 
@@ -371,10 +371,10 @@ func TestConfigListContext_SortsAlphabetically(t *testing.T) {
 		t.Fatalf("expected all contexts in output, got: %s", output)
 	}
 
-	// Alphabetical order: alpha < middle < zebra
-	if alphaIdx >= middleIdx || middleIdx >= zebraIdx {
-		t.Errorf("context list not sorted alphabetically (expected alpha < middle < zebra): alpha=%d, middle=%d, zebra=%d\noutput: %s",
-			alphaIdx, middleIdx, zebraIdx, output)
+	// Injection order: zebra < alpha < middle (matches config definition order)
+	if zebraIdx >= alphaIdx || alphaIdx >= middleIdx {
+		t.Errorf("context list not in injection order (expected zebra < alpha < middle): zebra=%d, alpha=%d, middle=%d\noutput: %s",
+			zebraIdx, alphaIdx, middleIdx, output)
 	}
 }
 

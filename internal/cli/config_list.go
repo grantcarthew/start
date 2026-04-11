@@ -112,6 +112,8 @@ func buildConfigListItem(m configMatch, local bool) (ConfigListItem, error) {
 }
 
 // collectConfigListItems loads all configured items for the given category (or all if "").
+// All categories are sorted alphabetically for consistent, analysis-friendly JSON output.
+// The human-readable display preserves injection order for roles and contexts.
 func collectConfigListItems(local bool, category string) ([]ConfigListItem, error) {
 	var items []ConfigListItem
 
@@ -120,6 +122,7 @@ func collectConfigListItems(local bool, category string) ([]ConfigListItem, erro
 		if err != nil {
 			return nil, err
 		}
+		sort.Strings(order)
 		for _, name := range order {
 			a := agents[name]
 			items = append(items, ConfigListItem{
@@ -135,6 +138,7 @@ func collectConfigListItems(local bool, category string) ([]ConfigListItem, erro
 		if err != nil {
 			return nil, err
 		}
+		sort.Strings(order)
 		for _, name := range order {
 			r := roles[name]
 			items = append(items, ConfigListItem{
@@ -150,6 +154,7 @@ func collectConfigListItems(local bool, category string) ([]ConfigListItem, erro
 		if err != nil {
 			return nil, err
 		}
+		sort.Strings(order)
 		for _, name := range order {
 			c := contexts[name]
 			items = append(items, ConfigListItem{
@@ -165,6 +170,7 @@ func collectConfigListItems(local bool, category string) ([]ConfigListItem, erro
 		if err != nil {
 			return nil, err
 		}
+		sort.Strings(order)
 		for _, name := range order {
 			t := tasks[name]
 			items = append(items, ConfigListItem{
@@ -315,10 +321,10 @@ func listRoles(w io.Writer, stderr io.Writer, local bool) error {
 	if err != nil {
 		printWarning(stderr, "failed to load roles: %s", err)
 	}
-	sort.Strings(order)
 
 	_, _ = tui.ColorRoles.Fprint(w, "roles")
-	_, _ = fmt.Fprintln(w, "/")
+	_, _ = fmt.Fprint(w, "/ ")
+	_, _ = fmt.Fprintln(w, tui.Annotate("injection order"))
 
 	if len(roles) == 0 {
 		_, _ = tui.ColorDim.Fprintln(w, "  none")
@@ -349,10 +355,10 @@ func listContexts(w io.Writer, stderr io.Writer, local bool) error {
 	if err != nil {
 		printWarning(stderr, "failed to load contexts: %s", err)
 	}
-	sort.Strings(order)
 
 	_, _ = tui.ColorContexts.Fprint(w, "contexts")
-	_, _ = fmt.Fprintln(w, "/")
+	_, _ = fmt.Fprint(w, "/ ")
+	_, _ = fmt.Fprintln(w, tui.Annotate("injection order"))
 
 	if len(contexts) == 0 {
 		_, _ = tui.ColorDim.Fprintln(w, "  none")

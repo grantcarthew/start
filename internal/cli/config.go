@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/grantcarthew/start/internal/config"
@@ -100,6 +101,7 @@ func runConfigList(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		printWarning(stderr, "failed to load agents: %s", err)
 	}
+	sort.Strings(agentOrder)
 	_, _ = fmt.Fprintln(w)
 	_, _ = tui.ColorAgents.Fprint(w, "agents")
 	_, _ = fmt.Fprint(w, "/ ")
@@ -129,6 +131,8 @@ func runConfigList(cmd *cobra.Command, args []string) error {
 	_, _ = fmt.Fprintln(w)
 	_, _ = tui.ColorRoles.Fprint(w, "roles")
 	_, _ = fmt.Fprint(w, "/ ")
+	_, _ = fmt.Fprint(w, tui.Annotate("injection order"))
+	_, _ = fmt.Fprint(w, " ")
 	_, _ = fmt.Fprint(w, tui.Annotate("%s", scopeLabel))
 	_, _ = tui.ColorDim.Fprintf(w, ": %d\n", len(roles))
 	if len(roles) > 0 {
@@ -147,6 +151,8 @@ func runConfigList(cmd *cobra.Command, args []string) error {
 	_, _ = fmt.Fprintln(w)
 	_, _ = tui.ColorContexts.Fprint(w, "contexts")
 	_, _ = fmt.Fprint(w, "/ ")
+	_, _ = fmt.Fprint(w, tui.Annotate("injection order"))
+	_, _ = fmt.Fprint(w, " ")
 	_, _ = fmt.Fprint(w, tui.Annotate("%s", scopeLabel))
 	_, _ = tui.ColorDim.Fprintf(w, ": %d\n", len(contexts))
 	if len(contexts) > 0 {
@@ -174,6 +180,7 @@ func runConfigList(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		printWarning(stderr, "failed to load tasks: %s", err)
 	}
+	sort.Strings(taskOrder)
 	_, _ = fmt.Fprintln(w)
 	_, _ = tui.ColorTasks.Fprint(w, "tasks")
 	_, _ = fmt.Fprint(w, "/ ")
