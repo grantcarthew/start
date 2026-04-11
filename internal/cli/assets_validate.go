@@ -329,7 +329,9 @@ func validateCacheDirName(repoURL string) string {
 // Custom assets repositories on a different default branch are not supported.
 const defaultAssetsBranch = "main"
 
-// validateEnsureRepo clones the repo if absent, otherwise pulls main.
+// validateEnsureRepo clones the repo if absent, otherwise fetches and resets to
+// origin/main. Using fetch+reset instead of pull avoids divergent branch errors
+// since the cache is not a working repository.
 // If the cache directory exists but has no .git (e.g. a stale failed clone),
 // it is removed and re-cloned, provided it is safely scoped under cacheParent.
 func validateEnsureRepo(repoURL, cacheDir string) error {
@@ -352,16 +354,21 @@ func validateEnsureRepo(repoURL, cacheDir string) error {
 		}
 		out, err := exec.Command("git", "clone", repoURL, cacheDir).CombinedOutput()
 		if err != nil {
-			return fmt.Errorf("cloning %s: %s", repoURL, strings.TrimSpace(string(out)))
+			return fmt.Errorf("cloning %s into %s: %s", repoURL, cacheDir, strings.TrimSpace(string(out)))
 		}
 		return nil
 	}
-	// Already cloned — checkout default branch then pull
+	// Already cloned — reset to match remote default branch.
+	// Using fetch + reset avoids merge strategy issues (divergent branches)
+	// that occur with "git pull" on a validation cache.
 	if out, err := exec.Command("git", "-C", cacheDir, "checkout", defaultAssetsBranch).CombinedOutput(); err != nil {
-		return fmt.Errorf("checking out main: %s", strings.TrimSpace(string(out)))
+		return fmt.Errorf("checking out %s in %s: %s", defaultAssetsBranch, cacheDir, strings.TrimSpace(string(out)))
 	}
-	if out, err := exec.Command("git", "-C", cacheDir, "pull").CombinedOutput(); err != nil {
-		return fmt.Errorf("pulling latest: %s", strings.TrimSpace(string(out)))
+	if out, err := exec.Command("git", "-C", cacheDir, "fetch", "origin", defaultAssetsBranch).CombinedOutput(); err != nil {
+		return fmt.Errorf("fetching %s from %s (cache: %s): %s", defaultAssetsBranch, repoURL, cacheDir, strings.TrimSpace(string(out)))
+	}
+	if out, err := exec.Command("git", "-C", cacheDir, "reset", "--hard", "origin/"+defaultAssetsBranch).CombinedOutput(); err != nil {
+		return fmt.Errorf("resetting to origin/%s in %s: %s", defaultAssetsBranch, cacheDir, strings.TrimSpace(string(out)))
 	}
 	return nil
 }
@@ -395,7 +402,7 @@ func validateVerifyRepo(cacheDir string) error {
 func validateFetchTags(cacheDir string) error {
 	out, err := exec.Command("git", "-C", cacheDir, "fetch", "--force", "origin", "refs/tags/*:refs/tags/*").CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("fetching tags: %s", strings.TrimSpace(string(out)))
+		return fmt.Errorf("fetching tags from %s (cache: %s): %s", "origin", cacheDir, strings.TrimSpace(string(out)))
 	}
 	return nil
 }
@@ -626,7 +633,7 @@ func validateModules(ctx context.Context, client *registry.Client, idx *registry
 				catResult.modules = append(catResult.modules, validateModuleResult{
 					name:   fsName,
 					status: validateModuleFail,
-					issues: []string{"module exists in filesystem but has no index entry"},
+					issues: []string{"module directory exists in repository but has no index entry — remove the directory or add it to the index"},
 				})
 			}
 		}
@@ -671,6 +678,15 @@ func validateOneModule(ctx context.Context, client *registry.Client, category, n
 		latestPublished = publishedVersions[len(publishedVersions)-1]
 	}
 
+	// Extract the module's major version from its path (e.g. "...@v1" → "v1").
+	// The registry only returns versions for this major version, so git tags
+	// from prior major versions (e.g. v0.x.x tags after upgrading to @v1) are
+	// not relevant to checks against the registry.
+	moduleMajor := ""
+	if idx := strings.LastIndex(entry.Module, "@"); idx >= 0 {
+		moduleMajor = entry.Module[idx+1:]
+	}
+
 	// Check 1: index version does not match latest published version
 	if entry.Version != "" && latestPublished != "" && entry.Version != latestPublished {
 		m.issues = append(m.issues, fmt.Sprintf("index version %s does not match latest published %s", entry.Version, latestPublished))
@@ -681,8 +697,14 @@ func validateOneModule(ctx context.Context, client *registry.Client, category, n
 		m.issues = append(m.issues, fmt.Sprintf("published version %s has no git tag %s", latestPublished, tagPrefix+latestPublished))
 	}
 
-	// Check 3: git tags exist with no corresponding published version
+	// Check 3: git tags exist with no corresponding published version.
+	// Only check tags whose major version matches the module's current major
+	// version. Old tags from prior major versions are expected to be absent
+	// from the registry for the current module path.
 	for _, tv := range tagVersions {
+		if moduleMajor != "" && semver.Major(tv) != moduleMajor {
+			continue
+		}
 		if !publishedSet[tv] {
 			m.issues = append(m.issues, fmt.Sprintf("git tag %s%s was never published to registry", tagPrefix, tv))
 		}
@@ -698,7 +720,7 @@ func validateOneModule(ctx context.Context, client *registry.Client, category, n
 		if err != nil {
 			m.issues = append(m.issues, fmt.Sprintf("staleness check failed: %v", err))
 		} else if stale {
-			m.issues = append(m.issues, fmt.Sprintf("content changed since tag %s%s", tagPrefix, latestTag))
+			m.issues = append(m.issues, fmt.Sprintf("content changed since %s%s — publish a new version", tagPrefix, latestTag))
 		}
 	}
 
