@@ -403,6 +403,7 @@ func TestAssetsIndexCommandExists(t *testing.T) {
 	}
 	if indexCmd == nil {
 		t.Fatal("index subcommand not found")
+		return
 	}
 
 	// Check alias

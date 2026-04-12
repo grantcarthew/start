@@ -163,6 +163,7 @@ func TestFindExactInRegistry(t *testing.T) {
 			}
 			if result == nil {
 				t.Fatalf("findExactInRegistry(%q) = nil, want %q", tt.query, tt.wantName)
+				return
 			}
 			if result.Name != tt.wantName {
 				t.Errorf("findExactInRegistry(%q).Name = %q, want %q", tt.query, result.Name, tt.wantName)
