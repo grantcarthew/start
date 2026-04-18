@@ -1,7 +1,5 @@
 # CLI Read Command
 
-This project follows `1-dedupe.md`, which extracts the shared `resolveCrossCategory()` function used by the `read` command for cross-category asset resolution.
-
 ## 1. Goal
 
 Add a `start read` subcommand that outputs asset file content directly to stdout. This enables users to pull curated asset content into existing agent sessions, pipe it to other tools, or preview what a document contains without launching a full agent session.
@@ -121,8 +119,8 @@ Key existing infrastructure:
 ## 8. Implementation Guidance
 
 - When a utility function or module already exists, use it. Do not reimplement the same logic. In particular, `resolveShowFile()` and `partialFillAgentCommand()` are in `show.go` but can be called directly since `read.go` is in the same package.
-- Use the shared `resolveCrossCategory()` function (extracted by the dedupe project) for cross-category asset resolution. Call it from `runRead()` and apply read-specific content extraction to the returned `AssetMatch`. After the call, look up the category with `cat := showCategoryFor(match.Category)` and guard against nil: `if cat == nil { return fmt.Errorf("unknown category %q", match.Category) }`. This matches the defensive check applied in `runShowSearch()` per `1-dedupe.md` issue 18.
-- When `r.didInstall` is true after `resolveCrossCategory()` returns, call `r.reloadConfig(workingDir)` before looking up the resolved asset's CUE value via `r.cfg.Value.LookupPath(...)`. The function installs to disk but does not refresh `r.cfg` in place, so a direct lookup against the pre-call config would miss the newly installed asset. Matches the existing pattern at `start.go:342-348` and `task.go:128-133`. See `1-dedupe.md` resolved issue 24 and the `resolveCrossCategory()` doc comment.
+- Use the shared `resolveCrossCategory()` function for cross-category asset resolution. Call it from `runRead()` and apply read-specific content extraction to the returned `AssetMatch`. After the call, look up the category with `cat := showCategoryFor(match.Category)` and guard against nil: `if cat == nil { return fmt.Errorf("unknown category %q", match.Category) }`. This matches the defensive check applied in `runShowSearch()`.
+- When `r.didInstall` is true after `resolveCrossCategory()` returns, call `r.reloadConfig(workingDir)` before looking up the resolved asset's CUE value via `r.cfg.Value.LookupPath(...)`. The function installs to disk but does not refresh `r.cfg` in place, so a direct lookup against the pre-call config would miss the newly installed asset. Matches the existing pattern at `start.go:342-348` and `task.go:128-133`. See the `resolveCrossCategory()` doc comment.
 - For template resolution, use `orchestration.NewTemplateProcessor(&orchestration.DefaultFileReader{}, shell.NewRunner(), workingDir)` and call `processor.Process(fields, "")`. Control source priority by stripping fields before passing to `Process()`.
 - All new modules, functions, or components must have corresponding tests.
 - Update `.ai/design/cli-command-structure.md` to include the `start read` command.
@@ -137,6 +135,25 @@ Key existing infrastructure:
 
     `Process()` (template.go:100-123) checks `fields.Prompt` first. The plan handles this by stripping fields before passing to `Process()`, but this is a subtle coupling. If `Process()` priority changes in a future refactor, `read`'s file-first priority could silently break. The plan correctly handles this today, but the coupling should be documented in a code comment.
 
+19. Shell and Timeout fields dropped when trimming `UTDFields` (gap)
+
+    Implementation plan step 3 constructs trimmed `UTDFields` values (e.g. `UTDFields{File: fields.File, Command: fields.Command}`) to control Process() priority. This drops `fields.Shell` and `fields.Timeout`, which `ShellRunner.Run()` consumes (composer.go invokes `p.shellRunner.Run(fields.Command, p.workingDir, fields.Shell, fields.Timeout)`). If an asset defines `command` with a custom `shell` or `timeout`, `read` would execute with defaults, diverging from what the orchestration engine does. Suggested resolution: copy `Shell` and `Timeout` through in each trimmed UTDFields literal.
+
+20. Resolver stdout/stderr wiring not specified in the plan (gap)
+
+    `cross_resolve.go` docs state that `read` must construct the resolver with stderr in the stdout slot: `newResolver(cfg, flags, stderr, stderr, stdin)`. Otherwise interactive selection menus, registry fetch progress, and auto-install notices land on stdout and corrupt piped output (`start read foo | other-tool`). The implementation plan mentions stderr only for `--verbose` metadata (step 5) and does not call out this wiring. Suggested resolution: add an explicit instruction to step 2 that `read` constructs the resolver with stderr in both writer slots.
+
+21. "No content available" on stdout breaks piping semantics (design)
+
+    Requirement 6 writes the literal string "No content available" to stdout when an asset has no file/prompt/command. Piping `start read foo | tool` then feeds that string into `tool` instead of an empty stream, breaking the "pure content, suitable for piping" promise (requirement 5). Options:
+    A. Write "No content available" to stderr, exit 0 with empty stdout.
+    B. Write "No content available" to stderr, exit non-zero.
+    C. Keep stdout write (current plan), accepted as a minor pipe pollution.
+
+22. `file + prompt` UTDs: read output diverges from agent view (risk)
+
+    When a UTD asset has both `file` and `prompt` (e.g. `prompt: "Context: {{.file_contents}}"`), the orchestration engine uses the prompt as the template and substitutes file contents via `{{.file_contents}}`. `read` prioritises the file and ignores the prompt entirely — users piping `start read <name>` see raw file content, not what the agent actually receives. Resolved issue 8 claims "read output matches what the agent sees", but that only holds for file-only or prompt-only UTDs. The `Long` description must be explicit that `read` shows file content (not the rendered prompt) whenever a `file` field is present, so users aren't misled when previewing mixed-field assets.
+
 ### Resolved Issues
 
 1. UTD priority inversion for file vs prompt (design) — Documented in help text.
@@ -145,8 +162,8 @@ Key existing infrastructure:
 2. Template resolution requires TemplateProcessor and ShellRunner setup (gap) — Option A adopted.
    Implementation plan step 3 now specifies constructing `TemplateProcessor` with `DefaultFileReader`, `shell.NewRunner()`, and `os.Getwd()`. All UTD paths use `processor.Process()` with field manipulation for priority control.
 
-3. Cross-category search extraction from `runShowSearch` (design) — Superseded by issues 13 and 16.
-   Original resolution: duplicate the resolution flow in `runReadSearch()` with read-specific output and leave `show.go` untouched. Superseded once the dedupe project (`1-dedupe.md`) was scheduled ahead of `read`. `read` now consumes the shared `resolveCrossCategory()` function extracted by dedupe — no duplication, no private `runReadSearch()` copy. See resolved issues 13 (dedupe extracts shared logic) and 16 (implementation order: dedupe first, read second).
+3. Cross-category search extraction from `runShowSearch` (design) — Superseded by issue 13.
+   Original resolution: duplicate the resolution flow in `runReadSearch()` with read-specific output and leave `show.go` untouched. Superseded by the extraction of the shared `resolveCrossCategory()` function from `runShowSearch()`. `read` now consumes that shared function — no duplication, no private `runReadSearch()` copy.
 
 4. Scope flag support (gap) — Merged scope only.
    No `--global` flag for `read`. Content output uses merged config (global + local), matching what the agent sees. Scope inspection is served by `show` and `config info`.
@@ -175,8 +192,8 @@ Key existing infrastructure:
 12. Empty origin guard for `@module/` paths (gap) — Added to implementation plan.
     Implementation plan step 3 updated to check for empty origin before calling `ResolveModulePath()`, matching the guard in `resolveShowFile()` and `composer.go:440-441`.
 
-13. `runReadSearch` duplication size and maintenance cost (risk) — Resolved by ordering.
-    The dedupe project (`1-dedupe.md`) extracts shared resolution logic first. `read` will use the shared `resolveCrossCategory()` function instead of duplicating `runShowSearch()`.
+13. `runReadSearch` duplication size and maintenance cost (risk) — Resolved by shared extraction.
+    The shared `resolveCrossCategory()` function has been extracted from `runShowSearch()` into `cross_resolve.go`. `read` uses it directly instead of duplicating the resolution flow.
 
 14. `ResolveModulePath` reference location incorrect (gap) — Fixed.
     Section 4 moved `ResolveModulePath()` from the `filepath.go` entry to the `composer.go` entry where the function actually lives.
@@ -184,8 +201,8 @@ Key existing infrastructure:
 15. Agent with no command field not handled in step 4 (gap) — Guard added.
     Implementation plan step 4 updated with an empty-command check that outputs "No content available" before calling `partialFillAgentCommand()`.
 
-16. Implementation order with dedupe (decision) — Dedupe first, read second.
-    The dedupe project extracts shared `resolveCrossCategory()` from `runShowSearch()` before `read` is implemented. `read` uses the shared function from the start, avoiding duplication. Section 8 guidance updated.
+16. Implementation order with shared extraction (decision) — Shared function landed first.
+    Shared `resolveCrossCategory()` was extracted from `runShowSearch()` before `read` implementation begins. `read` uses the shared function from the start, avoiding duplication. Section 8 guidance updated.
 
 ## 10. Acceptance Criteria
 
