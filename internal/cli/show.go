@@ -1,19 +1,16 @@
 package cli
 
 import (
-	"bufio"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"unicode"
 	"unicode/utf8"
 
 	"cuelang.org/go/cue"
 	cueformat "cuelang.org/go/cue/format"
-	"github.com/grantcarthew/start/internal/assets"
 	"github.com/grantcarthew/start/internal/config"
 	internalcue "github.com/grantcarthew/start/internal/cue"
 	"github.com/grantcarthew/start/internal/orchestration"
@@ -247,214 +244,22 @@ func runShowSearch(cmd *cobra.Command, name string) error {
 		return err
 	}
 
-	// Step 1: Exact match in installed config across all categories
-	var exactMatches []AssetMatch
-	var ambiguousMatches []AssetMatch
-	for _, cat := range showCategories {
-		resolved, err := findExactInstalledName(cfg.Value, cat.key, name)
-		if err != nil {
-			// Ambiguous short name within one category — collect all matches
-			// for interactive selection instead of erroring out.
-			matches, searchErr := searchInstalled(cfg.Value, cat.key, cat.category, name)
-			if searchErr != nil {
-				return searchErr
-			}
-			ambiguousMatches = append(ambiguousMatches, matches...)
-			continue
-		}
-		if resolved != "" {
-			exactMatches = append(exactMatches, AssetMatch{
-				Name:     resolved,
-				Category: cat.category,
-				Source:   AssetSourceInstalled,
-				Score:    100,
-			})
-		}
-	}
-
-	if len(ambiguousMatches) > 0 {
-		allMatches := make([]AssetMatch, 0, len(exactMatches)+len(ambiguousMatches))
-		allMatches = append(allMatches, exactMatches...)
-		allMatches = append(allMatches, ambiguousMatches...)
-		return promptShowSelection(w, stdin, scope, allMatches, name, nil)
-	}
-
-	if len(exactMatches) == 1 {
-		// Before returning the single exact match, check if a substring search
-		// finds additional matches. If so, fall through to show a selection list
-		// rather than silently picking the exact match. See task.go for the same
-		// pattern applied to task resolution.
-		var moreMatches bool
-		for _, cat := range showCategories {
-			matches, err := searchInstalled(cfg.Value, cat.key, cat.category, name)
-			if err != nil {
-				continue
-			}
-			if len(matches) > 1 {
-				moreMatches = true
-				break
-			}
-		}
-		if !moreMatches {
-			cat := showCategoryFor(exactMatches[0].Category)
-			return showVerboseItem(w, exactMatches[0].Name, scope, cat.key, cat.itemType)
-		}
-	}
-	if len(exactMatches) > 1 {
-		return promptShowSelection(w, stdin, scope, exactMatches, name, nil)
-	}
-
-	// Step 2: Substring search in installed config
-	var installedMatches []AssetMatch
-	for _, cat := range showCategories {
-		matches, err := searchInstalled(cfg.Value, cat.key, cat.category, name)
-		if err != nil {
-			continue
-		}
-		installedMatches = append(installedMatches, matches...)
-	}
-
-	if len(installedMatches) == 1 {
-		cat := showCategoryFor(installedMatches[0].Category)
-		return showVerboseItem(w, installedMatches[0].Name, scope, cat.key, cat.itemType)
-	}
-
-	// Step 3: Registry search
 	r := newResolver(cfg, flags, w, stderr, stdin)
-	index, _, _ := r.ensureIndex()
-
-	// Exact registry match (only when no installed matches)
-	if len(installedMatches) == 0 && index != nil {
-		for _, cat := range showCategories {
-			entries := registryEntries(index, cat.category)
-			if entries == nil {
-				continue
-			}
-			result, err := findExactInRegistry(entries, cat.category, name)
-			if err != nil {
-				return err
-			}
-			if result != nil {
-				if err := r.autoInstall(r.client, *result); err != nil {
-					return err
-				}
-				// After install, use merged scope to see the new item
-				return showVerboseItem(w, result.Name, config.ScopeMerged, cat.key, cat.itemType)
-			}
-		}
-	}
-
-	// Combined search across installed + registry
-	var registryMatches []AssetMatch
-	if index != nil {
-		for _, cat := range showCategories {
-			entries := registryEntries(index, cat.category)
-			if entries == nil {
-				continue
-			}
-			regMatches, err := searchRegistryCategory(entries, cat.category, name)
-			if err != nil {
-				continue
-			}
-			registryMatches = append(registryMatches, regMatches...)
-		}
-	}
-
-	allMatches := mergeAssetMatches(installedMatches, registryMatches)
-
-	switch len(allMatches) {
-	case 0:
-		return fmt.Errorf("no matches found for %q", name)
-	case 1:
-		return displayShowMatch(w, scope, allMatches[0], r)
-	default:
-		return promptShowSelection(w, stdin, scope, allMatches, name, r)
-	}
-}
-
-// displayShowMatch handles auto-install (if needed) and displays a verbose dump.
-func displayShowMatch(w io.Writer, scope config.Scope, m AssetMatch, r *resolver) error {
-	cat := showCategoryFor(m.Category)
-	if m.Source == AssetSourceRegistry && r != nil {
-		if err := r.autoInstall(r.client, assets.SearchResult{
-			Category: m.Category,
-			Name:     m.Name,
-			Entry:    m.Entry,
-		}); err != nil {
-			return err
-		}
-		// After install, use merged scope to see the new item
-		return showVerboseItem(w, m.Name, config.ScopeMerged, cat.key, cat.itemType)
-	}
-	return showVerboseItem(w, m.Name, scope, cat.key, cat.itemType)
-}
-
-// promptShowSelection handles interactive selection from multiple cross-category matches.
-func promptShowSelection(w io.Writer, stdin io.Reader, scope config.Scope, matches []AssetMatch, query string, r *resolver) error {
-	isTTY := isTerminal(stdin)
-
-	if !isTTY {
-		var names []string
-		for _, m := range matches {
-			names = append(names, m.Category+"/"+m.Name)
-		}
-		return fmt.Errorf("ambiguous name %q matches: %s\nSpecify exact name or run interactively",
-			query, strings.Join(names, ", "))
-	}
-
-	displayCount := len(matches)
-	if displayCount > maxAssetResults {
-		displayCount = maxAssetResults
-	}
-
-	_, _ = fmt.Fprintf(w, "Found %d matches for %q:\n\n", len(matches), query)
-
-	// Find longest display name for alignment
-	maxDisplayLen := 0
-	for i := 0; i < displayCount; i++ {
-		display := matches[i].Category + "/" + matches[i].Name
-		if len(display) > maxDisplayLen {
-			maxDisplayLen = len(display)
-		}
-	}
-
-	for i := 0; i < displayCount; i++ {
-		m := matches[i]
-		display := m.Category + "/" + m.Name
-		padding := strings.Repeat(" ", maxDisplayLen-len(display)+2)
-		var sourceLabel string
-		if m.Source == AssetSourceInstalled {
-			sourceLabel = tui.ColorInstalled.Sprint(m.Source)
-		} else {
-			sourceLabel = tui.ColorRegistry.Sprint(m.Source)
-		}
-		_, _ = fmt.Fprintf(w, "  %2d. %s%s%s\n", i+1, display, padding, sourceLabel)
-	}
-
-	if displayCount < len(matches) {
-		_, _ = fmt.Fprintf(w, "\nShowing %d of %d matches. Refine search for more specific results.\n",
-			displayCount, len(matches))
-	}
-
-	_, _ = fmt.Fprintln(w)
-	_, _ = fmt.Fprintf(w, "Select %s: ", tui.Annotate("1-%d", displayCount))
-
-	reader := bufio.NewReader(stdin)
-	input, err := reader.ReadString('\n')
+	match, err := resolveCrossCategory(name, r)
 	if err != nil {
-		return fmt.Errorf("reading input: %w", err)
-	}
-	input = strings.TrimSpace(input)
-
-	// Try number
-	if choice, err := strconv.Atoi(input); err == nil {
-		if choice >= 1 && choice <= displayCount {
-			return displayShowMatch(w, scope, matches[choice-1], r)
-		}
-		return fmt.Errorf("invalid selection: %s (choose 1-%d)", input, displayCount)
+		return err
 	}
 
-	return fmt.Errorf("invalid selection: %s", input)
+	effectiveScope := scope
+	if r.didInstall {
+		effectiveScope = config.ScopeMerged
+	}
+
+	cat := showCategoryFor(match.Category)
+	if cat == nil {
+		return fmt.Errorf("unknown category %q", match.Category)
+	}
+	return showVerboseItem(w, match.Name, effectiveScope, cat.key, cat.itemType)
 }
 
 // showVerboseItem prepares and displays a verbose dump for a single item.

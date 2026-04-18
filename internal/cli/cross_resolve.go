@@ -1,0 +1,267 @@
+package cli
+
+import (
+	"bufio"
+	"fmt"
+	"strconv"
+	"strings"
+
+	"github.com/grantcarthew/start/internal/assets"
+	"github.com/grantcarthew/start/internal/tui"
+)
+
+// resolveCrossCategory resolves an asset query across all categories via
+// three-tier search (exact installed → substring installed → registry) with
+// interactive selection on ambiguity. Auto-installs registry matches and
+// sets r.didInstall = true when an install occurs.
+//
+// Writes:
+//
+//	r.stdout — registry fetch progress, install notices, interactive selection prompts
+//	r.stderr — debug output only
+//
+// Callers needing clean stdout (e.g. `start read` piping content) should construct
+// the resolver with stderr in the stdout slot: newResolver(cfg, flags, stderr, stderr, stdin).
+//
+// Post-call contract: if r.didInstall is true and the caller subsequently reads
+// r.cfg.Value (e.g. to look up the resolved asset's CUE value), the caller must
+// first call r.reloadConfig(workingDir) — the installed asset is written to disk
+// but r.cfg is not refreshed in place. See runStart and runTask for the
+// established reload-after-install pattern. show is exempt because
+// showVerboseItem loads config independently via prepareShow.
+func resolveCrossCategory(query string, r *resolver) (AssetMatch, error) {
+	// Step 1: Exact match in installed config across all categories.
+	var exactMatches []AssetMatch
+	var ambiguousMatches []AssetMatch
+	for _, cat := range showCategories {
+		resolved, err := findExactInstalledName(r.cfg.Value, cat.key, query)
+		if err != nil {
+			// Ambiguous short name within one category — collect all matches
+			// for interactive selection instead of erroring out.
+			matches, searchErr := searchInstalled(r.cfg.Value, cat.key, cat.category, query)
+			if searchErr != nil {
+				return AssetMatch{}, searchErr
+			}
+			ambiguousMatches = append(ambiguousMatches, matches...)
+			continue
+		}
+		if resolved != "" {
+			exactMatches = append(exactMatches, AssetMatch{
+				Name:     resolved,
+				Category: cat.category,
+				Source:   AssetSourceInstalled,
+				Score:    100,
+			})
+		}
+	}
+
+	if len(ambiguousMatches) > 0 {
+		allMatches := make([]AssetMatch, 0, len(exactMatches)+len(ambiguousMatches))
+		allMatches = append(allMatches, exactMatches...)
+		allMatches = append(allMatches, ambiguousMatches...)
+		selected, err := promptCrossCategorySelection(r, allMatches, query)
+		if err != nil {
+			return AssetMatch{}, err
+		}
+		if err := r.installIfRegistry(selected); err != nil {
+			return AssetMatch{}, err
+		}
+		return selected, nil
+	}
+
+	if len(exactMatches) == 1 {
+		// Before returning the single exact match, check if a substring search
+		// finds additional matches. If so, fall through to show a selection list
+		// rather than silently picking the exact match.
+		var moreMatches bool
+		for _, cat := range showCategories {
+			matches, err := searchInstalled(r.cfg.Value, cat.key, cat.category, query)
+			if err != nil {
+				continue
+			}
+			if len(matches) > 1 {
+				moreMatches = true
+				break
+			}
+		}
+		if !moreMatches {
+			return exactMatches[0], nil
+		}
+	}
+	if len(exactMatches) > 1 {
+		selected, err := promptCrossCategorySelection(r, exactMatches, query)
+		if err != nil {
+			return AssetMatch{}, err
+		}
+		if err := r.installIfRegistry(selected); err != nil {
+			return AssetMatch{}, err
+		}
+		return selected, nil
+	}
+
+	// Step 2: Substring search in installed config.
+	var installedMatches []AssetMatch
+	for _, cat := range showCategories {
+		matches, err := searchInstalled(r.cfg.Value, cat.key, cat.category, query)
+		if err != nil {
+			continue
+		}
+		installedMatches = append(installedMatches, matches...)
+	}
+
+	if len(installedMatches) == 1 {
+		return installedMatches[0], nil
+	}
+
+	// Step 3: Registry search. Only reached when installed-only resolution
+	// failed to produce a single match — this gates the network call.
+	index, _, _ := r.ensureIndex()
+
+	// Exact registry match (only when no installed matches).
+	if len(installedMatches) == 0 && index != nil {
+		for _, cat := range showCategories {
+			entries := registryEntries(index, cat.category)
+			if entries == nil {
+				continue
+			}
+			result, err := findExactInRegistry(entries, cat.category, query)
+			if err != nil {
+				return AssetMatch{}, err
+			}
+			if result != nil {
+				match := AssetMatch{
+					Name:     result.Name,
+					Category: cat.category,
+					Source:   AssetSourceRegistry,
+					Entry:    result.Entry,
+					Score:    100,
+				}
+				if err := r.installIfRegistry(match); err != nil {
+					return AssetMatch{}, err
+				}
+				return match, nil
+			}
+		}
+	}
+
+	// Combined search across installed + registry.
+	var registryMatches []AssetMatch
+	if index != nil {
+		for _, cat := range showCategories {
+			entries := registryEntries(index, cat.category)
+			if entries == nil {
+				continue
+			}
+			regMatches, err := searchRegistryCategory(entries, cat.category, query)
+			if err != nil {
+				continue
+			}
+			registryMatches = append(registryMatches, regMatches...)
+		}
+	}
+
+	allMatches := mergeAssetMatches(installedMatches, registryMatches)
+
+	switch len(allMatches) {
+	case 0:
+		return AssetMatch{}, fmt.Errorf("no matches found for %q", query)
+	case 1:
+		if err := r.installIfRegistry(allMatches[0]); err != nil {
+			return AssetMatch{}, err
+		}
+		return allMatches[0], nil
+	default:
+		selected, err := promptCrossCategorySelection(r, allMatches, query)
+		if err != nil {
+			return AssetMatch{}, err
+		}
+		if err := r.installIfRegistry(selected); err != nil {
+			return AssetMatch{}, err
+		}
+		return selected, nil
+	}
+}
+
+// installIfRegistry auto-installs the match when it originates from the
+// registry. On success r.autoInstall sets r.didInstall = true (resolve.go:631),
+// and callers flip their scope to config.ScopeMerged to see the new asset.
+func (r *resolver) installIfRegistry(match AssetMatch) error {
+	if match.Source != AssetSourceRegistry {
+		return nil
+	}
+	return r.autoInstall(r.client, assets.SearchResult{
+		Category: match.Category,
+		Name:     match.Name,
+		Entry:    match.Entry,
+	})
+}
+
+// promptCrossCategorySelection asks the user to pick from multiple
+// cross-category matches and returns the chosen match. In non-TTY mode it
+// returns an ambiguity error listing all matches as "category/name".
+func promptCrossCategorySelection(r *resolver, matches []AssetMatch, query string) (AssetMatch, error) {
+	w := r.stdout
+	stdin := r.stdin
+	isTTY := isTerminal(stdin)
+
+	if !isTTY {
+		var names []string
+		for _, m := range matches {
+			names = append(names, m.Category+"/"+m.Name)
+		}
+		return AssetMatch{}, fmt.Errorf("ambiguous name %q matches: %s\nSpecify exact name or run interactively",
+			query, strings.Join(names, ", "))
+	}
+
+	displayCount := len(matches)
+	if displayCount > maxAssetResults {
+		displayCount = maxAssetResults
+	}
+
+	_, _ = fmt.Fprintf(w, "Found %d matches for %q:\n\n", len(matches), query)
+
+	maxDisplayLen := 0
+	for i := 0; i < displayCount; i++ {
+		display := matches[i].Category + "/" + matches[i].Name
+		if len(display) > maxDisplayLen {
+			maxDisplayLen = len(display)
+		}
+	}
+
+	for i := 0; i < displayCount; i++ {
+		m := matches[i]
+		display := m.Category + "/" + m.Name
+		padding := strings.Repeat(" ", maxDisplayLen-len(display)+2)
+		var sourceLabel string
+		if m.Source == AssetSourceInstalled {
+			sourceLabel = tui.ColorInstalled.Sprint(m.Source)
+		} else {
+			sourceLabel = tui.ColorRegistry.Sprint(m.Source)
+		}
+		_, _ = fmt.Fprintf(w, "  %2d. %s%s%s\n", i+1, display, padding, sourceLabel)
+	}
+
+	if displayCount < len(matches) {
+		_, _ = fmt.Fprintf(w, "\nShowing %d of %d matches. Refine search for more specific results.\n",
+			displayCount, len(matches))
+	}
+
+	_, _ = fmt.Fprintln(w)
+	_, _ = fmt.Fprintf(w, "Select %s: ", tui.Annotate("1-%d", displayCount))
+
+	reader := bufio.NewReader(stdin)
+	input, err := reader.ReadString('\n')
+	if err != nil {
+		return AssetMatch{}, fmt.Errorf("reading input: %w", err)
+	}
+	input = strings.TrimSpace(input)
+
+	if choice, err := strconv.Atoi(input); err == nil {
+		if choice >= 1 && choice <= displayCount {
+			return matches[choice-1], nil
+		}
+		return AssetMatch{}, fmt.Errorf("invalid selection: %s (choose 1-%d)", input, displayCount)
+	}
+
+	return AssetMatch{}, fmt.Errorf("invalid selection: %s", input)
+}
