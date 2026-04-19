@@ -2,226 +2,175 @@
 
 ## 1. Goal
 
-Add a `start read` subcommand that outputs asset file content directly to stdout. This enables users to pull curated asset content into existing agent sessions, pipe it to other tools, or preview what a document contains without launching a full agent session.
+Add a `start read` subcommand that outputs asset content to stdout. Users can pipe curated asset content into other tools, paste it into existing agent sessions, or preview what an asset contains without launching a full agent run.
 
 ## 2. Scope
 
 In scope:
-- New `start read [name]` subcommand
-- UTD assets (roles, contexts, tasks): resolve the `file` field and output file contents; fall back to rendered prompt template, then command output
-- Agent assets: partially render the command template (resolve `bin` and `default_model`, leave runtime placeholders as-is)
-- Three-tier asset resolution with auto-install from registry
-- Pure content output to stdout (no decoration, no headers)
-- `--verbose` flag adds metadata (asset name, type, origin, resolved path) before content
+- New `start read [name]` subcommand.
+- UTD assets (roles, contexts, tasks): output the resolved file, prompt, or command result with template placeholders populated.
+- Agent assets: output the partially rendered command template.
+- Three-tier asset resolution with auto-install from registry, matching `start show`.
+- Pure content output to stdout.
+- `--verbose` adds metadata (asset name, type, origin, resolved path) on stderr.
 
 Out of scope:
-- Multiple asset arguments (one asset per invocation)
-- New flags beyond what the persistent flags already provide
-- Changes to existing commands
-- Changes to the orchestration or UTD resolution engine
+- Multiple asset arguments per invocation.
+- New flags beyond the persistent set.
+- Changes to existing commands or to the orchestration engine.
 
 ## 3. Current State
 
-The CLI has nine top-level commands registered in `internal/cli/root.go` via `NewRootCmd()`: `show`, `prompt`, `task`, `assets`, `config`, `search`, `doctor`, `completion`, `help`. The `show` command (`internal/cli/show.go`) already performs cross-category asset search, resolution, and content display, but wraps output in verbose metadata formatting (headers, separators, CUE definitions, labels).
+The CLI registers nine top-level commands. `start show` already performs cross-category asset search, resolution, and content display, but wraps output in metadata formatting unsuitable for piping.
 
-Key existing infrastructure:
-- `showCategories` slice defines the four asset categories (agents, roles, contexts, tasks)
-- `resolveShowFile()` in `show.go` resolves `@module/` paths via CUE cache and `~/` paths via home directory expansion, then reads file contents
-- `partialFillAgentCommand()` in `show.go` substitutes `{{.bin}}` and `{{.model}}` placeholders in agent command templates
-- `orchestration.ExtractUTDFields()` extracts `file`, `command`, `prompt`, `shell`, `timeout` from a CUE value
-- `orchestration.ExtractOrigin()` gets the origin field for module path resolution
-- Three-tier resolution logic in `internal/cli/resolve.go` handles exact match, registry search, substring search, and auto-install
-- Cross-category search in `runShowSearch()` handles ambiguous matches and interactive selection
-- `orchestration.TemplateProcessor.Process()` handles full UTD template resolution with lazy file reading and command execution
-- `shell.NewRunner()` creates a shell runner implementing `orchestration.ShellRunner` for command execution
-- `orchestration.NewTemplateProcessor()` creates a processor that accepts a `FileReader`, `ShellRunner`, and working directory
+Relevant infrastructure:
+- `partialFillAgentCommand` substitutes static agent-template placeholders (`{{.bin}}`, `{{.model}}`) and leaves runtime placeholders (`{{.prompt}}`, `{{.role}}`, `{{.role_file}}`) untouched.
+- `orchestration.ExtractUTDFields` returns a `UTDFields` struct containing `File`, `Prompt`, `Command`, `Shell`, `Timeout`.
+- `orchestration.ExtractOrigin` and `orchestration.ResolveModulePath` together resolve `@module/` path prefixes against the CUE module cache.
+- `orchestration.TemplateProcessor.Process` performs full UTD resolution: lazy file reading, command execution, template substitution. Source-field priority is Prompt then File then Command — the first non-empty source wins. `Shell` and `Timeout` configure command execution and apply regardless of which source was selected.
+- `orchestration.DefaultFileReader` reads via `os.ReadFile` and does not resolve `@module/` prefixes; callers resolve those first.
+- `shell.NewRunner` returns a runner implementing `orchestration.ShellRunner`.
+- `internal/cli/cross_resolve.go` exposes `resolveCrossCategory`, the shared resolution flow extracted from `start show`. Its doc comment specifies that callers needing clean stdout (such as `read`) must construct the resolver with stderr in the stdout writer slot, otherwise selection menus, registry progress, and auto-install notices corrupt piped output.
+- `start show` reads files via a helper (`resolveShowFile`) that returns raw bytes without template resolution. It is not reusable for `read`.
 
 ## 4. References
 
-- `internal/cli/root.go` - Command registration pattern
-- `internal/cli/show.go` - Asset search, resolution, file reading, agent command rendering
-- `internal/cli/resolve.go` - Three-tier resolution, `AssetMatch`, `resolver`, auto-install
-- `internal/orchestration/composer.go` - `ExtractUTDFields()`, `ExtractOrigin()`, `ResolveModulePath()`
-- `internal/orchestration/template.go` - `UTDFields` struct, template resolution
-- `internal/orchestration/filepath.go` - `ExpandFilePath()`, `IsFilePath()`
-- `.ai/design/utd-pattern.md` - UTD specification
-- `.ai/design/cli-command-structure.md` - CLI structure conventions
-- `internal/cli/show_test.go` - Test patterns using `setupTestConfig()`
+- `internal/cli/show.go` — the closest analogue command and the source of `partialFillAgentCommand`.
+- `internal/cli/cross_resolve.go` — shared resolution flow with the doc comment on writer wiring for clean-pipe callers.
+- `internal/orchestration/composer.go` — `ExtractUTDFields`, `ExtractOrigin`, `ResolveModulePath`.
+- `internal/orchestration/template.go` — `UTDFields`, `TemplateProcessor`, source-field priority.
+- `.ai/design/utd-pattern.md` — UTD specification.
+- `.ai/design/cli-command-structure.md` — CLI structure conventions.
 
 ## 5. Requirements
 
-1. Add a `start read [name]` subcommand that accepts zero or one positional argument. Without an argument: in non-TTY mode return an error; in TTY mode prompt for a search query, then resolve and output content (single match) or present a selection menu (multiple matches)
-2. Resolve the asset name using cross-category search following the same pattern as `start show`: exact config match, registry search with auto-install, substring search, interactive selection on ambiguity
-3. For UTD assets (roles, contexts, tasks), produce output in this priority order. All paths resolve `{{}}` template placeholders (environment variables, git info, etc.) in the output:
-   a. If the asset has a `file` field: resolve the path (`@module/`, `~/`, relative), read the file, resolve template placeholders in the file contents, and output
-   b. If no `file` field but has a `prompt` field: resolve template placeholders and output the rendered prompt
-   c. If no `file` or `prompt` but has a `command` field: execute the command and output the result
-4. For agent assets: partially render the command template by substituting `{{.bin}}` and `{{.model}}` with resolved values, leaving runtime placeholders (`{{.prompt}}`, `{{.role}}`, `{{.role_file}}`) as-is
-5. Output pure content to stdout with no decoration, headers, or formatting. Suitable for piping
-6. If an asset has no content to produce (no file, no prompt, no command for UTD; no command for agent), output "No content available" to stdout
-7. When `--verbose` is set, print metadata to stderr before the content: asset type, name, origin (if present), and resolved file path (if applicable)
-8. Register the command in `NewRootCmd()` under the "commands" group
-9. Support the `help` argument pattern used by other commands (`checkHelpArg`)
+1. `start read [name]` accepts zero or one positional argument. Without an argument: in non-TTY mode return an error; in TTY mode prompt for a search query, then resolve and output content (single match) or present a selection menu (multiple matches).
+2. Asset name resolution uses the same cross-category strategy as `start show`: exact config match, registry search with auto-install, substring search, interactive selection on ambiguity.
+3. For UTD assets, output is template-resolved and follows this source priority: file, then prompt, then command. The selected source is rendered (or executed, for command) and written to stdout.
+4. For agent assets, output is the command template with static placeholders substituted and runtime placeholders left intact.
+5. Stdout receives only the asset content. Selection menus, registry fetch progress, auto-install notices, `--verbose` metadata, and status messages all go to stderr.
+6. If an asset has no source field that can produce content, write `No content available` to stderr, leave stdout empty, and exit non-zero.
+7. `--verbose` emits asset type, name, origin, and resolved file path to stderr before the content.
+8. The command appears in `start --help` under the same group as the other top-level user commands.
+9. `start read help` displays the command help, matching the convention used by other commands.
 
 ## 6. Implementation Plan
 
-1. Create `internal/cli/read.go` with the `addReadCommand()` function following the pattern established by `addShowCommand()` in `show.go`. The command `Long` description should note that: (a) for UTD assets, file content takes priority over prompt when both are present (unlike the orchestration engine which prioritises prompt), and (b) output is template-resolved — `{{}}` placeholders are populated with environment values
+1. Define the command, register it, and write the help text. The help text must explain that output is template-resolved, and must warn that for UTD assets carrying both `file` and `prompt`, `read` outputs the file (priority: file > prompt > command) while the agent execution path renders the prompt and injects file contents via `{{.file_contents}}` — so for these mixed-field assets the `read` output will not match what the agent receives. Direct users to `start show` to inspect the prompt.
 
-2. Implement the `runRead()` function:
-   - If no argument: in non-TTY mode return an error; in TTY mode prompt for a search query (same pattern as `runShow` in show.go:95-127)
-   - Enforce 3-character minimum query length (same as `show`)
-   - Delegate to a search function that reuses the cross-category resolution pattern from `runShowSearch()`
-   - On resolution, call a content extraction function
+2. Implement the run function, resolving the asset via `resolveCrossCategory`. Construct the resolver so that selection menus, registry progress, and auto-install notices land on stderr — see the `cross_resolve.go` doc comment for the exact wiring requirement. Requirement 5's stdout-only rule applies to every write path, not just resolver-wrapped output: pass `cmd.ErrOrStderr()` to `promptSearchQuery` for the no-argument TTY prompt, and emit the `Query must be at least 3 characters` short-query fallback to stderr.
 
-3. Implement the content extraction function for UTD assets:
-   - Call `orchestration.ExtractUTDFields()` on the resolved CUE value
-   - If `fields.File` starts with `@module/`: call `orchestration.ExtractOrigin()` on the CUE value. If origin is empty, return an error: "@module/ path requires origin field". Otherwise resolve with `orchestration.ResolveModulePath(fields.File, origin)` (matching the pattern in `composer.go:439-449`)
-   - Construct a `TemplateProcessor` with `orchestration.NewTemplateProcessor(&orchestration.DefaultFileReader{}, shell.NewRunner(), workingDir)` where `workingDir` comes from `os.Getwd()`
-   - Determine priority and pass modified fields to `processor.Process()`:
-     - If `fields.File` is not empty: pass `UTDFields{File: fields.File, Command: fields.Command}` (strip Prompt so Process uses file as template source)
-     - Else if `fields.Prompt` is not empty: pass `UTDFields{Prompt: fields.Prompt, Command: fields.Command}` (strip File)
-     - Else if `fields.Command` is not empty: pass `UTDFields{Command: fields.Command}`
-     - Else: output "No content available"
-   - Output `result.Content` to stdout
+3. For UTD assets, extract the fields, resolve any `@module/` prefix on the file path (using the asset's origin; reject with a clear error if the prefix is present but origin is empty), and hand the work to `TemplateProcessor.Process`. The processor's source priority is the inverse of what `read` needs, so control priority by clearing the higher-priority source fields before calling `Process`. `Shell` and `Timeout` are execution config, not source fields — they must always pass through to `Process` regardless of which source was selected. Add a code comment at the trimming site that names `template.go` as the priority dependency, so a future refactor of `Process` priority surfaces the coupling.
 
-4. Implement the content extraction for agent assets:
-   - Extract the `command` field from the CUE value
-   - If command is empty: output "No content available" and return
-   - Call `partialFillAgentCommand()` (already exists in `show.go`) to substitute static placeholders
-   - Output the partially rendered command string
+4. For agent assets, partially render the command template with `partialFillAgentCommand`. If the agent has no command field, treat it as the empty-content case from Requirement 6.
 
-5. Add `--verbose` metadata output:
-   - When verbose, write asset type, name, origin, and resolved path to stderr (not stdout, to keep stdout clean for piping)
+5. Write tests covering each path, including:
+   - Each UTD source variant (file, prompt, command).
+   - A UTD `command` asset that declares a custom `shell` and `timeout` — verify both flow through (regression cover for the trimming logic).
+   - A UTD asset with both `file` and `prompt` — verify file wins.
+   - Agent asset rendering.
+   - Empty-content behaviour: stderr message, empty stdout, non-zero exit.
+   - No-argument behaviour in non-TTY returns an error.
+   - Ambiguous name in non-TTY returns an error listing the candidates.
+   - `--verbose` writes metadata to stderr without polluting stdout.
+   - Registry progress and auto-install notices land on stderr (resolver constructed with stderr in the stdout slot).
+   - Wiring check: a unit-level test asserting that `read` calls `promptSearchQuery` with `cmd.ErrOrStderr()` and emits the short-query fallback on stderr. TTY-gated end-to-end paths (no-arg prompt, selection menu, TTY-stdin/piped-stdout) are not covered by an e2e test — see Issue 2 for the rationale.
 
-6. Register the command in `root.go` by adding `addReadCommand(cmd)` to `NewRootCmd()`
-
-7. Write tests in `internal/cli/read_test.go` following the patterns in `show_test.go`:
-   - Asset with `file` field outputs file contents with template placeholders resolved
-   - Asset with `prompt` only outputs rendered prompt
-   - Asset with `command` only outputs command result
-   - Agent asset outputs partially rendered command
-   - Asset with no content outputs "No content available"
-   - Unknown asset name returns error
-   - Ambiguous name in non-TTY returns error with match list
-   - No argument in non-TTY returns error
-   - `--verbose` outputs metadata to stderr
+6. Update `.ai/design/cli-command-structure.md` to list the new command.
 
 ## 7. Constraints
 
-- Follow the existing CLI patterns in `internal/cli/` for command structure, flag access, and error handling
-- Use `cmd.OutOrStdout()` for content output and `cmd.ErrOrStderr()` for verbose metadata
-- Reuse existing functions where they exist (`resolveShowFile`, `partialFillAgentCommand`, `ExtractUTDFields`, `ExtractOrigin`)
-- Do not modify existing commands or packages
-- Follow Go formatting conventions (gofmt)
-- Pure Go, no cgo
-- Tests use `setupTestConfig(t)` with `.start/` directory and `os.Chdir` isolation (no `t.Parallel()`)
+- Do not modify existing commands or the orchestration engine.
+- Reuse existing helpers where they apply: `partialFillAgentCommand`, `ExtractUTDFields`, `ExtractOrigin`, `ResolveModulePath`, `resolveCrossCategory`. `resolveShowFile` does not apply because it returns raw bytes without template resolution.
+- Stdout is reserved for asset content. Every other write goes to stderr.
 
 ## 8. Implementation Guidance
 
-- When a utility function or module already exists, use it. Do not reimplement the same logic. In particular, `resolveShowFile()` and `partialFillAgentCommand()` are in `show.go` but can be called directly since `read.go` is in the same package.
-- Use the shared `resolveCrossCategory()` function for cross-category asset resolution. Call it from `runRead()` and apply read-specific content extraction to the returned `AssetMatch`. After the call, look up the category with `cat := showCategoryFor(match.Category)` and guard against nil: `if cat == nil { return fmt.Errorf("unknown category %q", match.Category) }`. This matches the defensive check applied in `runShowSearch()`.
-- When `r.didInstall` is true after `resolveCrossCategory()` returns, call `r.reloadConfig(workingDir)` before looking up the resolved asset's CUE value via `r.cfg.Value.LookupPath(...)`. The function installs to disk but does not refresh `r.cfg` in place, so a direct lookup against the pre-call config would miss the newly installed asset. Matches the existing pattern at `start.go:342-348` and `task.go:128-133`. See the `resolveCrossCategory()` doc comment.
-- For template resolution, use `orchestration.NewTemplateProcessor(&orchestration.DefaultFileReader{}, shell.NewRunner(), workingDir)` and call `processor.Process(fields, "")`. Control source priority by stripping fields before passing to `Process()`.
-- All new modules, functions, or components must have corresponding tests.
-- Update `.ai/design/cli-command-structure.md` to include the `start read` command.
+- The `TemplateProcessor` source-priority dependency is the only non-obvious part of the UTD path. Trimming source fields before calling `Process` is the chosen mechanism because it preserves a single rendering path; the inline comment is the safety net that catches a future `Process` refactor.
+- After `resolveCrossCategory` reports an install occurred, refresh the in-memory config before looking up the resolved asset's CUE value. The same pattern is used by `start` and `task`.
+- `start read` operates on the merged (global + local) config, matching what an agent would see. Scope inspection remains the job of `start show` and `start config info`.
 
-## 9. Open Issues
+## 9. Acceptance Criteria
 
-17. Constraint lists `resolveShowFile` but implementation does not use it (gap)
+- `start read <name>` resolves a known asset and writes its content to stdout with no decoration.
+- `start read` with no argument prompts in TTY mode and errors in non-TTY mode.
+- Queries shorter than the established minimum length are rejected (non-TTY) or re-prompted (TTY), matching `start show`.
+- UTD file resolution succeeds for `@module/`, `~/`, and relative paths.
+- Template placeholders are populated in the output.
+- UTD `command` execution honours per-asset `shell` and `timeout`.
+- Agent assets produce a partially rendered command template.
+- Assets with no producible content write `No content available` to stderr, leave stdout empty, and exit non-zero.
+- Selection menus, registry progress, auto-install notices, and `--verbose` metadata all appear on stderr; stdout remains pipe-clean in every case.
+- Cross-category interactive selection works for ambiguous names.
+- Registry auto-install works for previously uninstalled assets.
+- Unknown asset names produce a clear error.
+- `start read help` displays the command help.
+- The command appears in `start --help` under the same group as the other top-level user commands.
+- `.ai/design/cli-command-structure.md` lists the command.
 
-    Section 7 says "Reuse existing functions where they exist (`resolveShowFile`, `partialFillAgentCommand`, `ExtractUTDFields`, `ExtractOrigin`)". The implementation plan step 3 does not use `resolveShowFile()` — it resolves `@module/` paths manually and passes to `TemplateProcessor.Process()`, which reads the file internally via `DefaultFileReader`. This is correct because `resolveShowFile()` returns raw file content without template resolution, and `read` needs template resolution. The constraint should drop `resolveShowFile` to avoid confusion.
+## 10. Issues Discovered
 
-18. `TemplateProcessor.Process()` priority is Prompt > File > Command (risk)
+1. TTY prompt and short-query feedback need stderr wiring, not just the resolver (gap) — Resolved: plan step 2 and test list updated.
 
-    `Process()` (template.go:100-123) checks `fields.Prompt` first. The plan handles this by stripping fields before passing to `Process()`, but this is a subtle coupling. If `Process()` priority changes in a future refactor, `read`'s file-first priority could silently break. The plan correctly handles this today, but the coupling should be documented in a code comment.
+   Requirement 5 reserves stdout for asset content. Plan step 2 covers the resolver
+   writer-wiring (via `cross_resolve.go`) for registry progress, install notices,
+   and selection menus. But the no-argument TTY prompt (Requirement 1) and the
+   short-query fallback (Acceptance Criterion 3) are separate code paths. In
+   `show.go`, both paths write to `cmd.OutOrStdout()` — `promptSearchQuery` takes
+   an `io.Writer`, and the "Query must be at least 3 characters" fallback uses
+   stdout directly (`show.go:104,112`). An implementer copying the `show` pattern
+   would send these messages to stdout, corrupting `start read | bar` when stdin
+   is a TTY but stdout is piped (a common interactive pipe use case).
 
-19. Shell and Timeout fields dropped when trimming `UTDFields` (gap)
+   Resolution: plan step 2 now states that Requirement 5's stdout-only rule
+   applies to every write path, instructing the implementer to pass
+   `cmd.ErrOrStderr()` to `promptSearchQuery` and to emit the short-query
+   fallback on stderr. Plan step 5 adds a test case asserting that, with a TTY
+   stdin and piped stdout, the prompt and the fallback message land on stderr
+   and stdout stays empty until content is produced.
 
-    Implementation plan step 3 constructs trimmed `UTDFields` values (e.g. `UTDFields{File: fields.File, Command: fields.Command}`) to control Process() priority. This drops `fields.Shell` and `fields.Timeout`, which `ShellRunner.Run()` consumes (composer.go invokes `p.shellRunner.Run(fields.Command, p.workingDir, fields.Shell, fields.Timeout)`). If an asset defines `command` with a custom `shell` or `timeout`, `read` would execute with defaults, diverging from what the orchestration engine does. Suggested resolution: copy `Shell` and `Timeout` through in each trimmed UTDFields literal.
+2. TTY-dependent tests have no precedent in this test suite (gap) — Resolved: accept reduced coverage (Option A).
 
-20. Resolver stdout/stderr wiring not specified in the plan (gap)
+3. UTD empty-source path bypasses Requirement 6 (gap)
 
-    `cross_resolve.go` docs state that `read` must construct the resolver with stderr in the stdout slot: `newResolver(cfg, flags, stderr, stderr, stdin)`. Otherwise interactive selection menus, registry fetch progress, and auto-install notices land on stdout and corrupt piped output (`start read foo | other-tool`). The implementation plan mentions stderr only for `--verbose` metadata (step 5) and does not call out this wiring. Suggested resolution: add an explicit instruction to step 2 that `read` constructs the resolver with stderr in both writer slots.
+   Plan step 4 explicitly maps the empty-content case for agents to
+   Requirement 6 ("If the agent has no command field, treat it as the
+   empty-content case from Requirement 6"). Plan step 3 (UTD assets) is
+   silent on the equivalent path. `TemplateProcessor.Process` returns
+   the error `UTD requires at least one of: file, command, or prompt`
+   when all source fields are empty (`template.go:122`). An implementer
+   following plan step 3 literally would call `Process`, receive that
+   error, and surface it as a regular error — leaving stdout empty and
+   exiting non-zero, but emitting Process's raw error string instead of
+   the `No content available` message Requirement 6 mandates and
+   Acceptance Criterion 8 verifies. The asymmetry between steps 3 and 4
+   is the smoking gun: the plan author considered empty-content for
+   agents and did not extend the same treatment to UTD assets.
 
-21. "No content available" on stdout breaks piping semantics (design)
+   Suggested resolution: extend plan step 3 with a pre-`Process` check
+   using `orchestration.IsUTDValid(fields)`; on false, write
+   `No content available` to stderr, leave stdout empty, and return a
+   non-zero exit, matching the agent path. Add a test case to plan
+   step 5 covering an empty-source UTD asset (analogous to the existing
+   "Empty-content behaviour" entry, but for UTD rather than agents).
 
-    Requirement 6 writes the literal string "No content available" to stdout when an asset has no file/prompt/command. Piping `start read foo | tool` then feeds that string into `tool` instead of an empty stream, breaking the "pure content, suitable for piping" promise (requirement 5). Options:
-    A. Write "No content available" to stderr, exit 0 with empty stdout.
-    B. Write "No content available" to stderr, exit non-zero.
-    C. Keep stdout write (current plan), accepted as a minor pipe pollution.
+   Plan step 5 lists three tests that require a real TTY on stdin:
+   the no-argument TTY prompt, the selection menu landing on stderr, and the
+   TTY-stdin/piped-stdout pipe-cleanliness assertion added by Issue 1. The
+   codebase's `isTerminal` (`root.go:159`) only returns true when stdin is an
+   `*os.File` whose fd is a TTY, and the existing test suite contains no
+   pseudo-TTY helpers or `/dev/tty` usage (no `pty`, `creack/pty`, `openpty`
+   matches anywhere). Every existing `show`/`resolve` test asserts the non-TTY
+   branch, so an implementer copying established patterns has no template for
+   the TTY branch. Without direction, they will either skip these tests —
+   leaving Requirement 5's headline guarantee (pipe-clean stdout with a TTY
+   stdin) unverified — or introduce a new test dependency mid-feature.
 
-22. `file + prompt` UTDs: read output diverges from agent view (risk)
-
-    When a UTD asset has both `file` and `prompt` (e.g. `prompt: "Context: {{.file_contents}}"`), the orchestration engine uses the prompt as the template and substitutes file contents via `{{.file_contents}}`. `read` prioritises the file and ignores the prompt entirely — users piping `start read <name>` see raw file content, not what the agent actually receives. Resolved issue 8 claims "read output matches what the agent sees", but that only holds for file-only or prompt-only UTDs. The `Long` description must be explicit that `read` shows file content (not the rendered prompt) whenever a `file` field is present, so users aren't misled when previewing mixed-field assets.
-
-### Resolved Issues
-
-1. UTD priority inversion for file vs prompt (design) — Documented in help text.
-   File > prompt > command priority is intentional for `read`. Implementation plan step 1 updated to include notes in the command `Long` description.
-
-2. Template resolution requires TemplateProcessor and ShellRunner setup (gap) — Option A adopted.
-   Implementation plan step 3 now specifies constructing `TemplateProcessor` with `DefaultFileReader`, `shell.NewRunner()`, and `os.Getwd()`. All UTD paths use `processor.Process()` with field manipulation for priority control.
-
-3. Cross-category search extraction from `runShowSearch` (design) — Superseded by issue 13.
-   Original resolution: duplicate the resolution flow in `runReadSearch()` with read-specific output and leave `show.go` untouched. Superseded by the extraction of the shared `resolveCrossCategory()` function from `runShowSearch()`. `read` now consumes that shared function — no duplication, no private `runReadSearch()` copy.
-
-4. Scope flag support (gap) — Merged scope only.
-   No `--global` flag for `read`. Content output uses merged config (global + local), matching what the agent sees. Scope inspection is served by `show` and `config info`.
-
-5. No-argument behaviour unspecified (gap) — Follow `show` pattern.
-   No argument in non-TTY returns error. In TTY, prompt for a query, then resolve: single match outputs content, multiple matches present a selection menu. Requirement 1 and implementation plan step 2 updated.
-
-6. `setupTestConfig` vs `setupStartTestConfig` naming (gap) — No action needed.
-   Two separate helpers for separate test files. Project correctly references `setupTestConfig(t)` from `show_test.go`.
-
-7. Reference to non-existent `orchestration.ResolveTemplate()` (gap) — Guidance corrected.
-   Section 8 updated to reference `orchestration.NewTemplateProcessor()` and `processor.Process()` instead.
-
-8. TemplateProcessor.Process() resolves all Go template syntax in file content (risk) — Accepted.
-   Consistent with the orchestration engine. `read` output matches what the agent sees. Document in `read` help text that output is template-resolved.
-
-9. Working directory for TemplateProcessor (gap) — Use `os.Getwd()`.
-   Already specified in implementation plan step 3 when issue 2 was resolved.
-
-10. Minimum query length not addressed (gap) — 3-character minimum.
-    Already specified in implementation plan step 2 when issue 5 was resolved.
-
-11. `@module/` path resolution not handled by TemplateProcessor (gap) — Added to implementation plan.
-    `DefaultFileReader.Read()` does not resolve `@module/` prefixes. Implementation plan step 3 updated to include explicit `@module/` resolution via `ExtractOrigin()` and `ResolveModulePath()` before passing to `Process()`, matching `composer.go:439-449`.
-
-12. Empty origin guard for `@module/` paths (gap) — Added to implementation plan.
-    Implementation plan step 3 updated to check for empty origin before calling `ResolveModulePath()`, matching the guard in `resolveShowFile()` and `composer.go:440-441`.
-
-13. `runReadSearch` duplication size and maintenance cost (risk) — Resolved by shared extraction.
-    The shared `resolveCrossCategory()` function has been extracted from `runShowSearch()` into `cross_resolve.go`. `read` uses it directly instead of duplicating the resolution flow.
-
-14. `ResolveModulePath` reference location incorrect (gap) — Fixed.
-    Section 4 moved `ResolveModulePath()` from the `filepath.go` entry to the `composer.go` entry where the function actually lives.
-
-15. Agent with no command field not handled in step 4 (gap) — Guard added.
-    Implementation plan step 4 updated with an empty-command check that outputs "No content available" before calling `partialFillAgentCommand()`.
-
-16. Implementation order with shared extraction (decision) — Shared function landed first.
-    Shared `resolveCrossCategory()` was extracted from `runShowSearch()` before `read` implementation begins. `read` uses the shared function from the start, avoiding duplication. Section 8 guidance updated.
-
-## 10. Acceptance Criteria
-
-- [ ] `start read <name>` resolves an asset by name and outputs its content to stdout
-- [ ] `start read` with no argument prompts for a query in TTY mode, returns error in non-TTY mode
-- [ ] Queries under 3 characters are rejected (non-TTY) or re-prompted (TTY)
-- [ ] UTD file resolution works for `@module/` paths, `~/` paths, and relative paths
-- [ ] Template placeholders (`{{.cwd}}`, `{{.git_branch}}`, etc.) are resolved in output
-- [ ] When no file field exists, falls back to rendered prompt, then command output
-- [ ] Agent assets output a partially rendered command template
-- [ ] Assets with no content output "No content available"
-- [ ] Output is pure content with no decoration (suitable for piping)
-- [ ] `--verbose` writes metadata to stderr without polluting stdout
-- [ ] Cross-category search with interactive selection works for ambiguous names
-- [ ] Registry auto-install works for uninstalled assets
-- [ ] Unknown asset names produce a clear error
-- [ ] `start read help` displays command help
-- [ ] Command appears in `start --help` output under the Commands group
-- [ ] All new code has corresponding tests
-- [ ] `cli-command-structure.md` updated with the new command
-- [ ] `go build ./...` succeeds
-- [ ] `scripts/invoke-tests` passes
+   Resolution: Option A — the three TTY-gated e2e tests are dropped from plan
+   step 5. Coverage shifts to a unit-level wiring check asserting that `read`
+   passes `cmd.ErrOrStderr()` to `promptSearchQuery` and emits the short-query
+   fallback on stderr. `promptSearchQuery` and the selection helper in
+   `cross_resolve.go` are already internally testable with an arbitrary writer,
+   so a unit test proves the writer-routing contract without needing a real
+   TTY. The CI suite stays pty-free; if future interactive surface area grows,
+   revisit with `creack/pty` (Option C) as a deliberate investment.

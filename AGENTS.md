@@ -10,7 +10,7 @@ Active development. The CLI is fully implemented with commands for agent launchi
 
 Projects are stored in `.ai/projects/`. Continue by reading the active project.
 
-Active Project: None
+Active Project: ./project.md
 
 Project Workflow:
 - Active projects are in `.ai/projects/`
