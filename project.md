@@ -49,7 +49,7 @@ Relevant infrastructure:
 3. For UTD assets, output is template-resolved and follows this source priority: file, then prompt, then command. The selected source is rendered (or executed, for command) and written to stdout.
 4. For agent assets, output is the command template with static placeholders substituted and runtime placeholders left intact.
 5. Stdout receives only the asset content. Selection menus, registry fetch progress, auto-install notices, `--verbose` metadata, and status messages all go to stderr.
-6. If an asset has no source field that can produce content, write `No content available` to stderr, leave stdout empty, and exit non-zero.
+6. If an asset has no source field that can produce content, return a configuration error naming the asset and the expected fields, leave stdout empty, and exit non-zero via the standard error path.
 7. `--verbose` emits asset type, name, origin, and resolved file path to stderr before the content.
 8. The command appears in `start --help` under the same group as the other top-level user commands.
 9. `start read help` displays the command help, matching the convention used by other commands.
@@ -60,21 +60,22 @@ Relevant infrastructure:
 
 2. Implement the run function, resolving the asset via `resolveCrossCategory`. Construct the resolver so that selection menus, registry progress, and auto-install notices land on stderr — see the `cross_resolve.go` doc comment for the exact wiring requirement. Requirement 5's stdout-only rule applies to every write path, not just resolver-wrapped output: pass `cmd.ErrOrStderr()` to `promptSearchQuery` for the no-argument TTY prompt, and emit the `Query must be at least 3 characters` short-query fallback to stderr.
 
-3. For UTD assets, extract the fields, resolve any `@module/` prefix on the file path (using the asset's origin; reject with a clear error if the prefix is present but origin is empty), and hand the work to `TemplateProcessor.Process`. The processor's source priority is the inverse of what `read` needs, so control priority by clearing the higher-priority source fields before calling `Process`. `Shell` and `Timeout` are execution config, not source fields — they must always pass through to `Process` regardless of which source was selected. Add a code comment at the trimming site that names `template.go` as the priority dependency, so a future refactor of `Process` priority surfaces the coupling.
+3. For UTD assets, extract the fields and resolve any `@module/` prefix on the file path using the asset's origin. Reject with a clear error if the prefix is present but origin is empty. Before calling `Process`, guard the empty-source case by calling `orchestration.IsUTDValid(fields)`; on false, return `fmt.Errorf("asset %q has no content fields (expected one of: file, prompt, command)", name)` per Requirement 6. When fields are valid, construct the processor with `NewTemplateProcessor(fr, sr, workingDir)` where `workingDir` is the result of `os.Getwd()`. Hand the work to `TemplateProcessor.Process`. The processor's source priority is the inverse of what `read` needs, so control priority by clearing the higher-priority source fields before calling `Process`. `Shell` and `Timeout` are execution config, not source fields — they must always pass through to `Process` regardless of which source was selected. Add a code comment at the trimming site that names `template.go` as the priority dependency.
 
-4. For agent assets, partially render the command template with `partialFillAgentCommand`. If the agent has no command field, treat it as the empty-content case from Requirement 6.
+4. For agent assets, partially render the command template with `partialFillAgentCommand`. If the agent has no command field, return `fmt.Errorf("agent %q has no command field", name)` per Requirement 6.
 
 5. Write tests covering each path, including:
    - Each UTD source variant (file, prompt, command).
    - A UTD `command` asset that declares a custom `shell` and `timeout` — verify both flow through (regression cover for the trimming logic).
    - A UTD asset with both `file` and `prompt` — verify file wins.
    - Agent asset rendering.
-   - Empty-content behaviour: stderr message, empty stdout, non-zero exit.
+   - Empty-content configuration error for agents (no command field): error names the agent, empty stdout, non-zero exit.
+   - Empty-content configuration error for UTD assets (file, prompt, command all empty): error names the asset and lists expected fields, empty stdout, non-zero exit.
    - No-argument behaviour in non-TTY returns an error.
    - Ambiguous name in non-TTY returns an error listing the candidates.
    - `--verbose` writes metadata to stderr without polluting stdout.
    - Registry progress and auto-install notices land on stderr (resolver constructed with stderr in the stdout slot).
-   - Wiring check: a unit-level test asserting that `read` calls `promptSearchQuery` with `cmd.ErrOrStderr()` and emits the short-query fallback on stderr. TTY-gated end-to-end paths (no-arg prompt, selection menu, TTY-stdin/piped-stdout) are not covered by an e2e test — see Issue 2 for the rationale.
+   - Wiring check: a unit-level test asserting that `read` calls `promptSearchQuery` with `cmd.ErrOrStderr()` and emits the short-query fallback on stderr. TTY-gated end-to-end paths (no-arg prompt, selection menu, TTY-stdin/piped-stdout) are intentionally not covered — see Implementation Guidance.
 
 6. Update `.ai/design/cli-command-structure.md` to list the new command.
 
@@ -89,6 +90,11 @@ Relevant infrastructure:
 - The `TemplateProcessor` source-priority dependency is the only non-obvious part of the UTD path. Trimming source fields before calling `Process` is the chosen mechanism because it preserves a single rendering path; the inline comment is the safety net that catches a future `Process` refactor.
 - After `resolveCrossCategory` reports an install occurred, refresh the in-memory config before looking up the resolved asset's CUE value. The same pattern is used by `start` and `task`.
 - `start read` operates on the merged (global + local) config, matching what an agent would see. Scope inspection remains the job of `start show` and `start config info`.
+- The `IsUTDValid` guard in plan step 3 lives in `read.go` because `TemplateProcessor.Process` returns the generic error `UTD requires at least one of: file, command, or prompt` (`template.go:122`) when all source fields are empty. Without the guard, that raw error would surface instead of the descriptive configuration error Requirement 6 commits to. Keeping the guard local to `read.go` leaves `Process` and the existing `start`/`task` paths unchanged.
+- `workingDir` in plan step 3 is resolved once via `os.Getwd()` because it feeds the `{{.cwd}}` and git template variables and is the directory where command-source UTDs execute (`template.go:115`). Command-source UTDs run in the user's cwd by design — not in the asset's origin or CUE module cache directory — so the user's environment (working tree, git state) is what the command sees. Passing `""` would let the shell command inherit the parent process's cwd at exec time rather than a stable resolved path. `start` and `task` use the same once-resolved pattern via `loadExecutionConfig` (`start.go:86-92`).
+- The empty-content error path (Requirement 6, plan step 4) does not use a `Silent()` error type because `cmd/start/main.go` prefixes non-silent RunE errors with `Error: `, which is the correct surface for a configuration error. The descriptive error names the asset and the missing fields. A `Silent()` type (cf. `assets_validate.go:90`, `doctor.go:89`) would suppress that message — the opposite of what's wanted here.
+- The wiring requirement in plan step 2 (route `promptSearchQuery` and the short-query fallback to stderr) departs from `show` because `show.go:99-112` writes both to `cmd.OutOrStdout()`. A literal copy of that pattern would corrupt `start read | bar` whenever stdin is a TTY but stdout is piped — a common interactive pipe case.
+- The TTY-gated e2e tests dropped from plan step 5 are out of scope because `isTerminal` (`root.go:159`) only treats `*os.File` TTY descriptors as interactive, and the existing test suite has no pseudo-TTY helpers (no `creack/pty` or `/dev/tty` usage). The unit-level wiring check proves the writer-routing contract without a real TTY; revisit with `creack/pty` if interactive surface area grows.
 
 ## 9. Acceptance Criteria
 
@@ -99,7 +105,7 @@ Relevant infrastructure:
 - Template placeholders are populated in the output.
 - UTD `command` execution honours per-asset `shell` and `timeout`.
 - Agent assets produce a partially rendered command template.
-- Assets with no producible content write `No content available` to stderr, leave stdout empty, and exit non-zero.
+- Assets with no producible content return a configuration error naming the asset (and, for UTD, the expected fields), leave stdout empty, and exit non-zero via the standard error path.
 - Selection menus, registry progress, auto-install notices, and `--verbose` metadata all appear on stderr; stdout remains pipe-clean in every case.
 - Cross-category interactive selection works for ambiguous names.
 - Registry auto-install works for previously uninstalled assets.
@@ -110,67 +116,7 @@ Relevant infrastructure:
 
 ## 10. Issues Discovered
 
-1. TTY prompt and short-query feedback need stderr wiring, not just the resolver (gap) — Resolved: plan step 2 and test list updated.
-
-   Requirement 5 reserves stdout for asset content. Plan step 2 covers the resolver
-   writer-wiring (via `cross_resolve.go`) for registry progress, install notices,
-   and selection menus. But the no-argument TTY prompt (Requirement 1) and the
-   short-query fallback (Acceptance Criterion 3) are separate code paths. In
-   `show.go`, both paths write to `cmd.OutOrStdout()` — `promptSearchQuery` takes
-   an `io.Writer`, and the "Query must be at least 3 characters" fallback uses
-   stdout directly (`show.go:104,112`). An implementer copying the `show` pattern
-   would send these messages to stdout, corrupting `start read | bar` when stdin
-   is a TTY but stdout is piped (a common interactive pipe use case).
-
-   Resolution: plan step 2 now states that Requirement 5's stdout-only rule
-   applies to every write path, instructing the implementer to pass
-   `cmd.ErrOrStderr()` to `promptSearchQuery` and to emit the short-query
-   fallback on stderr. Plan step 5 adds a test case asserting that, with a TTY
-   stdin and piped stdout, the prompt and the fallback message land on stderr
-   and stdout stays empty until content is produced.
-
-2. TTY-dependent tests have no precedent in this test suite (gap) — Resolved: accept reduced coverage (Option A).
-
-3. UTD empty-source path bypasses Requirement 6 (gap)
-
-   Plan step 4 explicitly maps the empty-content case for agents to
-   Requirement 6 ("If the agent has no command field, treat it as the
-   empty-content case from Requirement 6"). Plan step 3 (UTD assets) is
-   silent on the equivalent path. `TemplateProcessor.Process` returns
-   the error `UTD requires at least one of: file, command, or prompt`
-   when all source fields are empty (`template.go:122`). An implementer
-   following plan step 3 literally would call `Process`, receive that
-   error, and surface it as a regular error — leaving stdout empty and
-   exiting non-zero, but emitting Process's raw error string instead of
-   the `No content available` message Requirement 6 mandates and
-   Acceptance Criterion 8 verifies. The asymmetry between steps 3 and 4
-   is the smoking gun: the plan author considered empty-content for
-   agents and did not extend the same treatment to UTD assets.
-
-   Suggested resolution: extend plan step 3 with a pre-`Process` check
-   using `orchestration.IsUTDValid(fields)`; on false, write
-   `No content available` to stderr, leave stdout empty, and return a
-   non-zero exit, matching the agent path. Add a test case to plan
-   step 5 covering an empty-source UTD asset (analogous to the existing
-   "Empty-content behaviour" entry, but for UTD rather than agents).
-
-   Plan step 5 lists three tests that require a real TTY on stdin:
-   the no-argument TTY prompt, the selection menu landing on stderr, and the
-   TTY-stdin/piped-stdout pipe-cleanliness assertion added by Issue 1. The
-   codebase's `isTerminal` (`root.go:159`) only returns true when stdin is an
-   `*os.File` whose fd is a TTY, and the existing test suite contains no
-   pseudo-TTY helpers or `/dev/tty` usage (no `pty`, `creack/pty`, `openpty`
-   matches anywhere). Every existing `show`/`resolve` test asserts the non-TTY
-   branch, so an implementer copying established patterns has no template for
-   the TTY branch. Without direction, they will either skip these tests —
-   leaving Requirement 5's headline guarantee (pipe-clean stdout with a TTY
-   stdin) unverified — or introduce a new test dependency mid-feature.
-
-   Resolution: Option A — the three TTY-gated e2e tests are dropped from plan
-   step 5. Coverage shifts to a unit-level wiring check asserting that `read`
-   passes `cmd.ErrOrStderr()` to `promptSearchQuery` and emits the short-query
-   fallback on stderr. `promptSearchQuery` and the selection helper in
-   `cross_resolve.go` are already internally testable with an arbitrary writer,
-   so a unit test proves the writer-routing contract without needing a real
-   TTY. The CI suite stays pty-free; if future interactive surface area grows,
-   revisit with `creack/pty` (Option C) as a deliberate investment.
+None outstanding. Prior review pass identified five issues (writer wiring for
+TTY prompts, TTY-test precedent, UTD empty-source guard, error-framing for
+empty content, working-directory specification); all have been folded into
+Requirements, the Implementation Plan, and Implementation Guidance above.
