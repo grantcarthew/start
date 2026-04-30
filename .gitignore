@@ -8,11 +8,6 @@
 # AI and Documentation Files
 
 # Reference Directories
-context/*
-!context/README.md
-!context/docs/
-context/docs/*
-!context/docs/README.md
 start-assets/
 
 # Go Binary Output
