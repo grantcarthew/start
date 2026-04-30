@@ -29,7 +29,6 @@ func runPrompt(cmd *cobra.Command, args []string) error {
 	customText := ""
 	if len(args) > 0 {
 		arg := args[0]
-		// Check if argument is a file path (per DR-038)
 		if orchestration.IsFilePath(arg) {
 			content, err := orchestration.ReadFilePath(arg)
 			if err != nil {
@@ -55,7 +54,6 @@ func runPrompt(cmd *cobra.Command, args []string) error {
 
 	flags := getFlags(cmd)
 
-	// Per DR-014: required contexts only, no defaults
 	selection := orchestration.ContextSelection{
 		IncludeRequired: true,
 		IncludeDefaults: false,

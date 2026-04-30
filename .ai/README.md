@@ -1,6 +1,6 @@
 # .ai Directory
 
-AI agent working files for Documentation Driven Development.
+AI agent working files.
 
 - `projects/` - Project documents
 - `design/` - Technical standards and reference documents

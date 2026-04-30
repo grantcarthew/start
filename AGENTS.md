@@ -99,13 +99,13 @@ start prompt                    # Compose and preview a prompt
 
 ### Resolution Logic
 
-Asset resolution follows a three-tier strategy (DR-041, DR-015):
+Asset resolution follows a three-tier strategy:
 
 1. Exact match against installed config names
 2. Exact match against CUE Central Registry index
 3. Substring search across installed assets
 
-File paths (starting with `./`, `/`, or `~`) bypass search entirely (DR-038).
+File paths (starting with `./`, `/`, or `~`) bypass search entirely.
 
 CUE config lookup pattern:
 ```go

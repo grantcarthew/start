@@ -495,7 +495,7 @@ func printExecutionInfo(w io.Writer, agent orchestration.Agent, model, modelSour
 	_, _ = fmt.Fprintf(w, "Starting %s - awaiting response...\n", agent.Name)
 }
 
-// printDryRunSummary prints the dry-run summary per DR-016.
+// printDryRunSummary prints the dry-run summary.
 func printDryRunSummary(w io.Writer, agent orchestration.Agent, model, modelSource string, result orchestration.ComposeResult, dir string) {
 	printHeader(w, "Dry Run - Agent Not Executed")
 	printSeparator(w)

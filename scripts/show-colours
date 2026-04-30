@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # show-colours - Display standard ANSI terminal colours for development reference.
-# See DR-042 for the project's terminal colour standard.
+# See .ai/design/terminal-colour-standard.md for the project's terminal colour standard.
 
 set -euo pipefail
 
@@ -41,8 +41,8 @@ for name in "${order[@]}"; do
 done
 
 echo ""
-echo "Project Colour Assignments (DR-042)"
-echo "===================================="
+echo "Project Colour Assignments"
+echo "=========================="
 echo ""
 echo "  Message types:"
 printf "  ${colours[Red]}%-14s${R} %s\n" "Red" "Errors"
