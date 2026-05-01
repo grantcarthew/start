@@ -13,6 +13,7 @@ start find <query>...              # Alias for search
 start config [verb] [args]         # Manage configuration
 start assets [verb] [args]         # Manage registry assets
 start show [query]                 # Show resolved content
+start read [name]                  # Output asset content to stdout
 start doctor                       # Diagnose installation and configuration
 start completion bash|zsh|fish     # Output shell completion script
 ```
@@ -82,6 +83,23 @@ Distinction from `config info`:
 
 - `start config info <query>` — raw stored config fields (name, file path, tags, command template)
 - `start show <query>` — resolved content after global+local merge, file read, command execution
+
+## start read
+
+```
+start read [name]    # Search by name, write resolved content to stdout
+```
+
+Cross-category resolution (same as `start show`) with interactive selection on ambiguity. Stdout receives only asset content; selection menus, registry progress, auto-install notices, and `--verbose` metadata are written to stderr so output remains pipe-clean.
+
+UTD assets (roles, contexts, tasks) are template-resolved: file contents are read, prompts are rendered, and commands are executed. Source priority is `file > prompt > command`. Agent assets emit the command template with `{{.bin}}` and `{{.model}}` substituted; runtime placeholders (`{{.prompt}}`, `{{.role}}`, `{{.role_file}}`) remain. The `--model` flag, when set, overrides the agent's `default_model` for the `{{.model}}` substitution.
+
+For UTD assets carrying both `file` and `prompt`, `read` outputs the file. The agent execution path renders the prompt and injects the file via `{{.file_contents}}`, so for these mixed-field assets the `read` output will not match what the agent receives — use `start show` to inspect the prompt.
+
+Distinction from `show`:
+
+- `start show <query>` — verbose dump with metadata, decorations, and CUE definition
+- `start read <name>` — pure asset content for piping or preview
 
 ## Parent Command Defaults
 

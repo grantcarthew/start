@@ -1,0 +1,261 @@
+package cli
+
+import (
+	"fmt"
+	"io"
+	"os"
+	"strings"
+
+	"cuelang.org/go/cue"
+	"github.com/grantcarthew/start/internal/config"
+	"github.com/grantcarthew/start/internal/orchestration"
+	"github.com/grantcarthew/start/internal/shell"
+	"github.com/spf13/cobra"
+)
+
+// addReadCommand registers the `start read` subcommand.
+func addReadCommand(parent *cobra.Command) {
+	readCmd := &cobra.Command{
+		Use:     "read [name]",
+		GroupID: "commands",
+		Short:   "Output asset content to stdout",
+		Long: `Output the resolved content of an asset to stdout for piping or preview.
+
+Searches across all categories (agents, roles, contexts, tasks) and writes the
+asset's content to stdout. UTD assets (roles, contexts, tasks) are template-
+resolved: file contents are read, prompts are rendered, and commands are
+executed. Agent assets emit the command template with static placeholders
+({{.bin}}, {{.model}}) substituted while runtime placeholders ({{.prompt}},
+{{.role}}, {{.role_file}}, {{.datetime}}) are left intact. The --model flag,
+when set, overrides the agent's default_model in the {{.model}} substitution.
+
+Source priority for UTD assets is file > prompt > command. When a UTD asset
+defines both file and prompt, read outputs the file. The agent execution path
+behaves differently: it renders the prompt and injects file contents via
+{{.file_contents}} or command output via {{.command_output}}. So for these
+mixed-field assets, read's output will not match what an agent receives —
+use 'start show' to inspect the prompt.
+
+Stdout receives only the asset content. Selection menus, registry progress,
+auto-install notices, and --verbose metadata are written to stderr so the
+output remains pipe-clean.`,
+		Args: cobra.MaximumNArgs(1),
+		RunE: runRead,
+	}
+
+	parent.AddCommand(readCmd)
+}
+
+// runRead resolves an asset and writes its content to stdout.
+func runRead(cmd *cobra.Command, args []string) error {
+	if shown, err := checkHelpArg(cmd, args); shown || err != nil {
+		return err
+	}
+
+	stdout := cmd.OutOrStdout()
+	stderr := cmd.ErrOrStderr()
+	stdin := cmd.InOrStdin()
+
+	query, err := readResolveQuery(args, stderr, stdin)
+	if err != nil {
+		return err
+	}
+	if query == "" {
+		return nil
+	}
+
+	flags := getFlags(cmd)
+	cfg, err := loadConfig(config.ScopeMerged)
+	if err != nil {
+		return err
+	}
+
+	// Construct the resolver with stderr in the stdout slot so registry fetch
+	// progress, auto-install notices, and selection menus do not corrupt the
+	// piped content on stdout. See cross_resolve.go's doc comment.
+	r := newResolver(cfg, flags, stderr, stderr, stdin)
+	match, err := resolveCrossCategory(query, r)
+	if err != nil {
+		return err
+	}
+
+	// Refresh the in-memory config after an auto-install so the freshly
+	// installed asset's CUE value is visible. Same pattern as start and task.
+	if r.didInstall {
+		workingDir, wdErr := os.Getwd()
+		if wdErr != nil {
+			return fmt.Errorf("getting working directory: %w", wdErr)
+		}
+		if err := r.reloadConfig(workingDir); err != nil {
+			return err
+		}
+		cfg = r.cfg
+	}
+
+	cat := showCategoryFor(match.Category)
+	if cat == nil {
+		return fmt.Errorf("unknown category %q", match.Category)
+	}
+
+	items := cfg.Value.LookupPath(cue.ParsePath(cat.key))
+	item := items.LookupPath(cue.MakePath(cue.Str(match.Name)))
+	if !item.Exists() {
+		return fmt.Errorf("%s %q not found", strings.ToLower(cat.itemType), match.Name)
+	}
+
+	if cat.itemType == "Agent" {
+		return readAgent(stdout, stderr, flags, r, match.Name, item)
+	}
+	return readUTD(stdout, stderr, flags, match.Name, cat.itemType, item)
+}
+
+// readResolveQuery returns the asset query, prompting interactively when no
+// argument was supplied. All prompts and warnings go to stderr to keep stdout
+// reserved for asset content (Requirement 5).
+func readResolveQuery(args []string, stderr io.Writer, stdin io.Reader) (string, error) {
+	if len(args) == 0 {
+		if !isTerminal(stdin) {
+			return "", fmt.Errorf("name required in non-interactive mode")
+		}
+		return promptSearchQuery(stderr, stdin)
+	}
+
+	query := args[0]
+	if len(query) >= 3 {
+		return query, nil
+	}
+	if !isTerminal(stdin) {
+		return "", fmt.Errorf("query must be at least 3 characters")
+	}
+	_, _ = fmt.Fprintln(stderr, "Query must be at least 3 characters")
+	return promptSearchQuery(stderr, stdin)
+}
+
+// readAgent writes the agent's command template (with {{.bin}} and {{.model}}
+// resolved) to stdout. Runtime placeholders are left intact.
+//
+// When --model is set, it is resolved via resolver.resolveModelName (exact,
+// then multi-term substring, then passthrough) to keep `read` consistent with
+// `start`'s rendering of the same flag.
+func readAgent(stdout, stderr io.Writer, flags *Flags, r *resolver, name string, item cue.Value) error {
+	cmdField := item.LookupPath(cue.ParsePath("command"))
+	command := ""
+	if cmdField.Exists() {
+		command, _ = cmdField.String()
+	}
+	if command == "" {
+		return fmt.Errorf("agent %q has no command (or empty command field)", name)
+	}
+
+	if flags.Verbose {
+		printReadVerbose(stderr, "Agent", name, item, "")
+	}
+
+	modelOverride := ""
+	if flags.Model != "" {
+		agent, err := orchestration.ExtractAgent(r.cfg.Value, name)
+		if err != nil {
+			return fmt.Errorf("loading agent %q for --model resolution: %w", name, err)
+		}
+		modelOverride = r.resolveModelName(flags.Model, agent)
+	}
+
+	rendered := partialFillAgentCommand(command, item, modelOverride)
+	_, _ = fmt.Fprint(stdout, ensureTrailingNewline(rendered))
+	return nil
+}
+
+// readUTD resolves a UTD asset and writes its content to stdout. Source
+// priority is file > prompt > command. The TemplateProcessor's intrinsic
+// priority is the inverse (prompt > file > command, see template.go); the
+// trim block below flips it by clearing higher-priority sources before Process
+// runs. Shell and Timeout are execution config and pass through untouched so a
+// command-source asset still honours its declared shell and timeout.
+func readUTD(stdout, stderr io.Writer, flags *Flags, name, itemType string, item cue.Value) error {
+	fields := orchestration.ExtractUTDFields(item)
+	if !orchestration.IsUTDValid(fields) {
+		return fmt.Errorf("asset %q has no content fields (expected one of: file, prompt, command)", name)
+	}
+
+	resolvedFile := ""
+	if fields.File != "" {
+		if strings.HasPrefix(fields.File, "@module/") {
+			origin := orchestration.ExtractOrigin(item)
+			if origin == "" {
+				return fmt.Errorf("asset %q has @module/ file path but no origin field", name)
+			}
+			resolved, err := orchestration.ResolveModulePath(fields.File, origin)
+			if err != nil {
+				return fmt.Errorf("resolving module path %s: %w", fields.File, err)
+			}
+			fields.File = resolved
+		}
+		// Expand ~/ and relative paths so verbose `Path:` reports the same
+		// location DefaultFileReader will read from. @module/ is already
+		// absolute by this point.
+		resolvedFile = fields.File
+		if expanded, expandErr := orchestration.ExpandFilePath(fields.File); expandErr == nil {
+			resolvedFile = expanded
+		}
+	}
+
+	// Source-priority dependency: see TemplateProcessor.Process in
+	// internal/orchestration/template.go. Process picks Prompt before File, so
+	// clearing Prompt when File is set is what makes read's file > prompt
+	// priority hold. Clearing Command in the file and prompt branches is
+	// deliberate side-effect suppression: it disables Process's lazy
+	// {{.command_output}} expansion (template.go: needsCommandOutput &&
+	// fields.Command != "") so `read` never shells out unless command is the
+	// primary source. Do not extend this trim to Shell or Timeout — they
+	// configure command execution and apply regardless of which source wins.
+	if fields.File != "" {
+		fields.Prompt = ""
+		fields.Command = ""
+	} else if fields.Prompt != "" {
+		fields.Command = ""
+	}
+
+	workingDir, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("getting working directory: %w", err)
+	}
+
+	if flags.Verbose {
+		printReadVerbose(stderr, itemType, name, item, resolvedFile)
+	}
+
+	fr := &orchestration.DefaultFileReader{}
+	sr := shell.NewRunner()
+	processor := orchestration.NewTemplateProcessor(fr, sr, workingDir)
+
+	result, err := processor.Process(fields, "")
+	if err != nil {
+		return err
+	}
+
+	_, _ = fmt.Fprint(stdout, ensureTrailingNewline(result.Content))
+	return nil
+}
+
+// printReadVerbose writes asset metadata to stderr ahead of the content. Used
+// when --verbose is set; stdout remains reserved for the asset content itself.
+func printReadVerbose(stderr io.Writer, itemType, name string, item cue.Value, resolvedFile string) {
+	_, _ = fmt.Fprintf(stderr, "Type: %s\n", itemType)
+	_, _ = fmt.Fprintf(stderr, "Name: %s\n", name)
+	if origin := orchestration.ExtractOrigin(item); origin != "" {
+		_, _ = fmt.Fprintf(stderr, "Origin: %s\n", origin)
+	}
+	if resolvedFile != "" {
+		_, _ = fmt.Fprintf(stderr, "Path: %s\n", resolvedFile)
+	}
+}
+
+// ensureTrailingNewline returns s with exactly one trailing newline. Empty
+// strings pass through. Used at every read write site so stdout is line-aligned
+// regardless of which asset source produced the content.
+func ensureTrailingNewline(s string) string {
+	if s == "" || strings.HasSuffix(s, "\n") {
+		return s
+	}
+	return s + "\n"
+}

@@ -451,7 +451,7 @@ func printVerboseDump(w io.Writer, r ShowResult) {
 	if fields.Command != "" {
 		cmd := fields.Command
 		if r.ItemType == "Agent" {
-			cmd = partialFillAgentCommand(cmd, r.Value)
+			cmd = partialFillAgentCommand(cmd, r.Value, "")
 		}
 		_, _ = fmt.Fprintln(w)
 		_, _ = fmt.Fprintf(w, "%s %s\n", label("Command:"), cmd)
@@ -554,15 +554,24 @@ func resolveShowFile(filePath, origin string) (resolvedPath, content string, err
 // placeholders in an agent command template with their resolved values.
 // Runtime placeholders ({{.prompt}}, {{.role}}, {{.role_file}}, {{.datetime}})
 // are left as-is since they are only known at execution time.
-func partialFillAgentCommand(command string, v cue.Value) string {
+//
+// modelOverride, when non-empty, replaces the agent's default_model — the
+// caller is expected to have already resolved it (e.g. via
+// resolver.resolveModelName for `read`) so that exact and substring matches
+// against the models map have been applied. With an empty override, the
+// agent's default_model is used. Both paths look the resolved key up in the
+// models map; unknown keys pass through as the literal id.
+func partialFillAgentCommand(command string, v cue.Value, modelOverride string) string {
 	bin := ""
 	if f := v.LookupPath(cue.ParsePath("bin")); f.Exists() {
 		bin, _ = f.String()
 	}
 
-	model := ""
-	if dm := v.LookupPath(cue.ParsePath("default_model")); dm.Exists() {
-		model, _ = dm.String()
+	model := modelOverride
+	if model == "" {
+		if dm := v.LookupPath(cue.ParsePath("default_model")); dm.Exists() {
+			model, _ = dm.String()
+		}
 	}
 	if model != "" {
 		if models := v.LookupPath(cue.ParsePath("models")); models.Exists() {
