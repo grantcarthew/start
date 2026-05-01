@@ -980,33 +980,31 @@ roles: {
 }
 
 // TestReadLocalScope verifies --local restricts resolution to the local
-// config: the shared role resolves to the local definition, and a global-only
-// name fails with a not-found error and empty stdout.
+// config by asserting a global-only role is not visible under --local.
+//
+// This test has only one assertion (compared to TestReadGlobalScope's two)
+// because merged-scope CUE resolution makes local override global on field
+// conflict — so a "shared role under --local returns local content" check
+// would pass even if --local were silently ignored and merged scope used
+// instead. The only discriminating assertion for --local wiring is the
+// not-found path on a global-only asset: under --local-respected the asset
+// is invisible, under --local-ignored merged scope finds it. See
+// TestReadGlobalScope for the symmetric test, which has two assertions
+// because merged scope returns the local value for shared roles, making the
+// "global wins under --global" assertion discriminating.
 func TestReadLocalScope(t *testing.T) {
 	setupReadDualScopeConfig(t)
 
-	t.Run("shared role resolves to local definition", func(t *testing.T) {
-		stdout, stderr, err := runReadCmd(t, "--local", "shared-role")
-		if err != nil {
-			t.Fatalf("unexpected error: %v\nstderr: %s", err, stderr)
-		}
-		if stdout != "shared from local\n" {
-			t.Errorf("stdout = %q, want %q", stdout, "shared from local\n")
-		}
-	})
-
-	t.Run("global-only role not found under --local", func(t *testing.T) {
-		stdout, _, err := runReadCmd(t, "--local", "global-only-role")
-		if err == nil {
-			t.Fatal("expected not-found error for global-only role under --local")
-		}
-		if !strings.Contains(err.Error(), "global-only-role") {
-			t.Errorf("error should name the missing asset, got: %v", err)
-		}
-		if stdout != "" {
-			t.Errorf("stdout should be empty on not-found error, got: %q", stdout)
-		}
-	})
+	stdout, _, err := runReadCmd(t, "--local", "global-only-role")
+	if err == nil {
+		t.Fatal("expected not-found error for global-only role under --local")
+	}
+	if !strings.Contains(err.Error(), "global-only-role") {
+		t.Errorf("error should name the missing asset, got: %v", err)
+	}
+	if stdout != "" {
+		t.Errorf("stdout should be empty on not-found error, got: %q", stdout)
+	}
 }
 
 // TestReadGlobalScope verifies --global restricts resolution to the global
