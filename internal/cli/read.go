@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"cuelang.org/go/cue"
-	"github.com/grantcarthew/start/internal/config"
 	"github.com/grantcarthew/start/internal/orchestration"
 	"github.com/grantcarthew/start/internal/shell"
 	"github.com/spf13/cobra"
@@ -38,10 +37,16 @@ use 'start show' to inspect the prompt.
 
 Stdout receives only the asset content. Selection menus, registry progress,
 auto-install notices, and --verbose metadata are written to stderr so the
-output remains pipe-clean.`,
+output remains pipe-clean.
+
+Use --global to restrict resolution to the global config (~/.config/start/) or
+--local to restrict to the local config (./.start/). These flags are mutually
+exclusive; omitting both resolves against the merged configuration.`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: runRead,
 	}
+
+	readCmd.PersistentFlags().Bool("global", false, "Read from global scope only")
 
 	parent.AddCommand(readCmd)
 }
@@ -65,7 +70,11 @@ func runRead(cmd *cobra.Command, args []string) error {
 	}
 
 	flags := getFlags(cmd)
-	cfg, err := loadConfig(config.ScopeMerged)
+	scope, err := showScopeFromCmd(cmd)
+	if err != nil {
+		return err
+	}
+	cfg, err := loadConfig(scope)
 	if err != nil {
 		return err
 	}

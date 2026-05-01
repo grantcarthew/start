@@ -440,8 +440,12 @@ func TestReadResolveQueryRoutesToStderr(t *testing.T) {
 	})
 }
 
-// TestReadCommandHelp verifies `start read help` prints the command help and
-// that the help text includes the file > prompt > command priority warning.
+// TestReadCommandHelp verifies `start read help` prints the command help,
+// that the help text includes the file > prompt > command priority warning,
+// and that both scope flags (--local from root, --global from read itself)
+// are documented in the rendered usage. The flag assertions guard against
+// silent removal of the read-command --global flag and silent loss of the
+// inherited root --local flag from the rendered help.
 // No config isolation is needed: `help` short-circuits in checkHelpArg before
 // any config is loaded.
 func TestReadCommandHelp(t *testing.T) {
@@ -449,7 +453,7 @@ func TestReadCommandHelp(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	for _, want := range []string{"read", "stdout", "file > prompt > command", "start show"} {
+	for _, want := range []string{"read", "stdout", "file > prompt > command", "start show", "--global", "--local"} {
 		if !strings.Contains(stdout, want) {
 			t.Errorf("help output missing %q\ngot: %s", want, stdout)
 		}
@@ -898,5 +902,157 @@ func TestReadVerboseTildePathExpanded(t *testing.T) {
 	}
 	if strings.Contains(stderrStr, "Path: ~/tilde-role.md") {
 		t.Errorf("stderr should not contain the unexpanded literal path, got: %s", stderrStr)
+	}
+}
+
+// setupReadDualScopeConfig writes a global config at $HOME/.config/start/ and
+// a local config at ./.start/. Both define a "shared-role" with distinct
+// content so --local vs --global resolution can be told apart; each scope also
+// defines a scope-only role to exercise the not-found path of the other scope.
+// Mirrors TestReadMergedScopeFindsGlobalAndLocal's environment setup.
+func setupReadDualScopeConfig(t *testing.T) string {
+	t.Helper()
+
+	dir := t.TempDir()
+
+	// Not-found lookups fall through to the registry, which writes read-only
+	// files into HOME/.cache/cue. Re-chmod before TempDir cleanup so the
+	// teardown unlink calls can succeed.
+	t.Cleanup(func() {
+		_ = filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return nil
+			}
+			if info.IsDir() {
+				return os.Chmod(path, 0o755)
+			}
+			return os.Chmod(path, 0o644)
+		})
+	})
+
+	globalStartDir := filepath.Join(dir, ".config", "start")
+	if err := os.MkdirAll(globalStartDir, 0o755); err != nil {
+		t.Fatalf("creating global config dir: %v", err)
+	}
+	globalCueConfig := `
+roles: {
+	"global-only-role": {
+		description: "Lives only in global config"
+		prompt:      "from global"
+	}
+	"shared-role": {
+		description: "Defined in both scopes"
+		prompt:      "shared from global"
+	}
+}
+`
+	if err := os.WriteFile(filepath.Join(globalStartDir, "settings.cue"), []byte(globalCueConfig), 0o644); err != nil {
+		t.Fatalf("writing global config: %v", err)
+	}
+
+	localStartDir := filepath.Join(dir, ".start")
+	if err := os.MkdirAll(localStartDir, 0o755); err != nil {
+		t.Fatalf("creating local config dir: %v", err)
+	}
+	localCueConfig := `
+roles: {
+	"local-only-role": {
+		description: "Lives only in local config"
+		prompt:      "from local"
+	}
+	"shared-role": {
+		description: "Defined in both scopes"
+		prompt:      "shared from local"
+	}
+}
+`
+	if err := os.WriteFile(filepath.Join(localStartDir, "settings.cue"), []byte(localCueConfig), 0o644); err != nil {
+		t.Fatalf("writing local config: %v", err)
+	}
+
+	// globalConfigDir prefers XDG_CONFIG_HOME over $HOME/.config. Force the
+	// $HOME/.config branch so this test is deterministic regardless of the
+	// caller's environment.
+	t.Setenv("XDG_CONFIG_HOME", "")
+	t.Setenv("HOME", dir)
+	chdir(t, dir)
+	return dir
+}
+
+// TestReadLocalScope verifies --local restricts resolution to the local
+// config: the shared role resolves to the local definition, and a global-only
+// name fails with a not-found error and empty stdout.
+func TestReadLocalScope(t *testing.T) {
+	setupReadDualScopeConfig(t)
+
+	t.Run("shared role resolves to local definition", func(t *testing.T) {
+		stdout, stderr, err := runReadCmd(t, "--local", "shared-role")
+		if err != nil {
+			t.Fatalf("unexpected error: %v\nstderr: %s", err, stderr)
+		}
+		if stdout != "shared from local\n" {
+			t.Errorf("stdout = %q, want %q", stdout, "shared from local\n")
+		}
+	})
+
+	t.Run("global-only role not found under --local", func(t *testing.T) {
+		stdout, _, err := runReadCmd(t, "--local", "global-only-role")
+		if err == nil {
+			t.Fatal("expected not-found error for global-only role under --local")
+		}
+		if !strings.Contains(err.Error(), "global-only-role") {
+			t.Errorf("error should name the missing asset, got: %v", err)
+		}
+		if stdout != "" {
+			t.Errorf("stdout should be empty on not-found error, got: %q", stdout)
+		}
+	})
+}
+
+// TestReadGlobalScope verifies --global restricts resolution to the global
+// config: the shared role resolves to the global definition, and a local-only
+// name fails with a not-found error and empty stdout.
+func TestReadGlobalScope(t *testing.T) {
+	setupReadDualScopeConfig(t)
+
+	t.Run("shared role resolves to global definition", func(t *testing.T) {
+		stdout, stderr, err := runReadCmd(t, "--global", "shared-role")
+		if err != nil {
+			t.Fatalf("unexpected error: %v\nstderr: %s", err, stderr)
+		}
+		if stdout != "shared from global\n" {
+			t.Errorf("stdout = %q, want %q", stdout, "shared from global\n")
+		}
+	})
+
+	t.Run("local-only role not found under --global", func(t *testing.T) {
+		stdout, _, err := runReadCmd(t, "--global", "local-only-role")
+		if err == nil {
+			t.Fatal("expected not-found error for local-only role under --global")
+		}
+		if !strings.Contains(err.Error(), "local-only-role") {
+			t.Errorf("error should name the missing asset, got: %v", err)
+		}
+		if stdout != "" {
+			t.Errorf("stdout should be empty on not-found error, got: %q", stdout)
+		}
+	})
+}
+
+// TestReadLocalAndGlobalMutuallyExclusive verifies that passing both --local
+// and --global returns the same mutual-exclusion error as `start show` and
+// writes nothing to stdout. No fixture is required: showScopeFromCmd errors
+// before runRead reaches loadConfig, so the cwd and HOME contents are
+// irrelevant on this path.
+func TestReadLocalAndGlobalMutuallyExclusive(t *testing.T) {
+	stdout, _, err := runReadCmd(t, "--local", "--global", "any-name")
+	if err == nil {
+		t.Fatal("expected mutual-exclusion error when both --local and --global are set")
+	}
+	if !strings.Contains(err.Error(), "--local and --global are mutually exclusive") {
+		t.Errorf("error should match show's mutual-exclusion text, got: %v", err)
+	}
+	if stdout != "" {
+		t.Errorf("stdout should be empty on mutual-exclusion error, got: %q", stdout)
 	}
 }
