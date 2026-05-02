@@ -216,7 +216,7 @@ settings: {
 
 func TestPromptCommand_RequiredContextsOnly(t *testing.T) {
 	// This test verifies that prompt command includes required contexts
-	// but excludes default contexts (per DR-014)
+	// but excludes default contexts.
 	tmpDir := t.TempDir()
 
 	// Isolate from global config

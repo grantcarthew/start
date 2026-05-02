@@ -150,7 +150,6 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 
 	debugf(stderr, flags, dbgTask, "Searching for task %q", taskName)
 
-	// Check if taskName is a file path (per DR-038)
 	var taskResult orchestration.ProcessResult
 	var resolvedName string
 	if orchestration.IsFilePath(taskName) {
@@ -167,7 +166,7 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 		taskResult.FileRead = true
 		resolvedName = taskName // Display file path as task name
 	} else {
-		// Per DR-015: Unified task resolution - two-phase approach.
+		// Unified task resolution - two-phase approach.
 
 		// Phase 1: Full exact name in installed config - unambiguous, no registry needed.
 		// Skip when tags filter is active so Phase 2 applies the tag filter correctly.
@@ -326,7 +325,7 @@ func executeTask(stdout, stderr io.Writer, stdin io.Reader, flags *Flags, taskNa
 		debugf(stderr, flags, dbgRole, "Selected %q (--role flag)", flags.Role)
 	}
 
-	// Per DR-015: required contexts only for tasks
+	// Tasks load required contexts only.
 	selection := orchestration.ContextSelection{
 		IncludeRequired: true,
 		IncludeDefaults: false,
@@ -676,12 +675,17 @@ func installTaskFromRegistry(stdout io.Writer, flags *Flags, client *registry.Cl
 	configDir := paths.Global
 
 	// Install the asset
-	if err := assets.InstallAsset(ctx, client, index, result, configDir); err != nil {
+	version, err := assets.InstallAsset(ctx, client, index, result, configDir)
+	if err != nil {
 		return err
 	}
 
 	if !flags.Quiet {
-		_, _ = fmt.Fprintf(stdout, "Installed %s to global config\n\n", result.Name)
+		if version != "" {
+			_, _ = fmt.Fprintf(stdout, "Installed %s@%s to global config\n\n", result.Name, version)
+		} else {
+			_, _ = fmt.Fprintf(stdout, "Installed %s to global config\n\n", result.Name)
+		}
 	}
 
 	return nil

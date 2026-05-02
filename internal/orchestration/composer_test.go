@@ -366,7 +366,6 @@ func TestComposer_ComposeWithRole(t *testing.T) {
 	})
 
 	t.Run("explicit nonexistent role returns error", func(t *testing.T) {
-		// Per DR-039: explicit --role with missing file always errors
 		_, err := composer.ComposeWithRole(cfg, ContextSelection{IncludeRequired: true}, "nonexistent", "")
 		if err == nil {
 			t.Error("expected error for explicit nonexistent role")

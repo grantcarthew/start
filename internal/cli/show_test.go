@@ -1173,3 +1173,44 @@ func TestDeriveCacheDir(t *testing.T) {
 		}
 	})
 }
+
+// TestNotifyScopeWidenedIfLocal pins the conditions under which the notice
+// fires. The message itself carries grep-able text that scripted callers may
+// use to detect silent --local widening; the test asserts both presence of
+// that text in positive cases and absence in negative cases.
+func TestNotifyScopeWidenedIfLocal(t *testing.T) {
+	t.Parallel()
+
+	const wantText = "--local widened to merged scope"
+
+	cases := []struct {
+		name       string
+		flags      *Flags
+		didInstall bool
+		wantNotice bool
+	}{
+		{"local + install -> notice", &Flags{Local: true}, true, true},
+		{"local + no install -> no notice", &Flags{Local: true}, false, false},
+		{"no flag + install -> no notice", &Flags{}, true, false},
+		{"local + install + quiet -> no notice", &Flags{Local: true, Quiet: true}, true, false},
+		{"global + install -> no notice", &Flags{}, true, false},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			buf := new(bytes.Buffer)
+			notifyScopeWidenedIfLocal(buf, tc.flags, tc.didInstall)
+			got := buf.String()
+			if tc.wantNotice {
+				if !strings.Contains(got, wantText) {
+					t.Errorf("expected notice containing %q, got %q", wantText, got)
+				}
+			} else {
+				if got != "" {
+					t.Errorf("expected no output, got %q", got)
+				}
+			}
+		})
+	}
+}

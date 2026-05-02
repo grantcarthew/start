@@ -11,7 +11,6 @@ import (
 	"golang.org/x/term"
 )
 
-// Colour definitions per DR-042
 var (
 	ColorError     = color.New(color.FgRed)
 	ColorWarning   = color.New(color.FgYellow)

@@ -32,7 +32,6 @@ var (
 	repoURL    = "https://github.com/grantcarthew/start"
 )
 
-// versionTemplate is the custom version output format per DR-033
 var versionTemplate = fmt.Sprintf(`start version %s
 %s
 %s/issues/new
@@ -108,6 +107,7 @@ Examples:
 
 	// Add subcommands
 	addShowCommand(cmd)
+	addReadCommand(cmd)
 	addPromptCommand(cmd)
 	addTaskCommand(cmd)
 	addAssetsCommand(cmd)
@@ -125,7 +125,7 @@ Examples:
 // Execute runs the root command. This is the main entry point for the CLI.
 func Execute() error {
 	if runtime.GOOS == "windows" {
-		return fmt.Errorf("start does not support Windows (see DR-006 for platform scope)")
+		return fmt.Errorf("start does not support Windows")
 	}
 	return NewRootCmd().Execute()
 }

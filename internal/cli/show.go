@@ -1,19 +1,17 @@
 package cli
 
 import (
-	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"unicode"
 	"unicode/utf8"
 
 	"cuelang.org/go/cue"
 	cueformat "cuelang.org/go/cue/format"
-	"github.com/grantcarthew/start/internal/assets"
 	"github.com/grantcarthew/start/internal/config"
 	internalcue "github.com/grantcarthew/start/internal/cue"
 	"github.com/grantcarthew/start/internal/orchestration"
@@ -74,7 +72,11 @@ With an argument, searches across all categories and displays a verbose dump.
 
 Use --global to restrict output to the global config (~/.config/start/) or
 --local to restrict to the local config (./.start/). These flags are mutually
-exclusive; omitting both shows the effective merged configuration.`,
+exclusive; omitting both shows the effective merged configuration.
+
+Auto-installed assets always land in global config; the post-install lookup
+widens to merged scope so a --local invocation can still see the new asset.
+To inspect strictly within --local, ensure the asset is already installed.`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: runShow,
 	}
@@ -247,214 +249,30 @@ func runShowSearch(cmd *cobra.Command, name string) error {
 		return err
 	}
 
-	// Step 1: Exact match in installed config across all categories
-	var exactMatches []AssetMatch
-	var ambiguousMatches []AssetMatch
-	for _, cat := range showCategories {
-		resolved, err := findExactInstalledName(cfg.Value, cat.key, name)
-		if err != nil {
-			// Ambiguous short name within one category — collect all matches
-			// for interactive selection instead of erroring out.
-			matches, searchErr := searchInstalled(cfg.Value, cat.key, cat.category, name)
-			if searchErr != nil {
-				return searchErr
-			}
-			ambiguousMatches = append(ambiguousMatches, matches...)
-			continue
-		}
-		if resolved != "" {
-			exactMatches = append(exactMatches, AssetMatch{
-				Name:     resolved,
-				Category: cat.category,
-				Source:   AssetSourceInstalled,
-				Score:    100,
-			})
-		}
-	}
-
-	if len(ambiguousMatches) > 0 {
-		allMatches := make([]AssetMatch, 0, len(exactMatches)+len(ambiguousMatches))
-		allMatches = append(allMatches, exactMatches...)
-		allMatches = append(allMatches, ambiguousMatches...)
-		return promptShowSelection(w, stdin, scope, allMatches, name, nil)
-	}
-
-	if len(exactMatches) == 1 {
-		// Before returning the single exact match, check if a substring search
-		// finds additional matches. If so, fall through to show a selection list
-		// rather than silently picking the exact match. See task.go for the same
-		// pattern applied to task resolution.
-		var moreMatches bool
-		for _, cat := range showCategories {
-			matches, err := searchInstalled(cfg.Value, cat.key, cat.category, name)
-			if err != nil {
-				continue
-			}
-			if len(matches) > 1 {
-				moreMatches = true
-				break
-			}
-		}
-		if !moreMatches {
-			cat := showCategoryFor(exactMatches[0].Category)
-			return showVerboseItem(w, exactMatches[0].Name, scope, cat.key, cat.itemType)
-		}
-	}
-	if len(exactMatches) > 1 {
-		return promptShowSelection(w, stdin, scope, exactMatches, name, nil)
-	}
-
-	// Step 2: Substring search in installed config
-	var installedMatches []AssetMatch
-	for _, cat := range showCategories {
-		matches, err := searchInstalled(cfg.Value, cat.key, cat.category, name)
-		if err != nil {
-			continue
-		}
-		installedMatches = append(installedMatches, matches...)
-	}
-
-	if len(installedMatches) == 1 {
-		cat := showCategoryFor(installedMatches[0].Category)
-		return showVerboseItem(w, installedMatches[0].Name, scope, cat.key, cat.itemType)
-	}
-
-	// Step 3: Registry search
 	r := newResolver(cfg, flags, w, stderr, stdin)
-	index, _, _ := r.ensureIndex()
-
-	// Exact registry match (only when no installed matches)
-	if len(installedMatches) == 0 && index != nil {
-		for _, cat := range showCategories {
-			entries := registryEntries(index, cat.category)
-			if entries == nil {
-				continue
-			}
-			result, err := findExactInRegistry(entries, cat.category, name)
-			if err != nil {
-				return err
-			}
-			if result != nil {
-				if err := r.autoInstall(r.client, *result); err != nil {
-					return err
-				}
-				// After install, use merged scope to see the new item
-				return showVerboseItem(w, result.Name, config.ScopeMerged, cat.key, cat.itemType)
-			}
-		}
-	}
-
-	// Combined search across installed + registry
-	var registryMatches []AssetMatch
-	if index != nil {
-		for _, cat := range showCategories {
-			entries := registryEntries(index, cat.category)
-			if entries == nil {
-				continue
-			}
-			regMatches, err := searchRegistryCategory(entries, cat.category, name)
-			if err != nil {
-				continue
-			}
-			registryMatches = append(registryMatches, regMatches...)
-		}
-	}
-
-	allMatches := mergeAssetMatches(installedMatches, registryMatches)
-
-	switch len(allMatches) {
-	case 0:
-		return fmt.Errorf("no matches found for %q", name)
-	case 1:
-		return displayShowMatch(w, scope, allMatches[0], r)
-	default:
-		return promptShowSelection(w, stdin, scope, allMatches, name, r)
-	}
-}
-
-// displayShowMatch handles auto-install (if needed) and displays a verbose dump.
-func displayShowMatch(w io.Writer, scope config.Scope, m AssetMatch, r *resolver) error {
-	cat := showCategoryFor(m.Category)
-	if m.Source == AssetSourceRegistry && r != nil {
-		if err := r.autoInstall(r.client, assets.SearchResult{
-			Category: m.Category,
-			Name:     m.Name,
-			Entry:    m.Entry,
-		}); err != nil {
-			return err
-		}
-		// After install, use merged scope to see the new item
-		return showVerboseItem(w, m.Name, config.ScopeMerged, cat.key, cat.itemType)
-	}
-	return showVerboseItem(w, m.Name, scope, cat.key, cat.itemType)
-}
-
-// promptShowSelection handles interactive selection from multiple cross-category matches.
-func promptShowSelection(w io.Writer, stdin io.Reader, scope config.Scope, matches []AssetMatch, query string, r *resolver) error {
-	isTTY := isTerminal(stdin)
-
-	if !isTTY {
-		var names []string
-		for _, m := range matches {
-			names = append(names, m.Category+"/"+m.Name)
-		}
-		return fmt.Errorf("ambiguous name %q matches: %s\nSpecify exact name or run interactively",
-			query, strings.Join(names, ", "))
-	}
-
-	displayCount := len(matches)
-	if displayCount > maxAssetResults {
-		displayCount = maxAssetResults
-	}
-
-	_, _ = fmt.Fprintf(w, "Found %d matches for %q:\n\n", len(matches), query)
-
-	// Find longest display name for alignment
-	maxDisplayLen := 0
-	for i := 0; i < displayCount; i++ {
-		display := matches[i].Category + "/" + matches[i].Name
-		if len(display) > maxDisplayLen {
-			maxDisplayLen = len(display)
-		}
-	}
-
-	for i := 0; i < displayCount; i++ {
-		m := matches[i]
-		display := m.Category + "/" + m.Name
-		padding := strings.Repeat(" ", maxDisplayLen-len(display)+2)
-		var sourceLabel string
-		if m.Source == AssetSourceInstalled {
-			sourceLabel = tui.ColorInstalled.Sprint(m.Source)
-		} else {
-			sourceLabel = tui.ColorRegistry.Sprint(m.Source)
-		}
-		_, _ = fmt.Fprintf(w, "  %2d. %s%s%s\n", i+1, display, padding, sourceLabel)
-	}
-
-	if displayCount < len(matches) {
-		_, _ = fmt.Fprintf(w, "\nShowing %d of %d matches. Refine search for more specific results.\n",
-			displayCount, len(matches))
-	}
-
-	_, _ = fmt.Fprintln(w)
-	_, _ = fmt.Fprintf(w, "Select %s: ", tui.Annotate("1-%d", displayCount))
-
-	reader := bufio.NewReader(stdin)
-	input, err := reader.ReadString('\n')
+	match, err := resolveCrossCategory(name, r)
 	if err != nil {
-		return fmt.Errorf("reading input: %w", err)
-	}
-	input = strings.TrimSpace(input)
-
-	// Try number
-	if choice, err := strconv.Atoi(input); err == nil {
-		if choice >= 1 && choice <= displayCount {
-			return displayShowMatch(w, scope, matches[choice-1], r)
-		}
-		return fmt.Errorf("invalid selection: %s (choose 1-%d)", input, displayCount)
+		return err
 	}
 
-	return fmt.Errorf("invalid selection: %s", input)
+	// effectiveScope widens to merged after auto-install regardless of the
+	// user's original --local/--global flag. autoInstall always writes to
+	// global config (resolve.go's autoInstall), so merged is the smallest
+	// scope guaranteed to see the new asset. Under --global the lookup
+	// result is identical (asset only exists in global, merged is a
+	// superset); under --local the widening is required for the lookup to
+	// succeed and is signalled to the user via notifyScopeWidenedIfLocal.
+	effectiveScope := scope
+	if r.didInstall {
+		effectiveScope = config.ScopeMerged
+		notifyScopeWidenedIfLocal(stderr, flags, r.didInstall)
+	}
+
+	cat := showCategoryFor(match.Category)
+	if cat == nil {
+		return fmt.Errorf("unknown category %q", match.Category)
+	}
+	return showVerboseItem(w, match.Name, effectiveScope, cat.key, cat.itemType)
 }
 
 // showVerboseItem prepares and displays a verbose dump for a single item.
@@ -536,6 +354,30 @@ func prepareShow(name string, scope config.Scope, cueKey, itemType string) (Show
 	}, nil
 }
 
+// notifyScopeWidenedIfLocal emits a one-line stderr notice when an
+// auto-install during resolution silently widened --local resolution to
+// merged scope. Auto-installs always land in global config (resolve.go's
+// autoInstall), so a --local invocation that triggers an install will then
+// look the asset up against merged config — the user's literal --local
+// contract is bypassed. The notice gives scripted callers a grep-able
+// signal; no-op when --local was not set or when --quiet is in effect.
+// Called from runRead and runShowSearch after the post-install reload.
+//
+// The post-install reload also widens --global to merged scope, but no
+// notice fires for --global by design: the install lands in global config
+// (matching the user's requested scope), so the widened lookup is a no-op
+// in the common case. The corner case where it matters — a same-named
+// local asset whose fields unify with the freshly installed global one —
+// is narrow enough that routine notices on every --global install would
+// trade silent surprise for routine noise. If that edge case becomes a
+// real problem, narrow r.reloadConfig to honour the original scope.
+func notifyScopeWidenedIfLocal(stderr io.Writer, flags *Flags, didInstall bool) {
+	if !didInstall || !flags.Local || flags.Quiet {
+		return
+	}
+	printWarning(stderr, "--local widened to merged scope after registry install")
+}
+
 // showScopeFromCmd derives the config scope from show command flags.
 // Returns an error if --local and --global are both set.
 func showScopeFromCmd(cmd *cobra.Command) (config.Scope, error) {
@@ -577,7 +419,18 @@ func loadConfig(scope config.Scope) (internalcue.LoadResult, error) {
 	}
 
 	loader := internalcue.NewLoader()
-	return loader.Load(dirs)
+	result, err := loader.Load(dirs)
+	if err != nil && errors.Is(err, internalcue.ErrNoCUEFiles) {
+		switch scope {
+		case config.ScopeGlobal:
+			return result, fmt.Errorf("no global configuration found at %s (directory exists but contains no .cue files)", paths.Global)
+		case config.ScopeLocal:
+			return result, fmt.Errorf("no local configuration found at %s (directory exists but contains no .cue files)", paths.Local)
+		default:
+			return result, fmt.Errorf("no configuration found (checked %s and %s; directories exist but contain no .cue files)", paths.Global, paths.Local)
+		}
+	}
+	return result, err
 }
 
 // printVerboseDump writes the full verbose dump for a ShowResult.
@@ -646,7 +499,7 @@ func printVerboseDump(w io.Writer, r ShowResult) {
 	if fields.Command != "" {
 		cmd := fields.Command
 		if r.ItemType == "Agent" {
-			cmd = partialFillAgentCommand(cmd, r.Value)
+			cmd = partialFillAgentCommand(cmd, r.Value, "")
 		}
 		_, _ = fmt.Fprintln(w)
 		_, _ = fmt.Fprintf(w, "%s %s\n", label("Command:"), cmd)
@@ -749,15 +602,24 @@ func resolveShowFile(filePath, origin string) (resolvedPath, content string, err
 // placeholders in an agent command template with their resolved values.
 // Runtime placeholders ({{.prompt}}, {{.role}}, {{.role_file}}, {{.datetime}})
 // are left as-is since they are only known at execution time.
-func partialFillAgentCommand(command string, v cue.Value) string {
+//
+// modelOverride, when non-empty, replaces the agent's default_model — the
+// caller is expected to have already resolved it (e.g. via
+// resolver.resolveModelName for `read`) so that exact and substring matches
+// against the models map have been applied. With an empty override, the
+// agent's default_model is used. Both paths look the resolved key up in the
+// models map; unknown keys pass through as the literal id.
+func partialFillAgentCommand(command string, v cue.Value, modelOverride string) string {
 	bin := ""
 	if f := v.LookupPath(cue.ParsePath("bin")); f.Exists() {
 		bin, _ = f.String()
 	}
 
-	model := ""
-	if dm := v.LookupPath(cue.ParsePath("default_model")); dm.Exists() {
-		model, _ = dm.String()
+	model := modelOverride
+	if model == "" {
+		if dm := v.LookupPath(cue.ParsePath("default_model")); dm.Exists() {
+			model, _ = dm.String()
+		}
 	}
 	if model != "" {
 		if models := v.LookupPath(cue.ParsePath("models")); models.Exists() {

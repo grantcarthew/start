@@ -280,6 +280,89 @@ func TestTemplateProcessor_LazyEvaluation(t *testing.T) {
 	})
 }
 
+// TestTemplateProcessor_SourcePriorityContract pins the source-selection and
+// lazy-expansion behaviour that internal/cli/read.go's readUTD trim block
+// depends on. `start read` documents source priority as file > prompt >
+// command, but Process picks Prompt > File > Command. read.go flips the
+// order by clearing higher-priority fields before calling Process. If
+// Process's source-selection or its lazy {{.command_output}} expansion ever
+// changes, this test fails — at which point the maintainer must also revisit
+// readUTD's trim block in read.go (it relies on the behaviour pinned here to
+// implement file > prompt > command without shelling out).
+func TestTemplateProcessor_SourcePriorityContract(t *testing.T) {
+	t.Parallel()
+	tmpDir := t.TempDir()
+
+	filePath := filepath.Join(tmpDir, "src.md")
+	if err := os.WriteFile(filePath, []byte("FILE-CONTENT"), 0644); err != nil {
+		t.Fatalf("writing test file: %v", err)
+	}
+
+	t.Run("prompt wins over file when both set", func(t *testing.T) {
+		fields := UTDFields{
+			File:   filePath,
+			Prompt: "PROMPT-CONTENT",
+		}
+		processor := NewTemplateProcessor(nil, nil, tmpDir)
+		result, err := processor.Process(fields, "")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !strings.Contains(result.Content, "PROMPT-CONTENT") {
+			t.Errorf("expected prompt to win, got: %q", result.Content)
+		}
+		if strings.Contains(result.Content, "FILE-CONTENT") {
+			t.Errorf("file content should not appear when prompt wins, got: %q", result.Content)
+		}
+	})
+
+	t.Run("file wins over command when prompt empty", func(t *testing.T) {
+		runner := &mockShellRunner{output: "COMMAND-CONTENT"}
+		fields := UTDFields{
+			File:    filePath,
+			Command: "echo command",
+		}
+		processor := NewTemplateProcessor(nil, runner, tmpDir)
+		result, err := processor.Process(fields, "")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !strings.Contains(result.Content, "FILE-CONTENT") {
+			t.Errorf("expected file to win, got: %q", result.Content)
+		}
+		if len(runner.calls) > 0 {
+			t.Errorf("command should not run when file is the source and {{.command_output}} is not referenced, got %d calls", len(runner.calls))
+		}
+	})
+
+	t.Run("lazy command expansion fires for file source referencing command_output", func(t *testing.T) {
+		// readUTD's trim block (read.go: file != "" → fields.Command = "")
+		// deliberately neutralises this path. Pinning the underlying lazy
+		// expansion here means a refactor that removes it makes the trim
+		// block dead code and surfaces in this test.
+		cmdRefFile := filepath.Join(tmpDir, "cmd-ref.md")
+		if err := os.WriteFile(cmdRefFile, []byte("before {{.command_output}} after"), 0644); err != nil {
+			t.Fatalf("writing test file: %v", err)
+		}
+		runner := &mockShellRunner{output: "INJECTED"}
+		fields := UTDFields{
+			File:    cmdRefFile,
+			Command: "echo injected",
+		}
+		processor := NewTemplateProcessor(nil, runner, tmpDir)
+		result, err := processor.Process(fields, "")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !strings.Contains(result.Content, "INJECTED") {
+			t.Errorf("expected lazy command expansion to fire, got: %q", result.Content)
+		}
+		if len(runner.calls) != 1 {
+			t.Errorf("expected 1 shell call from lazy expansion, got %d", len(runner.calls))
+		}
+	})
+}
+
 func TestEnvTemplateData(t *testing.T) {
 	t.Parallel()
 	tmpDir := t.TempDir()

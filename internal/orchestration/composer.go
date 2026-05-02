@@ -179,7 +179,7 @@ func (c *Composer) Compose(cfg cue.Value, selection ContextSelection, customText
 		}
 	}
 
-	// Third: process user tags in order (per DR-038, order is preserved)
+	// Third: process user tags in order (order is preserved)
 	for _, tag := range selection.Tags {
 		if IsFilePath(tag) {
 			// File path - create context directly
@@ -286,7 +286,6 @@ func (c *Composer) ComposeWithRole(cfg cue.Value, selection ContextSelection, ro
 		var roleFilePath string
 		var roleErr error
 
-		// Check if roleName is a file path (per DR-038)
 		if IsFilePath(roleName) {
 			roleContent, roleErr = ReadFilePath(roleName)
 			if roleErr == nil {
@@ -326,7 +325,6 @@ func (c *Composer) ComposeWithRole(cfg cue.Value, selection ContextSelection, ro
 
 		if roleErr != nil {
 			if explicitRole {
-				// Explicit --role: always error (per DR-039)
 				return result, fmt.Errorf("role %q: %w", roleName, roleErr)
 			}
 			// Non-explicit role failure is shown in the role table via ○ status
@@ -436,7 +434,7 @@ func (c *Composer) resolveContext(cfg cue.Value, name string) (ProcessResult, er
 		return ProcessResult{}, fmt.Errorf("invalid UTD: no file, command, or prompt")
 	}
 
-	// Resolve @module/ paths using origin field (per DR-023)
+	// Resolve @module/ paths using origin field
 	if strings.HasPrefix(fields.File, "@module/") {
 		origin := ExtractOrigin(ctxVal)
 		if origin != "" {
@@ -496,7 +494,7 @@ func (c *Composer) resolveRole(cfg cue.Value, name string) (content, filePath st
 		return "", "", fmt.Errorf("invalid UTD: no file, command, or prompt")
 	}
 
-	// Resolve @module/ paths using origin field (per DR-023)
+	// Resolve @module/ paths using origin field
 	if strings.HasPrefix(fields.File, "@module/") {
 		origin := ExtractOrigin(roleVal)
 		if origin != "" {
@@ -508,7 +506,7 @@ func (c *Composer) resolveRole(cfg cue.Value, name string) (content, filePath st
 		}
 	}
 
-	// Track the file path for {{.role_file}} placeholder (per DR-020).
+	// Track the file path for {{.role_file}} placeholder.
 	// For file-based roles: use original path (cwd) or temp path (external).
 	// For inline roles: will write to temp after processing.
 	var roleFilePath string
@@ -677,7 +675,7 @@ func (c *Composer) ResolveTask(cfg cue.Value, name, instructions string) (Proces
 		return ProcessResult{}, fmt.Errorf("invalid UTD: no file, command, or prompt")
 	}
 
-	// Resolve @module/ paths using origin field (per DR-023)
+	// Resolve @module/ paths using origin field
 	if strings.HasPrefix(fields.File, "@module/") {
 		origin := ExtractOrigin(taskVal)
 		if origin != "" {
@@ -743,7 +741,7 @@ func ExtractOrigin(v cue.Value) string {
 }
 
 // ResolveModulePath resolves an @module/ path to the CUE cache location.
-// Per DR-023, @module/ paths resolve relative to the cached module directory.
+// @module/ paths resolve relative to the cached module directory.
 // The origin field contains the exact versioned module path (e.g.,
 // "github.com/.../task@v0.1.2") which maps directly to a cache directory.
 func ResolveModulePath(path, origin string) (string, error) {

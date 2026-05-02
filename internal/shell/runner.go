@@ -95,7 +95,6 @@ func (r *Runner) RunWithResult(command, workingDir, shell string, timeout int) (
 
 	// Unix-only: Create process group for clean termination on timeout.
 	// Allows killing child processes spawned by the command.
-	// Windows is not supported. See DR-006 for platform scope.
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
 	// Capture output

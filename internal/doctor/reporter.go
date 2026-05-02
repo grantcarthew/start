@@ -9,7 +9,7 @@ import (
 	"github.com/grantcarthew/start/internal/tui"
 )
 
-// fprintDim writes text with dim styling and cyan parenthetical delimiters per DR-042.
+// fprintDim writes text with dim styling and cyan parenthetical delimiters.
 // Text is dim, ( and ) are cyan. Byte iteration is safe here as delimiters are ASCII.
 func fprintDim(w io.Writer, s string) {
 	start := 0

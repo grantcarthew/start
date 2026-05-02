@@ -7,7 +7,7 @@ import (
 
 // DetectShell finds an available Unix shell in PATH.
 // Prefers bash, falls back to sh. Windows shells (cmd.exe, PowerShell)
-// are not supported. See DR-006 for platform scope.
+// are not supported.
 func DetectShell() (string, error) {
 	// Try bash first
 	if path, err := exec.LookPath("bash"); err == nil {

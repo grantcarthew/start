@@ -26,10 +26,12 @@ import (
 // references it by name. The index parameter enables role dependency resolution; pass nil
 // to skip role dependency handling.
 // If the asset is already installed, it is updated in place.
-func InstallAsset(ctx context.Context, client *registry.Client, index *registry.Index, selected SearchResult, configDir string) error {
+// Returns the resolved version that was installed (e.g., "v0.1.4"); empty if no version
+// could be parsed from the resolved module path.
+func InstallAsset(ctx context.Context, client *registry.Client, index *registry.Index, selected SearchResult, configDir string) (string, error) {
 	// Ensure config directory exists
 	if err := os.MkdirAll(configDir, 0755); err != nil {
-		return fmt.Errorf("creating config directory: %w", err)
+		return "", fmt.Errorf("creating config directory: %w", err)
 	}
 
 	// Fetch the actual asset module from registry
@@ -41,12 +43,12 @@ func InstallAsset(ctx context.Context, client *registry.Client, index *registry.
 	// Resolve to canonical version (e.g., @v0 -> @v0.0.1)
 	resolvedPath, err := client.ResolveLatestVersion(ctx, modulePath)
 	if err != nil {
-		return fmt.Errorf("resolving asset version: %w", err)
+		return "", fmt.Errorf("resolving asset version: %w", err)
 	}
 
 	fetchResult, err := client.Fetch(ctx, resolvedPath)
 	if err != nil {
-		return fmt.Errorf("fetching asset module: %w", err)
+		return "", fmt.Errorf("fetching asset module: %w", err)
 	}
 
 	// For tasks, detect and install role dependencies before extracting content.
@@ -55,7 +57,7 @@ func InstallAsset(ctx context.Context, client *registry.Client, index *registry.
 	if selected.Category == "tasks" && index != nil {
 		roleName, err = InstallRoleDependency(ctx, client, index, fetchResult.SourceDir, configDir)
 		if err != nil {
-			return fmt.Errorf("installing role dependency: %w", err)
+			return "", fmt.Errorf("installing role dependency: %w", err)
 		}
 	}
 
@@ -63,7 +65,7 @@ func InstallAsset(ctx context.Context, client *registry.Client, index *registry.
 	// Use resolved path with version for origin field (e.g., "github.com/.../task@v0.1.1")
 	assetContent, err := ExtractAssetContent(fetchResult.SourceDir, selected, client.Registry(), resolvedPath, roleName)
 	if err != nil {
-		return fmt.Errorf("extracting asset content: %w", err)
+		return "", fmt.Errorf("extracting asset content: %w", err)
 	}
 
 	// Determine the config file to write to based on asset type
@@ -72,10 +74,10 @@ func InstallAsset(ctx context.Context, client *registry.Client, index *registry.
 
 	// Write the asset to config
 	if err := writeAssetToConfig(configPath, selected, assetContent, modulePath); err != nil {
-		return fmt.Errorf("writing config: %w", err)
+		return "", fmt.Errorf("writing config: %w", err)
 	}
 
-	return nil
+	return VersionFromOrigin(resolvedPath), nil
 }
 
 // InstallRoleDependency checks if a task module has a role dependency and installs it
@@ -108,7 +110,7 @@ func InstallRoleDependency(ctx context.Context, client *registry.Client, index *
 		Entry:    roleEntry,
 	}
 
-	if err := InstallAsset(ctx, client, nil, roleResult, configDir); err != nil {
+	if _, err := InstallAsset(ctx, client, nil, roleResult, configDir); err != nil {
 		return "", fmt.Errorf("role %q: %w", roleName, err)
 	}
 

@@ -907,7 +907,7 @@ settings: {
 	}
 }
 
-// File path integration tests (DR-038)
+// File path integration tests
 
 func TestExecuteStart_FilePathRole(t *testing.T) {
 	tmpDir := setupStartTestConfig(t)
@@ -1151,7 +1151,7 @@ func TestExecuteStart_FilePathContextMissing(t *testing.T) {
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
 
-	// Missing context files should not cause fatal error (per DR-038: show ○ status)
+	// Missing context files should not cause fatal error; show ○ status instead.
 	err := executeStart(stdout, stderr, strings.NewReader(""), flags, selection, "")
 	if err != nil {
 		t.Fatalf("executeStart() should not fail for missing context file: %v", err)
@@ -1165,7 +1165,7 @@ func TestExecuteStart_FilePathContextMissing(t *testing.T) {
 	}
 }
 
-// Tests for unified task resolution (DR-015 update)
+// Tests for unified task resolution
 
 func TestTaskInMatches(t *testing.T) {
 	t.Parallel()

@@ -280,7 +280,6 @@ func (e *Executor) ExecuteCommand(cmdStr string, cfg ExecuteConfig) error {
 
 	// Unix-only: syscall.Exec replaces the current process with the agent.
 	// This is intentional - no wrapper overhead, clean process model.
-	// Windows is not supported. See DR-006 for platform scope.
 	args := []string{shell, "-c", cmdStr}
 	env := os.Environ()
 

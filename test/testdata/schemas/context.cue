@@ -10,8 +10,6 @@ package schemas
 // - required: true = always included, every command
 // - default: true = included in plain `start`, not with --context
 // - tags = included when matching tag requested via --context
-//
-// See: DR-008 for full selection and tagging behavior
 #Context: {
 	// Embed UTD pattern (file, command, prompt, shell, timeout)
 	#UTD

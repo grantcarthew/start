@@ -7,9 +7,9 @@ import (
 )
 
 // IsFilePath returns true if the string looks like a file path.
-// Detection rule per DR-038: strings starting with ./, /, or ~ are file paths.
-// Only bare ~ and ~/ are recognised as tilde paths; ~user syntax is not
-// supported by ExpandTilde and is therefore not treated as a file path.
+// Strings starting with ./, /, or ~ are file paths. Only bare ~ and ~/ are
+// recognised as tilde paths; ~user syntax is not supported by ExpandTilde
+// and is therefore not treated as a file path.
 func IsFilePath(s string) bool {
 	if s == "" {
 		return false

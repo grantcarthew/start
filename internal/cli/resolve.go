@@ -84,13 +84,12 @@ func (r *resolver) resolveRole(name string) (string, error) {
 // Phase 1: Exact full name match in installed config - use directly, no registry needed.
 // Phase 2: Collect all candidates from installed config and registry, merge, select.
 // displayType is the capitalised display name (e.g., "Agent", "Role").
-// When allowFilePath is true, file paths bypass resolution (per DR-038).
+// When allowFilePath is true, file paths bypass resolution.
 func (r *resolver) resolveAsset(name, cueKey, category, displayType string, allowFilePath bool) (string, error) {
 	if name == "" {
 		return "", nil
 	}
 
-	// File path bypass (per DR-038)
 	if allowFilePath && orchestration.IsFilePath(name) {
 		debugf(r.stderr, r.flags, dbgResolve, "%s %q: file path bypass", displayType, name)
 		return name, nil
@@ -619,12 +618,17 @@ func (r *resolver) autoInstall(client *registry.Client, result assets.SearchResu
 		_, _ = fmt.Fprintf(r.stdout, "Installing %s from registry...\n", result.Name)
 	}
 
-	if err := assets.InstallAsset(ctx, client, r.index, result, paths.Global); err != nil {
+	version, err := assets.InstallAsset(ctx, client, r.index, result, paths.Global)
+	if err != nil {
 		return err
 	}
 
 	if !r.flags.Quiet {
-		_, _ = fmt.Fprintf(r.stdout, "Installed %s to global config\n\n", result.Name)
+		if version != "" {
+			_, _ = fmt.Fprintf(r.stdout, "Installed %s@%s to global config\n\n", result.Name, version)
+		} else {
+			_, _ = fmt.Fprintf(r.stdout, "Installed %s to global config\n\n", result.Name)
+		}
 	}
 
 	debugf(r.stderr, r.flags, dbgResolve, "Auto-installed %s/%s", result.Category, result.Name)

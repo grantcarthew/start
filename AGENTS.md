@@ -45,6 +45,7 @@ start show agents               # Show installed agents
 start show roles                # Show installed roles
 start show tasks                # Show installed tasks
 start show contexts             # Show installed contexts
+start read <name>               # Output asset content to stdout (pipe-clean)
 start assets install <pkg>      # Install an asset package
 start config list               # List configuration entries
 start search <term>             # Search installed assets
@@ -99,13 +100,13 @@ start prompt                    # Compose and preview a prompt
 
 ### Resolution Logic
 
-Asset resolution follows a three-tier strategy (DR-041, DR-015):
+Asset resolution follows a three-tier strategy:
 
 1. Exact match against installed config names
 2. Exact match against CUE Central Registry index
 3. Substring search across installed assets
 
-File paths (starting with `./`, `/`, or `~`) bypass search entirely (DR-038).
+File paths (starting with `./`, `/`, or `~`) bypass search entirely.
 
 CUE config lookup pattern:
 ```go
@@ -163,19 +164,6 @@ CUE (Configure Unify Execute) provides:
 
 - CUE language: [cuelang.org](https://cuelang.org)
 - CUE Central Registry: [registry.cuelang.org](https://registry.cuelang.org)
-
-## Local Reference Repositories
-
-The `./context/` directory contains cloned source code and documentation for development reference. Each directory has an `INDEX.csv` file cataloging its contents:
-
-- `context/cue` - CUE language source code, standard library, and implementation
-  - Use for: Understanding CUE internals, package structure, encoding implementations, module system
-  - See: `context/cue/INDEX.csv` for detailed catalog
-
-- `context/cuelang-org` - CUE official documentation site
-  - Use for: Tutorials, concepts, how-to guides, language reference, examples
-  - See: `context/cuelang-org/INDEX.csv` for detailed catalog
-  - Key content: `content/docs/tutorial/` (especially working-with-a-custom-module-registry)
 
 ## Start Assets Repository
 
