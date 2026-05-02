@@ -71,7 +71,11 @@ With an argument, searches across all categories and displays a verbose dump.
 
 Use --global to restrict output to the global config (~/.config/start/) or
 --local to restrict to the local config (./.start/). These flags are mutually
-exclusive; omitting both shows the effective merged configuration.`,
+exclusive; omitting both shows the effective merged configuration.
+
+Auto-installed assets always land in global config; the post-install lookup
+widens to merged scope so a --local invocation can still see the new asset.
+To inspect strictly within --local, ensure the asset is already installed.`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: runShow,
 	}

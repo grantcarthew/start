@@ -56,14 +56,14 @@ func resolveCrossCategory(query string, r *resolver) (AssetMatch, error) {
 	}
 
 	if len(ambiguousMatches) > 0 {
+		// exactMatches and ambiguousMatches are installed-only by construction
+		// (Step 1 only). No installIfRegistry call is needed; if a future change
+		// mixes registry hits into either slice, restore the auto-install here.
 		allMatches := make([]AssetMatch, 0, len(exactMatches)+len(ambiguousMatches))
 		allMatches = append(allMatches, exactMatches...)
 		allMatches = append(allMatches, ambiguousMatches...)
 		selected, err := promptCrossCategorySelection(r, allMatches, query)
 		if err != nil {
-			return AssetMatch{}, err
-		}
-		if err := r.installIfRegistry(selected); err != nil {
 			return AssetMatch{}, err
 		}
 		return selected, nil
@@ -89,11 +89,11 @@ func resolveCrossCategory(query string, r *resolver) (AssetMatch, error) {
 		}
 	}
 	if len(exactMatches) > 1 {
+		// exactMatches is installed-only by construction (Step 1 only). No
+		// installIfRegistry call is needed; if a future change mixes registry
+		// hits into this slice, restore the auto-install here.
 		selected, err := promptCrossCategorySelection(r, exactMatches, query)
 		if err != nil {
-			return AssetMatch{}, err
-		}
-		if err := r.installIfRegistry(selected); err != nil {
 			return AssetMatch{}, err
 		}
 		return selected, nil

@@ -41,7 +41,11 @@ output remains pipe-clean.
 
 Use --global to restrict resolution to the global config (~/.config/start/) or
 --local to restrict to the local config (./.start/). These flags are mutually
-exclusive; omitting both resolves against the merged configuration.`,
+exclusive; omitting both resolves against the merged configuration.
+
+Auto-installed assets always land in global config; the post-install lookup
+widens to merged scope so a --local invocation can still see the new asset.
+To inspect strictly within --local, ensure the asset is already installed.`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: runRead,
 	}
@@ -157,7 +161,7 @@ func readAgent(stdout, stderr io.Writer, flags *Flags, r *resolver, name string,
 	}
 
 	if flags.Verbose {
-		printReadVerbose(stderr, "Agent", name, item, "")
+		printReadVerbose(stderr, "Agent", name, item, "", "")
 	}
 
 	modelOverride := ""
@@ -201,10 +205,14 @@ func readUTD(stdout, stderr io.Writer, flags *Flags, name, itemType string, item
 		}
 		// Expand ~/ and relative paths so verbose `Path:` reports the same
 		// location DefaultFileReader will read from. @module/ is already
-		// absolute by this point.
+		// absolute by this point. On expansion failure (rare), keep the
+		// literal config string and log the cause under --debug so the
+		// misleading verbose Path: line is diagnosable.
 		resolvedFile = fields.File
 		if expanded, expandErr := orchestration.ExpandFilePath(fields.File); expandErr == nil {
 			resolvedFile = expanded
+		} else {
+			debugf(stderr, flags, dbgResolve, "expanding %s: %v", fields.File, expandErr)
 		}
 	}
 
@@ -229,8 +237,12 @@ func readUTD(stdout, stderr io.Writer, flags *Flags, name, itemType string, item
 		return fmt.Errorf("getting working directory: %w", err)
 	}
 
+	// Verbose runs after the trim block so fields.Command reflects the
+	// chosen source (only set when command is the active source). No I/O
+	// happens between the trim and here, so the verbose lines are still
+	// emitted before any read or shell-out.
 	if flags.Verbose {
-		printReadVerbose(stderr, itemType, name, item, resolvedFile)
+		printReadVerbose(stderr, itemType, name, item, resolvedFile, fields.Command)
 	}
 
 	fr := &orchestration.DefaultFileReader{}
@@ -248,7 +260,9 @@ func readUTD(stdout, stderr io.Writer, flags *Flags, name, itemType string, item
 
 // printReadVerbose writes asset metadata to stderr ahead of the content. Used
 // when --verbose is set; stdout remains reserved for the asset content itself.
-func printReadVerbose(stderr io.Writer, itemType, name string, item cue.Value, resolvedFile string) {
+// command is set only when command is the active source — readUTD passes the
+// post-trim fields.Command, which is non-empty exactly when command was chosen.
+func printReadVerbose(stderr io.Writer, itemType, name string, item cue.Value, resolvedFile, command string) {
 	_, _ = fmt.Fprintf(stderr, "Type: %s\n", itemType)
 	_, _ = fmt.Fprintf(stderr, "Name: %s\n", name)
 	if origin := orchestration.ExtractOrigin(item); origin != "" {
@@ -256,6 +270,9 @@ func printReadVerbose(stderr io.Writer, itemType, name string, item cue.Value, r
 	}
 	if resolvedFile != "" {
 		_, _ = fmt.Fprintf(stderr, "Path: %s\n", resolvedFile)
+	}
+	if command != "" {
+		_, _ = fmt.Fprintf(stderr, "Command: %s\n", command)
 	}
 }
 

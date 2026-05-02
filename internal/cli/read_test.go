@@ -372,6 +372,36 @@ tasks: {
 	}
 }
 
+// TestReadVerboseCommandSource verifies --verbose against a command-source
+// UTD asset emits a "Command: ..." line on stderr alongside Type/Name.
+// Without this metadata, a user piping `start read --verbose ctx-cmd | ...`
+// has no visibility into the shell-out that produced stdout.
+func TestReadVerboseCommandSource(t *testing.T) {
+	setupReadTestConfig(t)
+
+	cmd := NewRootCmd()
+	stdout := new(bytes.Buffer)
+	stderr := new(bytes.Buffer)
+	cmd.SetOut(stdout)
+	cmd.SetErr(stderr)
+	cmd.SetIn(strings.NewReader(""))
+	cmd.SetArgs([]string{"--verbose", "read", "ctx-cmd"})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v\nstderr: %s", err, stderr.String())
+	}
+
+	stderrStr := stderr.String()
+	for _, want := range []string{"Type: Context", "Name: ctx-cmd", "Command: printf 'cmd-output'"} {
+		if !strings.Contains(stderrStr, want) {
+			t.Errorf("stderr missing %q\ngot: %s", want, stderrStr)
+		}
+	}
+	if stdout.String() != "cmd-output\n" {
+		t.Errorf("stdout = %q, want %q", stdout.String(), "cmd-output\n")
+	}
+}
+
 // TestReadVerboseToStderr verifies --verbose writes metadata to stderr without
 // polluting stdout.
 func TestReadVerboseToStderr(t *testing.T) {
@@ -453,7 +483,7 @@ func TestReadCommandHelp(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	for _, want := range []string{"read", "stdout", "file > prompt > command", "start show", "--global", "--local"} {
+	for _, want := range []string{"read", "stdout", "file > prompt > command", "start show", "--global", "--local", "Auto-installed"} {
 		if !strings.Contains(stdout, want) {
 			t.Errorf("help output missing %q\ngot: %s", want, stdout)
 		}
