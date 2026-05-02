@@ -1211,3 +1211,403 @@ func TestReadLocalAndGlobalMutuallyExclusive(t *testing.T) {
 		t.Errorf("stdout should be empty on mutual-exclusion error, got: %q", stdout)
 	}
 }
+
+// TestEnsureTrailingNewline pins the helper that normalises stdout line-
+// alignment. Empty content stays empty (so an empty asset does not produce a
+// stray blank line), an already-newline-terminated string is returned
+// unchanged (no double newline), and a string without a trailing newline
+// gets exactly one appended.
+func TestEnsureTrailingNewline(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{"empty stays empty", "", ""},
+		{"already newline-terminated", "abc\n", "abc\n"},
+		{"missing newline gets one", "abc", "abc\n"},
+		{"multi-line with newline preserved", "a\nb\nc\n", "a\nb\nc\n"},
+		{"multi-line without newline gets one", "a\nb\nc", "a\nb\nc\n"},
+		{"trailing whitespace untouched", "abc  ", "abc  \n"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := ensureTrailingNewline(tc.in)
+			if got != tc.want {
+				t.Errorf("ensureTrailingNewline(%q) = %q, want %q", tc.in, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestReadAgentVerboseMetadata covers the --verbose branch of readAgent
+// (read.go: 175-177). The agent has no file path or command source field,
+// so verbose stderr must contain Type and Name only — no Path or Command
+// line — and stdout is unaffected by the verbose flag.
+func TestReadAgentVerboseMetadata(t *testing.T) {
+	setupReadTestConfig(t)
+
+	cmd := NewRootCmd()
+	stdout := new(bytes.Buffer)
+	stderr := new(bytes.Buffer)
+	cmd.SetOut(stdout)
+	cmd.SetErr(stderr)
+	cmd.SetIn(strings.NewReader(""))
+	cmd.SetArgs([]string{"--verbose", "read", "claude"})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v\nstderr: %s", err, stderr.String())
+	}
+
+	stderrStr := stderr.String()
+	for _, want := range []string{"Type: Agent", "Name: claude"} {
+		if !strings.Contains(stderrStr, want) {
+			t.Errorf("stderr missing %q\ngot: %s", want, stderrStr)
+		}
+	}
+	for _, banned := range []string{"Path:", "Command:"} {
+		if strings.Contains(stderrStr, banned) {
+			t.Errorf("stderr should not contain %q for an agent (no UTD source fields), got: %s", banned, stderrStr)
+		}
+	}
+
+	stdoutStr := stdout.String()
+	for _, banned := range []string{"Type:", "Name:"} {
+		if strings.Contains(stdoutStr, banned) {
+			t.Errorf("stdout should not contain %q metadata, got: %q", banned, stdoutStr)
+		}
+	}
+	if !strings.Contains(stdoutStr, "claude --model claude-sonnet-4") {
+		t.Errorf("stdout should still contain the rendered agent command, got: %q", stdoutStr)
+	}
+}
+
+// TestReadAgentRuntimePlaceholdersIntact pins read's contract that runtime
+// placeholders are passed through verbatim: only {{.bin}} and {{.model}} are
+// resolved at read time. {{.prompt}}, {{.role}}, {{.role_file}}, and
+// {{.datetime}} are filled by the agent execution path (start/task), not
+// read, and must remain in the rendered command for downstream piping.
+func TestReadAgentRuntimePlaceholdersIntact(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("HOME", dir)
+	t.Setenv("XDG_CONFIG_HOME", dir)
+
+	startDir := filepath.Join(dir, ".start")
+	if err := os.MkdirAll(startDir, 0o755); err != nil {
+		t.Fatalf("creating .start dir: %v", err)
+	}
+
+	cueConfig := `
+agents: {
+	"runtime-rich": {
+		bin:           "rt"
+		command:       "{{.bin}} -m {{.model}} -r {{.role}} -rf {{.role_file}} -d {{.datetime}} -- {{.prompt}}"
+		description:   "Agent exercising every runtime placeholder"
+		default_model: "fast"
+		models: {
+			fast: "rt-fast-1"
+		}
+	}
+}
+`
+	if err := os.WriteFile(filepath.Join(startDir, "settings.cue"), []byte(cueConfig), 0o644); err != nil {
+		t.Fatalf("writing config: %v", err)
+	}
+	chdir(t, dir)
+
+	stdout, stderr, err := runReadCmd(t, "runtime-rich")
+	if err != nil {
+		t.Fatalf("unexpected error: %v\nstderr: %s", err, stderr)
+	}
+
+	for _, want := range []string{"rt -m rt-fast-1", "{{.role}}", "{{.role_file}}", "{{.datetime}}", "{{.prompt}}"} {
+		if !strings.Contains(stdout, want) {
+			t.Errorf("stdout missing %q\ngot: %q", want, stdout)
+		}
+	}
+	if !strings.HasSuffix(stdout, "\n") {
+		t.Errorf("stdout should end with a single newline, got: %q", stdout)
+	}
+}
+
+// TestReadStdoutContentOnly verifies the default-mode output contract: with
+// no --verbose, stdout receives only the rendered content — no Type/Name/
+// Path metadata — and stderr is empty on the happy path. The contract is
+// asserted independently from --quiet so a regression that drops the
+// verbose gate cannot pass merely because --quiet still suppresses it.
+func TestReadStdoutContentOnly(t *testing.T) {
+	setupReadTestConfig(t)
+
+	stdout, stderr, err := runReadCmd(t, "role-file")
+	if err != nil {
+		t.Fatalf("unexpected error: %v\nstderr: %s", err, stderr)
+	}
+	if stdout != "Role file contents.\n" {
+		t.Errorf("stdout = %q, want exactly %q (no metadata, no extra newlines)", stdout, "Role file contents.\n")
+	}
+	if stderr != "" {
+		t.Errorf("stderr should be empty on default-mode happy path, got: %q", stderr)
+	}
+}
+
+// TestReadAllSourceFieldsFileWins covers the explicit three-field case: an
+// asset declaring file, prompt, AND command must emit only the file
+// content. This pins the trim block (file != "" → both prompt and command
+// cleared) against a regression that handled only the two-field case.
+func TestReadAllSourceFieldsFileWins(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("HOME", dir)
+	t.Setenv("XDG_CONFIG_HOME", dir)
+
+	startDir := filepath.Join(dir, ".start")
+	if err := os.MkdirAll(startDir, 0o755); err != nil {
+		t.Fatalf("creating .start dir: %v", err)
+	}
+
+	roleFile := filepath.Join(dir, "all-three.md")
+	if err := os.WriteFile(roleFile, []byte("FILE-WINS"), 0o644); err != nil {
+		t.Fatalf("writing role file: %v", err)
+	}
+
+	cueConfig := `
+roles: {
+	"all-three": {
+		description: "File, prompt, and command — file must win"
+		file:        "` + roleFile + `"
+		prompt:      "PROMPT-LOSES"
+		command:     "echo COMMAND-LOSES"
+	}
+}
+`
+	if err := os.WriteFile(filepath.Join(startDir, "settings.cue"), []byte(cueConfig), 0o644); err != nil {
+		t.Fatalf("writing config: %v", err)
+	}
+	chdir(t, dir)
+
+	stdout, stderr, err := runReadCmd(t, "all-three")
+	if err != nil {
+		t.Fatalf("unexpected error: %v\nstderr: %s", err, stderr)
+	}
+	if !strings.Contains(stdout, "FILE-WINS") {
+		t.Errorf("stdout should contain file content, got: %q", stdout)
+	}
+	for _, banned := range []string{"PROMPT-LOSES", "COMMAND-LOSES"} {
+		if strings.Contains(stdout, banned) {
+			t.Errorf("stdout must not contain %q when file is set, got: %q", banned, stdout)
+		}
+	}
+}
+
+// TestReadUTDFileMissingOnDisk covers the readUTD process error path
+// (read.go: 265-267). A file source that points at a non-existent file
+// must surface a descriptive error and leave stdout empty.
+func TestReadUTDFileMissingOnDisk(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("HOME", dir)
+	t.Setenv("XDG_CONFIG_HOME", dir)
+
+	startDir := filepath.Join(dir, ".start")
+	if err := os.MkdirAll(startDir, 0o755); err != nil {
+		t.Fatalf("creating .start dir: %v", err)
+	}
+
+	missing := filepath.Join(dir, "does-not-exist.md")
+	cueConfig := `
+roles: {
+	"role-missing-file": {
+		description: "File path that does not exist on disk"
+		file:        "` + missing + `"
+	}
+}
+`
+	if err := os.WriteFile(filepath.Join(startDir, "settings.cue"), []byte(cueConfig), 0o644); err != nil {
+		t.Fatalf("writing config: %v", err)
+	}
+	chdir(t, dir)
+
+	stdout, _, err := runReadCmd(t, "role-missing-file")
+	if err == nil {
+		t.Fatal("expected error when file source path does not exist")
+	}
+	if stdout != "" {
+		t.Errorf("stdout should be empty on file-read error, got: %q", stdout)
+	}
+}
+
+// TestReadUTDTaskPromptSource verifies a prompt-source task resolves and
+// renders. The fixture defines task-prompt, but no other test exercises a
+// task asset through read — this guards regressions where read silently
+// stops handling a category.
+func TestReadUTDTaskPromptSource(t *testing.T) {
+	setupReadTestConfig(t)
+
+	stdout, stderr, err := runReadCmd(t, "task-prompt")
+	if err != nil {
+		t.Fatalf("unexpected error: %v\nstderr: %s", err, stderr)
+	}
+	if stdout != "Task body\n" {
+		t.Errorf("stdout = %q, want %q", stdout, "Task body\n")
+	}
+}
+
+// TestReadUTDTaskCommandSource verifies a command-source task executes its
+// command and the output flows through ensureTrailingNewline. Companion to
+// TestReadUTDTaskPromptSource — together they confirm tasks are not a
+// dead category in the cross-resolver.
+func TestReadUTDTaskCommandSource(t *testing.T) {
+	setupReadTestConfig(t)
+
+	stdout, stderr, err := runReadCmd(t, "task-cmd")
+	if err != nil {
+		t.Fatalf("unexpected error: %v\nstderr: %s", err, stderr)
+	}
+	if stdout != "task-cmd-output\n" {
+		t.Errorf("stdout = %q, want %q", stdout, "task-cmd-output\n")
+	}
+}
+
+// TestReadUTDFileMultilineNoExtraNewline verifies that a multi-line file
+// already carrying a trailing newline is emitted verbatim — no extra blank
+// line appended by ensureTrailingNewline. A double-newline regression in
+// `start read foo | wc -l` would silently shift line counts for scripted
+// callers.
+func TestReadUTDFileMultilineNoExtraNewline(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("HOME", dir)
+	t.Setenv("XDG_CONFIG_HOME", dir)
+
+	startDir := filepath.Join(dir, ".start")
+	if err := os.MkdirAll(startDir, 0o755); err != nil {
+		t.Fatalf("creating .start dir: %v", err)
+	}
+
+	multi := filepath.Join(dir, "multi.md")
+	content := "line one\nline two\nline three\n"
+	if err := os.WriteFile(multi, []byte(content), 0o644); err != nil {
+		t.Fatalf("writing multi file: %v", err)
+	}
+
+	cueConfig := `
+roles: {
+	"role-multi": {
+		description: "Multi-line file with trailing newline"
+		file:        "` + multi + `"
+	}
+}
+`
+	if err := os.WriteFile(filepath.Join(startDir, "settings.cue"), []byte(cueConfig), 0o644); err != nil {
+		t.Fatalf("writing config: %v", err)
+	}
+	chdir(t, dir)
+
+	stdout, stderr, err := runReadCmd(t, "role-multi")
+	if err != nil {
+		t.Fatalf("unexpected error: %v\nstderr: %s", err, stderr)
+	}
+	if stdout != content {
+		t.Errorf("stdout = %q, want %q (no extra newline)", stdout, content)
+	}
+}
+
+// TestReadUTDPromptAddsTrailingNewline verifies that a prompt with no
+// trailing newline gets exactly one appended on the way to stdout. Pins the
+// "abc" → "abc\n" branch of ensureTrailingNewline through the full read
+// pipeline.
+func TestReadUTDPromptAddsTrailingNewline(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("HOME", dir)
+	t.Setenv("XDG_CONFIG_HOME", dir)
+
+	startDir := filepath.Join(dir, ".start")
+	if err := os.MkdirAll(startDir, 0o755); err != nil {
+		t.Fatalf("creating .start dir: %v", err)
+	}
+
+	cueConfig := `
+roles: {
+	"no-newline": {
+		description: "Prompt without trailing newline"
+		prompt:      "no-newline-here"
+	}
+}
+`
+	if err := os.WriteFile(filepath.Join(startDir, "settings.cue"), []byte(cueConfig), 0o644); err != nil {
+		t.Fatalf("writing config: %v", err)
+	}
+	chdir(t, dir)
+
+	stdout, stderr, err := runReadCmd(t, "no-newline")
+	if err != nil {
+		t.Fatalf("unexpected error: %v\nstderr: %s", err, stderr)
+	}
+	if stdout != "no-newline-here\n" {
+		t.Errorf("stdout = %q, want %q (exactly one trailing newline)", stdout, "no-newline-here\n")
+	}
+}
+
+// TestReadCrossCategoryFindsContext verifies a context asset is reachable
+// via the cross-category resolver. The other categories (agents, roles,
+// tasks) all have at least one direct read test; without this case a
+// regression dropping contexts from showCategories would only surface in
+// `show` tests.
+func TestReadCrossCategoryFindsContext(t *testing.T) {
+	setupReadTestConfig(t)
+
+	stdout, stderr, err := runReadCmd(t, "ctx-cmd")
+	if err != nil {
+		t.Fatalf("unexpected error: %v\nstderr: %s", err, stderr)
+	}
+	if stdout != "cmd-output\n" {
+		t.Errorf("stdout = %q, want %q", stdout, "cmd-output\n")
+	}
+}
+
+// TestReadAgentExplicitlyEmptyModelFlag verifies that an empty --model
+// value (e.g. `start --model "" read claude`) does not trigger
+// resolveModelName and the agent's default_model still wins. Regression
+// guard for a "treat empty string as override" bug — readAgent gates on
+// flags.Model != "" before invoking the resolver.
+func TestReadAgentExplicitlyEmptyModelFlag(t *testing.T) {
+	setupReadTestConfig(t)
+
+	cmd := NewRootCmd()
+	stdout := new(bytes.Buffer)
+	stderr := new(bytes.Buffer)
+	cmd.SetOut(stdout)
+	cmd.SetErr(stderr)
+	cmd.SetIn(strings.NewReader(""))
+	cmd.SetArgs([]string{"--model", "", "read", "claude"})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v\nstderr: %s", err, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "claude-sonnet-4") {
+		t.Errorf("empty --model should fall back to default_model, got: %q", stdout.String())
+	}
+}
+
+// TestReadDebugFlagDoesNotPolluteStdout verifies that --debug — which
+// emits diagnostic lines via debugf — never writes to stdout. The flag is
+// useful for diagnosing path-expansion failures (read.go: ExpandFilePath
+// debug branch) but stdout must remain pipe-clean regardless of verbosity.
+func TestReadDebugFlagDoesNotPolluteStdout(t *testing.T) {
+	setupReadTestConfig(t)
+
+	cmd := NewRootCmd()
+	stdout := new(bytes.Buffer)
+	stderr := new(bytes.Buffer)
+	cmd.SetOut(stdout)
+	cmd.SetErr(stderr)
+	cmd.SetIn(strings.NewReader(""))
+	cmd.SetArgs([]string{"--debug", "read", "role-file"})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v\nstderr: %s", err, stderr.String())
+	}
+	if stdout.String() != "Role file contents.\n" {
+		t.Errorf("stdout should contain only the file content under --debug, got: %q", stdout.String())
+	}
+}
