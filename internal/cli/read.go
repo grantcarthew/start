@@ -29,11 +29,12 @@ executed. Agent assets emit the command template with static placeholders
 when set, overrides the agent's default_model in the {{.model}} substitution.
 
 Source priority for UTD assets is file > prompt > command. When a UTD asset
-defines both file and prompt, read outputs the file. The agent execution path
-behaves differently: it renders the prompt and injects file contents via
-{{.file_contents}} or command output via {{.command_output}}. So for these
-mixed-field assets, read's output will not match what an agent receives —
-use 'start show' to inspect the prompt.
+defines both file and prompt, read outputs the file. During role/task/context
+rendering by 'start' or 'start task', behaviour differs: the prompt is rendered
+and file contents are injected via {{.file_contents}}, command output via
+{{.command_output}}. So for mixed-field assets, read's output will not match
+what 'start' renders into the agent prompt — use 'start show' to inspect the
+prompt.
 
 Stdout receives only the asset content. Selection menus, registry progress,
 auto-install notices, and --verbose metadata are written to stderr so the
@@ -94,6 +95,16 @@ func runRead(cmd *cobra.Command, args []string) error {
 
 	// Refresh the in-memory config after an auto-install so the freshly
 	// installed asset's CUE value is visible. Same pattern as start and task.
+	//
+	// reloadConfig always reloads in merged scope regardless of the user's
+	// original --local/--global flag. This is deliberate: autoInstall always
+	// writes to global config (resolve.go's autoInstall), so merged is the
+	// smallest scope guaranteed to see the new asset for any original scope.
+	// Under --global the result is identical (asset only exists in global,
+	// merged is a superset); under --local the widening is required for the
+	// lookup to succeed and is signalled to the user via
+	// notifyScopeWidenedIfLocal. A scope-aware reload would be a no-op
+	// distinction for --global today.
 	if r.didInstall {
 		workingDir, wdErr := os.Getwd()
 		if wdErr != nil {
@@ -103,6 +114,7 @@ func runRead(cmd *cobra.Command, args []string) error {
 			return err
 		}
 		cfg = r.cfg
+		notifyScopeWidenedIfLocal(stderr, flags, r.didInstall)
 	}
 
 	cat := showCategoryFor(match.Category)

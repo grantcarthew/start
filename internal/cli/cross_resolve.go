@@ -69,25 +69,6 @@ func resolveCrossCategory(query string, r *resolver) (AssetMatch, error) {
 		return selected, nil
 	}
 
-	if len(exactMatches) == 1 {
-		// Before returning the single exact match, check if a substring search
-		// finds additional matches. If so, fall through to show a selection list
-		// rather than silently picking the exact match.
-		var moreMatches bool
-		for _, cat := range showCategories {
-			matches, err := searchInstalled(r.cfg.Value, cat.key, cat.category, query)
-			if err != nil {
-				continue
-			}
-			if len(matches) > 1 {
-				moreMatches = true
-				break
-			}
-		}
-		if !moreMatches {
-			return exactMatches[0], nil
-		}
-	}
 	if len(exactMatches) > 1 {
 		// exactMatches is installed-only by construction (Step 1 only). No
 		// installIfRegistry call is needed; if a future change mixes registry
@@ -99,7 +80,11 @@ func resolveCrossCategory(query string, r *resolver) (AssetMatch, error) {
 		return selected, nil
 	}
 
-	// Step 2: Substring search in installed config.
+	// Step 2: Substring search in installed config. Computed once and reused
+	// for the single-exact-match disambiguation gate below and for the
+	// combined-search path further down. The exact match from Step 1, if any,
+	// also appears here as a self-substring — len(installedMatches) <= 1
+	// therefore means "no neighbours alongside the exact match".
 	var installedMatches []AssetMatch
 	for _, cat := range showCategories {
 		matches, err := searchInstalled(r.cfg.Value, cat.key, cat.category, query)
@@ -109,7 +94,16 @@ func resolveCrossCategory(query string, r *resolver) (AssetMatch, error) {
 		installedMatches = append(installedMatches, matches...)
 	}
 
-	if len(installedMatches) == 1 {
+	// Single exact match with no other installed neighbours (in any category)
+	// — return directly. Any neighbour, even a single substring hit in a
+	// different category, falls through to the combined-search prompt so the
+	// user can disambiguate rather than silently getting the exact match.
+	if len(exactMatches) == 1 && len(installedMatches) <= 1 {
+		return exactMatches[0], nil
+	}
+
+	// No exact match, single substring match — return directly.
+	if len(exactMatches) == 0 && len(installedMatches) == 1 {
 		return installedMatches[0], nil
 	}
 

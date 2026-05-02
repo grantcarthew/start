@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/spf13/cobra"
 )
 
 // setupReadTestConfig writes a CUE config covering each read code path.
@@ -71,6 +73,15 @@ func setupReadTestConfig(t *testing.T) string {
 		t.Fatalf("writing relative file: %v", err)
 	}
 
+	// File whose content references {{.command_output}}, paired with a non-empty
+	// command in CUE. Used to assert readUTD's trim block suppresses
+	// TemplateProcessor.Process's lazy command execution
+	// (template.go: needsCommandOutput && fields.Command != "").
+	fcCmdRefFile := filepath.Join(dir, "fc-cmd-ref.md")
+	if err := os.WriteFile(fcCmdRefFile, []byte("before {{.command_output}} after"), 0o644); err != nil {
+		t.Fatalf("writing fc-cmd-ref file: %v", err)
+	}
+
 	cueConfig := `
 agents: {
 	claude: {
@@ -127,6 +138,16 @@ roles: {
 		description: "File source with origin (verbose metadata)"
 		file:        "` + tracedFile + `"
 		origin:      "github.com/example/start-assets/roles/traced@v1.2.3"
+	}
+	"fc-cmd-ref": {
+		description: "File source whose content references {{.command_output}}; command must not run"
+		file:        "` + fcCmdRefFile + `"
+		command:     "echo SHOULD-NOT-APPEAR"
+	}
+	"pc-cmd-ref": {
+		description: "Prompt referencing {{.command_output}} with command; command must not run"
+		prompt:      "before {{.command_output}} after"
+		command:     "echo SHOULD-NOT-APPEAR"
 	}
 }
 
@@ -437,6 +458,39 @@ func TestReadVerboseToStderr(t *testing.T) {
 	}
 }
 
+// TestReadQuietSuppressesStderr verifies that --quiet leaves stdout holding
+// only the asset content with stderr empty. Three independent stderr-write
+// paths converge in runRead and read* helpers — autoInstall progress
+// (resolve.go), notifyScopeWidenedIfLocal (show.go), and printReadVerbose
+// (read.go) — and a regression in any single Quiet/Verbose gate would leak
+// metadata into a `start read --quiet | bar` pipeline. The autoInstall arm
+// of that contract is unit-tested in resolve.go's tests; the widen-notice
+// arm in TestNotifyScopeWidenedIfLocal. This test covers the verbose-path
+// gate and the integration shape (no flag combination produces stderr on the
+// happy path).
+func TestReadQuietSuppressesStderr(t *testing.T) {
+	setupReadTestConfig(t)
+
+	cmd := NewRootCmd()
+	stdout := new(bytes.Buffer)
+	stderr := new(bytes.Buffer)
+	cmd.SetOut(stdout)
+	cmd.SetErr(stderr)
+	cmd.SetIn(strings.NewReader(""))
+	cmd.SetArgs([]string{"--quiet", "read", "role-prompt"})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v\nstderr: %s", err, stderr.String())
+	}
+
+	if stderr.Len() != 0 {
+		t.Errorf("--quiet must leave stderr empty on happy path, got: %q", stderr.String())
+	}
+	if !strings.HasPrefix(stdout.String(), "Hello ") {
+		t.Errorf("stdout should carry rendered content, got: %q", stdout.String())
+	}
+}
+
 // TestReadResolveQueryRoutesToStderr asserts the wiring contract from the
 // implementation plan: `read` must invoke promptSearchQuery with stderr (not
 // stdout) and emit the short-query fallback to stderr. This keeps `start read
@@ -470,23 +524,43 @@ func TestReadResolveQueryRoutesToStderr(t *testing.T) {
 	})
 }
 
-// TestReadCommandHelp verifies `start read help` prints the command help,
-// that the help text includes the file > prompt > command priority warning,
-// and that both scope flags (--local from root, --global from read itself)
-// are documented in the rendered usage. The flag assertions guard against
-// silent removal of the read-command --global flag and silent loss of the
-// inherited root --local flag from the rendered help.
-// No config isolation is needed: `help` short-circuits in checkHelpArg before
-// any config is loaded.
+// TestReadCommandHelp verifies `start read help` prints the command help and
+// that the read command registers --global plus inherits --local from root.
+// Help-string assertions are limited to text that only lives in help (the
+// stdout-routing contract, the start-show pointer, the auto-install widening
+// note); flag presence is asserted via direct flag lookup so cosmetic
+// help-formatter changes (heading order, line wrapping, colour) cannot
+// false-fail it. Source priority is pinned by TestReadUTDFileWinsOverPrompt
+// and TestReadUTDPromptWinsOverCommand, so help wording is not the place to
+// re-assert it. No config isolation is needed: `help` short-circuits in
+// checkHelpArg before any config is loaded.
 func TestReadCommandHelp(t *testing.T) {
 	stdout, _, err := runReadCmd(t, "help")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	for _, want := range []string{"read", "stdout", "file > prompt > command", "start show", "--global", "--local", "Auto-installed"} {
+	for _, want := range []string{"read", "stdout", "start show", "Auto-installed"} {
 		if !strings.Contains(stdout, want) {
 			t.Errorf("help output missing %q\ngot: %s", want, stdout)
 		}
+	}
+
+	root := NewRootCmd()
+	var readCmd *cobra.Command
+	for _, c := range root.Commands() {
+		if c.Name() == "read" {
+			readCmd = c
+			break
+		}
+	}
+	if readCmd == nil {
+		t.Fatal("read command not registered on root")
+	}
+	if readCmd.Flag("global") == nil {
+		t.Error("read command missing --global flag")
+	}
+	if readCmd.Flag("local") == nil {
+		t.Error("read command missing inherited --local flag (expected via root persistent flags)")
 	}
 }
 
@@ -612,6 +686,59 @@ func TestReadShortQueryNonTTYEndToEnd(t *testing.T) {
 	// would clutter scripted callers' error output.
 	if strings.Contains(stderr, "Query must be at least 3 characters") {
 		t.Errorf("non-TTY path should not emit TTY re-prompt notice, stderr: %q", stderr)
+	}
+}
+
+// TestReadUTDFileSourceSuppressesCommand pins the safety property of
+// readUTD's source-priority trim block for the file branch. With both `file`
+// and `command` set, and the file's content referencing {{.command_output}},
+// the asset's command must not execute. TemplateProcessor.Process's lazy
+// {{.command_output}} expansion (template.go: needsCommandOutput &&
+// fields.Command != "") would otherwise shell out — readUTD's trim block
+// (read.go: file != "" → fields.Command = "") is what prevents it. If
+// Process's source-selection or lazy-eval semantics ever change so the trim
+// block stops protecting against this, this test fails. The companion
+// TestReadUTDFileWinsOverPrompt covers the externally observable behaviour
+// (file content wins) but not the no-shell-out invariant.
+func TestReadUTDFileSourceSuppressesCommand(t *testing.T) {
+	setupReadTestConfig(t)
+
+	stdout, stderr, err := runReadCmd(t, "fc-cmd-ref")
+	if err != nil {
+		t.Fatalf("unexpected error: %v\nstderr: %s", err, stderr)
+	}
+
+	if strings.Contains(stdout, "SHOULD-NOT-APPEAR") {
+		t.Errorf("command output leaked into file-source render — readUTD trim block did not suppress command execution\nstdout: %q\nstderr: %s", stdout, stderr)
+	}
+	for _, marker := range []string{"before", "after"} {
+		if !strings.Contains(stdout, marker) {
+			t.Errorf("file content marker %q missing from stdout: %q", marker, stdout)
+		}
+	}
+}
+
+// TestReadUTDPromptSourceSuppressesCommand is the prompt-branch counterpart
+// to TestReadUTDFileSourceSuppressesCommand. With `prompt` set and the prompt
+// referencing {{.command_output}} alongside a non-empty `command`, the
+// command must not execute. Guards the prompt-branch arm of readUTD's trim
+// block (read.go: prompt != "" → fields.Command = "") against the same
+// TemplateProcessor.Process lazy-eval regression.
+func TestReadUTDPromptSourceSuppressesCommand(t *testing.T) {
+	setupReadTestConfig(t)
+
+	stdout, stderr, err := runReadCmd(t, "pc-cmd-ref")
+	if err != nil {
+		t.Fatalf("unexpected error: %v\nstderr: %s", err, stderr)
+	}
+
+	if strings.Contains(stdout, "SHOULD-NOT-APPEAR") {
+		t.Errorf("command output leaked into prompt-source render — readUTD trim block did not suppress command execution\nstdout: %q\nstderr: %s", stdout, stderr)
+	}
+	for _, marker := range []string{"before", "after"} {
+		if !strings.Contains(stdout, marker) {
+			t.Errorf("prompt content marker %q missing from stdout: %q", marker, stdout)
+		}
 	}
 }
 

@@ -403,3 +403,42 @@ func TestResolveCrossCategory_MultipleExactAcrossCategoriesNonTTY(t *testing.T) 
 		t.Error("didInstall should remain false when ambiguous")
 	}
 }
+
+// TestResolveCrossCategory_ExactPlusCrossCategorySubstring verifies the bug
+// fix: when a single exact match coexists with a single substring match in a
+// *different* category, the resolver must surface a selection rather than
+// silently picking the exact match. Pre-fix, the per-category ambiguity gate
+// only triggered selection when one category had >1 substring hit, missing
+// cross-category neighbours entirely.
+func TestResolveCrossCategory_ExactPlusCrossCategorySubstring(t *testing.T) {
+	t.Parallel()
+
+	cfg := buildTestCfg(t, `{
+		agents: {
+			claude: {
+				bin: "claude"
+				command: "{{.bin}}"
+			}
+		}
+		roles: {
+			"claude-expert": {
+				prompt: "Claude expert role"
+			}
+		}
+	}`)
+
+	r := newTestResolver(cfg)
+	_, err := resolveCrossCategory("claude", r)
+	if err == nil {
+		t.Fatal("expected ambiguity error: exact agents/claude alongside roles/claude-expert should not silently pick the exact match")
+	}
+	if !strings.Contains(err.Error(), "ambiguous") {
+		t.Errorf("error = %q, want containing 'ambiguous'", err.Error())
+	}
+	if !strings.Contains(err.Error(), "agents/claude") {
+		t.Errorf("error should list the exact match entry: %v", err)
+	}
+	if !strings.Contains(err.Error(), "roles/claude-expert") {
+		t.Errorf("error should list the substring neighbour: %v", err)
+	}
+}

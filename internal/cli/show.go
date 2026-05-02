@@ -254,9 +254,17 @@ func runShowSearch(cmd *cobra.Command, name string) error {
 		return err
 	}
 
+	// effectiveScope widens to merged after auto-install regardless of the
+	// user's original --local/--global flag. autoInstall always writes to
+	// global config (resolve.go's autoInstall), so merged is the smallest
+	// scope guaranteed to see the new asset. Under --global the lookup
+	// result is identical (asset only exists in global, merged is a
+	// superset); under --local the widening is required for the lookup to
+	// succeed and is signalled to the user via notifyScopeWidenedIfLocal.
 	effectiveScope := scope
 	if r.didInstall {
 		effectiveScope = config.ScopeMerged
+		notifyScopeWidenedIfLocal(stderr, flags, r.didInstall)
 	}
 
 	cat := showCategoryFor(match.Category)
@@ -343,6 +351,21 @@ func prepareShow(name string, scope config.Scope, cueKey, itemType string) (Show
 		AllNames:   allNames,
 		ShowReason: showReason,
 	}, nil
+}
+
+// notifyScopeWidenedIfLocal emits a one-line stderr notice when an
+// auto-install during resolution silently widened --local resolution to
+// merged scope. Auto-installs always land in global config (resolve.go's
+// autoInstall), so a --local invocation that triggers an install will then
+// look the asset up against merged config — the user's literal --local
+// contract is bypassed. The notice gives scripted callers a grep-able
+// signal; no-op when --local was not set or when --quiet is in effect.
+// Called from runRead and runShowSearch after the post-install reload.
+func notifyScopeWidenedIfLocal(stderr io.Writer, flags *Flags, didInstall bool) {
+	if !didInstall || !flags.Local || flags.Quiet {
+		return
+	}
+	printWarning(stderr, "--local widened to merged scope after registry install")
 }
 
 // showScopeFromCmd derives the config scope from show command flags.
