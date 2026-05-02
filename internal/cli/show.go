@@ -361,6 +361,15 @@ func prepareShow(name string, scope config.Scope, cueKey, itemType string) (Show
 // contract is bypassed. The notice gives scripted callers a grep-able
 // signal; no-op when --local was not set or when --quiet is in effect.
 // Called from runRead and runShowSearch after the post-install reload.
+//
+// The post-install reload also widens --global to merged scope, but no
+// notice fires for --global by design: the install lands in global config
+// (matching the user's requested scope), so the widened lookup is a no-op
+// in the common case. The corner case where it matters — a same-named
+// local asset whose fields unify with the freshly installed global one —
+// is narrow enough that routine notices on every --global install would
+// trade silent surprise for routine noise. If that edge case becomes a
+// real problem, narrow r.reloadConfig to honour the original scope.
 func notifyScopeWidenedIfLocal(stderr io.Writer, flags *Flags, didInstall bool) {
 	if !didInstall || !flags.Local || flags.Quiet {
 		return
