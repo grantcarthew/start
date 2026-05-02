@@ -173,7 +173,7 @@ func readAgent(stdout, stderr io.Writer, flags *Flags, r *resolver, name string,
 	}
 
 	if flags.Verbose {
-		printReadVerbose(stderr, "Agent", name, item, "", "")
+		printReadVerbose(stderr, "Agent", name, item, "", "", false)
 	}
 
 	modelOverride := ""
@@ -203,8 +203,10 @@ func readUTD(stdout, stderr io.Writer, flags *Flags, name, itemType string, item
 	}
 
 	resolvedFile := ""
+	fromModuleCache := false
 	if fields.File != "" {
 		if strings.HasPrefix(fields.File, "@module/") {
+			fromModuleCache = true
 			origin := orchestration.ExtractOrigin(item)
 			if origin == "" {
 				return fmt.Errorf("asset %q has @module/ file path but no origin field", name)
@@ -215,8 +217,8 @@ func readUTD(stdout, stderr io.Writer, flags *Flags, name, itemType string, item
 			}
 			fields.File = resolved
 		}
-		// Expand ~/ and relative paths so verbose `Path:` reports the same
-		// location DefaultFileReader will read from. @module/ is already
+		// Expand ~/ and relative paths so verbose `Path:`/`Cache:` reports the
+		// same location DefaultFileReader will read from. @module/ is already
 		// absolute by this point. On expansion failure (rare), keep the
 		// literal config string and log the cause under --debug so the
 		// misleading verbose Path: line is diagnosable.
@@ -254,7 +256,7 @@ func readUTD(stdout, stderr io.Writer, flags *Flags, name, itemType string, item
 	// happens between the trim and here, so the verbose lines are still
 	// emitted before any read or shell-out.
 	if flags.Verbose {
-		printReadVerbose(stderr, itemType, name, item, resolvedFile, fields.Command)
+		printReadVerbose(stderr, itemType, name, item, resolvedFile, fields.Command, fromModuleCache)
 	}
 
 	fr := &orchestration.DefaultFileReader{}
@@ -274,14 +276,21 @@ func readUTD(stdout, stderr io.Writer, flags *Flags, name, itemType string, item
 // when --verbose is set; stdout remains reserved for the asset content itself.
 // command is set only when command is the active source — readUTD passes the
 // post-trim fields.Command, which is non-empty exactly when command was chosen.
-func printReadVerbose(stderr io.Writer, itemType, name string, item cue.Value, resolvedFile, command string) {
+// fromModuleCache labels the file location as `Cache:` (matching `start show`)
+// so users aren't misled into editing the CUE module cache; local-file assets
+// keep the `Path:` label so the user knows where the editable source lives.
+func printReadVerbose(stderr io.Writer, itemType, name string, item cue.Value, resolvedFile, command string, fromModuleCache bool) {
 	_, _ = fmt.Fprintf(stderr, "Type: %s\n", itemType)
 	_, _ = fmt.Fprintf(stderr, "Name: %s\n", name)
 	if origin := orchestration.ExtractOrigin(item); origin != "" {
 		_, _ = fmt.Fprintf(stderr, "Origin: %s\n", origin)
 	}
 	if resolvedFile != "" {
-		_, _ = fmt.Fprintf(stderr, "Path: %s\n", resolvedFile)
+		label := "Path"
+		if fromModuleCache {
+			label = "Cache"
+		}
+		_, _ = fmt.Fprintf(stderr, "%s: %s\n", label, resolvedFile)
 	}
 	if command != "" {
 		_, _ = fmt.Fprintf(stderr, "Command: %s\n", command)

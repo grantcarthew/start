@@ -2,7 +2,9 @@ package cli
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -194,17 +196,31 @@ func (r *resolver) installIfRegistry(match AssetMatch) error {
 // cross-category matches and returns the chosen match. In non-TTY mode it
 // returns an ambiguity error listing all matches as "category/name".
 func promptCrossCategorySelection(r *resolver, matches []AssetMatch, query string) (AssetMatch, error) {
+	sort.SliceStable(matches, func(i, j int) bool {
+		return matches[i].Category+"/"+matches[i].Name < matches[j].Category+"/"+matches[j].Name
+	})
+
 	w := r.stdout
 	stdin := r.stdin
 	isTTY := isTerminal(stdin)
 
 	if !isTTY {
-		var names []string
-		for _, m := range matches {
-			names = append(names, m.Category+"/"+m.Name)
+		shown := matches
+		truncated := false
+		if len(shown) > maxAssetResults {
+			shown = shown[:maxAssetResults]
+			truncated = true
 		}
-		return AssetMatch{}, fmt.Errorf("ambiguous name %q matches: %s\nSpecify exact name or run interactively",
-			query, strings.Join(names, ", "))
+		var b strings.Builder
+		fmt.Fprintf(&b, "ambiguous name %q matches:", query)
+		for _, m := range shown {
+			fmt.Fprintf(&b, "\n  %s/%s", m.Category, m.Name)
+		}
+		if truncated {
+			fmt.Fprintf(&b, "\n(showing %d of %d; refine search for more specific results)", len(shown), len(matches))
+		}
+		b.WriteString("\nSpecify exact name or run interactively")
+		return AssetMatch{}, errors.New(b.String())
 	}
 
 	displayCount := len(matches)

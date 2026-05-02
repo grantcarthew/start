@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -418,7 +419,18 @@ func loadConfig(scope config.Scope) (internalcue.LoadResult, error) {
 	}
 
 	loader := internalcue.NewLoader()
-	return loader.Load(dirs)
+	result, err := loader.Load(dirs)
+	if err != nil && errors.Is(err, internalcue.ErrNoCUEFiles) {
+		switch scope {
+		case config.ScopeGlobal:
+			return result, fmt.Errorf("no global configuration found at %s (directory exists but contains no .cue files)", paths.Global)
+		case config.ScopeLocal:
+			return result, fmt.Errorf("no local configuration found at %s (directory exists but contains no .cue files)", paths.Local)
+		default:
+			return result, fmt.Errorf("no configuration found (checked %s and %s; directories exist but contain no .cue files)", paths.Global, paths.Local)
+		}
+	}
+	return result, err
 }
 
 // printVerboseDump writes the full verbose dump for a ShowResult.

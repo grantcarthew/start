@@ -245,7 +245,8 @@ func installSingleAsset(ctx context.Context, w io.Writer, prog *tui.Progress, cl
 
 	// Install the asset
 	prog.Update("Fetching asset...")
-	if err := assets.InstallAsset(ctx, client, index, selected, configDir); err != nil {
+	version, err := assets.InstallAsset(ctx, client, index, selected, configDir)
+	if err != nil {
 		return err
 	}
 	prog.Done()
@@ -260,7 +261,11 @@ func installSingleAsset(ctx context.Context, w io.Writer, prog *tui.Progress, cl
 		if configFile == "" {
 			configFile = "settings.cue"
 		}
-		_, _ = fmt.Fprintf(w, "\nInstalled %s/%s to %s config\n", selected.Category, selected.Name, scopeName)
+		if version != "" {
+			_, _ = fmt.Fprintf(w, "\nInstalled %s/%s@%s to %s config\n", selected.Category, selected.Name, version, scopeName)
+		} else {
+			_, _ = fmt.Fprintf(w, "\nInstalled %s/%s to %s config\n", selected.Category, selected.Name, scopeName)
+		}
 		_, _ = fmt.Fprintf(w, "Config: %s/%s\n", configDir, configFile)
 	}
 

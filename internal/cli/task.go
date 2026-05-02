@@ -675,12 +675,17 @@ func installTaskFromRegistry(stdout io.Writer, flags *Flags, client *registry.Cl
 	configDir := paths.Global
 
 	// Install the asset
-	if err := assets.InstallAsset(ctx, client, index, result, configDir); err != nil {
+	version, err := assets.InstallAsset(ctx, client, index, result, configDir)
+	if err != nil {
 		return err
 	}
 
 	if !flags.Quiet {
-		_, _ = fmt.Fprintf(stdout, "Installed %s to global config\n\n", result.Name)
+		if version != "" {
+			_, _ = fmt.Fprintf(stdout, "Installed %s@%s to global config\n\n", result.Name, version)
+		} else {
+			_, _ = fmt.Fprintf(stdout, "Installed %s to global config\n\n", result.Name)
+		}
 	}
 
 	return nil

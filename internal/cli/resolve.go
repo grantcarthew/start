@@ -618,12 +618,17 @@ func (r *resolver) autoInstall(client *registry.Client, result assets.SearchResu
 		_, _ = fmt.Fprintf(r.stdout, "Installing %s from registry...\n", result.Name)
 	}
 
-	if err := assets.InstallAsset(ctx, client, r.index, result, paths.Global); err != nil {
+	version, err := assets.InstallAsset(ctx, client, r.index, result, paths.Global)
+	if err != nil {
 		return err
 	}
 
 	if !r.flags.Quiet {
-		_, _ = fmt.Fprintf(r.stdout, "Installed %s to global config\n\n", result.Name)
+		if version != "" {
+			_, _ = fmt.Fprintf(r.stdout, "Installed %s@%s to global config\n\n", result.Name, version)
+		} else {
+			_, _ = fmt.Fprintf(r.stdout, "Installed %s to global config\n\n", result.Name)
+		}
 	}
 
 	debugf(r.stderr, r.flags, dbgResolve, "Auto-installed %s/%s", result.Category, result.Name)
