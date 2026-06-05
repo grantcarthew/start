@@ -1,3 +1,19 @@
+> [!CAUTION]
+> # ⚠️ THIS REPOSITORY IS ARCHIVED — DO NOT USE ⚠️
+>
+> **`start` has moved to a new home: https://github.com/start-cli/start**
+>
+> This repository is **no longer maintained**. It will receive **no further
+> updates, bug fixes, or security patches**. The code here is **frozen and
+> obsolete**.
+>
+> 🚫 **Do not** clone, install, or depend on this repository.
+> 🚫 **Do not** open issues or pull requests here — they will not be actioned.
+>
+> 👉 **Go to the new repository instead: https://github.com/start-cli/start**
+
+---
+
 # start
 
 [![License: MPL 2.0](https://img.shields.io/badge/License-MPL_2.0-brightgreen.svg)](https://opensource.org/licenses/MPL-2.0)
